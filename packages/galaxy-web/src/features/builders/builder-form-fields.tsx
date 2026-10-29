@@ -1,7 +1,7 @@
 import {ReadingDetails,ReadingSummary} from "../../shared/reading/reading-details";
 import React from 'react';
 import {Button} from '@/components/ui/button';
-import {builderActionIds} from "../../../../galaxy-official/src/shared/builder-support-v2-schema.mjs";
+import {builderActionIds} from "../../../../galaxy-contracts/src/builder-support-v2-schema.mjs";
 import {builderActionName} from './builder-details';
 import {builderField as get,replaceBuilderField as replace,builderRows,builderLines,builderDateValue,builderDateSeconds,copyDeclarationCommon,newBuilderDeclaration,newSupportMapping} from './builder-authoring-state';
 import type {BuilderForms,BuilderSupport} from './builder-authoring-state';

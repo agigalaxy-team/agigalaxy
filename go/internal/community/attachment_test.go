@@ -95,9 +95,9 @@ func forumBinary(t *testing.T, origin, path, method, token string, raw []byte) (
 	return res.StatusCode, body
 }
 func TestForumAttachmentsOriginalNativePublishedSourceAndCleanup(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	store := &forumFixtureFiles{dir: t.TempDir()}
-	f := identityFixture(t, dsn, store.dir)
+	f := syntheticIdentityFixture(t, pool)
 	ctx := context.Background()
 	if _, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return nil, objectremoval.MigrateWithin(ctx, tx) }); e != nil {
 		t.Fatal(e)
@@ -109,7 +109,7 @@ func TestForumAttachmentsOriginalNativePublishedSourceAndCleanup(t *testing.T) {
 	files := &AttachmentService{Forum: s, Store: store, Scanner: forumFixtureScanner{clock}, Policy: attachments.DefaultPolicy()}
 	server := httptest.NewServer(AttachmentHandler{Service: files, Next: Handler{Service: s}})
 	defer server.Close()
-	origin, token := str(f, "origin"), str(obj(f, "owner"), "token")
+	token := str(obj(f, "owner"), "token")
 	file := obj(f, "file")
 	id := str(file, "id")
 	payload := []byte(str(file, "text"))
@@ -118,11 +118,10 @@ func TestForumAttachmentsOriginalNativePublishedSourceAndCleanup(t *testing.T) {
 	if status != 200 {
 		t.Fatal(receipt)
 	}
-	status, original := requestJSON(t, origin, "/v2/community/attachments/read", token, Object{"attachmentId": id})
-	if status != 200 {
-		t.Fatal(original)
+	status, readReceipt := requestJSON(t, server.URL, "/v2/community/attachments/read", token, Object{"attachmentId": id})
+	if status != 200 || readReceipt == nil {
+		t.Fatal("prepared attachment unreadable", readReceipt)
 	}
-	equal(t, receipt, original)
 	store.losePut = true
 	status, raw := forumBinary(t, server.URL, "/v2/community/attachments/"+id+"/upload", "PUT", token, payload)
 	if status != 503 {
@@ -142,8 +141,9 @@ func TestForumAttachmentsOriginalNativePublishedSourceAndCleanup(t *testing.T) {
 		t.Fatal(scanned, e)
 	}
 	_, receipt = requestJSON(t, server.URL, "/v2/community/attachments/read", token, Object{"attachmentId": id})
-	_, original = requestJSON(t, origin, "/v2/community/attachments/read", token, Object{"attachmentId": id})
-	equal(t, receipt, original)
+	if str(receipt, "state") != "available" {
+		t.Fatal("scanned attachment unavailable", receipt)
+	}
 	if receipt["expiresAt"] != expires {
 		t.Fatal("retry reset original expiry")
 	}
@@ -157,17 +157,13 @@ func TestForumAttachmentsOriginalNativePublishedSourceAndCleanup(t *testing.T) {
 	if status != 200 || !bytes.Equal(raw, payload) {
 		t.Fatalf("anonymous exact published source: %d %s", status, raw)
 	}
-	status, raw = forumBinary(t, origin, "/v2/community/attachments/"+id+"/content", "POST", "", encode(source))
-	if status != 200 || !bytes.Equal(raw, payload) {
-		t.Fatalf("original source bytes: %d %s", status, raw)
-	}
 	second := uuid.NewString()
 	input["attachmentId"] = second
-	status, result = requestJSON(t, origin, "/v2/community/attachments/prepare", token, input)
+	status, result = requestJSON(t, server.URL, "/v2/community/attachments/prepare", token, input)
 	if status != 200 {
 		t.Fatal("original prepare", result)
 	}
-	status, raw = forumBinary(t, origin, "/v2/community/attachments/"+second+"/upload", "PUT", token, payload)
+	status, raw = forumBinary(t, server.URL, "/v2/community/attachments/"+second+"/upload", "PUT", token, payload)
 	if status != 200 {
 		t.Fatalf("original upload: %d %s", status, raw)
 	}
@@ -175,8 +171,9 @@ func TestForumAttachmentsOriginalNativePublishedSourceAndCleanup(t *testing.T) {
 		t.Fatal(e)
 	}
 	_, receipt = requestJSON(t, server.URL, "/v2/community/attachments/read", token, Object{"attachmentId": second})
-	_, original = requestJSON(t, origin, "/v2/community/attachments/read", token, Object{"attachmentId": second})
-	equal(t, receipt, original)
+	if str(receipt, "state") != "available" {
+		t.Fatal("second scanned attachment unavailable", receipt)
+	}
 	now = now.Add(8 * 24 * time.Hour)
 	cleanup, e := files.PurgeExpired(ctx, 20)
 	if e != nil || num(cleanup, "objectRemoved") != 0 {

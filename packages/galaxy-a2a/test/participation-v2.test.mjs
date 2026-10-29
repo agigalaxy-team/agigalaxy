@@ -4,15 +4,14 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
+import { goDomainFixture } from './go-domain-fixture.mjs';
 import { createNativeA2aHostV2 } from '../src/hosts/host-flow-v2.mjs';
 import { hash } from '../src/storage/journal.mjs';
 import { sdkPeer } from './sdk-peer.mjs';
 
 test('actual Participation/Intervention uses exact Result receipts; revoked source stops future work without erasing acceptance', async t => {
-  const scopes = ['binding', 'consent', 'case-teaser', 'assistance'];
-  const f = await serviceFixture(scopes), p = await serviceFixture(scopes, f.db, { migrateDatabase: false });
-  t.after(() => f.db.close()); const peer = await sdkPeer(); t.after(() => peer.close());
+  const {owner:f,peer:p}=await goDomainFixture(t);
+  const peer=await sdkPeer();t.after(()=>peer.close());
   const directory = await mkdtemp(join(tmpdir(), 'galaxy-a2a-participation-')); t.after(() => rm(directory, { recursive: true, force: true }));
   const grant = (who, e, viewers = []) => who.authorize(e, 'case.teaser.publish', { objectId: e.eventId, viewers });
   const taskGrant = (who, e, viewers = []) => who.authorize(e, 'assistance.publish', { objectId: e.operationId ?? e.eventId, viewers });

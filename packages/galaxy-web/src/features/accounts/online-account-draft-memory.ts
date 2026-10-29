@@ -1,4 +1,4 @@
-import {accountAvatarKey} from "../../../../galaxy-official/src/shared/account-profile-presentation.mjs";
+import {accountAvatarKey} from "../../../../galaxy-contracts/src/account-profile-presentation.mjs";
 
 type PublicQuery={enabled:boolean;scope:'profile'|'profile-and-public-posts';showLinkedIds:boolean;showExternalCredentials:boolean};
 export type AccountSettingsDraftSource={accountId:string;revision:number;displayName:string|null;avatarKey?:string|null;bio?:string;publicQuery:PublicQuery;archiveRetentionDays:number|null};

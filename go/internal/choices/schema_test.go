@@ -1,9 +1,9 @@
 package choices
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jstext"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -51,18 +51,15 @@ func TestOriginalChoiceSchemasAndIntent(t *testing.T) {
 	duplicate := objectMust(raw)
 	object(duplicate["content"])["candidateRefs"] = []any{ref, ref}
 	appendInput("put", duplicate)
-	dir := t.TempDir()
-	file := filepath.Join(dir, "schema.json")
-	b, _ := json.Marshal(inputs)
-	if e := os.WriteFile(file, b, 0600); e != nil {
-		t.Fatal(e)
-	}
 	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/qualification-interop.mjs"), "choice-schema", file)
+	script := `import {canonicalInformationCommand as canonicalize} from './packages/galaxy-contracts/src/information-canonical.mjs'; import {digest} from './packages/galaxy-contracts/src/digest.mjs'; import {choicePutIntent} from './packages/galaxy-contracts/src/choice-snapshot-schema-v2.mjs'; import * as schemas from './packages/galaxy-contracts/src/choice-snapshot-schema-v2.mjs'; const names={'preferences/save':'choicePreferenceSchema',get:'choiceGetSchema',list:'choicePageSchema',delete:'choiceDeleteSchema',receipt:'choiceReceiptQuerySchema',put:'choicePutSchema'};let text='';for await(const c of process.stdin)text+=c;console.log(JSON.stringify(JSON.parse(text).map(x=>{let value;try{value=schemas[names[x.action]].parse(JSON.parse(x.raw))}catch{return {accepted:false}}const r={accepted:true,json:JSON.stringify(value)};if(x.action==='put'){try{r.hash=digest(canonicalize(choicePutIntent(value)))}catch{r.hashError=true}}return r})))`
+	cmd := exec.Command("node", "--input-type=module", "-e", script)
 	cmd.Dir = root
+	rawInputs, _ := json.Marshal(inputs)
+	cmd.Stdin = bytes.NewReader(rawInputs)
 	b, e := cmd.CombinedOutput()
 	if e != nil {
-		t.Fatalf("original schema %v %s", e, b)
+		t.Fatalf("current contract schema %v %s", e, b)
 	}
 	var expected []struct {
 		Accepted   bool

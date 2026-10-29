@@ -8,7 +8,7 @@ const pluginRoot = resolve(scriptDirectory, '..');
 const repositoryRoot = process.env.GALAXY_INTEGRATION_REPO_ROOT
   ? resolve(process.env.GALAXY_INTEGRATION_REPO_ROOT)
   : resolve(pluginRoot, '../../../..');
-const mcpEntry = resolve(repositoryRoot, 'packages/galaxy-edge-mcp/src/index.mjs');
+const mcpEntry = resolve(repositoryRoot, 'scripts/hub-runtime.mjs');
 
 if (!existsSync(mcpEntry)) {
   throw new Error(
@@ -16,7 +16,7 @@ if (!existsSync(mcpEntry)) {
   );
 }
 
-const child = spawn(process.execPath, [mcpEntry], {
+const child = spawn(process.execPath, [mcpEntry, 'integration-mcp'], {
   cwd: repositoryRoot,
   env: process.env,
   stdio: 'inherit',

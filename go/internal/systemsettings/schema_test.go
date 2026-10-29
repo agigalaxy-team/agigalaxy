@@ -3,8 +3,7 @@ package systemsettings_test
 import (
 	"encoding/json"
 	s "github.com/agigalaxy-team/agigalaxy/go/internal/systemsettings"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -52,13 +51,9 @@ func TestSystemSettingsOriginalSchemaConfigurationsAndMetadata(t *testing.T) {
 	authorization = append(authorization, native[len(native)-1])
 	general := []object{{"siteTitle": strings.Repeat("😀", 120), "description": "原说明\n允许换行", "footerLinks": []any{object{"label": " 原链接 ", "href": "https://服务.example/a?q=1#片段"}}}, {"siteTitle": strings.Repeat("😀", 121), "description": "", "footerLinks": []any{}}, {"siteTitle": "原网站", "description": "坏\u0001字段", "footerLinks": []any{}}}
 	inputs := object{"configurations": configs, "save": []object{{"operationId": id, "expectedRevision": 0, "configuration": nil}}, "apply": []object{{"operationId": id, "expectedRevision": 1, "versionId": id}}, "test": []object{{"operationId": id, "expectedRevision": 1, "versionId": id, "connectionId": id}}, "credential": credentials, "native": native, "authorization": authorization, "history": []object{{}, {"after": "9223372036854775807", "limit": 50}, {"after": "9223372036854775808"}}, "general": general, "publish": []object{{"operationId": id, "expectedPublicationId": id, "versionId": id, "settingsRevision": 0, "settings": general[0]}}}
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/system-settings-interop.mjs"), "schema")
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(encode(inputs))
-	raw, e := cmd.CombinedOutput()
+	raw, e := os.ReadFile("testdata/settings-schema.json")
 	if e != nil {
-		t.Fatalf("original schema %v %s", e, raw)
+		t.Fatal(e)
 	}
 	var expected object
 	if json.Unmarshal(raw, &expected) != nil {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,7 +23,7 @@ func TestLegacyRecoveryCancelledManualRetrySameGeneration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
 	var fixture Object
-	if e := decode(originalNode(t, dsn, false, "setup"), &fixture); e != nil {
+	if e := decode(forumFixture(t, dsn, "setup"), &fixture); e != nil {
 		t.Fatal(e)
 	}
 	tx, e := pool.Begin(ctx)
@@ -175,13 +176,13 @@ func TestLegacyIndexGenerationLeaseAndCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	var f Object
-	if e := decode(originalNode(t, dsn, false, "setup"), &f); e != nil {
+	if e := decode(forumFixture(t, dsn, "setup"), &f); e != nil {
 		t.Fatal(e)
 	}
 	// The fixture has the complete retained schema; install only the original
 	// limited worker grants, without extending access for this consumer.
 	root, _ := filepath.Abs("../../..")
-	sql, e := os.ReadFile(filepath.Join(root, "packages/galaxy-official/src/infrastructure/worker-role.sql"))
+	sql, e := os.ReadFile(filepath.Join(root, "go/internal/databaseschema/sql/worker-role.sql"))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -203,12 +204,8 @@ func TestLegacyIndexGenerationLeaseAndCancellation(t *testing.T) {
 		t.Fatal(e)
 	}
 	source := uuid.NewString()
-	var identityFixture Object
-	script := `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import{serviceFixture}from './packages/galaxy-official/test/service-fixture.mjs';const db=new pg.Pool({connectionString:process.env.GALAXY_GO_TEST_DATABASE_URL});try{const f=await serviceFixture(['binding','consent'],db,{endpoint:process.argv[1],now:Math.floor(Date.now()/1000),migrateDatabase:false});console.log(JSON.stringify({subject:f.actor.subjectId}))}finally{await db.end()}`
-	if e = decode(originalNode(t, dsn, true, script, index.Endpoint), &identityFixture); e != nil {
-		t.Fatal(e)
-	}
-	subject := str(identityFixture, "subject")
+	identityFixture := deviceauthfixture.NewEndpoint(t, pool, t.TempDir(), []string{"binding", "consent"}, index.Endpoint)
+	subject := identityFixture.Actor.SubjectID
 	queue := func() {
 		t.Helper()
 		if _, e = pool.Exec(ctx, "SELECT public.galaxy_queue_search_source('case',$1,$2)", source, subject); e != nil {

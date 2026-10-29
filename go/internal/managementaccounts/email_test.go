@@ -34,6 +34,10 @@ func TestOriginalNativeEmailVerificationSubmission(t *testing.T) {
 			json.NewEncoder(w).Encode(Object{"version": 1, "available": c != "unavailable", "mode": "native-update-email", "verificationBeforeChange": true, "metadataOnly": true})
 			return
 		}
+		var body Object
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body["operationId"] != operationID || body["newEmail"] != "new@example.invalid" {
+			t.Error("email submission changed selected target or operation")
+		}
 		if c == "invalid" {
 			w.Write([]byte("invalid"))
 			return
@@ -68,7 +72,7 @@ func TestOriginalNativeEmailVerificationSubmission(t *testing.T) {
 	}))
 	defer provider.Close()
 	cases := []string{"submitted", "unknown", "invalid", "forbidden", "server-error", "unexpected", "unavailable", "redirect"}
-	js := oracle(t, "", "email", Object{"origin": provider.URL, "operationId": operationID, "cases": cases})
+
 	goResults := []Object{}
 	for _, c := range cases {
 		adapter, e := NewNativeEmail("https://management.example.invalid/realms/galaxy-operations", provider.URL, &Credential{"galaxy-management-account-maintenance", "isolated-writer"}, caseTransport{c}, func() time.Time { return time.Unix(2000000000, 0) })
@@ -82,5 +86,18 @@ func TestOriginalNativeEmailVerificationSubmission(t *testing.T) {
 		}
 		goResults = append(goResults, Object{"available": available, "result": result})
 	}
-	eq(t, "native verified email request", goResults, js["results"])
+	expectedStates := []string{"submitted", "unknown", "unknown", "failed", "unknown", "unknown", "", "unknown"}
+	for i, result := range goResults {
+		available := result["available"].(bool)
+		body := result["result"].(Object)
+		if cases[i] == "unavailable" {
+			if available || body["error"] != "management_email_verification_not_configured" {
+				t.Fatalf("%s: %v", cases[i], result)
+			}
+			continue
+		}
+		if !available || body["state"] != expectedStates[i] {
+			t.Fatalf("%s: %v", cases[i], result)
+		}
+	}
 }

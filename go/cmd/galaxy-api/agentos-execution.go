@@ -7,6 +7,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/discovery"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/filegovernance"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
 	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
@@ -29,9 +30,27 @@ func policySeconds(value any) int64 {
 	return 0
 }
 
+func previewScanFile(ctx context.Context, tx pgx.Tx, id string, lookup func(context.Context, pgx.Tx, string, string) (filegovernance.Object, error)) (operationsstrategies.Object, error) {
+	for _, typ := range []string{"chat", "forum"} {
+		r, err := lookup(ctx, tx, typ, id)
+		if fault.Status(err) == 404 {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		version := r["version"]
+		if version == nil {
+			version = r["revision"]
+		}
+		return operationsstrategies.Object{"kind": typ + "-file", "available": r["purged_at"] == nil && r["revoked_at"] == nil, "version": version}, nil
+	}
+	return operationsstrategies.Object{"available": false, "version": nil}, nil
+}
+
 // One execution authority is shared by qualification, the native gateway and
 // the actual content writer. A role/catalog entry alone is never readiness.
-func connectExecutions(gateway *access.Gateway, permissions *p.Service, autonomy *operationsautonomy.Service, content *operationscommunity.Service, client *agentos.Client, search func() *discovery.Runtime) (*agentos.ExecutionGateway, *operationsstrategies.Service) {
+func connectExecutions(gateway *access.Gateway, permissions *p.Service, autonomy *operationsautonomy.Service, content *operationscommunity.Service, files *filegovernance.Service, client *agentos.Client, search func() *discovery.Runtime) (*agentos.ExecutionGateway, *operationsstrategies.Service) {
 	executions := &agentos.Executions{Pool: permissions.Pool, Endpoint: permissions.Endpoint, Permissions: permissions,
 		Supported: []string{"strategies.read", "strategies.ordinary.configure", "strategies.ordinary.publish"}}
 	authority := &p.BusinessAuthority{Human: gateway, Duty: autonomy, Execution: executions}
@@ -65,6 +84,11 @@ func connectExecutions(gateway *access.Gateway, permissions *p.Service, autonomy
 	}
 	strategies.PreviewObjectWithin = func(ctx context.Context, tx pgx.Tx, a p.Actor, kind, id string) (operationsstrategies.Object, error) {
 		switch kind {
+		case "file-scan-retry":
+			if files == nil {
+				return operationsstrategies.Object{"available": false, "version": nil}, nil
+			}
+			return previewScanFile(ctx, tx, id, files.ScopeActionFileWithin)
 		case "content-visibility", "content-curation", "public-content-batch":
 			for _, typ := range []string{"post", "reply"} {
 				r, err := content.Forum.OperationsContentSourceWithin(ctx, tx, typ, id, false)

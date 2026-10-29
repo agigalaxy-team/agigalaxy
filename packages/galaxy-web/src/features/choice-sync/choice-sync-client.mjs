@@ -1,5 +1,5 @@
-import {sha256Hex,stableJson} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
-import {choicePutIntent,choiceReceiptQuerySchema,choiceReceiptResultSchema} from "../../../../galaxy-official/src/shared/choice-snapshot-schema-v2.mjs";
+import {sha256Hex,stableJson} from "../../../../galaxy-contracts/src/web-primitives.mjs";
+import {choicePutIntent,choiceReceiptQuerySchema,choiceReceiptResultSchema} from "../../../../galaxy-contracts/src/choice-snapshot-schema-v2.mjs";
 const copy=x=>structuredClone(x),key=r=>`${r.type}:${r.id}:${r.version}`;
 /** @param {any} runtime @param {{subjectId:string}} options */
 export function createChoiceSyncClient(runtime,{subjectId}){

@@ -1,0 +1,16 @@
+{
+  "durable": {
+    "selfDeclared": {
+      "displayName": "Retained signed device statement"
+    },
+    "selfDeclaredReadExpiresAt": 2002678460,
+    "selfDeclaredSource": {
+      "id": "109223ec-9586-4329-946e-cd3caa86f885",
+      "classification": "self-declared",
+      "capabilityVerified": false
+    }
+  },
+  "legacy": {
+    "selfDeclared": {}
+  }
+}

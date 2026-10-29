@@ -14,6 +14,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/hubs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identitygroups"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/information"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/qualification"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/targetgovernance"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/taskmaterials"
@@ -24,11 +25,11 @@ import (
 )
 
 func TestRetentionWorkerOriginalTaskCopiesHubReceiptsArchiveTombstoneAndRollback(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 	path := filepath.Join(t.TempDir(), "execution-fixture.json")
-	executionNode(t, dsn, "setup", path, nil)
+	loadSyntheticExecution(t, pool, path)
 	data, _ := os.ReadFile(path)
 	var f struct {
 		Subject, Other, Endpoint string
@@ -75,7 +76,7 @@ func TestRetentionWorkerOriginalTaskCopiesHubReceiptsArchiveTombstoneAndRollback
 	targets := &targetgovernance.Service{}
 	qualificationRequests := &qualification.Service{}
 	outcomes := &taskmaterials.OutcomeService{}
-	result, e := CleanupRetentionWithin(ctx, tx, f.Clock, RetentionConsumers{
+	consumers := RetentionConsumers{
 		PrivateConversations: accountarchive.CleanupRetentionWithin, IdentityGroups: identitygroups.CleanupWithin,
 		Hubs: func(ctx context.Context, tx pgx.Tx, at int64) (Object, error) {
 			return hubs.CleanupRetentionWithin(ctx, tx, at, func(ctx context.Context, tx pgx.Tx, r hubs.ContentErasure) error {
@@ -95,7 +96,8 @@ func TestRetentionWorkerOriginalTaskCopiesHubReceiptsArchiveTombstoneAndRollback
 		OutcomeMaterials: func(ctx context.Context, tx pgx.Tx, at int64) (Object, error) {
 			return outcomes.CleanupWithin(ctx, tx, at, 100)
 		},
-	})
+	}
+	result, e := CleanupRetentionWithin(ctx, tx, f.Clock, consumers)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -128,8 +130,18 @@ func TestRetentionWorkerOriginalTaskCopiesHubReceiptsArchiveTombstoneAndRollback
 	if e = pool.QueryRow(ctx, `SELECT payload_text FROM hub_events_v2 WHERE id=$1`, event).Scan(&body); e != nil || body != "TEMPORARY-HUB-BODY" {
 		t.Fatal("retention rollback", body, e)
 	}
-	original := executionNode(t, dsn, "retention", path, nil)
+	original := originalProjection(t, "retention")
+	committed, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) {
+		if _, err := tx.Exec(ctx, "SET LOCAL ROLE galaxy_evidence_worker"); err != nil {
+			return nil, err
+		}
+		return CleanupRetentionWithin(ctx, tx, f.Clock, consumers)
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
 	executionSame(t, result, original)
+	executionSame(t, committed, original)
 	var exists bool
 	if e = pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM private_conversation_deletions_v1 WHERE archive_id=$1 AND scope_id=$2 AND reason='expired')`, archive, scope).Scan(&exists); e != nil || !exists {
 		t.Fatal("archive tombstone", e)

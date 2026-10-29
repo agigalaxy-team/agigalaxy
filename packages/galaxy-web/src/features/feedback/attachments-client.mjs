@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import {feedbackAttachmentPrepareSchema,feedbackAttachmentTargetSchema} from '../../../../galaxy-official/src/shared/feedback-attachments-v1-schema.mjs';
+import {feedbackAttachmentPrepareSchema,feedbackAttachmentTargetSchema} from '../../../../galaxy-contracts/src/feedback-attachments-v1-schema.mjs';
 
 const states=['preparing','prepared','uploading','unconfirmed','scan-pending','scanning','available','blocked','erased','revoked','expired','unavailable'];
 const timestamp=z.string().refine(value=>Number.isFinite(Date.parse(value)));

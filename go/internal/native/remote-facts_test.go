@@ -3,7 +3,6 @@ package native
 import (
 	"context"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -57,11 +56,7 @@ func remoteFactsInputFixtures() []map[string]any {
 }
 func TestRemoteFactsThirtyOriginalConsumersAndRefinements(t *testing.T) {
 	cases := remoteFactsInputFixtures()
-	path := filepath.Join(t.TempDir(), "consumers.json")
-	if e := writeJSON(path, cases); e != nil {
-		t.Fatal(e)
-	}
-	original := initializationNode(t, `import {readFile} from 'node:fs/promises';import {nativeHttpDefinitions} from './packages/galaxy-edge-mcp/src/native-v2/tools/http.mjs';const calls=[],api={call:(path,input,options)=>{calls.push({path,input:input??null,options:options??null});return{items:[]}}},tools=nativeHttpDefinitions(api),cases=JSON.parse(await readFile(process.argv[1],'utf8')),normalized=[];for(const c of cases){const value=tools[c.name].inputSchema.parse(c.input);normalized.push(value);await tools[c.name].run(value)}console.log(JSON.stringify({calls,normalized}));`, path)
+	original := nativeContractFixture(t)
 	for index, item := range cases {
 		name := text(item["name"])
 		value, e := remoteFactsNormalize(name, item["input"])

@@ -1,6 +1,6 @@
-import {identityKeyId} from "../../../../galaxy-core/src/domain/identity-material.mjs";
-import {verifyTrustIdentity,verifyTrustJws} from "../../../../galaxy-official/src/shared/trust-package-crypto.mjs";
-import {browserScopes} from "../../../../galaxy-official/src/browser-client.mjs";
+import {identityKeyId} from "../../../../galaxy-contracts/src/identity/identity-material.mjs";
+import {verifyTrustIdentity,verifyTrustJws} from "../../../../galaxy-contracts/src/trust-package-crypto.mjs";
+import {browserScopes} from "../../../../galaxy-client/src/browser-client.mjs";
 import {readAgentIdentityEntry} from './agent-identity-handoff.mjs';
 
 const protocol='galaxy-web-identity-handoff',proofType='galaxy-web-identity-handoff-v1+jws';

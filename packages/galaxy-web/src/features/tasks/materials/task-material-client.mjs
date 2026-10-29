@@ -1,6 +1,6 @@
-import { sha256Hex } from "../../../../../galaxy-official/src/shared/web-primitives.mjs";
+import { sha256Hex } from "../../../../../galaxy-contracts/src/web-primitives.mjs";
 import { taskMaterialDescriptorSchema, taskMaterialPrepareSchema, taskMaterialPrepareResultSchema,
-  taskTextMaterialIds, taskMaterialBodyIssue } from "../../../../../galaxy-official/src/shared/task-material-v1-schema.mjs";
+  taskTextMaterialIds, taskMaterialBodyIssue } from "../../../../../galaxy-contracts/src/task-material-v1-schema.mjs";
 
 const clone = value => structuredClone(value);
 const fail = (code, message) => { throw Object.assign(new Error(message), { code }); };

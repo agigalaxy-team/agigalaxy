@@ -5,27 +5,22 @@
       "id": "contracts",
       "kind": "library",
       "roots": [
-        "packages/galaxy-official/src/shared"
+        "packages/galaxy-contracts"
       ],
-      "files": [
-        "packages/galaxy-official/src/browser-client.mjs",
-        "packages/galaxy-official/src/operations-permission-catalog.mjs"
-      ],
-      "dependsOn": [
-        "hub",
-        "core"
-      ],
+      "files": [],
+      "dependsOn": [],
       "build": [],
       "checks": [
         [
           "{node}",
           "--test",
-          "packages/galaxy-official/test/task-enrollment-v2.test.mjs"
+          "packages/galaxy-contracts/test/release-artifact.test.mjs",
+          "packages/galaxy-contracts/test/trust-package-format.test.mjs"
         ]
       ],
       "sourceEntries": [
-        "packages/galaxy-official/src/shared/task-schema-v2.mjs",
-        "packages/galaxy-official/src/shared/task-owner-control-v2-schema.mjs"
+        "packages/galaxy-contracts/src/operations-permission-catalog.mjs",
+        "packages/galaxy-contracts/src/task-schema-v2.mjs"
       ],
       "configurationInputs": [],
       "artifact": "source-contracts",
@@ -35,36 +30,55 @@
       ]
     },
     {
+      "id": "client-sdk",
+      "roots": [
+        "packages/galaxy-client"
+      ],
+      "files": [],
+      "dependsOn": [
+        "contracts"
+      ],
+      "sourceEntries": [
+        "packages/galaxy-client/src/browser-client.mjs"
+      ],
+      "build": [],
+      "checks": [
+        [
+          "{node}",
+          "--test",
+          "packages/galaxy-client/test/public-transport.test.mjs",
+          "packages/galaxy-client/test/runtime-diagnostics.test.mjs"
+        ]
+      ],
+      "artifactType": "shared-source"
+    },
+    {
       "id": "core",
       "kind": "library",
       "roots": [
-        "packages/galaxy-core"
+        "go/internal/protocol",
+        "go/internal/localdata"
       ],
       "dependsOn": [],
       "build": [],
       "checks": [
         [
-          "{node}",
-          "scripts/check.mjs",
-          "core"
+          "{go}",
+          "test",
+          "./internal/protocol"
         ]
       ],
       "sourceEntries": [
-        "packages/galaxy-core/src/galaxy-guid.mjs",
-        "packages/galaxy-core/src/local-store.mjs"
+        "go/internal/protocol/json.go"
       ],
-      "configurationInputs": [
-        "packages/galaxy-core/src/connection-profile.mjs"
-      ],
+      "configurationInputs": [],
       "artifact": "source-library",
       "dataOwner": "Local identity, device and work data remain owned by the selected local ID.",
       "interfaces": [
-        "Source modules used by Native/A2A; no standalone npm package is declared"
+        "Shared Go protocol and local-data primitives used by the Native executable and server."
       ],
-      "files": [
-        "scripts/check-core-runtime.mjs",
-        "test/local-identity-upload-history.test.mjs"
-      ]
+      "files": [],
+      "cwd": "go"
     },
     {
       "id": "mail",
@@ -84,7 +98,8 @@
       "dataOwner": "No mailbox or SMTP credentials; consuming services own delivery ledgers.",
       "interfaces": [
         "HTML/plain-text rendering and official sender identity definitions"
-      ]
+      ],
+      "files": []
     },
     {
       "id": "hub",
@@ -123,7 +138,13 @@
           "--without-native"
         ]
       ],
-      "checks": [],
+      "checks": [
+        [
+          "{node}",
+          "scripts/check-go.mjs",
+          "hub"
+        ]
+      ],
       "sourceEntries": [
         "go/cmd/galaxy-api/main.go",
         "go/cmd/galaxy-worker/main.go",
@@ -133,11 +154,9 @@
         "go/cmd/galaxy-lifecycle/main.go"
       ],
       "configurationInputs": [
-        "packages/galaxy-official/src/operations/configuration.mjs",
         "packages/galaxy-official/deploy/runtime-settings.example.json",
         "go/go.mod",
-        "go/go.sum",
-        "go/deploy"
+        "go/go.sum"
       ],
       "artifact": "go-core-local-candidate",
       "dataOwner": "API, worker and publisher share the Hub business database and exact migration set.",
@@ -145,8 +164,6 @@
         "Authorized HTTP APIs, public schemas and private AgentOS authority protocol"
       ],
       "files": [
-        "packages/galaxy-official/src/shared/operations-agentos-schema.mjs",
-        "packages/galaxy-official/src/shared/operations-tool-call-id.mjs",
         "scripts/build-api-reference.mjs",
         "docs/operations/examples/alerts/galaxy.rules.json",
         "docs/operations/examples/alerts/galaxy.rules.test.json",
@@ -169,7 +186,6 @@
         "docs/operations/examples/slo/pilot.rules.json",
         "docs/operations/examples/monitoring/external.rules.test.json",
         "docs/operations/examples/slo/pilot.rules.test.json",
-        "test/forum-attachments-v1.test.mjs",
         "scripts/build-go-core.mjs",
         "scripts/hub-runtime.mjs",
         "docs/technical/go-core-plan.md"
@@ -180,8 +196,6 @@
       "id": "native-client",
       "kind": "client",
       "roots": [
-        "packages/galaxy-node",
-        "packages/galaxy-edge-mcp",
         "integrations/native-v2",
         "integrations/host-adapters",
         "integrations/codex/plugins/galaxy-integration-pack",
@@ -202,7 +216,13 @@
           "{output}"
         ]
       ],
-      "checks": [],
+      "checks": [
+        [
+          "{node}",
+          "scripts/check-go.mjs",
+          "native-client"
+        ]
+      ],
       "buildLimit": "Local Go Native and thin host candidate; does not replace installed commands or establish platform acceptance.",
       "sourceEntries": [
         "go/cmd/galaxy/main.go",
@@ -221,27 +241,13 @@
         "Native runtime/server exports, MCP, host adapters and signed browser handoff"
       ],
       "files": [
-        "scripts/browser-worker-pack-host-journey.mjs",
-        "scripts/build-client.mjs",
-        "scripts/build-host-test-runtime.mjs",
         "scripts/build-native-client-verifier.mjs",
-        "scripts/build-native-host.mjs",
         "scripts/build-native-v2.mjs",
-        "scripts/install-native-host-candidate.mjs",
         "scripts/native-client-installed-host-probe.mjs",
         "scripts/native-client-release.mjs",
         "scripts/native-download-inputs.mjs",
-        "scripts/native-host-release.mjs",
         "scripts/native-license-notices.mjs",
-        "scripts/opencode-binding-bridge.mjs",
-        "scripts/opencode-binding-probe.mjs",
-        "scripts/opencode-host-probe.mjs",
-        "scripts/opencode-initialization-probe.mjs",
-        "scripts/opencode-switch-bridge.mjs",
-        "scripts/opencode-switch-probe.mjs",
         "scripts/prepare-client-candidate.mjs",
-        "scripts/prepare-opencode-host-check.mjs",
-        "scripts/prepare-opencode-switch-check.mjs",
         "scripts/test-client-install.mjs",
         "scripts/verify-native-client-download.mjs",
         "scripts/verify-native-download.mjs",
@@ -249,27 +255,13 @@
         "scripts/verify-public-configuration-v2.mjs",
         "scripts/verify-public-trust-package-v2.mjs",
         "integrations/shared/read-task.mjs",
-        "scripts/structure/check-mcp-layout.mjs",
-        "scripts/structure/check-native-layout.mjs",
         "test/content-context-notes.test.mjs",
-        "test/native-local-cloud-sync.test.mjs",
-        "test/native-local-continuity.test.mjs",
-        "test/native-local-panel-state.test.mjs",
-        "test/native-public-account-tools.test.mjs",
         "docs/technical/native-client.md",
-        "scripts/test/client-artifact.test.mjs",
-        "scripts/client-release.mjs",
         "scripts/test/native-client-release.test.mjs",
-        "scripts/test/native-retained-receipt-candidate.test.mjs",
-        "scripts/test/native-candidate-case-receipts.test.mjs",
-        "scripts/test/native-candidate-full-review.test.mjs",
-        "scripts/test/native-candidate-moderation-receipt.test.mjs",
         "scripts/test/native-client-installed-host-probe.test.mjs",
         "scripts/test/native-download-inputs.test.mjs",
-        "scripts/test/native-host-release.test.mjs",
         "scripts/test/native-license-notices.test.mjs",
-        "scripts/test/native-owner-candidate.test.mjs",
-        "test/native-local-loading.test.mjs"
+        "scripts/go-native-licenses.mjs"
       ]
     },
     {
@@ -304,7 +296,8 @@
       "dataOwner": "Peer reports preserve their issuer and scope; local decision and account authorization remain separate.",
       "interfaces": [
         "Package exports: root, host, host-v2, facts-v2 and discovery"
-      ]
+      ],
+      "files": []
     },
     {
       "id": "web",
@@ -317,43 +310,32 @@
       ],
       "dependsOn": [
         "contracts",
-        "core",
+        "client-sdk",
         "native-client",
         "hub",
         "site"
       ],
-      "build": [
-        [
-          "{node}",
-          "node_modules/vite/bin/vite.js",
-          "build",
-          "--config",
-          "packages/galaxy-web/vite.config.mjs",
-          "--configLoader",
-          "native",
-          "--outDir",
-          "{output}"
-        ]
-      ],
+      "build": [],
       "checks": [
         [
           "{node}",
           "--test",
-          "packages/galaxy-official/test/task-owner-control-client-continuity.test.mjs"
+          "packages/galaxy-web/test/account-automatic-continuity-wire.test.mjs",
+          "packages/galaxy-web/test/profile-current-overview-wire.test.mjs",
+          "packages/galaxy-web/test/task-owner-read-client.test.mjs"
         ]
       ],
       "sourceEntries": [
-        "packages/galaxy-web/src/main.tsx"
+        "packages/galaxy-web/src/runtime.mjs"
       ],
       "configurationInputs": [
-        "scripts/serve-product.mjs",
         "components.json"
       ],
       "files": [
         "scripts/test/capsule-lease-independent-review.test.mjs",
         "test/content-share-continuation.test.mjs"
       ],
-      "artifact": "static-web-assets",
+      "artifact": "shared-browser-source",
       "dataOwner": "Browser drafts and account context; local ID creation/control remains Native-owned.",
       "interfaces": [
         "Authorized account HTTP APIs, shared schemas and current Native handoff"
@@ -398,7 +380,6 @@
       "files": [
         "scripts/test/browser-demo.test.mjs",
         "scripts/build-product.mjs",
-        "scripts/serve-product.mjs",
         "scripts/web-runtime.mjs",
         "scripts/website-artifact.mjs",
         "scripts/test/website-artifact.test.mjs"
@@ -494,7 +475,8 @@
         "Independent management OIDC, CMS and authorized Node BFF"
       ],
       "buildOutput": "apps/galaxy-admin/.next",
-      "buildLimit": "Next writes its own .next output. Include standalone, public and .next/static when assembling a deployment."
+      "buildLimit": "Next writes its own .next output. Include standalone, public and .next/static when assembling a deployment.",
+      "files": []
     },
     {
       "id": "agentos",
@@ -571,7 +553,8 @@
         "services/galaxy-model-gateway/config/models.empty.yaml"
       ],
       "artifact": "python-source-compilation-or-fixed-upstream-image",
-      "dataOwner": "Human-managed provider configuration and gateway usage; no authority to grant Hub actions."
+      "dataOwner": "Human-managed provider configuration and gateway usage; no authority to grant Hub actions.",
+      "files": []
     },
     {
       "id": "discovery",
@@ -610,7 +593,8 @@
       "interfaces": [
         "Closed authenticated Gorse proxy paths and bounded pagination"
       ],
-      "buildLimit": "OpenPanel requires the explicitly supplied full cd24bb8 account-scope source archive; prepare-openpanel-source.py assembles a new context and never builds/activates an image or migrates data. See services/galaxy-discovery/SOURCE_BUILD.md."
+      "buildLimit": "OpenPanel requires the explicitly supplied full cd24bb8 account-scope source archive; prepare-openpanel-source.py assembles a new context and never builds/activates an image or migrates data. See services/galaxy-discovery/SOURCE_BUILD.md.",
+      "files": []
     }
   ],
   "globalInputs": [
@@ -638,7 +622,9 @@
     "scripts/test/check.test.mjs",
     "scripts/test/conformance-runner.test.mjs",
     "scripts/test/version-contract.test.mjs",
-    "scripts/test/verify-layers.test.mjs"
+    "scripts/test/verify-layers.test.mjs",
+    "scripts/check-go.mjs",
+    "scripts/go/generate-permission-catalog.mjs"
   ],
   "sourceRoots": [
     "go",
@@ -683,7 +669,9 @@
     "RIGHTS.md",
     "WORK_STATUS.md",
     "opencode.json",
-    ".opencode/tui.json"
+    ".opencode/tui.json",
+    "LICENSE",
+    "NOTICE"
   ],
   "sourceExtensions": [
     ".go",
@@ -766,9 +754,9 @@
     "apps/galaxy-site/workspace-navigation.json",
     "public/images/examples/credits.json",
     "public/images/external/credits.json",
-    "packages/galaxy-edge-mcp/src/native-v2/notifications/windows-notify-icon.ps1",
-    "packages/galaxy-edge-mcp/src/native-v2/notifications/macos-helper/Info.plist",
-    "packages/galaxy-edge-mcp/src/native-v2/notifications/macos-helper/GalaxyNotifications.swift",
+    "integrations/native-v2/notifications/windows-notify-icon.ps1",
+    "integrations/native-v2/notifications/macos-helper/Info.plist",
+    "integrations/native-v2/notifications/macos-helper/GalaxyNotifications.swift",
     "integrations/native-v2/host-capabilities.json",
     "integrations/native-v2/codex/galaxy-native-v2/.mcp.json",
     "integrations/native-v2/codex/galaxy-native-v2/.codex-plugin/plugin.json",
@@ -806,9 +794,14 @@
     "docs/product/overview.md",
     "docs/operations/deployment.md",
     "originals/README.md",
-    "docs/public/publish-manifest.json"
+    "docs/public/publish-manifest.json",
+    "go/internal/native/testdata/legacy-sqlite/history.sqlite",
+    "go/internal/native/testdata/legacy-sqlite/private.sqlite",
+    "go/internal/native/testdata/legacy-upload/history.sqlite",
+    "go/internal/native/testdata/legacy-native/conversation-archive/private.sqlite",
+    "go/internal/native/testdata/legacy-native/work-history/history.sqlite"
   ],
-  "licensePolicy": "Preserve each existing license and notice. No new project-wide license or public visibility is selected by this catalog.",
+  "licensePolicy": "Galaxy-owned source is Apache-2.0; retain each third-party license, notice and source obligations.",
   "nonBuildInputs": [
     ".editorconfig",
     "docs/technical/reference/api-error-catalog-v0.1.json",

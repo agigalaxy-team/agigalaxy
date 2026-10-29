@@ -1,0 +1,3 @@
+`setup.json` contains only synthetic, previously accepted identity/device and selected room/task prerequisites captured once during the Go migration. Public keys, signed consent/control documents and test-only bearer tokens refer to these disposable rows. It contains no private keys or real account data.
+
+Current Go migrations restore the explicit tables. Current Go device authentication, room/agent/task readers and watch commands perform all authorization, cursor transfer, competing takeover, receipt recovery, revocation and bounded retention checks. The original Node fixture is archived outside the project and is not a runtime or test dependency.

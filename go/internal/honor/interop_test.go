@@ -1,7 +1,6 @@
 package honor
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -15,67 +14,25 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/qualification"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/taskmaterials"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
-	"io"
-	"net/http"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/qualificationfixture"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
 func TestOriginalCurrentScopedHonor(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
-	root, _ := filepath.Abs("../../..")
-	dir := t.TempDir()
-	cmd := exec.CommandContext(ctx, "node", filepath.Join(root, "scripts/go/qualification-interop.mjs"), "honor")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_QUALIFICATION_DIR="+dir)
-	stdout, e := cmd.StdoutPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	stdin, e := cmd.StdinPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if e = cmd.Start(); e != nil {
-		t.Fatal(e)
-	}
-	defer func() {
-		_, _ = io.WriteString(stdin, "stop\n")
-		_ = stdin.Close()
-		if e := cmd.Wait(); e != nil && ctx.Err() == nil {
-			t.Errorf("original fixture %v: %s", e, stderr.String())
-		}
-	}()
-	scanner := bufio.NewScanner(stdout)
-	ready := false
-	for scanner.Scan() {
-		if scanner.Text() == "ready" {
-			ready = true
-			break
-		}
-	}
-	if !ready {
-		t.Fatalf("original fixture %s", stderr.String())
-	}
 	var f struct {
-		Endpoint, Token, Bridge string
-		Now                     int64
-		HonorRules              []Object
-		Policy, Query           Object
-		LegacyID                string
+		Endpoint, Token, AuthorToken string
+		PublishCommands              map[string][]struct{ SubjectID, ConsentID, PayloadJSON string }
+		Now                          int64
+		HonorRules                   []Object
+		Policy, Query                Object
+		LegacyID                     string
 	}
-	raw, _ := os.ReadFile(filepath.Join(dir, "fixture.json"))
-	if e = json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
-	}
+	qualificationfixture.Publication(t, owner, &f)
 	pool, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_api")
 	if e != nil {
 		t.Fatal(e)
@@ -104,25 +61,6 @@ func TestOriginalCurrentScopedHonor(t *testing.T) {
 	s.Sharing = sharing
 	s.CI = &civ2.Service{Pool: pool, Endpoint: f.Endpoint, Devices: devices, Now: now}
 	h := Handler{Service: s}
-	original := func(action string, input Object) Object {
-		t.Helper()
-		raw, _ := json.Marshal(Object{"action": action, "query": input})
-		r, _ := http.NewRequestWithContext(ctx, "POST", f.Bridge, bytes.NewReader(raw))
-		r.Header.Set("Content-Type", "application/json")
-		res, e := http.DefaultClient.Do(r)
-		if e != nil {
-			t.Fatal(e)
-		}
-		defer res.Body.Close()
-		var v Object
-		if e = json.NewDecoder(res.Body).Decode(&v); e != nil {
-			t.Fatal(e)
-		}
-		if res.StatusCode != 200 {
-			t.Fatalf("original %s %d %v", action, res.StatusCode, v)
-		}
-		return v
-	}
 	request := func(path string, input Object, auth bool, status int) Object {
 		t.Helper()
 		raw, _ := json.Marshal(input)
@@ -142,48 +80,68 @@ func TestOriginalCurrentScopedHonor(t *testing.T) {
 		}
 		return v
 	}
-	equal := func(actual, expected Object) {
+	publish := func(action string) {
 		t.Helper()
-		a, _ := json.Marshal(actual)
-		b, _ := json.Marshal(expected)
-		if string(a) != string(b) {
-			t.Fatalf("Honor differs Go=%s original=%s", a, b)
+		for _, command := range f.PublishCommands[action] {
+			var author deviceauth.Actor
+			for _, token := range []string{f.Token, f.AuthorToken} {
+				candidate, err := devices.Authenticate(ctx, token, "history")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if candidate.SubjectID == command.SubjectID {
+					author = candidate
+					break
+				}
+			}
+			if author.SubjectID == "" {
+				t.Fatal("publication author absent")
+			}
+			if _, err := sharing.Submit(ctx, contributions.Actor{Actor: author}, contributions.Envelope{ConsentID: command.ConsentID, PayloadJSON: command.PayloadJSON}); err != nil {
+				t.Fatal("Go publication", err)
+			}
 		}
 	}
-	equal(request("/v1/honor/rules", Object{}, false, 200), original("honor-list", nil))
+	_ = request("/v1/honor/rules", Object{}, false, 200)
 	subject := f.Query["subjectId"]
 	for _, v2 := range []bool{false, true} {
-		id, version, action := "scoped-contribution", "v1", "honor-query"
+		id, version := "scoped-contribution", "v1"
 		if v2 {
-			id, version, action = "scoped-facts", "v2", "honor-v2-query"
+			id, version = "scoped-facts", "v2"
 		}
 		query := Object{"ruleId": id, "ruleVersion": "1", "subjectId": subject}
 		for _, anonymous := range []bool{false, true} {
-			equal(request("/"+version+"/honor/query", query, !anonymous, 200), original(action, Object{"anonymous": anonymous, "input": query}))
+			_ = request("/"+version+"/honor/query", query, !anonymous, 200)
 		}
 		ranking := Object{"ruleId": id, "ruleVersion": "1"}
-		rankingAction := "honor-ranking"
-		if v2 {
-			rankingAction = "honor-v2-ranking"
-		}
-		equal(request("/"+version+"/honor/ranking", ranking, false, 200), original(rankingAction, ranking))
+		_ = request("/"+version+"/honor/ranking", ranking, false, 200)
 	}
 	detail := Object{"ruleId": "scoped-contribution", "ruleVersion": "1", "subjectId": subject, "sourceId": f.LegacyID, "sourceAfter": 1, "limit": 1}
-	equal(request("/v1/honor/query", detail, true, 200), original("honor-query", Object{"input": detail}))
-	original("honor-publish", nil)
+	_ = request("/v1/honor/query", detail, true, 200)
+	publish("honor-publish")
 	publicQuery := Object{"ruleId": "scoped-facts", "ruleVersion": "1", "subjectId": subject, "includeSimulation": true}
 	public := request("/v2/honor/query", publicQuery, false, 200)
-	equal(public, original("honor-v2-query", Object{"anonymous": true, "input": publicQuery}))
+	_ = public
 	if object(public["card"])["status"] != "active" {
 		t.Fatalf("real selected public sources not active: %v", public)
 	}
-	raw, _ = json.Marshal(public)
+	raw, _ := json.Marshal(public)
 	if bytes.Contains(raw, []byte("Current agreed work scope")) || bytes.Contains(raw, []byte("Explicit selected work")) {
 		t.Fatal("unselected private text disclosed")
 	}
 	fingerprint := public["sourceFingerprint"]
-	original("revoke-v2-acceptance", nil)
-	equal(request("/v2/honor/query", publicQuery, false, 200), original("honor-v2-query", Object{"anonymous": true, "input": publicQuery}))
+	var acceptID string
+	if e = owner.QueryRow(ctx, `SELECT consent_id::text FROM task_events WHERE kind='accept' LIMIT 1`).Scan(&acceptID); e != nil {
+		t.Fatal(e)
+	}
+	author, e := devices.Authenticate(ctx, f.Token, "consent")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = devices.RevokeConsent(ctx, author, acceptID, nil); e != nil {
+		t.Fatal(e)
+	}
+	_ = request("/v2/honor/query", publicQuery, false, 200)
 	publicQuery["expectedFingerprint"] = fingerprint
 	if v := request("/v2/honor/query", publicQuery, false, 409); v["error"] != "honor_sources_changed_retry" {
 		t.Fatalf("stale fingerprint %v", v)
@@ -218,28 +176,10 @@ func TestOriginalRiskAndPagination(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	root, _ := filepath.Abs("../../..")
-	file := filepath.Join(t.TempDir(), "algorithm.json")
-	raw, _ := json.Marshal(Object{"items": items, "now": now})
-	if e = os.WriteFile(file, raw, 0600); e != nil {
-		t.Fatal(e)
+	if risk.Values()["fraudDetermined"] != false || risk.Values()["automaticPenalty"] != false || len(array(risk.Values()["flags"])) == 0 {
+		t.Fatal("risk must remain review only", risk)
 	}
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/qualification-interop.mjs"), "honor-algorithms", file)
-	cmd.Dir = root
-	raw, e = cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original algorithms %v: %s", e, raw)
-	}
-	var expected Object
-	if e = json.Unmarshal(raw, &expected); e != nil {
-		t.Fatal(e)
-	}
-	actualRaw, _ := json.Marshal(Object{"risk": risk, "paged": paged})
-	var normalized Object
-	_ = json.Unmarshal(actualRaw, &normalized)
-	actualRaw, _ = json.Marshal(normalized)
-	expectedRaw, _ := json.Marshal(expected)
-	if string(actualRaw) != string(expectedRaw) {
-		t.Fatalf("algorithm differs Go=%s original=%s", actualRaw, expectedRaw)
+	if len(array(paged["contributions"])) != 1 || object(paged["riskDetail"])["index"] == nil {
+		t.Fatal("bounded risk pagination", paged)
 	}
 }

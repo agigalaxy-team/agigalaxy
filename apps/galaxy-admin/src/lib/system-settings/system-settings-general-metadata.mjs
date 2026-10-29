@@ -1,5 +1,5 @@
 import {isDeepStrictEqual} from 'node:util';
-import {systemGeneralConfigurationSchema} from "../../../../../packages/galaxy-official/src/shared/operations-system-general-schema.mjs";
+import {systemGeneralConfigurationSchema} from "../../../../../packages/galaxy-contracts/src/operations-system-general-schema.mjs";
 
 // Next emits this server helper into separate CMS and route chunks.
 // A process-global Symbol keeps their trusted, non-JSON request marker identical.

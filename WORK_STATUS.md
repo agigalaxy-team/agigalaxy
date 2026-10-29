@@ -2,7 +2,19 @@
 
 ## 当前任务与状态
 
-2026-10-29：服务器与本机 Go 核心收束、GitHub 同步及服务器实际部署。保留现有页面、业务、数据、ID／UID／绑定和专业组件；旧压力测试、模拟活跃及资料填充仍停止。
+2026-10-29：全仓遗漏重构与源码收束的本地实现、冻结产物及必要定向检查已完成；正在按用户授权同步GitHub、跟进CI并部署服务器。当前尚未完成新版本切换，下方既有线上结果属于此前版本。
+
+- 当前入口：服务器由 `go/cmd/galaxy-api`、`galaxy-worker`、`galaxy-information-worker`、`galaxy-publisher`、`galaxy-migrate`、`galaxy-lifecycle` 承担；Native由 `go/cmd/galaxy` 的 native/integration-mcp/host/integration-host承接。官网Next与Admin Next/Payload分别运行，共用浏览器组件与查询/事件/会话机制。
+- 已退出：旧 Core、Node CLI、Edge MCP、Official业务src/test整树，以及旧API/Worker/迁移/发布入口、Standalone/Vite/serve-product网站主链、旧Native候选发行链和无消费者工具。全部分批归档到项目外 `source-reviews/retired/galaxy-superseded-core-20261029`；Official最后一批717文件已按原相对路径与摘要保存。主树无旧内核、备份副本或旧路径转发壳。
+- 共同来源：`packages/galaxy-contracts` 管共享合同与权限目录，`packages/galaxy-client` 管浏览器/Node SDK，`go/internal/databaseschema/sql` 管132份原迁移和四角色SQL（最高133、保留120空号）；生成器、工具和真实消费者已同步。
+- 实际补齐：Go发行维护绑定、文件扫描策略预演、Native服务发现/根信任续期、隔离恢复调用Go lifecycle、SMTP测试投递审计类别、任务材料/A2A当前Go调用均已接通。Native原身份恢复码现含登记、同GUID恢复、新设备/下一代码、本人临时本机页和原操作回执；空身份宿主入口不再强制创建新GUID。恢复身份不等于恢复丢失私有资料或自动连接。
+- 产物：项目外 `work/galaxy-reconstruction-implementation-20261029/server-final` 包含六个Linux amd64 Go服务及真实许可；`native-final` 是含最后恢复码/菜单修正的Windows amd64候选与准备包，宿主依赖17组件许可已收集。最终Native包SHA256 `2727a62359fdb8cc1234b6e192152b5f25a29841daacd494c2674151ecc649cb`；包完整性和临时宿主配置通过，实际用户宿主安装仍pending，不改成功标志。
+- 依赖与工具：Official仅保留zod/pg/AWS S3 SDK/nodemailer四项直接平台依赖，锁更新后干净安装42包；旧XMPP/OIDC/pg-boss业务依赖已退出该包。根pg-boss仅用于真实旧队列接管兼容回归。A2A CI补Go/隔离PG和独立Python环境，同一Python锁补6个Linux轮子哈希；下载校验不等于Linux运行。组件清单无过期Native/serve-product资源，API参考使用当前Go声明且仅声明其明确子集，不再以全Go源码指纹制造无关失效。
+- 必要检查：网站与Admin生产构建、根TypeScript、默认标签下全部Go包及测试编译通过（没有执行全套测试）。当前领域按受影响范围完成隔离PG回归，Native恢复三项及独立无头本机页、相关宿主定向检查通过；最终Native二进制经真实MCP SDK读旧格式履历/原件及本人选择通过。AgentOS两模块12项、A2A Node参与1项及独立Python3项通过。文档54份/444本地引用检查无错误。
+- 网页实际范围：最新Next源码独立无头代表流通过公开读取、论坛发布读取、私聊传输不可用时错误/草稿保留、后台反馈保存返回；不据此宣称成功聊天投递、生产登录或全站全部操作本轮重验。
+- 保留与限制：JS继续承接Next/React、浏览器密钥/IndexedDB、宿主SDK/UI、A2A SDK及必要部署工具；Python继续承接Agno、LiteLLM与公开内容编译。Keycloak/Prosody/搜索/推荐/分析引擎仍按原职责保留。实际macOS、全部第三方宿主、用户本机安装及PG/Prosody/对象存储联合整站恢复未验收；R13固定程序策略仍限已接通且获准的动作，未放开任意全领域动作。没有恢复广泛模型、压力、活跃模拟或资料填充。
+
+当前没有本轮未分派的源码接线或旧内核退出事项；上述目标平台与实际外部环境限制另行办理，不以本机结果冒充。正式上传/CI执行/部署须基于本轮冻结源码另行记录。
 
 源码主库现为公开的 `agigalaxy-team/agigalaxy`。银河自有代码采用 Apache-2.0，第三方继续遵守原许可。功能源码已上传至 `74c21e8`，本轮对应 CI 的全部组件与 Runner Smoke 均已通过；原 site 归档 404 修复后仅补跑失败项，原失败记录保留。独立公开仓库已删除，完整本地 Git 历史保留在项目外 `source-reviews/retired/galaxy-public-repository-20261028`。
 
@@ -12,7 +24,7 @@
 
 本次官网发布的临时资料已清理：本地 7 个文件和任务空目录、服务器 6 个临时上传及构建暂存目录均已移除；原始构建日志与截图只保留在仓库外的操作证据区。先前拒绝发生在复合删除命令执行前，改用完整绝对路径逐项删除后正常完成，无需改权限或安全配置。已核对实际代码提交的 CI 最终成功，不重复执行已通过且未改动的检查；后续提交仅更新状态记录。
 
-本次服务器切换、源码同步和基础实际流程收尾完成。下列结果以实际进程、浏览器及原操作回执为准；本机平台验收范围见末节。
+前一轮服务器切换、源码同步和基础实际流程已完成；本轮全仓源码收束仍在推进。下列结果以实际进程、浏览器及原操作回执为准；本机平台验收范围见末节。
 
 ## 已真正接通
 

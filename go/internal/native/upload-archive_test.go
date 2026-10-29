@@ -12,7 +12,7 @@ import (
 )
 
 func TestArchiveUploadOriginalChunkLostACKAndSettingsJournal(t *testing.T) {
-	store, meta, transport := workUploadServiceFixture(t)
+	store, meta, transport := nativeGoUploadFixture(t)
 	ctx := context.Background()
 	rt, e := NewRuntime(store, meta.Configuration, ConnectionOptions{HTTPClient: &http.Client{Transport: transport}, Now: func() time.Time { return time.Unix(meta.Now, 0) }})
 	if e != nil {

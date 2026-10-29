@@ -1,5 +1,5 @@
 import type { Action, Routes, MenuOption } from '../adapter-types.ts';
-import { redactLocalWorkData } from '../../../../packages/galaxy-core/src/local-data-redaction.mjs';
+import { redactLocalWorkData } from '../../../../packages/galaxy-contracts/src/identity/local-data-redaction.mjs';
 import { setWorkArchiveSelection } from '../work-archive-choice.mjs';
 import type { GalaxyMenuSession } from './session-context.ts';
 

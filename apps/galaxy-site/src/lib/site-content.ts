@@ -28,7 +28,7 @@ export async function readSiteContent():Promise<SiteContent>{
  if(marker.version!==1||typeof marker.publicationId!=='string'||!uuid.test(marker.publicationId))throw Error('Invalid active site publication');
  if(snapshot.version!==1||!snapshot.settings||!Array.isArray(snapshot.pages)||!Array.isArray(snapshot.media))throw Error('Invalid active site snapshot');
  // Dynamically use the same domain validator as publication, including URL/block validation.
- const {contentSnapshotSchema}=await import('../../../../packages/galaxy-official/src/publishing/content-snapshot.mjs');
+ const {contentSnapshotSchema}=await import('../../../../packages/galaxy-contracts/src/content-snapshot.mjs');
  const parsed=contentSnapshotSchema.parse(snapshot) as SiteSnapshot;
  return {mode:'published',snapshot:parsed,publicationId:marker.publicationId};
 }

@@ -1,5 +1,5 @@
 import { createCapsuleWebClient } from "../capsules/capsule-workspace-client.mjs";
-import {qualificationCalculationSchema} from "../../../../galaxy-official/src/shared/qualification-calculation-schema.mjs";
+import {qualificationCalculationSchema} from "../../../../galaxy-contracts/src/qualification-calculation-schema.mjs";
 import {taskMaterialDerivedView} from "../tasks/materials/task-material-client.mjs";
 export function createQualificationPermissionClient({
   runtime,

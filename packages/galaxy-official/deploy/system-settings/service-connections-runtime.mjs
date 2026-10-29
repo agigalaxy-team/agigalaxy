@@ -3,8 +3,8 @@ import {isAbsolute} from 'node:path';
 import {isDeepStrictEqual} from 'node:util';
 import {createHash} from 'node:crypto';
 import {atomicWrite,noSymlinkPath,runCommand} from '../operations-stack/host.mjs';
-import {serviceConnectionsConfigurationSchema,serviceConnectionSchema,serviceCredentialProvisionSchema,serviceConnectionCredentialTarget,serviceConnectionConsumerMetadataSchema,serviceConnectionConsumerReadbackSchema} from '../../src/operations/system-settings/service-connections-schema.mjs';
-import {serviceConnectionAdopted,serviceConnectionTargets,serviceConnectionReceiptFiles,serviceConnectionKinds,serviceConnectionMatches} from '../../src/operations/system-settings/service-connections.mjs';
+import {serviceConnectionsConfigurationSchema,serviceConnectionSchema,serviceCredentialProvisionSchema,serviceConnectionCredentialTarget,serviceConnectionConsumerMetadataSchema,serviceConnectionConsumerReadbackSchema} from '../../../galaxy-contracts/src/operations-service-connections-schema.mjs';
+import {serviceConnectionAdopted,serviceConnectionTargets,serviceConnectionReceiptFiles,serviceConnectionKinds,serviceConnectionMatches} from '../support/service-connections.mjs';
 import {testServiceConnection} from './service-connections-probes.mjs';
 
 const fail=code=>Object.assign(new Error(code),{code});

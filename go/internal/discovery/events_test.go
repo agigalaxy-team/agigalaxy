@@ -5,10 +5,14 @@ import (
 	"testing"
 )
 
-func TestOriginalClosedEventPurposesAndNoCallerIdentity(t *testing.T) {
-	id := "00000000-0000-4000-8000-000000000001"
-	version := "00000000-0000-4000-8000-000000000002"
-	rows := []Object{}
+func TestClosedEventPurposesAndNoCallerIdentity(t *testing.T) {
+	id, version := "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"
+	allowed := map[string][]string{
+		"pageview":     {"home", "community", "find", "account", "help", "download"},
+		"content-view": {"community"}, "content-bookmark": {"community"}, "content-participate": {"community"},
+		"content-click": {"home", "community", "find"}, "content-exposure": {"home", "community", "find"},
+		"not-interested": {"home", "community", "find"}, "search": {"find"}, "search-click": {"find"},
+	}
 	for name := range eventNames {
 		for page := range pagePaths {
 			input := Object{"eventId": id, "name": name, "pageKey": page}
@@ -18,31 +22,55 @@ func TestOriginalClosedEventPurposesAndNoCallerIdentity(t *testing.T) {
 			if name == "search" {
 				input["query"] = " \ufeff Go \u00a0 "
 			}
-			rows = append(rows, input)
+			accepted := false
+			for _, value := range allowed[name] {
+				accepted = accepted || page == value
+			}
+			value, err := parseEvent(input)
+			if !accepted {
+				if errorCode(err) != "discovery_purpose_denied" {
+					t.Fatalf("event purpose %s/%s: %v", name, page, err)
+				}
+				continue
+			}
+			if err != nil {
+				t.Fatalf("allowed event %s/%s: %v", name, page, err)
+			}
+			expected := merge(Object{}, input)
+			expected["purpose"] = "site-usage-analytics"
+			if name == "search" {
+				expected["query"] = "Go"
+			}
+			if name != "pageview" && name != "search" && name != "content-exposure" {
+				expected["recommendationPurpose"] = "public-community-recommendation"
+			}
+			if !sameValue(value, expected) {
+				t.Fatalf("bounded event %s/%s: %s", name, page, jsonString(value))
+			}
 		}
 	}
 	base := Object{"eventId": id, "name": "pageview", "pageKey": "home"}
 	for _, key := range []string{"accountId", "visitorId", "profileId", "purpose", "transport", "body", "title", "url", "privateMessages"} {
 		input := merge(Object{}, base)
 		input[key] = "caller-data"
-		rows = append(rows, input)
-	}
-	for _, change := range []Object{{"query": "unexpected"}, {"content": nil}, {"eventId": "invalid"}, {"pageKey": "unknown"}, {"exposureId": id}, {"search": Object{"requestId": id}}, {"recommendation": Object{"requestId": id}}} {
-		rows = append(rows, merge(merge(Object{}, base), change))
-	}
-	script := `import{discoveryEvent}from './packages/galaxy-official/src/discovery-runtime/purpose.mjs';let v=JSON.parse(process.argv[1]);console.log(JSON.stringify(v.map(input=>{try{return{value:discoveryEvent(input),code:null}}catch(e){return{value:null,code:e.code??'internal_error'}}})))`
-	var original []Object
-	if e := decode(originalNode(t, "", true, script, jsonString(rows)), &original); e != nil {
-		t.Fatal(e)
-	}
-	for i, input := range rows {
-		value, e := parseEvent(input)
-		var code any
-		if e != nil {
-			code = errorCode(e)
+		if _, err := parseEvent(input); errorCode(err) != "invalid_discovery_request" {
+			t.Fatalf("caller identity or content %s accepted: %v", key, err)
 		}
-		if !sameValue(Object{"value": value, "code": code}, original[i]) {
-			t.Errorf("event purpose %s/%s Go %s JS %s", input["name"], input["pageKey"], jsonString(Object{"value": value, "code": code}), jsonString(original[i]))
+	}
+	for _, row := range []struct {
+		change Object
+		code   string
+	}{
+		{Object{"query": "unexpected"}, "discovery_purpose_denied"},
+		{Object{"content": nil}, "invalid_discovery_request"},
+		{Object{"eventId": "invalid"}, "invalid_discovery_request"},
+		{Object{"pageKey": "unknown"}, "invalid_discovery_request"},
+		{Object{"exposureId": id}, "discovery_purpose_denied"},
+		{Object{"search": Object{"requestId": id}}, "discovery_purpose_denied"},
+		{Object{"recommendation": Object{"requestId": id}}, "discovery_purpose_denied"},
+	} {
+		if _, err := parseEvent(merge(merge(Object{}, base), row.change)); errorCode(err) != row.code {
+			t.Fatalf("closed event %s: %v", jsonString(row.change), err)
 		}
 	}
 }

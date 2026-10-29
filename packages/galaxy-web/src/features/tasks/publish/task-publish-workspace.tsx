@@ -21,7 +21,7 @@ import {createTaskMaterialClient,draftMaterialIds,hasMaterialText,literalTaskTex
 import {TaskForumMaterialWorkspace,TaskMaterialDraftField} from "../materials/task-forum-material-workspace";
 import {availableForumContent,type ForumClient,type ForumPostView} from "../../community-forum/community-forum-view-types";
 import type {TaskText,TaskTextField,TaskMaterialBody,TaskMaterialStates,TaskMaterialInput,TaskMaterialOptions} from "../materials/task-material-types";
-import {searchV2QuerySchema} from "../../../../../galaxy-official/src/shared/search-v2-schema.mjs";
+import {searchV2QuerySchema} from "../../../../../galaxy-contracts/src/search-v2-schema.mjs";
 import {object} from "../../projects/contracts";
 import {readOperationReceipt} from "../operations/task-operation-state";
 import type {OperationReceipt} from "../operations/task-operation-state";

@@ -20,6 +20,7 @@ type connectionEnvelope struct {
 	Data                map[string]any
 	ID                  string
 	IssuedAt, ExpiresAt int64
+	KID                 string
 }
 
 var connectionUUID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
@@ -101,7 +102,9 @@ func (c *Connection) envelope(token, kind string, maxAge int64) (connectionEnvel
 	if !connectionExact(header, "alg", "kid", "typ") || header["alg"] != "Ed25519" || header["typ"] != "galaxy-"+kind+"+jwt" {
 		return out, connectionFailure("native_server_proof_invalid")
 	}
+	c.mu.Lock()
 	pin, ok := c.config.TrustedKeys[text(header["kid"])]
+	c.mu.Unlock()
 	now := c.now().Unix()
 	if !ok || pin.Revoked || now < pin.NotBefore || now >= pin.NotAfter || pin.TrustedUntil != nil && now >= *pin.TrustedUntil {
 		return out, connectionFailure("native_server_pin_invalid")
@@ -125,7 +128,7 @@ func (c *Connection) envelope(token, kind string, maxAge int64) (connectionEnvel
 	if id == "" || len(id) > 128 || !ok {
 		return out, connectionFailure("native_server_proof_invalid")
 	}
-	return connectionEnvelope{data, id, iat, exp}, nil
+	return connectionEnvelope{Data: data, ID: id, IssuedAt: iat, ExpiresAt: exp, KID: text(header["kid"])}, nil
 }
 
 type connectionNotBefore struct{ second int64 }

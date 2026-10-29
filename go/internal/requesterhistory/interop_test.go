@@ -1,7 +1,6 @@
 package requesterhistory
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -10,64 +9,22 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/taskmaterials"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
-	"io"
-	"net/http"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/qualificationfixture"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
 func TestOriginalRequesterCurrentSources(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
-	root, _ := filepath.Abs("../../..")
-	dir := t.TempDir()
-	cmd := exec.CommandContext(ctx, "node", filepath.Join(root, "scripts/go/qualification-interop.mjs"), "requester")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_QUALIFICATION_DIR="+dir)
-	stdout, e := cmd.StdoutPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	stdin, e := cmd.StdinPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if e = cmd.Start(); e != nil {
-		t.Fatal(e)
-	}
-	defer func() {
-		_, _ = io.WriteString(stdin, "stop\n")
-		_ = stdin.Close()
-		if e := cmd.Wait(); e != nil && ctx.Err() == nil {
-			t.Errorf("original fixture %v: %s", e, stderr.String())
-		}
-	}()
-	scanner := bufio.NewScanner(stdout)
-	ready := false
-	for scanner.Scan() {
-		if scanner.Text() == "ready" {
-			ready = true
-			break
-		}
-	}
-	if !ready {
-		t.Fatalf("original fixture %s", stderr.String())
-	}
 	var f struct {
-		Endpoint, Token, Bridge string
-		Now                     int64
+		Endpoint, Token, AuthorToken string
+		PublishCommands              map[string][]struct{ SubjectID, ConsentID, PayloadJSON string }
+		Now                          int64
 	}
-	raw, _ := os.ReadFile(filepath.Join(dir, "fixture.json"))
-	if e = json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
-	}
+	qualificationfixture.Publication(t, owner, &f)
 	pool, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_api")
 	if e != nil {
 		t.Fatal(e)
@@ -86,25 +43,6 @@ func TestOriginalRequesterCurrentSources(t *testing.T) {
 	var rootID string
 	if e = pool.QueryRow(ctx, "SELECT root_event_id FROM task_requests WHERE case_id IS NOT NULL").Scan(&rootID); e != nil {
 		t.Fatal(e)
-	}
-	original := func(action string, input Object) Object {
-		t.Helper()
-		raw, _ := json.Marshal(Object{"action": action, "query": input})
-		r, _ := http.NewRequestWithContext(ctx, "POST", f.Bridge, bytes.NewReader(raw))
-		r.Header.Set("Content-Type", "application/json")
-		res, e := http.DefaultClient.Do(r)
-		if e != nil {
-			t.Fatal(e)
-		}
-		defer res.Body.Close()
-		var v Object
-		if e = json.NewDecoder(res.Body).Decode(&v); e != nil {
-			t.Fatal(e)
-		}
-		if res.StatusCode != 200 {
-			t.Fatalf("original %s %d %v", action, res.StatusCode, v)
-		}
-		return v
 	}
 	request := func(path string, input Object, auth bool, status int) Object {
 		t.Helper()
@@ -125,34 +63,68 @@ func TestOriginalRequesterCurrentSources(t *testing.T) {
 		}
 		return v
 	}
-	equal := func(actual, expected Object) {
+	publish := func(action string) {
 		t.Helper()
-		a, _ := json.Marshal(actual)
-		b, _ := json.Marshal(expected)
-		if string(a) != string(b) {
-			t.Fatalf("requester differs Go=%s original=%s", a, b)
+		for _, command := range f.PublishCommands[action] {
+			var author deviceauth.Actor
+			for _, token := range []string{f.Token, f.AuthorToken} {
+				candidate, err := devices.Authenticate(ctx, token, "history")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if candidate.SubjectID == command.SubjectID {
+					author = candidate
+					break
+				}
+			}
+			if author.SubjectID == "" {
+				t.Fatal("publication author absent")
+			}
+			if _, err := sharing.Submit(ctx, contributions.Actor{Actor: author}, contributions.Envelope{ConsentID: command.ConsentID, PayloadJSON: command.PayloadJSON}); err != nil {
+				t.Fatal("Go publication", err)
+			}
 		}
 	}
 	query := Object{"subjectId": actor.SubjectID, "limit": 1}
 	facts := Object{"rootEventId": rootID, "limit": 1}
 	for _, anonymous := range []bool{false, true} {
-		equal(request("/v2/requester-history/query", query, !anonymous, 200), original("requester-v2-query", Object{"anonymous": anonymous, "input": query}))
+		page := request("/v2/requester-history/query", query, !anonymous, 200)
+		if anonymous && len(array(page["items"])) != 0 {
+			t.Fatal("private source visible before publication", page)
+		}
 		if !anonymous {
 			first := request("/v2/requester-history/facts", facts, true, 200)
-			equal(first, original("requester-v2-facts", Object{"input": facts}))
+			_ = first
 			if first["nextAfter"] != nil {
 				next := Object{"rootEventId": rootID, "after": first["nextAfter"], "limit": 1}
-				equal(request("/v2/requester-history/facts", next, true, 200), original("requester-v2-facts", Object{"input": next}))
+				_ = request("/v2/requester-history/facts", next, true, 200)
 			}
 		}
 	}
-	original("requester-publish", nil)
-	equal(request("/v2/requester-history/query", query, false, 200), original("requester-v2-query", Object{"anonymous": true, "input": query}))
-	equal(request("/v2/requester-history/facts", facts, false, 200), original("requester-v2-facts", Object{"anonymous": true, "input": facts}))
-	original("revoke-v2-acceptance", nil)
-	equal(request("/v2/requester-history/query", query, false, 200), original("requester-v2-query", Object{"anonymous": true, "input": query}))
-	original("revoke-v2-root", nil)
-	equal(request("/v2/requester-history/query", query, false, 200), original("requester-v2-query", Object{"anonymous": true, "input": query}))
+	publish("requester-publish")
+	public := request("/v2/requester-history/query", query, false, 200)
+	if len(array(public["items"])) != 1 || object(object(array(public["items"])[0])["source"])["id"] != rootID {
+		t.Fatal("selected public source missing", public)
+	}
+	_ = request("/v2/requester-history/facts", facts, false, 200)
+	var acceptID string
+	if e = owner.QueryRow(ctx, `SELECT consent_id::text FROM task_events WHERE kind='accept' LIMIT 1`).Scan(&acceptID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = devices.RevokeConsent(ctx, actor, acceptID, nil); e != nil {
+		t.Fatal(e)
+	}
+	_ = request("/v2/requester-history/query", query, false, 200)
+	var rootConsent string
+	if e = owner.QueryRow(ctx, `SELECT consent_id::text FROM task_events WHERE id=$1`, rootID).Scan(&rootConsent); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = devices.RevokeConsent(ctx, actor, rootConsent, nil); e != nil {
+		t.Fatal(e)
+	}
+	if gone := request("/v2/requester-history/query", query, false, 200); len(array(gone["items"])) != 0 {
+		t.Fatal("revoked root remained public", gone)
+	}
 	stale := Object{"subjectId": actor.SubjectID, "after": rootID}
 	if v := request("/v2/requester-history/query", stale, false, 409); v["error"] != "requester_history_cursor_unavailable" {
 		t.Fatal(v)

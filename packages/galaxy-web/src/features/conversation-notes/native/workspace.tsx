@@ -3,7 +3,7 @@ import React,{useEffect,useEffectEvent,useId,useLayoutEffect,useRef,useState} fr
 import {Button} from '@/components/ui/button';
 import {Textarea} from '@/components/ui/textarea';
 import {getSummaryRuntime} from "./runtime.mjs";
-import {summaryContentSchema} from "../../../../../galaxy-official/src/shared/personal-summary-schema.mjs";
+import {summaryContentSchema} from "../../../../../galaxy-contracts/src/personal-summary-schema.mjs";
 import {PageLoading} from "../../../site-shell";
 import {useChoiceViewLease} from "../../../shared/operations/choice-retained-operations";
 import "../../../profile-settings.css";

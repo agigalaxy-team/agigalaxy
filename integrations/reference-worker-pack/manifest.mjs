@@ -1,4 +1,4 @@
-import { workerPackManifestSchema } from '../../packages/galaxy-official/src/shared/builder-support-v2-schema.mjs';
+import { workerPackManifestSchema } from '../../packages/galaxy-contracts/src/builder-support-v2-schema.mjs';
 
 // Source references and the actual source digest come from the owner's selected
 // release. Creating or reading this manifest never starts the Worker.

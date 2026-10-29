@@ -1,20 +1,15 @@
 package native
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
+	"time"
 )
 
 func TestUploadPrivacyAndProjectionMatchOriginalJavaScript(t *testing.T) {
-	_, file, _, _ := runtime.Caller(0)
-	root := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(file), "../../..")))
-	script := `import {normalizeUploadPrivacy,selectUploadPrivacy} from 'file:///` + root + `/packages/galaxy-core/src/upload-privacy.mjs';let raw='';for await(const part of process.stdin)raw+=part;const cases=JSON.parse(raw);console.log(JSON.stringify(cases.map(x=>{try{const current=normalizeUploadPrivacy(x.current);return {current,selected:selectUploadPrivacy(current,x.selection,'2033-05-18T03:33:20.000Z')}}catch(e){return {error:e.code}}})));`
 	rawCases := []byte(`[
  {"current":null,"selection":{"level":"work-content"}},
  {"current":{"level":"conversation-archive","revision":4,"includeFullConversations":true,"sessionIds":[" a ",null,7,"a","\ufeffb\ufeff",""]},"selection":{"level":"conversation-archive","sessionIds":["b","a"]}},
@@ -23,9 +18,7 @@ func TestUploadPrivacyAndProjectionMatchOriginalJavaScript(t *testing.T) {
  {"current":{"level":"conversation-archive","revision":7,"includeFullConversations":false,"sessionIds":[]},"selection":{"level":"conversation-archive","includeFullConversations":true,"sessionIds":[]}},
  {"current":{"level":"work-content","revision":9},"selection":{"level":"conversation-archive","includeFullConversations":true,"sessionIds":[" one ","one"]}}
  ]`)
-	cmd := exec.Command("node", "--input-type=module", "-e", script)
-	cmd.Stdin = bytes.NewReader(rawCases)
-	raw, e := cmd.Output()
+	raw, e := os.ReadFile(filepath.Join("testdata", "contracts", "upload-privacy-v1.json"))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -55,9 +48,19 @@ func TestUploadPrivacyAndProjectionMatchOriginalJavaScript(t *testing.T) {
 		same(t, expected[i], map[string]any{"current": current, "selected": selected})
 	}
 	store := materialStore(t)
-	program := `import {createLocalWorkHistory} from 'file:///` + root + `/packages/galaxy-core/src/work-history/index.mjs';import {projectWorkHistoryForUpload} from 'file:///` + root + `/packages/galaxy-core/src/upload-privacy.mjs';const history=createLocalWorkHistory({dataDirectory:process.argv[1]});await history.observeEnvironment({host:'opencode',sessionId:'opaque-session',facts:{host:'opencode',selectedModel:'local/model',tools:['editor','mcp:source','ignored/path'],configuredModel:'private-choice',cwd:'private/path'}});const note=await history.recordNote({host:'opencode',sessionId:'opaque-session',text:'Isolated model report',sourceKind:'model-report'});const record=await history.exportWork({workId:note.workId});console.log(JSON.stringify({workId:note.workId,projections:['local-only','history-overview','work-content','conversation-archive'].map(level=>projectWorkHistoryForUpload({level},record))}));`
-	cmd = exec.Command("node", "--input-type=module", "-e", program, store.Directory)
-	raw, e = cmd.Output()
+	// Preserve the original synthetic work-history database and its JS projection bytes.
+	database, e := os.ReadFile(filepath.Join("testdata", "legacy-upload", "history.sqlite"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	path := filepath.Join(store.Directory, "work-history", "history.sqlite")
+	if e = os.MkdirAll(filepath.Dir(path), 0700); e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile(path, database, 0600); e != nil {
+		t.Fatal(e)
+	}
+	raw, e = os.ReadFile(filepath.Join("testdata", "legacy-upload", "projections.json"))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -109,26 +112,39 @@ func TestUploadPrivacyReviewedPersistenceKeepsLocalAndAdoptedOwnersSeparate(t *t
 	if e != nil {
 		t.Fatal(e)
 	}
-	_, file, _, _ := runtime.Caller(0)
-	root := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(file), "../../..")))
-	original := func(owner string) any {
-		script := `import {getLocalUploadPrivacy} from 'file:///` + root + `/packages/galaxy-core/src/application/local-operations.mjs';console.log(JSON.stringify(await getLocalUploadPrivacy(process.argv[1],{getIdentity:()=>({id:process.argv[2]})})));`
-		cmd := exec.Command("node", "--input-type=module", "-e", script, store.Directory, owner)
-		raw, e := cmd.Output()
-		if e != nil {
-			t.Fatal(e)
+	compareOriginal := func(owner string, view any) {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join("testdata", "legacy-upload", owner+".json"))
+		if err != nil {
+			t.Fatal(err)
 		}
-		var value any
-		if e = json.Unmarshal(raw, &value); e != nil {
-			t.Fatal(e)
+		var expected map[string]any
+		if err = json.Unmarshal(raw, &expected); err != nil {
+			t.Fatal(err)
 		}
-		return value
+		actualBytes, err := json.Marshal(view)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var actual map[string]any
+		if err = json.Unmarshal(actualBytes, &actual); err != nil {
+			t.Fatal(err)
+		}
+		stamp, ok := actual["settings"].(map[string]any)["updatedAt"].(string)
+		if !ok {
+			t.Fatal("missing preference timestamp")
+		}
+		if _, err = time.Parse(time.RFC3339Nano, stamp); err != nil {
+			t.Fatal(err)
+		}
+		expected["settings"].(map[string]any)["updatedAt"] = stamp
+		same(t, expected, actual)
 	}
 	view, e := rt.GetUploadPrivacy(ctx)
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, original(scope.Owner), view)
+	compareOriginal(scope.Owner, view)
 	activePath := connectionRecordPath(store.Directory, "native-active:"+store.Endpoint)
 	if e = os.MkdirAll(filepath.Dir(activePath), 0700); e != nil {
 		t.Fatal(e)
@@ -151,7 +167,7 @@ func TestUploadPrivacyReviewedPersistenceKeepsLocalAndAdoptedOwnersSeparate(t *t
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, original(adopted.Owner), view)
+	compareOriginal(adopted.Owner, view)
 	if _, e = rt.SetUploadPrivacyReviewed(ctx, UploadPrivacySelection{Level: "conversation-archive"}, &scope); e == nil {
 		t.Fatal("stale owner choice overwrote adopted preference")
 	}

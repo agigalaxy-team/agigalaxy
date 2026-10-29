@@ -8,43 +8,35 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/runtimeconfig"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/accessfixture"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/feedbackfixture"
 )
 
 func TestDevelopmentEntryComposesOriginalAssetsAndBoundaries(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("production entry rejects root runtime")
 	}
-	_, dsn := testsupport.PostgreSQL(t)
+	pool, dsn := testsupport.PostgreSQL(t)
 	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	setup := exec.Command("node", filepath.Join(root, "scripts/go/feedback-fixture.mjs"), "setup")
-	setup.Dir, setup.Env = root, append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	if _, err := setup.Output(); err != nil {
-		t.Fatal("isolated original schema setup failed")
-	}
-	config := exec.Command("node", filepath.Join(root, "scripts/go/access-fixture.mjs"), t.TempDir())
-	config.Dir = root
-	raw, err := config.Output()
-	if err != nil {
-		t.Fatal("isolated original configuration fixture failed")
-	}
-	var files struct{ Endpoint, AccountFile, OperationsFile, IdentityFile string }
-	if json.Unmarshal(raw, &files) != nil {
-		t.Fatal("configuration result invalid")
-	}
+	feedbackfixture.Create(t, pool)
+	files := accessfixture.Create(t, t.TempDir(), "https://api.example.invalid", "https://web.example.invalid", "https://admin.example.invalid")
 	// The existing installation records current registries before readers use
 	// them. Seed that original source in this isolated cluster, never bypass it.
-	registry := exec.Command("node", filepath.Join(root, "scripts/go/feedback-fixture.mjs"), "entry-runtime", files.Endpoint)
-	registry.Dir, registry.Env = root, append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	if output, err := registry.CombinedOutput(); err != nil {
-		t.Fatalf("original entry registry %v %s", err, output)
+	governance, err := community.ParseGovernance(community.Object{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = runtimeconfig.RecordLoaded(context.Background(), pool, files.Endpoint, "api", "isolated-go-entry", runtimeconfig.LoadedSources{Governance: governance}, runtimeconfig.Options{Now: func() time.Time { return time.Unix(2000000000, 0) }}); err != nil {
+		t.Fatalf("current entry registry: %v", err)
 	}
 	// The real entry reads configuration, but this test never discovers or calls
 	// the fixture .invalid identity servers and never uses host credentials.

@@ -1,4 +1,4 @@
-import {nativeDiagnostics} from '../../../packages/galaxy-edge-mcp/src/native-v2/diagnostics.mjs';
+import {nativeDiagnostics} from './bridge/native-diagnostics.mjs';
 
 const outputSchema = {type: 'object', additionalProperties: false, required: ['title', 'summary', 'outcome'], properties: {
   title: {type: 'string', minLength: 1, maxLength: 180}, summary: {type: 'string', minLength: 1, maxLength: 12000},

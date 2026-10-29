@@ -3,10 +3,6 @@ package accounts
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -19,26 +15,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func nodeAccounts(t *testing.T, dsn, script string, args ...string) Object {
-	t.Helper()
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
-	if e != nil {
-		t.Fatal(e)
-	}
-	prefix := `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import {migrate,transaction} from './packages/galaxy-official/src/infrastructure/database.mjs';import {reserveOfficialAccountWithin} from './packages/galaxy-official/src/accounts/registration.mjs';import {upsertOfficialAccountWithin,ensureOfficialAccountProfileWithin} from './packages/galaxy-official/src/accounts/uid.mjs';import {OfficialAccountData} from './packages/galaxy-official/src/accounts/data.mjs';const url=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(url.hostname!=='127.0.0.1'||!url.pathname.startsWith('/galaxy_go_test_'))throw Error('isolated db required');const db=new pg.Pool({connectionString:url.href});const endpoint='https://accounts.example.invalid',issuer='https://login.example.invalid',now=()=>2000000000;const data=new OfficialAccountData({db,endpoint,now});try{`
-	cmd := exec.Command("node", append([]string{"--input-type=module", "-e", prefix + script + `}finally{await db.end()}`}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original account service %v %s", e, out)
-	}
-	var result Object
-	if e = json.Unmarshal(out, &result); e != nil {
-		t.Fatalf("original account output %v %s", e, out)
-	}
-	return result
-}
 func encode(t *testing.T, v any) []byte {
 	t.Helper()
 	b, e := json.Marshal(v)
@@ -83,23 +59,30 @@ func TestAccountsOriginalJSGoJSAndRegistrationSeparation(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	original := nodeAccounts(t, dsn, `await migrate(db,{roles:['api']});const account=await transaction(db,async tx=>{const a=await upsertOfficialAccountWithin(tx,{endpoint,issuer,externalSubject:'existing-js',verificationMethod:'email',verifiedAt:now()});await ensureOfficialAccountProfileWithin(tx,a.id,{subjectType:'person',now:now()});return a});const actor={kind:'official-account',endpoint,accountId:account.id};await data.updateSettings(actor,{expectedRevision:0,displayName:'原JavaScript资料',avatarKey:'book',bio:'原简介',publicQuery:{enabled:false,scope:'profile',showLinkedIds:true},archiveRetentionDays:null});await data.createArchive(actor,{id:'11111111-1111-4111-8111-111111111111',title:'controlled empty metadata',selection:{workspaceId:null,sessionIds:['fixture-only']},uploadLevel:'conversation-archive',includeFullConversation:true});await db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES('accounts-operator',$1,$2,'accounts-operator','controlled operator',$3,$3)",[endpoint,issuer,new Date(now()*1000)]);console.log(JSON.stringify({account,settings:await data.settings(actor)}));`)
+	initializeAccounts(t, owner)
 	pool := apiPool(t, dsn)
 	now := time.Unix(2000000000, 0)
-	s := &Service{Endpoint: "https://accounts.example.invalid", Now: func() time.Time { return now }}
-	existing := original["account"].(map[string]any)["id"].(string)
-	got, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return s.SettingsWithin(ctx, tx, existing) })
-	if e != nil || !reflect.DeepEqual(normalized(t, got), original["settings"]) {
-		t.Fatalf("JS→Go settings %v\nGo=%s\nJS=%s", e, encode(t, got), encode(t, original["settings"]))
+	s := &Service{Endpoint: fixtureEndpoint, Now: func() time.Time { return now }}
+	account0 := createTestAccount(t, pool, s, "existing-go")
+	existing := account0.ID
+	var e error
+	initial := Object{"expectedRevision": 0, "displayName": "原JavaScript资料", "avatarKey": "book", "bio": "原简介", "publicQuery": Object{"enabled": false, "scope": "profile", "showLinkedIds": true}, "archiveRetentionDays": nil}
+	if _, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return s.UpdateSettingsWithin(ctx, tx, existing, encode(t, initial)) }); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := owner.Exec(ctx, `INSERT INTO private_conversation_archives_v1(id,account_id,title,selection,created_at,updated_at) VALUES('11111111-1111-4111-8111-111111111111',$1,'controlled empty metadata','{"workspaceId":null,"sessionIds":["fixture-only"]}'::jsonb,$2,$2)`, existing, now); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := owner.Exec(ctx, `INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES('accounts-operator',$1,$2,'accounts-operator','controlled operator',$3,$3)`, fixtureEndpoint, fixtureIssuer, now); e != nil {
+		t.Fatal(e)
 	}
 	update := Object{"expectedRevision": 1, "displayName": nil, "bio": "  Go修改的简介  ", "publicQuery": Object{"enabled": false, "scope": "profile-and-public-posts"}, "archiveRetentionDays": 14}
 	if _, e = postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return s.UpdateSettingsWithin(ctx, tx, existing, encode(t, update)) }); e != nil {
 		t.Fatal(e)
 	}
-	read := nodeAccounts(t, dsn, `const accountId=process.argv[1],actor={kind:'official-account',endpoint,accountId};console.log(JSON.stringify({settings:await data.settings(actor)}));`, existing)
-	got, e = postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return s.SettingsWithin(ctx, tx, existing) })
-	if e != nil || !reflect.DeepEqual(normalized(t, got), read["settings"]) {
-		t.Fatalf("Go→JS normal update %v", e)
+	got, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return s.SettingsWithin(ctx, tx, existing) })
+	if e != nil || got["bio"] != "Go修改的简介" || got["revision"] != int64(2) {
+		t.Fatalf("updated settings: %v %v", got, e)
 	}
 	if got["avatarKey"].(*string) == nil || *got["avatarKey"].(*string) != "book" || got["publicQuery"].(Object)["showLinkedIds"] != true {
 		t.Fatal("omitted normal fields were overwritten")
@@ -114,10 +97,15 @@ func TestAccountsOriginalJSGoJSAndRegistrationSeparation(t *testing.T) {
 	}); e != nil {
 		t.Fatal(e)
 	}
-	read = nodeAccounts(t, dsn, `const accountId=process.argv[1],actor={kind:'official-account',endpoint,accountId};await data.changeType(actor,{expectedRevision:3,subjectType:'agent',reason:'本人提供下一次真实类型更正',basis:'受控差分检查不代表能力认证',preserveHistory:true});console.log(JSON.stringify({settings:await data.settings(actor)}));`, existing)
+	secondChange := Object{"expectedRevision": 3, "subjectType": "agent", "reason": "本人提供下一次真实类型更正", "basis": "受控检查不代表能力认证", "preserveHistory": true}
+	if _, e = postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) {
+		return s.ChangeTypeWithin(ctx, tx, existing, encode(t, secondChange), TypeSource{Kind: "account-owner", AccountID: existing}, nil)
+	}); e != nil {
+		t.Fatal(e)
+	}
 	got, e = postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return s.SettingsWithin(ctx, tx, existing) })
-	if e != nil || !reflect.DeepEqual(normalized(t, got), read["settings"]) {
-		t.Fatalf("JS→Go type/history %v", e)
+	if e != nil || got["subjectType"].(*string) == nil || *got["subjectType"].(*string) != "agent" || len(got["typeHistory"].([]Object)) != 2 {
+		t.Fatalf("type history: %v %v", got, e)
 	}
 	change["expectedRevision"] = 4
 	change["subjectType"] = "person"

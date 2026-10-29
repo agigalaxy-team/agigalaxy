@@ -2,12 +2,10 @@ package workerconfig
 
 import (
 	"context"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
@@ -18,12 +16,8 @@ func TestExplicitAdoptionIndependentWorkerAndShutdown(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
 	defer cancel()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/web-events-interop.mjs"), "setup")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	if out, e := cmd.CombinedOutput(); e != nil {
-		t.Fatalf("original schema: %v %s", e, out)
+	if _, e := databaseschema.Migrate(ctx, pool, nil); e != nil {
+		t.Fatal(e)
 	}
 	config := Config{DatabaseURL: dsn, Endpoint: "https://events.invalid"}
 	if _, e := Open(ctx, config); fault.Code(e) != "operations_jobs_schema_unavailable" {
@@ -33,14 +27,8 @@ func TestExplicitAdoptionIndependentWorkerAndShutdown(t *testing.T) {
 	if e := pool.QueryRow(ctx, "SELECT to_regclass('galaxy_go_jobs.control_v1') IS NULL").Scan(&missing); e != nil || !missing {
 		t.Fatal("construction created schema")
 	}
-	for _, name := range []string{"api-role.sql", "worker-role.sql"} {
-		b, e := os.ReadFile(filepath.Join(root, "packages/galaxy-official/src/infrastructure", name))
-		if e != nil {
-			t.Fatal(e)
-		}
-		if _, e = pool.Exec(ctx, string(b)); e != nil {
-			t.Fatal(e)
-		}
+	if _, e := databaseschema.Migrate(ctx, pool, []string{"api", "worker"}); e != nil {
+		t.Fatal(e)
 	}
 	tx, e := pool.Begin(ctx)
 	if e != nil {

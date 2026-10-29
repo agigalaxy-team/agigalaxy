@@ -5,19 +5,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	a "github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/autonomyfixture"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -26,25 +26,13 @@ func TestTickOriginalCatchUpAndRealRiverWorkerRole(t *testing.T) {
 	admin, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string) a.Object {
-		t.Helper()
-		cmd := exec.CommandContext(ctx, "node", filepath.Join(root, "scripts/go/operations-autonomy-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o a.Object
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid fixture result")
-		}
-		return o
+	f := operationsfixture.NewEndpoint(t, admin, "https://autonomy.example.invalid")
+	automation := f.Automation(t)
+	autonomyfixture.Setup(t, f, automation)
+	endpoint := f.Endpoint
+	if _, e := databaseschema.Migrate(ctx, admin, []string{"worker"}); e != nil {
+		t.Fatal(e)
 	}
-	base := node("setup")
-	node("worker-provision")
-	endpoint := base["endpoint"].(string)
 	tx, e := admin.Begin(ctx)
 	if e != nil {
 		t.Fatal(e)

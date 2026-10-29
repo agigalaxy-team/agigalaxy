@@ -4,20 +4,16 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
-import { createApi } from '../../galaxy-official/src/http.mjs';
-import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
+import { goDomainFixture } from './go-domain-fixture.mjs';
 import { createNativeA2aHostV2 } from '../src/hosts/host-flow-v2.mjs';
 import { hash } from '../src/storage/journal.mjs';
 import { pythonPeer } from './python-peer.mjs';
 
-test('actual v2 Official HTTP and independent Python SDK recover only proven original unknown Task after restart',
+test('actual v2 Go HTTP and independent Python SDK recover only proven original unknown Task after restart',
   { skip: !process.env.GALAXY_A2A_PYTHON, timeout: 120000 }, async t => {
   const peer = await pythonPeer(process.env.GALAXY_A2A_PYTHON); t.after(() => peer.close());
-  const f = await serviceFixture(); t.after(() => f.db.close());
-  const api = createApi({ ...f, rateLimit: 500, failureAudit: async () => 'stored' });
-  await new Promise(r => api.listen(0, '127.0.0.1', r));
-  t.after(() => new Promise(r => { api.close(r); api.closeAllConnections(); }));
-  const origin = 'http://127.0.0.1:' + api.address().port, http = [], checks = [];
+  const {owner:f,origin}=await goDomainFixture(t);
+  const http=[],checks=[];
   const directory = await mkdtemp(join(tmpdir(), 'galaxy-a2a-original-http-'));
   t.after(() => { assert.ok(resolve(directory).startsWith(resolve(tmpdir()) + sep)); return rm(directory, { recursive: true, force: true }); });
   let current = f.actor.subjectId, generation = 1, principal = 'synthetic-local', clock = Date.now();

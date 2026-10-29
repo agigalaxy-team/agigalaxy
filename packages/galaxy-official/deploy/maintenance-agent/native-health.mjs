@@ -1,5 +1,5 @@
 import {readFile,lstat} from 'node:fs/promises';
-import {MeilisearchClient,GorseClient,OpenPanelClient} from '../../src/discovery-runtime/native-clients.mjs';
+import {MeilisearchClient,GorseClient,OpenPanelClient} from '../support/native-clients.mjs';
 import {postgresSqlArguments} from '../operations-stack/host.mjs';
 
 const fail=code=>Object.assign(Error(code),{code});

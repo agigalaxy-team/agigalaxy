@@ -1,8 +1,8 @@
-import { projectEventV2Schema } from "../../../../../galaxy-official/src/shared/projects-schema-v2.mjs";
-import { contactEventV2Schema } from "../../../../../galaxy-official/src/shared/contacts-schema-v2.mjs";
-import { recruitmentEventV2Schema } from "../../../../../galaxy-official/src/shared/recruitment-schema-v2.mjs";
-import { recruitmentOperationReceiptResultSchema } from "../../../../../galaxy-official/src/shared/recruitment-schema-v2.mjs";
-import { sha256Hex } from "../../../../../galaxy-official/src/shared/web-primitives.mjs";
+import { projectEventV2Schema } from "../../../../../galaxy-contracts/src/projects-schema-v2.mjs";
+import { contactEventV2Schema } from "../../../../../galaxy-contracts/src/contacts-schema-v2.mjs";
+import { recruitmentEventV2Schema } from "../../../../../galaxy-contracts/src/recruitment-schema-v2.mjs";
+import { recruitmentOperationReceiptResultSchema } from "../../../../../galaxy-contracts/src/recruitment-schema-v2.mjs";
+import { sha256Hex } from "../../../../../galaxy-contracts/src/web-primitives.mjs";
 const types = {
   project: { schema: projectEventV2Schema, path: '/v2/projects', field: 'projectId' },
   contact: { schema: contactEventV2Schema, path: '/v2/contacts', field: 'contactId' },

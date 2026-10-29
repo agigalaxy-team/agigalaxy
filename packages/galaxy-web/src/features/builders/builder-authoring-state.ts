@@ -1,7 +1,7 @@
 import * as z from 'zod/v4';
 import type {createWebRuntime} from "../../runtime.mjs";
-import {builderDeclarationSchema,builderEventSchema} from "../../../../galaxy-official/src/shared/builders-schema.mjs";
-import {builderExtensionEventSchema,builderSupportProfileSchema,workerPackManifestSchema} from "../../../../galaxy-official/src/shared/builder-support-v2-schema.mjs";
+import {builderDeclarationSchema,builderEventSchema} from "../../../../galaxy-contracts/src/builders-schema.mjs";
+import {builderExtensionEventSchema,builderSupportProfileSchema,workerPackManifestSchema} from "../../../../galaxy-contracts/src/builder-support-v2-schema.mjs";
 
 export type BuilderDeclaration=z.infer<typeof builderDeclarationSchema>;
 export type BuilderSupport=z.infer<typeof builderSupportProfileSchema>;

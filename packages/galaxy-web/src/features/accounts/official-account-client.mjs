@@ -1,6 +1,6 @@
-import {isAccountChatJsonPath,isAccountBinaryPath,isAccountUploadPath,isAccountBookmarkPath,accountFeedbackOperationId} from "../../../../galaxy-official/src/shared/account-resource-routes.mjs";
-import {accountAvatarKey} from "../../../../galaxy-official/src/shared/account-profile-presentation.mjs";
-import {accountFollowMethod} from "../../../../galaxy-official/src/shared/account-follows-schema.mjs";
+import {isAccountChatJsonPath,isAccountBinaryPath,isAccountUploadPath,isAccountBookmarkPath,accountFeedbackOperationId} from "../../../../galaxy-contracts/src/account-resource-routes.mjs";
+import {accountAvatarKey} from "../../../../galaxy-contracts/src/account-profile-presentation.mjs";
+import {accountFollowMethod} from "../../../../galaxy-contracts/src/account-follows-schema.mjs";
 const guid=value=>typeof value==='string'&&/^GUID1[0-5][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/.test(value);
 const accountId=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const accountUid=value=>typeof value==='string'&&/^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{6,16}$/.test(value);

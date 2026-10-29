@@ -8,17 +8,13 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const npmCli = process.env.GALAXY_TEST_NPM_CLI && isAbsolute(process.env.GALAXY_TEST_NPM_CLI) ? process.env.GALAXY_TEST_NPM_CLI : join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
 export function catalog(env = process.env) {
   return [
-    { id: 'requirements', args: ['scripts/check-requirements.mjs'], scope: 'Read-only source, reading-packet and preserved legacy-plan checks; not proof of intent understanding or product acceptance' },
+    { id: 'requirements', args: ['scripts/check-requirements.mjs'], scope: 'Current source and document checks; not proof of product acceptance' },
     { id: 'fast', args: ['scripts/check.mjs', 'all'] },
     { id: 'adapter', args: ['node_modules/typescript/bin/tsc', '--project', 'tsconfig.json', '--noEmit', '--incremental', 'false', '--pretty', 'false'], scope: 'Root strict TypeScript including configured native entry; not rendered host acceptance' },
-    { id: 'host-contract', args: ['--test', '--test-concurrency=2', 'packages/galaxy-core/test/l3-initialization.test.mjs',
-      'packages/galaxy-core/test/host-connection.test.mjs', 'packages/galaxy-core/test/host-lifecycle.test.mjs', 'packages/galaxy-official/test/configured-adapter.test.mjs',
-      'packages/galaxy-official/test/history-adapter.test.mjs', 'packages/galaxy-official/test/remote-tools.test.mjs',
-      'packages/galaxy-official/test/remote-host-integration.test.mjs'], scope: 'Native API contract simulations and real MCP client with synthetic local service records; no live OpenCode rendering' },
-    { id: 'core-runtime', args: ['scripts/check-core-runtime.mjs'] },
-    { id: 'postgres', args: ['packages/galaxy-official/scripts/test-postgres.mjs'], prerequisite: env.GALAXY_TEST_PG_BIN && join(env.GALAXY_TEST_PG_BIN, process.platform === 'win32' ? 'initdb.exe' : 'initdb') },
-    { id: 'proxy', args: ['--test', 'packages/galaxy-official/test/proxy/caddy.test.mjs'], prerequisite: env.GALAXY_TEST_CADDY_BIN },
-    { id: 'tls', args: ['--test', 'packages/galaxy-official/test/tls/public-tls.test.mjs'], prerequisite: env.GALAXY_TEST_OPENSSL_BIN },
+    { id: 'go-hub', args: ['scripts/check-go.mjs', 'hub'], scope: 'Current Go Hub regressions; isolated database checks require GALAXY_GO_TEST_PG_BIN' },
+    { id: 'go-native', args: ['scripts/check-go.mjs', 'native-client'], scope: 'Current Go Native/local-data regressions; real host installation remains separate' },
+    { id: 'proxy', args: ['--test', 'packages/galaxy-official/deploy/test/caddy-candidate.test.mjs', 'packages/galaxy-official/deploy/test/website-deployment-routes.test.mjs'], prerequisite: env.GALAXY_TEST_CADDY_BIN },
+    { id: 'tls', args: ['--test', 'packages/galaxy-official/deploy/test/tls/public-tls.test.mjs'], prerequisite: env.GALAXY_TEST_OPENSSL_BIN },
     { id: 'client-install', args: ['scripts/test-client-install.mjs'], prerequisite: npmCli },
     { id: 'web-build', args: [npmCli, 'run', 'build'], prerequisite: npmCli },
   ];

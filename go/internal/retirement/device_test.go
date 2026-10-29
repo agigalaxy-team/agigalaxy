@@ -19,13 +19,14 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/devicefixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestRetirementActualDeviceGatesAndReceiptDeadline(t *testing.T) {
-	ownerPool, dsn := testsupport.PostgreSQL(t)
+	ownerPool, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
 	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
 	dir := t.TempDir()
@@ -35,14 +36,14 @@ func TestRetirementActualDeviceGatesAndReceiptDeadline(t *testing.T) {
 		t.Helper()
 		cmd := exec.Command("node", filepath.Join(root, "scripts/go", script), mode)
 		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN="+origin, "GALAXY_GO_TEST_SKIP_BOOTSTRAP=true", "GALAXY_GO_TEST_RETIREMENT_DIR="+dir)
+		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN="+origin, "GALAXY_GO_TEST_SKIP_BOOTSTRAP=true")
 		out, e := cmd.CombinedOutput()
 		if e != nil {
 			t.Fatalf("original fixture %s %s: %v %s", script, mode, e, out)
 		}
 		return out
 	}
-	_ = node("device-auth-interop.mjs", "setup")
+	devicefixture.New(t, ownerPool, dir)
 	var state struct {
 		DeviceID, PublicKeyPEM, OwnerPrivate, InstallationID string
 		Genesis                                              struct {
@@ -91,7 +92,7 @@ func TestRetirementActualDeviceGatesAndReceiptDeadline(t *testing.T) {
 	server := httptest.NewServer(controller.Handler(deviceauth.Handler{Service: service, Next: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })}))
 	defer server.Close()
 	origin = server.URL
-	_ = node("device-auth-interop.mjs", "client-consent")
+	_ = node("device-client-fixture.mjs", "client-consent")
 	token, e := os.ReadFile(filepath.Join(dir, "credential.txt"))
 	if e != nil {
 		t.Fatal(e)
@@ -107,21 +108,8 @@ func TestRetirementActualDeviceGatesAndReceiptDeadline(t *testing.T) {
 	if e != nil || verification.PublicKey != state.PublicKeyPEM || verification.KeyID != identity.Digest([]byte(state.PublicKeyPEM)) || verification.DeviceID == nil || *verification.DeviceID != state.DeviceID || verification.Epoch != 1 || verification.ChainHead == nil {
 		t.Fatalf("current public control mismatch %+v %v", verification, e)
 	}
-	var stranger struct {
-		Genesis struct {
-			ID           string
-			GenesisProof json.RawMessage
-		}
-		InstallationID string
-	}
-	if e = json.Unmarshal(node("retirement-interop.mjs", "stranger"), &stranger); e != nil {
-		t.Fatal(e)
-	}
-	strangerKeyRaw, e := os.ReadFile(filepath.Join(dir, "stranger-private.pem"))
-	if e != nil {
-		t.Fatal(e)
-	}
-	strangerKey, e := identity.PrivatePEM(strangerKeyRaw)
+	stranger := devicefixture.New(t, ownerPool, t.TempDir())
+	strangerKey, e := identity.PrivatePEM([]byte(stranger.OwnerPrivate))
 	if e != nil {
 		t.Fatal(e)
 	}

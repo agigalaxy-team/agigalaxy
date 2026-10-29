@@ -1,6 +1,6 @@
 import { chatCreateSchema, chatDecisionSchema, chatSendSchema, chatEditSchema, chatPageSchema, chatMessageReceiptResultSchema,
-  chatParticipantRefSchema,chatDirectorySchema,chatContextSchema,chatOperationReceiptSchema,chatOperationReceiptResultSchema } from "../../../../galaxy-official/src/shared/chat-schema.mjs";
-import {chatSendRequestHash,chatEditRequestHash} from "../../../../galaxy-official/src/shared/chat-message-request-hash.mjs";
+  chatParticipantRefSchema,chatDirectorySchema,chatContextSchema,chatOperationReceiptSchema,chatOperationReceiptResultSchema } from "../../../../galaxy-contracts/src/chat-schema.mjs";
+import {chatSendRequestHash,chatEditRequestHash} from "../../../../galaxy-contracts/src/chat-message-request-hash.mjs";
 export {chatSendRequestHash,chatEditRequestHash};
 const stoppedIndexWrites = new Map();
 

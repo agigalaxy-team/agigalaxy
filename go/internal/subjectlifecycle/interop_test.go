@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -31,14 +33,20 @@ func TestOriginalTakeoutSignedDeletionAndDurableResume(t *testing.T) {
 	origin := ""
 	node := func(mode string) {
 		t.Helper()
-		cmd := exec.CommandContext(ctx, "node", filepath.Join(root, "scripts/go/subject-lifecycle-interop.mjs"), mode)
+		cmd := exec.CommandContext(ctx, "node", filepath.Join(root, "scripts/go/subject-lifecycle-client.mjs"), mode)
 		cmd.Dir = root
 		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN="+origin)
 		if out, e := cmd.CombinedOutput(); e != nil {
 			t.Fatalf("original JS %s: %v %s", mode, e, out)
 		}
 	}
-	node("setup")
+	prepared := deviceauthfixture.Prepare(t, owner, dir, []string{"binding", "history", "data-export", "data-delete"})
+	for i, id := range []string{"00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"} {
+		reference, _ := json.Marshal(map[string]any{"kind": "forum-post", "postId": uuid.NewString(), "versionId": uuid.NewString()})
+		if _, e := owner.Exec(ctx, `INSERT INTO reading_bookmarks_v1(id,subject_id,reference_key,reference,saved,revision,created_at,saved_at,updated_at) VALUES($1,$2,$3,$4,true,1,now(),now(),now())`, id, prepared.Materials.Genesis.ID, fmt.Sprintf("fixture-%d", i), reference); e != nil {
+			t.Fatal(e)
+		}
+	}
 	api, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_api")
 	if e != nil {
 		t.Fatal(e)
@@ -90,9 +98,12 @@ func TestOriginalTakeoutSignedDeletionAndDurableResume(t *testing.T) {
 	raw, _ = os.ReadFile(filepath.Join(dir, "resume.json"))
 	_ = json.Unmarshal(raw, &saved)
 	// Mutable status is read again; a new service instance resumes the persisted
-	// ticket/cursor and the exact original JS reader can use the same ledger.
+	// ticket/cursor through the independent SDK reader.
 	service = makeService()
 	node("resume")
+	if _, e = owner.Exec(ctx, "UPDATE access_credentials SET revoked_at=now() WHERE binding_id=$1", saved.BindingID); e != nil {
+		t.Fatal(e)
+	}
 	node("status")
 	if _, e = service.Page(ctx, a, PageInput{ID: saved.Ticket.ID, Dataset: "identity"}); fault.Status(e) != 401 {
 		t.Fatal("revoked credential read resumed ticket", e)

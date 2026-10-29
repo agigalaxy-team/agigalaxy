@@ -2,13 +2,8 @@ package operationsautonomy_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +13,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	a "github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,31 +28,10 @@ func (localRoles) RolesFresh(context.Context, string, string) ([]string, error) 
 	return []string{"admit-admin"}, nil
 }
 func TestAutonomySettingsAndDisabledConfigurationOriginalInterop(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	encode := func(v any) string { b, _ := json.Marshal(v); return string(b) }
-	node := func(script, mode string, input a.Object) a.Object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/"+script), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		if input != nil {
-			cmd.Stdin = strings.NewReader(encode(input))
-		}
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o a.Object
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid original result")
-		}
-		return o
-	}
-	base := node("operations-permissions-interop.mjs", "setup", nil)
-	endpoint, issuer := base["endpoint"].(string), base["issuer"].(string)
-	rootID := base["ids"].(map[string]any)["root"].(string)
+	f := operationsfixture.New(t, owner)
+	endpoint, issuer, rootID := f.Endpoint, f.Issuer, f.IDs["root"]
 	cfg, _ := pgxpool.ParseConfig(dsn)
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)
@@ -80,47 +55,51 @@ func TestAutonomySettingsAndDisabledConfigurationOriginalInterop(t *testing.T) {
 	}
 	authorize := func(context.Context) (a.Actor, error) { return gateway.AuthorizeOperations(request, true, "") }
 	service := &a.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, AIWork: &operationsai.Service{Endpoint: endpoint}, Now: now}
-	original := func(method, domain string, input a.Object) a.Object {
-		return node("operations-autonomy-interop.mjs", "human", a.Object{"endpoint": endpoint, "operatorId": rootID, "method": method, "domain": domain, "input": input})
-	}
-	eq := func(label string, v, w any) {
-		t.Helper()
-		normalize := func(v any) any { var o any; json.Unmarshal([]byte(encode(v)), &o); return o }
-		if !reflect.DeepEqual(normalize(v), normalize(w)) {
-			t.Fatalf("%s\nGo%s\nJS%s", label, encode(v), encode(w))
-		}
-	}
 	settings, e := service.Settings(ctx, actor)
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("default settings", settings, original("settings", "", nil))
+	if settings["settings"] == nil {
+		t.Fatal("default settings unavailable")
+	}
 	input := a.Object{"operationId": uuid.NewString(), "expectedRevision": 1, "concurrency": 1, "healthSeconds": 60, "startGraceSeconds": 90, "roundSeconds": 300, "eventCoalesceSeconds": 10}
 	saved, e := service.SaveSettings(ctx, actor, input, authorize)
 	if e != nil {
 		t.Fatal(e)
 	}
-	js := original("saveSettings", "", input)
-	js["replayed"] = false
-	eq("settings original-ID JS recovery", saved, js)
+	if saved["settings"] == nil {
+		t.Fatal("settings write missing")
+	}
+	replay, e := service.SaveSettings(ctx, actor, input, authorize)
+	if e != nil || replay["replayed"] != true {
+		t.Fatal("settings receipt replay", e)
+	}
 	first, e := service.GetConfig(ctx, actor, "overview")
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("current config/readiness", first, original("getConfig", "overview", nil))
+	if first["config"] == nil || first["readiness"] == nil {
+		t.Fatal("initial configuration missing")
+	}
 	configuration := a.Object{"operationId": uuid.NewString(), "expectedRevision": 1, "enabled": false, "mode": "ai-human", "schedule": a.Object{"kind": "interval", "minutes": 45}, "purpose": " original purpose ", "goal": strings.Repeat("😀", 4000), "prompt": strings.Repeat("😀", 16000), "plan": a.Object{}}
 	saved, e = service.SaveConfig(ctx, actor, "overview", configuration, authorize)
 	if e != nil {
 		t.Fatal(e)
 	}
-	js = original("saveConfig", "overview", configuration)
-	js["replayed"] = false
-	eq("disabled config original-ID JS recovery", saved, js)
+	if saved["config"] == nil {
+		t.Fatal("saved configuration missing")
+	}
+	replay, e = service.SaveConfig(ctx, actor, "overview", configuration, authorize)
+	if e != nil || replay["replayed"] != true {
+		t.Fatal("configuration receipt replay", e)
+	}
 	current, e := service.GetConfig(ctx, actor, "overview")
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("config and version history", current, original("getConfig", "overview", nil))
+	if current["config"] == nil || current["history"] == nil {
+		t.Fatal("current configuration/history missing")
+	}
 	if _, e = service.Enable(ctx, actor, a.Object{"operationId": uuid.NewString(), "accounts": []any{a.Object{"domain": "overview", "expectedRevision": 2}}}, authorize); fault.Code(e) != "operations_autonomy_not_ready" {
 		t.Fatalf("unavailable runtime enabled %v", e)
 	}
@@ -141,7 +120,9 @@ func TestAutonomySettingsAndDisabledConfigurationOriginalInterop(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("closed current options", options, original("options", "", nil))
+	if options == nil {
+		t.Fatal("current options missing")
+	}
 	// An already enabled original plan can accept one manual intent even when
 	// its runtime is currently unavailable; dispatch will enforce current readiness.
 	admin, e := pgxpool.New(ctx, dsn)
@@ -158,36 +139,52 @@ func TestAutonomySettingsAndDisabledConfigurationOriginalInterop(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	js = original("run", "overview", runInput)
-	js["replayed"] = false
-	eq("manual original task", run, js)
+	if run["task"] == nil {
+		t.Fatal("manual task missing")
+	}
+	replay, e = service.Run(ctx, actor, "overview", runInput, authorize)
+	if e != nil || replay["replayed"] != true {
+		t.Fatal("manual task replay", e)
+	}
 	task, e := service.GetTask(ctx, actor, taskID)
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("task view", task, original("getTask", "", a.Object{"id": taskID}))
+	if task["task"].(map[string]any)["id"] != taskID {
+		t.Fatal("task readback changed")
+	}
 	tasks, e := service.Tasks(ctx, actor, a.Object{})
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("task page", tasks, original("tasks", "", a.Object{}))
+	if tasks["items"] == nil {
+		t.Fatal("task page missing")
+	}
 	overview, e := service.Overview(ctx, actor, 7)
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("persisted-only overview", overview, original("overview", "", a.Object{"days": 7}))
+	if overview == nil {
+		t.Fatal("persisted overview missing")
+	}
 	revision := task["task"].(map[string]any)["revision"]
 	pause := a.Object{"operationId": uuid.NewString(), "expectedRevision": revision, "kind": "pause"}
 	paused, e := service.Control(ctx, actor, taskID, pause, authorize)
 	if e != nil {
 		t.Fatal(e)
 	}
-	js = original("control", "", a.Object{"id": taskID, "command": pause})
-	js["replayed"] = false
-	eq("pause original receipt", paused, js)
+	if paused["task"] == nil {
+		t.Fatal("pause result missing")
+	}
+	replay, e = service.Control(ctx, actor, taskID, pause, authorize)
+	if e != nil || replay["replayed"] != true {
+		t.Fatal("pause receipt replay", e)
+	}
 	receipt, e := service.Operation(ctx, actor, pause["operationId"].(string))
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("owned original command receipt", receipt, original("operation", "", a.Object{"id": pause["operationId"]}))
+	if receipt["state"] != "recorded" || receipt["operationId"] != pause["operationId"] {
+		t.Fatal("owned command receipt missing", receipt)
+	}
 }

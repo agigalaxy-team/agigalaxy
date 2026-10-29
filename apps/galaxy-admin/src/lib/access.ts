@@ -1,5 +1,5 @@
 import type {Access,PayloadRequest} from 'payload';
-import {isOperationsPermission,operationsPermissionCatalog} from '../../../../packages/galaxy-official/src/operations-permission-catalog.mjs';
+import {isOperationsPermission,operationsPermissionCatalog} from '../../../../packages/galaxy-contracts/src/operations-permission-catalog.mjs';
 
 export type OperatorBusinessAuthorization={version:string;permissions:string[]};
 export type OperatorUser={id:string;collection:'operators';externalId:string;displayName:string;role:'administrator'|'reader';verifiedOperator:true;businessAuthorization?:OperatorBusinessAuthorization};

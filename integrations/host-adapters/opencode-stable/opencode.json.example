@@ -3,9 +3,10 @@
   "mcp": {
     "galaxy": {
       "type": "local",
-      "command": ["node", "C:/path/to/galaxy-founding-beta/packages/galaxy-edge-mcp/src/native-v2-entry.mjs"],
+      "command": ["node", "C:/path/to/galaxy/scripts/hub-runtime.mjs", "native"],
       "environment": {
-        "GALAXY_NATIVE_CONFIG": "C:/path/to/selected-public-native-config.json"
+        "GALAXY_NATIVE_CONFIG": "C:/path/to/selected-public-native-config.json",
+        "GALAXY_NATIVE_EXECUTABLE": "C:/path/to/galaxy.exe"
       },
       "enabled": true,
       "timeout": 10000

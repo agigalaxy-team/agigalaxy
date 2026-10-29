@@ -1,8 +1,8 @@
 import type {z} from 'zod/v4';
 import type {newForumDraft} from './community-forum-client.mjs';
-import {forumCreatePostSchema,forumPublishVersionSchema,forumCreateReplySchema,forumWithdrawPostSchema,forumWithdrawVersionSchema,forumWithdrawReplySchema,forumReportSchema,forumSupplementSchema,forumWithdrawReportSchema,forumAppealSchema,forumResolveSchema,forumTargetSchema,forumPostsQuerySchema} from "../../../../galaxy-official/src/shared/community-forum-v1-schema.mjs";
-import {forumReadTopicSchema} from "../../../../galaxy-official/src/shared/community-forum-topics-v1.mjs";
-import {forumAudienceSchema,forumAudienceRuleSchema,forumSectionWriteSchema} from "../../../../galaxy-official/src/shared/community-forum-access-v2.mjs";
+import {forumCreatePostSchema,forumPublishVersionSchema,forumCreateReplySchema,forumWithdrawPostSchema,forumWithdrawVersionSchema,forumWithdrawReplySchema,forumReportSchema,forumSupplementSchema,forumWithdrawReportSchema,forumAppealSchema,forumResolveSchema,forumTargetSchema,forumPostsQuerySchema} from "../../../../galaxy-contracts/src/community-forum-v1-schema.mjs";
+import {forumReadTopicSchema} from "../../../../galaxy-contracts/src/community-forum-topics-v1.mjs";
+import {forumAudienceSchema,forumAudienceRuleSchema,forumSectionWriteSchema} from "../../../../galaxy-contracts/src/community-forum-access-v2.mjs";
 import type {ForumAttachmentClient,ForumAttachmentView} from './forum-attachments';
 
 export type ForumDraft=ReturnType<typeof newForumDraft>;

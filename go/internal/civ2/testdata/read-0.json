@@ -1,0 +1,392 @@
+{
+  "input": {
+    "clock": 2000000040,
+    "queries": [
+      {
+        "id": "ff3da657-d4e0-43c2-9261-2bc917f79024",
+        "kind": "proof"
+      },
+      {
+        "id": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+        "kind": "proof"
+      },
+      {
+        "id": "8724ce0e-e2a7-45dc-9e22-d5b12ce8d7f0",
+        "kind": "request"
+      },
+      {
+        "input": {
+          "id": "8724ce0e-e2a7-45dc-9e22-d5b12ce8d7f0",
+          "type": "request"
+        },
+        "kind": "receipt"
+      },
+      {
+        "input": {
+          "refs": [
+            {
+              "id": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+              "type": "ci-proof-v2"
+            }
+          ]
+        },
+        "kind": "status"
+      }
+    ]
+  },
+  "results": [
+    {
+      "value": {
+        "proofId": "ff3da657-d4e0-43c2-9261-2bc917f79024",
+        "status": "active",
+        "signed": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LXByb29mK2p3dCIsImtpZCI6ImZpeHR1cmUifQ.eyJkYXRhIjp7InZlcnNpb24iOjIsInR5cGUiOiJjaS1leGVjdXRpb24tb2JzZXJ2YXRpb24iLCJzb3VyY2VQcm9maWxlIjoiZmFjdHMtdjIiLCJpZCI6ImZmM2RhNjU3LWQ0ZTAtNDNjMi05MjYxLTJiYzkxN2Y3OTAyNCIsInN1YmplY3QiOiJHVUlEMTUwMU02MVhEODMwWTQ4VFQwVkQ4MEs5UzExRSIsImlzc3VlciI6Imh0dHBzOi8vY2kuZXhhbXBsZS5pbnZhbGlkIiwiYmluZGluZ0lkIjoiZWNjYTA1YTYtNGY1OS00ZjQ4LWIwODMtZTQyOGFkYTY1OWJhIiwib2JzZXJ2YXRpb25JZCI6ImU3NTBjNWNhLTY0ZjQtNDAyNi1iY2QzLWFhNjIwZjM1ZTg2YiIsInNjb3BlIjoicmVmZXJlbmNlZC1jaS1ydW4tb25seSIsInN0cmVuZ3RoIjoiY2ktZXhlY3V0aW9uLWZhY3QiLCJpbmRlcGVuZGVuY2UiOiJyZXBvc2l0b3J5LWNvbnRyb2xsZWQiLCJhdHRyaWJ1dGlvbiI6InN1Ym1pdHRlci1hc3NlcnRlZCIsInNvdXJjZSI6eyJvd25lciI6IkZpeHR1cmUiLCJydW5JZCI6MTEsImNvbW1pdCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJhdHRlbXB0IjoxLCJwcm92aWRlciI6ImdpdGh1Yi1hY3Rpb25zIiwicmVwb3NpdG9yeSI6IlN5bnRoZXRpYyIsInJlcG9zaXRvcnlJZCI6NzcsInNvdXJjZVVwZGF0ZWRBdCI6IjIwMzMtMDUtMThUMDM6MzM6MjAuMDAwWiJ9LCJzb3VyY2VDb250cm9sIjp7InZlcnNpb24iOjEsIm9ic2VydmVkVmlhIjoiZ2l0aHViLXJlc3QtYXBpIiwicmVwb3NpdG9yeU93bmVyIjp7ImlkIjozLCJ0eXBlIjoiT3JnYW5pemF0aW9uIiwibG9naW4iOiJGaXh0dXJlIn0sInN1Ym1pdHRlckNvbnRyb2xWZXJpZmllZCI6ZmFsc2UsImluZGVwZW5kZW50RXhlY3V0aW9uVmVyaWZpZWQiOmZhbHNlfSwiY29uY2x1c2lvbiI6InN1Y2Nlc3MiLCJzeW50aGV0aWMiOmZhbHNlLCJ0YXNrT3V0Y29tZVZlcmlmaWNhdGlvbiI6Im5vdC1pbmRlcGVuZGVudGx5LXZlcmlmaWVkIiwiY2FwYWJpbGl0eVZlcmlmaWVkIjpmYWxzZSwicHJlcGFyZWRBdCI6MjAwMDAwMDAwMCwib2JzZXJ2ZWRBdCI6MjAwMDAwMDAwMCwiZXhwaXJlc0F0IjoyMDAwMDAzNjAwLCJsaW1pdGF0aW9ucyI6WyJSZXBvc2l0b3J5IHdvcmtmbG93cyBtYXkgYmUgY29udHJvbGxlZCBieSB0aGUgc3VibWl0dGVyLiIsIkEgQ0kgY29uY2x1c2lvbiBkb2VzIG5vdCBwcm92ZSB0YXNrIHF1YWxpdHkgb3IgaW5kaXZpZHVhbCBjb250cmlidXRpb24uIl0sInN0YXR1c1BhdGgiOiIvdjIvY2kvcHJvb2ZzL2ZmM2RhNjU3LWQ0ZTAtNDNjMi05MjYxLTJiYzkxN2Y3OTAyNC9zdGF0dXMifSwiaXNzIjoiaHR0cHM6Ly9jaS5leGFtcGxlLmludmFsaWQiLCJhdWQiOiJodHRwczovL2NpLmV4YW1wbGUuaW52YWxpZCIsImlhdCI6MjAwMDAwMDAwMCwibmJmIjoyMDAwMDAwMDAwLCJleHAiOjIwMDAwMDM2MDAsImp0aSI6ImZmM2RhNjU3LWQ0ZTAtNDNjMi05MjYxLTJiYzkxN2Y3OTAyNCJ9.ZvFaMu7PiOz0ab7rOMvDkYdjFuNev4GnHLnm7RdJBtOa8TzJ7xfx7E3LDUAR67GMdGfo6iuWh2z2Qn-MtCNnBw",
+        "data": {
+          "version": 2,
+          "type": "ci-execution-observation",
+          "sourceProfile": "facts-v2",
+          "id": "ff3da657-d4e0-43c2-9261-2bc917f79024",
+          "subject": "GUID1501M61XD830Y48TT0VD80K9S11E",
+          "issuer": "https://ci.example.invalid",
+          "bindingId": "ecca05a6-4f59-4f48-b083-e428ada659ba",
+          "observationId": "e750c5ca-64f4-4026-bcd3-aa620f35e86b",
+          "scope": "referenced-ci-run-only",
+          "strength": "ci-execution-fact",
+          "independence": "repository-controlled",
+          "attribution": "submitter-asserted",
+          "source": {
+            "owner": "Fixture",
+            "runId": 11,
+            "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "attempt": 1,
+            "provider": "github-actions",
+            "repository": "Synthetic",
+            "repositoryId": 77,
+            "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+          },
+          "sourceControl": {
+            "version": 1,
+            "observedVia": "github-rest-api",
+            "repositoryOwner": {
+              "id": 3,
+              "type": "Organization",
+              "login": "Fixture"
+            },
+            "submitterControlVerified": false,
+            "independentExecutionVerified": false
+          },
+          "conclusion": "success",
+          "synthetic": false,
+          "taskOutcomeVerification": "not-independently-verified",
+          "capabilityVerified": false,
+          "preparedAt": 2000000000,
+          "observedAt": 2000000000,
+          "expiresAt": 2000003600,
+          "limitations": [
+            "Repository workflows may be controlled by the submitter.",
+            "A CI conclusion does not prove task quality or individual contribution."
+          ],
+          "statusPath": "/v2/ci/proofs/ff3da657-d4e0-43c2-9261-2bc917f79024/status"
+        },
+        "provenance": {
+          "version": 2,
+          "profile": "github-actions-provenance/2",
+          "sourceKey": "github-actions:repository:77:run:11:attempt:1",
+          "issuer": "https://ci.example.invalid",
+          "proofId": "ff3da657-d4e0-43c2-9261-2bc917f79024",
+          "source": {
+            "provider": "github-actions",
+            "owner": "Fixture",
+            "repository": "Synthetic",
+            "runId": 11,
+            "attempt": 1,
+            "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "repositoryId": 77,
+            "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+          },
+          "conclusion": "success",
+          "sourceControl": {
+            "version": 1,
+            "observedVia": "github-rest-api",
+            "repositoryOwner": {
+              "id": 3,
+              "login": "Fixture",
+              "type": "Organization"
+            },
+            "submitterControlVerified": false,
+            "independentExecutionVerified": false
+          },
+          "authority": "issuer-attested-github-api-observation",
+          "submitterControlVerified": false,
+          "independentExecutionVerified": false
+        },
+        "taskOutcomeVerified": false,
+        "capabilityVerified": false,
+        "independentExecutionVerified": false
+      }
+    },
+    {
+      "value": {
+        "proofId": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+        "status": "active",
+        "signed": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LXByb29mK2p3dCIsImtpZCI6ImdvLWZpeHR1cmUifQ.eyJkYXRhIjp7InZlcnNpb24iOjIsInR5cGUiOiJjaS1leGVjdXRpb24tb2JzZXJ2YXRpb24iLCJzb3VyY2VQcm9maWxlIjoiZmFjdHMtdjIiLCJpZCI6ImY3OTNkY2Q0LTc3YWEtNDMyNC1iNmM1LTM4MDRlYTI1M2JjYSIsInN1YmplY3QiOiJHVUlEMTUwMU02MVhEODMwWTQ4VFQwVkQ4MEs5UzExRSIsImlzc3VlciI6Imh0dHBzOi8vY2kuZXhhbXBsZS5pbnZhbGlkIiwiYmluZGluZ0lkIjoiZWNjYTA1YTYtNGY1OS00ZjQ4LWIwODMtZTQyOGFkYTY1OWJhIiwib2JzZXJ2YXRpb25JZCI6ImU3NTBjNWNhLTY0ZjQtNDAyNi1iY2QzLWFhNjIwZjM1ZTg2YiIsInNjb3BlIjoicmVmZXJlbmNlZC1jaS1ydW4tb25seSIsInN0cmVuZ3RoIjoiY2ktZXhlY3V0aW9uLWZhY3QiLCJpbmRlcGVuZGVuY2UiOiJyZXBvc2l0b3J5LWNvbnRyb2xsZWQiLCJhdHRyaWJ1dGlvbiI6InN1Ym1pdHRlci1hc3NlcnRlZCIsInNvdXJjZSI6eyJvd25lciI6IkZpeHR1cmUiLCJydW5JZCI6MTEsImNvbW1pdCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJhdHRlbXB0IjoxLCJwcm92aWRlciI6ImdpdGh1Yi1hY3Rpb25zIiwicmVwb3NpdG9yeSI6IlN5bnRoZXRpYyIsInJlcG9zaXRvcnlJZCI6NzcsInNvdXJjZVVwZGF0ZWRBdCI6IjIwMzMtMDUtMThUMDM6MzM6MjAuMDAwWiJ9LCJzb3VyY2VDb250cm9sIjp7InZlcnNpb24iOjEsIm9ic2VydmVkVmlhIjoiZ2l0aHViLXJlc3QtYXBpIiwicmVwb3NpdG9yeU93bmVyIjp7ImlkIjozLCJ0eXBlIjoiT3JnYW5pemF0aW9uIiwibG9naW4iOiJGaXh0dXJlIn0sInN1Ym1pdHRlckNvbnRyb2xWZXJpZmllZCI6ZmFsc2UsImluZGVwZW5kZW50RXhlY3V0aW9uVmVyaWZpZWQiOmZhbHNlfSwiY29uY2x1c2lvbiI6InN1Y2Nlc3MiLCJzeW50aGV0aWMiOmZhbHNlLCJ0YXNrT3V0Y29tZVZlcmlmaWNhdGlvbiI6Im5vdC1pbmRlcGVuZGVudGx5LXZlcmlmaWVkIiwiY2FwYWJpbGl0eVZlcmlmaWVkIjpmYWxzZSwicHJlcGFyZWRBdCI6MjAwMDAwMDAwMCwib2JzZXJ2ZWRBdCI6MjAwMDAwMDAwMCwiZXhwaXJlc0F0IjoyMDAwMDAzNjAwLCJsaW1pdGF0aW9ucyI6WyJSZXBvc2l0b3J5IHdvcmtmbG93cyBtYXkgYmUgY29udHJvbGxlZCBieSB0aGUgc3VibWl0dGVyLiIsIkEgQ0kgY29uY2x1c2lvbiBkb2VzIG5vdCBwcm92ZSB0YXNrIHF1YWxpdHkgb3IgaW5kaXZpZHVhbCBjb250cmlidXRpb24uIl0sInN0YXR1c1BhdGgiOiIvdjIvY2kvcHJvb2ZzL2Y3OTNkY2Q0LTc3YWEtNDMyNC1iNmM1LTM4MDRlYTI1M2JjYS9zdGF0dXMifSwiaXNzIjoiaHR0cHM6Ly9jaS5leGFtcGxlLmludmFsaWQiLCJhdWQiOiJodHRwczovL2NpLmV4YW1wbGUuaW52YWxpZCIsImlhdCI6MjAwMDAwMDAwMCwibmJmIjoyMDAwMDAwMDAwLCJleHAiOjIwMDAwMDM2MDAsImp0aSI6ImY3OTNkY2Q0LTc3YWEtNDMyNC1iNmM1LTM4MDRlYTI1M2JjYSJ9.pQnKHEuPgNVrWkq-dDaz8kYjW1yx-QlQAnCRTiJQw915cXpC8SoqAl-5K5bTmNx--xjBWoaB0SyJ5DdyVZFICg",
+        "data": {
+          "version": 2,
+          "type": "ci-execution-observation",
+          "sourceProfile": "facts-v2",
+          "id": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+          "subject": "GUID1501M61XD830Y48TT0VD80K9S11E",
+          "issuer": "https://ci.example.invalid",
+          "bindingId": "ecca05a6-4f59-4f48-b083-e428ada659ba",
+          "observationId": "e750c5ca-64f4-4026-bcd3-aa620f35e86b",
+          "scope": "referenced-ci-run-only",
+          "strength": "ci-execution-fact",
+          "independence": "repository-controlled",
+          "attribution": "submitter-asserted",
+          "source": {
+            "owner": "Fixture",
+            "runId": 11,
+            "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "attempt": 1,
+            "provider": "github-actions",
+            "repository": "Synthetic",
+            "repositoryId": 77,
+            "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+          },
+          "sourceControl": {
+            "version": 1,
+            "observedVia": "github-rest-api",
+            "repositoryOwner": {
+              "id": 3,
+              "type": "Organization",
+              "login": "Fixture"
+            },
+            "submitterControlVerified": false,
+            "independentExecutionVerified": false
+          },
+          "conclusion": "success",
+          "synthetic": false,
+          "taskOutcomeVerification": "not-independently-verified",
+          "capabilityVerified": false,
+          "preparedAt": 2000000000,
+          "observedAt": 2000000000,
+          "expiresAt": 2000003600,
+          "limitations": [
+            "Repository workflows may be controlled by the submitter.",
+            "A CI conclusion does not prove task quality or individual contribution."
+          ],
+          "statusPath": "/v2/ci/proofs/f793dcd4-77aa-4324-b6c5-3804ea253bca/status"
+        },
+        "provenance": {
+          "version": 2,
+          "profile": "github-actions-provenance/2",
+          "sourceKey": "github-actions:repository:77:run:11:attempt:1",
+          "issuer": "https://ci.example.invalid",
+          "proofId": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+          "source": {
+            "provider": "github-actions",
+            "owner": "Fixture",
+            "repository": "Synthetic",
+            "runId": 11,
+            "attempt": 1,
+            "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "repositoryId": 77,
+            "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+          },
+          "conclusion": "success",
+          "sourceControl": {
+            "version": 1,
+            "observedVia": "github-rest-api",
+            "repositoryOwner": {
+              "id": 3,
+              "login": "Fixture",
+              "type": "Organization"
+            },
+            "submitterControlVerified": false,
+            "independentExecutionVerified": false
+          },
+          "authority": "issuer-attested-github-api-observation",
+          "submitterControlVerified": false,
+          "independentExecutionVerified": false
+        },
+        "taskOutcomeVerified": false,
+        "capabilityVerified": false,
+        "independentExecutionVerified": false
+      }
+    },
+    {
+      "value": {
+        "requestId": "8724ce0e-e2a7-45dc-9e22-d5b12ce8d7f0",
+        "state": "observed",
+        "evidenceRef": {
+          "id": "5ae8072d-f547-4328-a9f8-29fa4519eff0",
+          "version": 1
+        },
+        "resultRef": {
+          "id": "53769e49-968a-4e55-a9bb-8bc91090ff7a",
+          "version": 1
+        },
+        "synthetic": false,
+        "observation": {
+          "source": {
+            "owner": "Fixture",
+            "runId": 11,
+            "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "attempt": 1,
+            "provider": "github-actions",
+            "repository": "Synthetic",
+            "repositoryId": 77,
+            "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+          },
+          "status": "observed",
+          "strength": "ci-execution-fact",
+          "verifier": "github-actions-api/0.1",
+          "completed": true,
+          "conclusion": "success",
+          "validUntil": 2000003640,
+          "attribution": "submitter-asserted",
+          "collectedAt": 2000000040,
+          "limitations": [
+            "Repository workflows may be controlled by the submitter.",
+            "A CI conclusion does not prove task quality or individual contribution."
+          ],
+          "independence": "repository-controlled",
+          "responseHash": "402968146a42ec2657a7de7b4fce952c978ce87cff320c57df5c2fc7c7d399f2",
+          "sourceControl": {
+            "version": 1,
+            "observedVia": "github-rest-api",
+            "repositoryOwner": {
+              "id": 3,
+              "type": "Organization",
+              "login": "Fixture"
+            },
+            "submitterControlVerified": false,
+            "independentExecutionVerified": false
+          },
+          "capabilitiesVerified": false
+        },
+        "taskOutcomeVerified": false,
+        "capabilityVerified": false,
+        "independentExecutionVerified": false
+      }
+    },
+    {
+      "value": {
+        "id": "8724ce0e-e2a7-45dc-9e22-d5b12ce8d7f0",
+        "type": "request",
+        "state": "recorded",
+        "payloadHash": "641e89e9a6e89dfa7bbc3c284d19d1ddb27e7ed440951db86ce2fd2e0a3ab1c5",
+        "consentId": "f32b15c2-5fc0-49de-a3ce-03089e94948b",
+        "objectState": "observed",
+        "taskOutcomeVerified": false,
+        "capabilityVerified": false,
+        "independentExecutionVerified": false
+      }
+    },
+    {
+      "value": {
+        "items": [
+          {
+            "type": "ci-proof-v2",
+            "id": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+            "profile": "ci-execution-observation/facts-v2",
+            "proofId": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+            "status": "active",
+            "signed": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LXByb29mK2p3dCIsImtpZCI6ImdvLWZpeHR1cmUifQ.eyJkYXRhIjp7InZlcnNpb24iOjIsInR5cGUiOiJjaS1leGVjdXRpb24tb2JzZXJ2YXRpb24iLCJzb3VyY2VQcm9maWxlIjoiZmFjdHMtdjIiLCJpZCI6ImY3OTNkY2Q0LTc3YWEtNDMyNC1iNmM1LTM4MDRlYTI1M2JjYSIsInN1YmplY3QiOiJHVUlEMTUwMU02MVhEODMwWTQ4VFQwVkQ4MEs5UzExRSIsImlzc3VlciI6Imh0dHBzOi8vY2kuZXhhbXBsZS5pbnZhbGlkIiwiYmluZGluZ0lkIjoiZWNjYTA1YTYtNGY1OS00ZjQ4LWIwODMtZTQyOGFkYTY1OWJhIiwib2JzZXJ2YXRpb25JZCI6ImU3NTBjNWNhLTY0ZjQtNDAyNi1iY2QzLWFhNjIwZjM1ZTg2YiIsInNjb3BlIjoicmVmZXJlbmNlZC1jaS1ydW4tb25seSIsInN0cmVuZ3RoIjoiY2ktZXhlY3V0aW9uLWZhY3QiLCJpbmRlcGVuZGVuY2UiOiJyZXBvc2l0b3J5LWNvbnRyb2xsZWQiLCJhdHRyaWJ1dGlvbiI6InN1Ym1pdHRlci1hc3NlcnRlZCIsInNvdXJjZSI6eyJvd25lciI6IkZpeHR1cmUiLCJydW5JZCI6MTEsImNvbW1pdCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJhdHRlbXB0IjoxLCJwcm92aWRlciI6ImdpdGh1Yi1hY3Rpb25zIiwicmVwb3NpdG9yeSI6IlN5bnRoZXRpYyIsInJlcG9zaXRvcnlJZCI6NzcsInNvdXJjZVVwZGF0ZWRBdCI6IjIwMzMtMDUtMThUMDM6MzM6MjAuMDAwWiJ9LCJzb3VyY2VDb250cm9sIjp7InZlcnNpb24iOjEsIm9ic2VydmVkVmlhIjoiZ2l0aHViLXJlc3QtYXBpIiwicmVwb3NpdG9yeU93bmVyIjp7ImlkIjozLCJ0eXBlIjoiT3JnYW5pemF0aW9uIiwibG9naW4iOiJGaXh0dXJlIn0sInN1Ym1pdHRlckNvbnRyb2xWZXJpZmllZCI6ZmFsc2UsImluZGVwZW5kZW50RXhlY3V0aW9uVmVyaWZpZWQiOmZhbHNlfSwiY29uY2x1c2lvbiI6InN1Y2Nlc3MiLCJzeW50aGV0aWMiOmZhbHNlLCJ0YXNrT3V0Y29tZVZlcmlmaWNhdGlvbiI6Im5vdC1pbmRlcGVuZGVudGx5LXZlcmlmaWVkIiwiY2FwYWJpbGl0eVZlcmlmaWVkIjpmYWxzZSwicHJlcGFyZWRBdCI6MjAwMDAwMDAwMCwib2JzZXJ2ZWRBdCI6MjAwMDAwMDAwMCwiZXhwaXJlc0F0IjoyMDAwMDAzNjAwLCJsaW1pdGF0aW9ucyI6WyJSZXBvc2l0b3J5IHdvcmtmbG93cyBtYXkgYmUgY29udHJvbGxlZCBieSB0aGUgc3VibWl0dGVyLiIsIkEgQ0kgY29uY2x1c2lvbiBkb2VzIG5vdCBwcm92ZSB0YXNrIHF1YWxpdHkgb3IgaW5kaXZpZHVhbCBjb250cmlidXRpb24uIl0sInN0YXR1c1BhdGgiOiIvdjIvY2kvcHJvb2ZzL2Y3OTNkY2Q0LTc3YWEtNDMyNC1iNmM1LTM4MDRlYTI1M2JjYS9zdGF0dXMifSwiaXNzIjoiaHR0cHM6Ly9jaS5leGFtcGxlLmludmFsaWQiLCJhdWQiOiJodHRwczovL2NpLmV4YW1wbGUuaW52YWxpZCIsImlhdCI6MjAwMDAwMDAwMCwibmJmIjoyMDAwMDAwMDAwLCJleHAiOjIwMDAwMDM2MDAsImp0aSI6ImY3OTNkY2Q0LTc3YWEtNDMyNC1iNmM1LTM4MDRlYTI1M2JjYSJ9.pQnKHEuPgNVrWkq-dDaz8kYjW1yx-QlQAnCRTiJQw915cXpC8SoqAl-5K5bTmNx--xjBWoaB0SyJ5DdyVZFICg",
+            "data": {
+              "version": 2,
+              "type": "ci-execution-observation",
+              "sourceProfile": "facts-v2",
+              "id": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+              "subject": "GUID1501M61XD830Y48TT0VD80K9S11E",
+              "issuer": "https://ci.example.invalid",
+              "bindingId": "ecca05a6-4f59-4f48-b083-e428ada659ba",
+              "observationId": "e750c5ca-64f4-4026-bcd3-aa620f35e86b",
+              "scope": "referenced-ci-run-only",
+              "strength": "ci-execution-fact",
+              "independence": "repository-controlled",
+              "attribution": "submitter-asserted",
+              "source": {
+                "owner": "Fixture",
+                "runId": 11,
+                "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "attempt": 1,
+                "provider": "github-actions",
+                "repository": "Synthetic",
+                "repositoryId": 77,
+                "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+              },
+              "sourceControl": {
+                "version": 1,
+                "observedVia": "github-rest-api",
+                "repositoryOwner": {
+                  "id": 3,
+                  "type": "Organization",
+                  "login": "Fixture"
+                },
+                "submitterControlVerified": false,
+                "independentExecutionVerified": false
+              },
+              "conclusion": "success",
+              "synthetic": false,
+              "taskOutcomeVerification": "not-independently-verified",
+              "capabilityVerified": false,
+              "preparedAt": 2000000000,
+              "observedAt": 2000000000,
+              "expiresAt": 2000003600,
+              "limitations": [
+                "Repository workflows may be controlled by the submitter.",
+                "A CI conclusion does not prove task quality or individual contribution."
+              ],
+              "statusPath": "/v2/ci/proofs/f793dcd4-77aa-4324-b6c5-3804ea253bca/status"
+            },
+            "provenance": {
+              "version": 2,
+              "profile": "github-actions-provenance/2",
+              "sourceKey": "github-actions:repository:77:run:11:attempt:1",
+              "issuer": "https://ci.example.invalid",
+              "proofId": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+              "source": {
+                "provider": "github-actions",
+                "owner": "Fixture",
+                "repository": "Synthetic",
+                "runId": 11,
+                "attempt": 1,
+                "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "repositoryId": 77,
+                "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+              },
+              "conclusion": "success",
+              "sourceControl": {
+                "version": 1,
+                "observedVia": "github-rest-api",
+                "repositoryOwner": {
+                  "id": 3,
+                  "login": "Fixture",
+                  "type": "Organization"
+                },
+                "submitterControlVerified": false,
+                "independentExecutionVerified": false
+              },
+              "authority": "issuer-attested-github-api-observation",
+              "submitterControlVerified": false,
+              "independentExecutionVerified": false
+            },
+            "taskOutcomeVerified": false,
+            "capabilityVerified": false,
+            "independentExecutionVerified": false
+          }
+        ],
+        "checkedAt": "2033-05-18T03:34:00.000Z",
+        "coverage": "requested-visible-references",
+        "sourceSummary": {
+          "evidenceRecordCount": 0,
+          "declaredSourceGroupCount": 0,
+          "duplicateRecordCount": 0,
+          "independentlyVerifiedSourceCount": 0,
+          "globalCountProvided": false,
+          "groups": []
+        }
+      }
+    }
+  ]
+}

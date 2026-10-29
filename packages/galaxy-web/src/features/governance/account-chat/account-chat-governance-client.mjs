@@ -1,4 +1,4 @@
-import {accountChatReportSchema,accountChatReportEventSchema} from "../../../../../galaxy-official/src/shared/account-chat-governance-schema.mjs";
+import {accountChatReportSchema,accountChatReportEventSchema} from "../../../../../galaxy-contracts/src/account-chat-governance-schema.mjs";
 
 // The journal belongs to the real online account. It stores the user's own
 // statement and selected source locators, never copies of chat message bodies.

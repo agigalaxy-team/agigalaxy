@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
-	"github.com/google/uuid"
-	"os/exec"
+	"os"
 	"strings"
 	"testing"
 )
 
 func TestOriginalBusinessSchemasAstralAndPresence(t *testing.T) {
-	id := uuid.NewString()
+	id := "11111111-1111-4111-8111-111111111111"
 	cases := []Object{}
 	add := func(kind string, x Object) { cases = append(cases, Object{"kind": kind, "input": x}) }
 	for _, kind := range []string{"page", "sections", "reports"} {
@@ -45,9 +44,7 @@ func TestOriginalBusinessSchemasAstralAndPresence(t *testing.T) {
 			add("resolve", x)
 		}
 	}
-	cmd := exec.Command("node", "testdata/schema.mjs")
-	cmd.Stdin = bytes.NewReader(encode(cases))
-	raw, e := cmd.Output()
+	raw, e := os.ReadFile("testdata/original-business-schema.json")
 	if e != nil {
 		t.Fatal(e)
 	}

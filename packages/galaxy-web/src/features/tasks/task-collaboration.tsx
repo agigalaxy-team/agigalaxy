@@ -18,7 +18,7 @@ import {MemberAvatar,MemberLink,useMemberNames} from "../../shared/people/conver
 import {FileText,MessageCircle,Plus,Search,Settings,Users,X} from 'lucide-react';
 import type {LucideIcon} from 'lucide-react';
 import * as z from 'zod/v4';
-import {participationEventV2Schema,taskEventV2Schema} from "../../../../galaxy-official/src/shared/task-schema-v2.mjs";
+import {participationEventV2Schema,taskEventV2Schema} from "../../../../galaxy-contracts/src/task-schema-v2.mjs";
 import {readOperationReceipt} from "./operations/task-operation-state";
 import {useChoiceViewLease,type ChoiceViewLease} from "../../shared/operations/choice-retained-operations";
 import type {WorkProps,WorkParticipation,WorkDelivery} from "./work-task-types";

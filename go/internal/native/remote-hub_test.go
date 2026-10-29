@@ -5,7 +5,6 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/builders"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/hubs"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -15,10 +14,7 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
-	"os/exec"
-	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,7 +23,7 @@ import (
 func TestNativeHubOriginalToolsActualGoSourceAndChoice(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	store, meta, transport := workUploadServiceFixtureDatabase(t, dsn)
+	store, meta, transport := nativeGoUploadFixtureDatabase(t, dsn)
 	now := func() time.Time { return time.Unix(meta.Now, 0) }
 	cfg := owner.Config()
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
@@ -61,16 +57,7 @@ func TestNativeHubOriginalToolsActualGoSourceAndChoice(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	command := exec.Command("node", "--input-type=module", "-e", `import {builderDeclaration} from './packages/galaxy-official/test/builders-workflow.mjs';import {sampleCharter} from './packages/galaxy-official/test/hubs-workflow.mjs';import {migrate} from './packages/galaxy-official/src/infrastructure/database.mjs';import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';const address=new URL(process.argv[3]);if(address.hostname!=='127.0.0.1'||!/^\/galaxy_go_test_[a-z0-9_]+$/.test(address.pathname))throw Error('isolated database only');const db=new pg.Pool({connectionString:address.href});try{await migrate(db,{roles:['api']});}finally{await db.end()}console.log(JSON.stringify({declaration:builderDeclaration('hub',process.argv[1]),charter:sampleCharter(Number(process.argv[2]))}));`, scope.Owner, strconv.FormatInt(meta.Now, 10), dsn)
-	command.Dir, _ = filepath.Abs("../../..")
-	raw, e := command.Output()
-	if e != nil {
-		t.Fatal(e)
-	}
-	var shapes map[string]any
-	if protocol.Decode(raw, &shapes) != nil {
-		t.Fatal("source shapes")
-	}
+	shapes := nativeSourceShape(t, "hub-source-v1.json", scope.Owner)
 	hubID, declID := uuid.NewString(), uuid.NewString()
 	declaration := uploadObject(shapes["declaration"])
 	declaration["endpoint"] = meta.Configuration.Endpoint

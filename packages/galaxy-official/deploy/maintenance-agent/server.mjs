@@ -2,12 +2,12 @@ import {createServer} from 'node:http';
 import {mkdir,lstat,chmod,chown,unlink} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {noSymlinkPath,assertTarget} from '../operations-stack/host.mjs';
-import {verifyMaintenanceSignature,maintenanceServiceKeyMatches} from "../../src/operations/maintenance/native.mjs";
+import {verifyMaintenanceSignature,maintenanceServiceKeyMatches} from "../support/maintenance-signature.mjs";
 import {readMaintenanceAgentConfiguration} from './configuration.mjs';
 import {MaintenanceNativeRuntime} from './runtime.mjs';
 import {ModelConfigurationRuntime,readModelConfigurationControl} from './model-configuration.mjs';
 import {createSystemSettingsRuntime,readSystemSettingsControl} from '../system-settings/configuration.mjs';
-import {systemSettingsErrorCodes} from '../../src/operations/system-settings/schema.mjs';
+import {systemSettingsErrorCodes} from '../../../galaxy-contracts/src/operations-system-settings-schema.mjs';
 
 export function createMaintenanceNativeHttpServer({runtime,modelRuntime=null,systemSettingsRuntime=null,serviceKey,now=()=>Math.floor(Date.now()/1000)}){
  const seen=new Map();

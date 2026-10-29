@@ -1,91 +1,24 @@
 package chat
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessrules"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsrules"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/accountlinkfixture"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/devicefixture"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
-func chatIdentityFixture(t *testing.T, dsn, service string, storeDir ...string) Object {
-	return chatNativeFixture(t, dsn, service, "identity-server", storeDir...)
-}
-func chatNativeFixture(t *testing.T, dsn, service, command string, storeDir ...string) Object {
-	t.Helper()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	args := []string{filepath.Join(root, "scripts", "go", "chat-interop.mjs"), command, service}
-	args = append(args, storeDir...)
-	cmd := exec.Command("node", args...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	stdout, e := cmd.StdoutPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	stdin, e := cmd.StdinPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if e = cmd.Start(); e != nil {
-		t.Fatal(e)
-	}
-	t.Cleanup(func() {
-		stdin.Write([]byte("close\n"))
-		stdin.Close()
-		done := make(chan error, 1)
-		go func() { done <- cmd.Wait() }()
-		select {
-		case <-done:
-		case <-time.After(10 * time.Second):
-			cmd.Process.Kill()
-			<-done
-		}
-	})
-	ready := make(chan []byte, 1)
-	go func() {
-		reader := bufio.NewReader(stdout)
-		for {
-			line, e := reader.ReadBytes('\n')
-			if json.Valid(line) {
-				ready <- line
-				return
-			}
-			if e != nil {
-				ready <- nil
-				return
-			}
-		}
-	}()
-	select {
-	case raw := <-ready:
-		if len(raw) == 0 {
-			t.Fatalf("original chat fixture: %s", stderr.String())
-		}
-		var result Object
-		if e = json.Unmarshal(raw, &result); e != nil {
-			t.Fatal(e)
-		}
-		return result
-	case <-time.After(60 * time.Second):
-		t.Fatal("chat fixture startup timeout")
-	}
-	return nil
-}
 func chatRequest(t *testing.T, origin, path, token string, input any) (int, Object) {
 	t.Helper()
 	request, e := http.NewRequest("POST", origin+path, bytes.NewReader(encode(input)))
@@ -109,22 +42,39 @@ func chatRequest(t *testing.T, origin, path, token string, input any) (int, Obje
 	}
 	return response.StatusCode, result
 }
-func TestOpenJoinRealAgentBindingExportAndWorker(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
-	archive := fakeArchive(t)
-	serviceURL := "xmpp://" + archive.listener.Addr().String()
-	f := chatIdentityFixture(t, dsn, serviceURL)
-	now := time.Unix(num(f, "now"), 0)
-	devices := &deviceauth.Service{Pool: pool, Endpoint: str(f, "endpoint"), Now: func() time.Time { return now }}
+
+// chatGoIdentityFixture creates two real device sessions and OIDC-signed account links.
+func chatGoIdentityFixture(t *testing.T, pool *pgxpool.Pool) Object {
+	t.Helper()
 	ctx := context.Background()
-	owner, e := devices.Authenticate(ctx, str(obj(f, "owner"), "token"), "binding")
-	if e != nil {
+	owner := deviceauthfixture.New(t, pool, t.TempDir(), []string{"binding", "consent", "history", "notifications", "case-teaser", "evidence", "proof", "assistance", "moderation"})
+	peer := deviceauthfixture.New(t, pool, t.TempDir(), []string{"binding", "consent", "history", "notifications", "case-teaser", "evidence", "proof", "assistance", "moderation"})
+	links := accountlinkfixture.New(t, pool, owner.Service)
+	links.Link(owner, "isolated-chat-owner")
+	links.Link(peer, "isolated-chat-peer")
+	if _, err := pool.Exec(ctx, `INSERT INTO operations_product_rules_v1(endpoint,policy_key,version,policy,source,created_at) VALUES($1,'business-controls',1,$2,'configured-baseline',$3) ON CONFLICT DO NOTHING`, devicefixture.Endpoint, operationsrules.EmptyControls(), time.Unix(devicefixture.Now, 0)); err != nil {
+		t.Fatal(err)
+	}
+	return Object{"endpoint": devicefixture.Endpoint, "issuer": links.Issuer, "now": devicefixture.Now, "owner": Object{"token": owner.Credential, "subjectId": owner.Actor.SubjectID}, "peer": Object{"token": peer.Credential, "subjectId": peer.Actor.SubjectID}, "ownerFixture": owner, "peerFixture": peer}
+}
+
+func TestOpenJoinRealAgentBindingExportAndWorker(t *testing.T) {
+	pool, _ := testsupport.PostgreSQL(t)
+	ctx := context.Background()
+	ownerFixture := deviceauthfixture.New(t, pool, t.TempDir(), []string{"binding", "consent", "history"})
+	peerFixture := deviceauthfixture.New(t, pool, t.TempDir(), []string{"binding", "consent", "history"})
+	links := accountlinkfixture.New(t, pool, ownerFixture.Service)
+	links.Link(ownerFixture, "isolated-chat-owner")
+	links.Link(peerFixture, "isolated-chat-peer")
+	owner, peer := ownerFixture.Actor, peerFixture.Actor
+	now := time.Unix(devicefixture.Now, 0)
+	if _, e := pool.Exec(ctx, `INSERT INTO operations_product_rules_v1(endpoint,policy_key,version,policy,source,created_at) VALUES($1,'business-controls',1,$2,'configured-baseline',$3)`, devicefixture.Endpoint, operationsrules.EmptyControls(), now); e != nil {
 		t.Fatal(e)
 	}
-	peer, e := devices.Authenticate(ctx, str(obj(f, "peer"), "token"), "binding")
-	if e != nil {
-		t.Fatal(e)
-	}
+	archive := fakeArchive(t)
+	serviceURL := "xmpp://" + archive.Listener.Addr().String()
+	devices := ownerFixture.Service
+	var e error
 	// Two callers already hold their verified binding SHARE lock. The target
 	// reader must not turn both into competing UPDATE lock upgrades.
 	locked := make(chan struct{}, 2)
@@ -173,7 +123,7 @@ func TestOpenJoinRealAgentBindingExportAndWorker(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer transport.Stop()
-	s := &Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Links: &accountlinks.Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Providers: []accountlinks.Provider{{Issuer: str(f, "issuer"), ClientID: "galaxy-fixture"}}, Now: func() time.Time { return now }}, Transport: transport, Rules: &businessrules.Service{Endpoint: str(f, "endpoint"), Now: func() time.Time { return now }}, Now: func() time.Time { return now }}
+	s := &Service{Pool: pool, Endpoint: devicefixture.Endpoint, Devices: devices, Links: links.Registry, Transport: transport, Rules: &businessrules.Service{Endpoint: devicefixture.Endpoint, Now: func() time.Time { return now }}, Now: func() time.Time { return now }}
 	a, b := Actor{Device: &owner}, Actor{Device: &peer}
 	room := uuid.NewString()
 	first, e := s.Create(ctx, a, encode(Object{"roomId": room, "operationId": uuid.NewString(), "title": "原开放讨论"}))
@@ -187,11 +137,9 @@ func TestOpenJoinRealAgentBindingExportAndWorker(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	status, js := chatRequest(t, str(f, "origin"), "/v2/chat/rooms/"+room+"/join-preview", str(obj(f, "peer"), "token"), Object{})
-	if status != 200 {
-		t.Fatal(js)
+	if preview["joiningGrantsOtherMaterials"] != false || preview["joiningStartsAgent"] != false || preview["requiresVerifiedAccount"] != true {
+		t.Fatal("join authority changed", preview)
 	}
-	same(t, preview, js)
 	join := Object{"operationId": uuid.NewString(), "ruleVersion": preview["ruleVersion"], "ruleHash": preview["ruleHash"]}
 	joined, e := s.Join(ctx, b, room, encode(join))
 	if e != nil {
@@ -214,20 +162,16 @@ func TestOpenJoinRealAgentBindingExportAndWorker(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	status, js = chatRequest(t, str(f, "origin"), "/v2/chat/rooms/"+room+"/agent-grants", str(obj(f, "owner"), "token"), Object{})
-	if status != 200 {
-		t.Fatal(js)
+	if len(grants["items"].([]Object)) != 1 || str(grants["items"].([]Object)[0], "grantId") != grant {
+		t.Fatal("agent grant read changed", grants)
 	}
-	same(t, grants, js)
 	participants, e := s.QueryAgentParticipants(ctx, b, room, []byte(`{}`))
 	if e != nil {
 		t.Fatal(e)
 	}
-	status, js = chatRequest(t, str(f, "origin"), "/v2/chat/rooms/"+room+"/agent-participants", str(obj(f, "peer"), "token"), Object{})
-	if status != 200 {
-		t.Fatal(js)
+	if len(participants["items"].([]Object)) != 1 {
+		t.Fatal("agent participant read changed", participants)
 	}
-	same(t, participants, js)
 	sent, e := s.Send(ctx, a, room, encode(Object{"clientMessageId": uuid.NewString(), "text": "经本人实际绑定授权的响应", "agentGrantId": grant}))
 	if e != nil {
 		t.Fatal(e)
@@ -236,11 +180,9 @@ func TestOpenJoinRealAgentBindingExportAndWorker(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	status, js = chatRequest(t, str(f, "origin"), "/v2/chat/export/owned", str(obj(f, "owner"), "token"), Object{})
-	if status != 200 {
-		t.Fatal(js)
+	if len(owned["messages"].([]Object)) != 1 || str(owned, "scope") != "own-authored-retained-messages" {
+		t.Fatal("owned export changed", owned)
 	}
-	same(t, owned, js)
 	ready, e := s.MaintenanceReadiness(ctx)
 	if e != nil || truth(ready, "bodyReturned") || !truth(ready, "roundTrip") {
 		t.Fatalf("body-free probe: %v %v", ready, e)
@@ -256,9 +198,9 @@ func TestOpenJoinRealAgentBindingExportAndWorker(t *testing.T) {
 	if e != nil || !truth(erased, "complete") || num(erased, "archiveDeleted") != 1 {
 		t.Fatalf("erase: %v %v", erased, e)
 	}
-	archive.mu.Lock()
-	_, exists := archive.bodies[str(sent, "messageId")]
-	archive.mu.Unlock()
+	archive.Mu.Lock()
+	_, exists := archive.Bodies[str(sent, "messageId")]
+	archive.Mu.Unlock()
 	if exists {
 		t.Fatal("erase ack did not delete real fixture archive")
 	}
@@ -276,9 +218,9 @@ func TestOpenJoinRealAgentBindingExportAndWorker(t *testing.T) {
 		t.Fatal(e)
 	}
 	now = now.Add(2 * time.Second)
-	archive.mu.Lock()
-	archive.eraseNegative = true
-	archive.mu.Unlock()
+	archive.Mu.Lock()
+	archive.EraseNegative = true
+	archive.Mu.Unlock()
 	if _, e = s.PurgeExpired(ctx, 100); fault.Code(e) != "chat_archive_receipt_invalid" {
 		t.Fatalf("negative erase acknowledgement: %v", e)
 	}
@@ -287,9 +229,9 @@ func TestOpenJoinRealAgentBindingExportAndWorker(t *testing.T) {
 	if e = pool.QueryRow(ctx, "SELECT state,purge_pending FROM chat_message_refs WHERE message_id=$1", peerMessage["messageId"]).Scan(&state, &pending); e != nil || state != "expired" || !pending {
 		t.Fatalf("expiry failed to preserve retry: %s %v %v", state, pending, e)
 	}
-	archive.mu.Lock()
-	archive.eraseNegative = false
-	archive.mu.Unlock()
+	archive.Mu.Lock()
+	archive.EraseNegative = false
+	archive.Mu.Unlock()
 	purged, e := s.PurgeExpired(ctx, 100)
 	if e != nil || num(purged, "archiveDeleted") != 1 {
 		t.Fatalf("expiry retry: %v %v", purged, e)

@@ -3,9 +3,9 @@ package operationsmodels
 import (
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -32,19 +32,19 @@ func TestOriginalModelsSchemaAndNativeUnknownProjection(t *testing.T) {
 		x["models"] = []any{m}
 		models = append(models, x)
 	}
+	sort.Slice(models, func(i, j int) bool {
+		a, _ := json.Marshal(models[i])
+		b, _ := json.Marshal(models[j])
+		return string(a) < string(b)
+	})
 	id := "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"
 	status := sampleStatus()
 	usage := Object{"availability": Object{"state": "available"}, "days": 7, "calls": Object{"total": 2, "completed": 1, "failed": 0, "unknown": 1}, "tokens": Object{"input": 12, "output": nil, "total": nil, "cachedInput": 0, "reasoning": nil}, "byScenario": []any{}, "byModel": []any{}, "unknownUsageCalls": 1, "from": "2033-05-18T00:00:00Z", "to": nil, "coverageFrom": nil, "coversWholeWindow": false}
 	input := Object{"configuration": models, "applicable": models, "draft": []Object{{"operationId": id, "expectedRevision": 0, "configuration": c, "reason": strings.Repeat("😀", 500)}, {"operationId": id, "expectedRevision": 0, "configuration": c, "reason": strings.Repeat("😀", 501)}}, "credential": []Object{{"operationId": id, "modelRecordId": id, "apiKey": "isolated-secret"}, {"operationId": id, "modelRecordId": id, "apiKey": " spaced "}}, "history": []Object{{}, {"after": "9223372036854775808"}, {"after": "9223372036854775807", "limit": 50}, {"limit": "20"}}, "usage": []Object{{}, {"days": 30}, {"days": "7"}}, "command": []Object{{"kind": "models-overview"}, {"kind": "models-apply", "operationId": id, "operatorId": strings.Repeat("😀", 500), "versionId": id, "revision": 0, "configuration": c}}, "status": []Object{status, {}, clone(status)}, "operation": []Object{{"id": id, "kind": "models-apply", "state": "completed", "code": "unexpected_private", "startedAt": "invalid", "finishedAt": nil}, {}}, "nativeUsage": []Object{usage, {}}, "nativeCredential": []Object{{"reference": "model-key:22222222-2222-4222-8222-222222222222", "modelRecordId": id, "configured": true}}}
 	obj(list(input["status"])[2])["credentials"] = []any{Object{"configured": true}}
-	root, _ := filepath.Abs("../../..")
-	b, _ := json.Marshal(input)
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/models-interop.mjs"), "schema")
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(string(b))
-	raw, e := cmd.CombinedOutput()
+	raw, e := os.ReadFile("testdata/models-schema.json")
 	if e != nil {
-		t.Fatalf("original %v %s", e, raw)
+		t.Fatal(e)
 	}
 	var expected Object
 	_ = json.Unmarshal(raw, &expected)

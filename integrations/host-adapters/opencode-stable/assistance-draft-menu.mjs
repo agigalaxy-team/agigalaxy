@@ -3,7 +3,7 @@ import { createAssistanceDraftsRequest } from './assistance-drafts/request.mjs';
 import { createAssistanceDraftsEvents } from './assistance-drafts/events.mjs';
 import { createLegacyWorkSelection } from './legacy-work-selection.mjs';
 import { createExistingRecordSelection } from './existing-record-selection.mjs';
-import { assistanceDraftApproaches } from "../../../packages/galaxy-official/src/clients/local/assistance-store.mjs";
+import { assistanceDraftApproaches } from "../../../packages/galaxy-contracts/src/assistance-schema.mjs";
 // Native persisted collaboration wizard. Saving fields is local.
 export function createAssistanceDraftMenu({
   controller,

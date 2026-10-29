@@ -1,4 +1,4 @@
-import { equalJson } from '../../../../galaxy-official/src/shared/web-primitives.mjs';
+import { equalJson } from '../../../../galaxy-contracts/src/web-primitives.mjs';
 
 // Editing revisions and acceptance coordinates share the caller's original lease.
 export function createParticipationCompose({ prefix, store, captureTaskDraftLease, taskAwait, checkOperationLease, stoppedQueueName, now, updateTaskQueue }) {

@@ -6,32 +6,11 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/localdata"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
-func materialJS(t *testing.T, dir, body string) map[string]any {
-	t.Helper()
-	_, file, _, _ := runtime.Caller(0)
-	root := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(file), "../../..")))
-	script := `import {createLocalWorkHistory} from 'file:///` + root + `/packages/galaxy-core/src/work-history/index.mjs';import {createLocalConversationArchive} from 'file:///` + root + `/packages/galaxy-core/src/conversation-archive/index.mjs';const dir=process.argv[1],h=createLocalWorkHistory({dataDirectory:dir}),a=createLocalConversationArchive({dataDirectory:dir});` + body
-	cmd := exec.Command("node", "--input-type=module", "-e", script, dir)
-	b, e := cmd.Output()
-	if e != nil {
-		if ex, ok := e.(*exec.ExitError); ok {
-			t.Fatalf("original JS material: %v %s", e, ex.Stderr)
-		}
-		t.Fatal(e)
-	}
-	var v map[string]any
-	if e = json.Unmarshal(b, &v); e != nil {
-		t.Fatalf("JS result: %v %s", e, b)
-	}
-	return v
-}
-func TestLocalMaterialWritesRemainReadableAndDuplicateInOriginalJS(t *testing.T) {
+func TestLocalMaterialLegacySQLiteAndProjection(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	if e := os.WriteFile(filepath.Join(dir, "galaxy-id.json"), []byte(`{"id":"isolated-owner","createdAt":"2026-01-01T00:00:00.000Z"}`), 0600); e != nil {
@@ -41,7 +20,28 @@ func TestLocalMaterialWritesRemainReadableAndDuplicateInOriginalJS(t *testing.T)
 	if e != nil {
 		t.Fatal(e)
 	}
-	seed := materialJS(t, dir, `const observed=await h.observe({host:'opencode',sessionId:'s',sourceId:'m',kind:'message',source:{kind:'host-event',messageId:'m'},content:{excerpt:'original',originalLength:8,retained:'full',availableFromHost:true},details:{z:1,a:2}});await a.configure({enabled:true,sessions:[{host:'opencode',sessionId:'s'}]});const captured=await a.captureMessage({host:'opencode',sessionId:'s',messageId:'m',message:{id:'m',role:'user',time:{created:1790000000000}},parts:[{type:'text',text:'original'}]});console.log(JSON.stringify({observed,captured}));`)
+	// Original synthetic SQLite files retain the pre-Go schemas and bytes.
+	for target, source := range map[string]string{"work-history/history.sqlite": "history.sqlite", "conversation-archive/private.sqlite": "private.sqlite"} {
+		raw, err := os.ReadFile(filepath.Join("testdata", "legacy-sqlite", source))
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, target)
+		if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(path, raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rawSeed, e := os.ReadFile(filepath.Join("testdata", "legacy-sqlite", "seed.json"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	var seed map[string]any
+	if e = json.Unmarshal(rawSeed, &seed); e != nil {
+		t.Fatal(e)
+	}
 	work := seed["observed"].(map[string]any)["workId"].(string)
 	session := seed["captured"].(map[string]any)["archiveSessionId"].(string)
 	length := int64(8)
@@ -122,21 +122,28 @@ func TestLocalMaterialWritesRemainReadableAndDuplicateInOriginalJS(t *testing.T)
 	if _, e = s.CaptureArchiveMessage(ctx, capture); e != nil {
 		t.Fatal(e)
 	}
-	expected := materialJS(t, dir, `const list=await h.list();const w=await h.exportWork({workId:list.items[0].workId});const sessions=await a.list();const archive=await a.exportSession({archiveSessionId:sessions.items[0].archiveSessionId});const duplicate=await a.captureMessage({host:'opencode',sessionId:'s',messageId:'m',message:{id:'m',role:'user',time:{created:1790000000000}},parts:[{type:'text',text:'password=fake-only-for-test'}]});console.log(JSON.stringify({work:w,archive,duplicate}));`)
-	if expected["duplicate"].(map[string]any)["duplicate"] != true {
-		t.Fatal("original JS did not deduplicate Go original")
+	fixtureBytes, e := os.ReadFile(filepath.Join("testdata", "legacy-sqlite", "result.json"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	var expected map[string]any
+	if e = json.Unmarshal(fixtureBytes, &expected); e != nil {
+		t.Fatal(e)
+	}
+	duplicate, e := s.CaptureArchiveMessage(ctx, capture)
+	if e != nil {
+		t.Fatal(e)
 	}
 	exported, e := s.WorkExport(ctx, WorkQuery{WorkID: work})
 	if e != nil {
 		t.Fatal(e)
 	}
-	exported.(map[string]any)["exportedAt"] = expected["work"].(map[string]any)["exportedAt"]
-	same(t, expected["work"], exported)
 	archive, e := s.ArchiveExport(ctx, ArchiveQuery{ArchiveSessionID: session})
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, expected["archive"], archive)
+	actual := map[string]any{"work": exported, "archive": archive, "duplicate": duplicate}
+	same(t, normalizeLegacyMaterial(t, expected), normalizeLegacyMaterial(t, actual))
 	if _, e = s.SubmitWorkSummary(ctx, WorkSummaryInput{WorkID: work, ThroughSequence: through, SourceObservationIDs: sources, Title: "Summary", Summary: "retry"}); fault.Code(e) != "local_work_summary_revision_conflict" {
 		t.Fatalf("summary stale revision: %v", e)
 	}

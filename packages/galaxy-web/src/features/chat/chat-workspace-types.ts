@@ -1,8 +1,8 @@
-import {chatMessageEditWindowMs} from "../../../../galaxy-official/src/shared/chat-message-edit-policy.mjs";
+import {chatMessageEditWindowMs} from "../../../../galaxy-contracts/src/chat-message-edit-policy.mjs";
 import type {z} from 'zod/v4';
 import type {createWebRuntime} from "../../runtime.mjs";
-import type {chatCreateSchema,chatDecisionSchema,chatSendSchema,chatEditSchema} from "../../../../galaxy-official/src/shared/chat-schema.mjs";
-import type {attachmentReferenceSchema} from "../../../../galaxy-official/src/shared/chat-attachments-schema.mjs";
+import type {chatCreateSchema,chatDecisionSchema,chatSendSchema,chatEditSchema} from "../../../../galaxy-contracts/src/chat-schema.mjs";
+import type {attachmentReferenceSchema} from "../../../../galaxy-contracts/src/chat-attachments-schema.mjs";
 
 export type ChatRuntime=Awaited<ReturnType<typeof createWebRuntime>>;
 export type ChatAttachmentReference=z.infer<typeof attachmentReferenceSchema>;

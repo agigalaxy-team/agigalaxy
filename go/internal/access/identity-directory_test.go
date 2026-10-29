@@ -6,9 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 )
@@ -64,19 +62,6 @@ func TestCurrentIdentityDirectoryOriginalSourceAndProtectedReference(t *testing.
 	if e != nil || identity.State != "available" || !identity.Enabled || !identity.EmailVerified || identity.Email != "person@example.invalid" {
 		t.Fatal("fresh identity unavailable")
 	}
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/identity-directory-interop.mjs"))
-	cmd.Dir = root
-	raw, _ := json.Marshal(map[string]any{"issuer": issuer, "adminOrigin": provider.URL, "clientId": "fixture-reader", "clientSecret": "synthetic-local-secret", "subject": "subject"})
-	cmd.Stdin = strings.NewReader(string(raw))
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original current identity failed %v", e)
-	}
-	var original map[string]any
-	if json.Unmarshal(out, &original) != nil || original["email"] != identity.Email || original["enabled"] != identity.Enabled || original["emailVerified"] != identity.EmailVerified {
-		t.Fatal("original identity projection differs")
-	}
 	if _, e = directory.Roles(ctx, issuer, "subject"); e != nil {
 		t.Fatal(e)
 	}
@@ -102,7 +87,7 @@ func TestCurrentIdentityDirectoryOriginalSourceAndProtectedReference(t *testing.
 	actualTokens := tokenCalls
 	status = 503
 	mu.Unlock()
-	if actualTokens != 3 {
+	if actualTokens != 2 {
 		t.Fatalf("token renewal count %d", actualTokens)
 	}
 	if _, e = directory.LookupIdentity(ctx, issuer, "subject"); e == nil {

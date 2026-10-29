@@ -1,8 +1,8 @@
 import {z} from 'zod/v4';
-import {profileStatementSchema,profileReceiptLocatorSchema,selfDeclaredProfileSchema} from "../../../../galaxy-official/src/shared/profile-schema.mjs";
-import {consentSchema} from "../../../../galaxy-official/src/shared/consents-schema.mjs";
-import {equalJson,sha256Hex} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
-import {readProfileDisplayNames} from "../../../../galaxy-official/src/accounts/profile-display-names.mjs";
+import {profileStatementSchema,profileReceiptLocatorSchema,selfDeclaredProfileSchema} from "../../../../galaxy-contracts/src/profile-schema.mjs";
+import {consentSchema} from "../../../../galaxy-contracts/src/consents-schema.mjs";
+import {equalJson,sha256Hex} from "../../../../galaxy-contracts/src/web-primitives.mjs";
+import {readProfileDisplayNames} from "../../../../galaxy-client/src/accounts/profile-display-names.mjs";
 
 const subjectSchema=z.string().regex(/^GUID[0-9A-Z]{28}$/);
 const viewersSchema=z.array(subjectSchema).max(16).refine(ids=>new Set(ids).size===ids.length);

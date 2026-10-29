@@ -1,8 +1,8 @@
 import type * as z from 'zod/v4';
 import type {createWebRuntime} from "../../runtime.mjs";
-import type {contextGrantV2Schema,contextEventV2Schema,contextReceiptV2Schema} from "../../../../galaxy-official/src/shared/context-v2-schema.mjs";
-import type {contributionPublicationSchema,contributionSourceRefSchema,contributionOwnedSourcesSchema,contributionPreviewSchema} from "../../../../galaxy-official/src/shared/contribution-sharing-v2-schema.mjs";
-import type {historyV2QuerySchema} from "../../../../galaxy-official/src/shared/history-v2-schema.mjs";
+import type {contextGrantV2Schema,contextEventV2Schema,contextReceiptV2Schema} from "../../../../galaxy-contracts/src/context-v2-schema.mjs";
+import type {contributionPublicationSchema,contributionSourceRefSchema,contributionOwnedSourcesSchema,contributionPreviewSchema} from "../../../../galaxy-contracts/src/contribution-sharing-v2-schema.mjs";
+import type {historyV2QuerySchema} from "../../../../galaxy-contracts/src/history-v2-schema.mjs";
 
 export type RecordRuntime=Awaited<ReturnType<typeof createWebRuntime>>;
 export type RecordLease=ReturnType<RecordRuntime['receiptStatus']['captureLease']>;

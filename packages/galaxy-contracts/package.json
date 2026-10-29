@@ -1,0 +1,11 @@
+{
+  "name": "@galaxy/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "canonicalize": "4.0.0",
+    "jose": "6.2.12",
+    "zod": "4.5.4"
+  }
+}

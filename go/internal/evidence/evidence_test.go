@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/cases"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/history"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
@@ -19,36 +18,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 )
 
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/evidence/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	raw, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original Evidence %s %v %s", mode, e, stderr.String())
-	}
-	var out Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if json.Unmarshal(line, &out) == nil && out != nil {
-			return out
-		}
-	}
-	t.Fatal("fixture result")
-	return nil
-}
 func same(t *testing.T, a, b any) {
 	t.Helper()
 	var x, y any
@@ -59,24 +33,11 @@ func same(t *testing.T, a, b any) {
 	}
 }
 func TestOriginalEvidenceProofHTTPAndTargetedWorker(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	public, key, _ := ed25519.GenerateKey(rand.Reader)
-	pem, _ := identity.PublicPEM(public)
-	path := filepath.Join(t.TempDir(), "evidence-fixture.json")
-	node(t, dsn, "setup", path, Object{"publicKey": pem})
-	raw, _ := os.ReadFile(path)
-	var f struct {
-		Endpoint                                                                             string
-		Clock                                                                                int64
-		Owner                                                                                struct{ Subject, Token string }
-		Root, First, Second, Third, ThirdGrant, SeedGrant, SeedProof, NextPreview, NextGrant Object
-		SeedID, NextID, RunJSON                                                              string
-		Pins                                                                                 []json.RawMessage
-	}
-	if e := json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
-	}
+	seed := sha256.Sum256([]byte("galaxy-synthetic-evidence-signing-fixture"))
+	key := ed25519.NewKeyFromSeed(seed[:])
+	f := setupEvidence(t, owner)
 	rolePool := func(role string) *pgxpool.Pool {
 		config := owner.Config()
 		config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE "+role); return e }
@@ -234,7 +195,7 @@ func TestOriginalEvidenceProofHTTPAndTargetedWorker(t *testing.T) {
 	}
 	// Original JS reads both the Go signature and the Go worker observation.
 	clock = f.Clock
-	expected := node(t, dsn, "read", path, nil)
+	expected := fixtureValue(t, "read")
 	for _, entry := range []struct{ id, key string }{{f.SeedID, "seed"}, {f.NextID, "next"}} {
 		status, out = call("GET", "/v1/proofs/"+entry.id, nil, false)
 		if status != 200 {
@@ -308,9 +269,7 @@ func TestOriginalEvidenceProofHTTPAndTargetedWorker(t *testing.T) {
 	if e = owner.QueryRow(ctx, `SELECT count(*) FROM verification_attempts WHERE job_id=$1`, ids[0]).Scan(&attempts); e != nil || attempts != 1 {
 		t.Fatal("lost lease wrote an observation", attempts, e)
 	}
-	var fixture Object
-	_ = json.Unmarshal(raw, &fixture)
-	fourth := obj(fixture["fourth"])
+	fourth := f.Fourth
 	var exhaustedID string
 	if e = owner.QueryRow(ctx, `SELECT id::text FROM jobs WHERE deduplication_key=$1`, "verify:"+str(fourth, "id")).Scan(&exhaustedID); e != nil {
 		t.Fatal(e)

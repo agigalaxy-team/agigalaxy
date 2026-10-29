@@ -2,29 +2,24 @@ package maintenance
 
 import (
 	"encoding/json"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
 )
 
-func jsFixture(t *testing.T, input Object) Object {
+// This captured vector records the original schema defaults and public projection.
+func jsFixture(t *testing.T, _ Object) Object {
 	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	b, _ := json.Marshal(input)
-	c := exec.Command("node", filepath.Join(root, "scripts/go/maintenance-interop.mjs"))
-	c.Dir = root
-	c.Stdin = strings.NewReader(string(b))
-	raw, e := c.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original maintenance: %v %s", e, raw)
+	raw, err := os.ReadFile("testdata/maintenance-original.json")
+	if err != nil {
+		t.Fatal(err)
 	}
-	var o Object
-	if e = json.Unmarshal(raw, &o); e != nil {
-		t.Fatal(e)
+	var result Object
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatal(err)
 	}
-	return o
+	return result
 }
 func normalized(v any) any { b, _ := json.Marshal(v); var x any; _ = json.Unmarshal(b, &x); return x }
 func TestOriginalMaintenanceSchemaAndMetadata(t *testing.T) {

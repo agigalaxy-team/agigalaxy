@@ -1,4 +1,4 @@
-import {stableJson} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {stableJson} from "../../../../galaxy-contracts/src/web-primitives.mjs";
 
 // Contribution observedAt describes this read, not a change to the authored
 // record. Keep its immutable locator, all selected values and provenance exact.

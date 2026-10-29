@@ -3,10 +3,10 @@ import {isAbsolute} from 'node:path';
 import {createHmac} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {atomicWrite,noSymlinkPath,runCommand} from '../operations-stack/host.mjs';
-import {createOperationsSmtpTransport} from "../../src/operations/messaging/smtp-transport.mjs";
-import {systemSettingsMailConfigurationSchema,systemSettingsMailConnectionSchema,systemSettingsCredentialSchema,parseSystemSettings,safeSystemSettingsError} from '../../src/operations/system-settings/schema.mjs';
-import {operationsMailMetadataSchema,operationsMailReceiptSchema,operationsMailReceiptFiles,operationsMailConfiguration} from '../../src/operations/system-settings/mail-consumer.mjs';
-import {operationsSmtpCredentialAlias} from '../../src/operations/system-settings/smtp-credentials.mjs';
+import {createOperationsSmtpTransport} from "../support/smtp-transport.mjs";
+import {systemSettingsMailConfigurationSchema,systemSettingsMailConnectionSchema,systemSettingsCredentialSchema,parseSystemSettings,safeSystemSettingsError} from '../../../galaxy-contracts/src/operations-system-settings-schema.mjs';
+import {operationsMailMetadataSchema,operationsMailReceiptSchema,operationsMailReceiptFiles,operationsMailConfiguration} from '../support/mail-consumer.mjs';
+import {operationsSmtpCredentialAlias} from '../support/smtp-credentials.mjs';
 
 const failure=code=>Object.assign(Error(code),{code});
 const realms=['galaxy','galaxy-operations'];

@@ -1,6 +1,6 @@
 # Discovery service adapters
 
-This directory currently contains the closed Gorse HTTP gateway. Hub adapters for search, analytics and recommendation remain in `packages/galaxy-official/src`; this folder is not an independently implemented recommendation engine or another business database.
+This directory contains the restricted Gorse HTTP gateway. Current Hub adapters for search, analytics and recommendation live in `go/internal/discovery`; this folder does not implement another recommendation engine or business database.
 
 `gorse-gateway.mjs` checks the caller key before forwarding to private Gorse. It admits readiness, the existing user/item/feedback writes, item removal and bounded latest/recommendation queries. `n` and `offset` are at most 100; duplicate and unknown parameters fail. Source eligibility, content permissions and business attribution remain Hub responsibilities.
 

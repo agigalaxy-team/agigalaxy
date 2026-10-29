@@ -1,0 +1,117 @@
+{
+  "items": [
+    {
+      "follow": false,
+      "value": {
+        "expectedRevision": 0,
+        "operationId": "2e49284e-40c9-4fc5-a249-f23e61b5fdac",
+        "reference": {
+          "kind": "forum-post",
+          "postId": "56065c53-4881-44fe-a3f1-528747c6cab9"
+        },
+        "saved": true
+      }
+    },
+    {
+      "follow": false,
+      "value": {
+        "expectedRevision": 0,
+        "operationId": "fb3182c9-87cd-4893-8631-6b88550fafb7",
+        "reference": {
+          "kind": "capsule",
+          "capsuleId": "1a4c37aa-5007-4d17-b58a-b4e3ccafd211",
+          "versionId": "3d1ec3f1-75d7-4259-bba8-67c12939dd07"
+        },
+        "saved": true
+      }
+    },
+    {
+      "follow": false,
+      "value": {
+        "expectedRevision": 0,
+        "operationId": "e148d74a-78d8-4224-b407-5b1fa2b24815",
+        "reference": {
+          "kind": "project",
+          "projectId": "ede1316a-aab6-4adf-92e7-e37d942051f9"
+        },
+        "saved": true
+      }
+    },
+    {
+      "follow": false,
+      "value": {
+        "expectedRevision": 0,
+        "operationId": "ed56f5c2-7ea3-430f-8d5b-1b7c3b56851a",
+        "reference": {
+          "kind": "person",
+          "subjectId": "GUIDAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "saved": true
+      }
+    },
+    {
+      "follow": false,
+      "value": {
+        "expectedRevision": 0,
+        "operationId": "50aa5f81-6ad6-4614-891f-52740f1c14eb",
+        "reference": {
+          "kind": "chat-message",
+          "roomId": "4d63e8d2-e242-4910-adc1-dde587f0e703",
+          "messageId": "0dfcfc0a-5124-4a8f-8433-9b38fb576e33"
+        },
+        "saved": true
+      }
+    },
+    {
+      "follow": true,
+      "value": {
+        "expectedRevision": 0,
+        "following": true,
+        "operationId": "9e54ce9b-b90d-4388-9d54-03ee165b385c",
+        "targetAccountId": "1082b7cd-029c-4591-9d59-a1f65503cafa"
+      }
+    },
+    {
+      "follow": false,
+      "value": {
+        "expectedRevision": 0,
+        "extra": true,
+        "operationId": "2e49284e-40c9-4fc5-a249-f23e61b5fdac",
+        "reference": {
+          "kind": "forum-post",
+          "postId": "56065c53-4881-44fe-a3f1-528747c6cab9"
+        },
+        "saved": true
+      }
+    }
+  ],
+  "checks": [
+    {
+      "accepted": true,
+      "hash": "54d1906d81918ba880987cc080c49663f28b9da1f69988bb5f7d1866609cbb56"
+    },
+    {
+      "accepted": true,
+      "hash": "9ef19582f84943d6a58d597e6a07fe1919a9c686bca61479b7e734d5fe13262d"
+    },
+    {
+      "accepted": true,
+      "hash": "f5cb75e213ed3b1f4040dde679a9f0571e72396676097a2bf44cc5076dec29a9"
+    },
+    {
+      "accepted": true,
+      "hash": "91c8bc6b61201939bac2b07b3bcb8a082e8ec8197e9e2c266370b9f7e07323f8"
+    },
+    {
+      "accepted": true,
+      "hash": "59856077f9fc4f0dab08621ae25447d251149b6b513b6abbb50a0375f8991220"
+    },
+    {
+      "accepted": true,
+      "hash": "a5fa35255ce4b388bfccca024f42bbb97bc17dac069a6d2e2ba574eb3932e90d"
+    },
+    {
+      "accepted": false
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { nativeConnectionMessage } from '../../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
+import { nativeConnectionMessage } from '../../../native-v2/presentation/native-result.mjs';
 import { nativeChoiceUrl } from '../../../native-v2/compact-app/browser-choice.mjs';
-import { nativeConfigurationMessage } from '../../../../packages/galaxy-edge-mcp/src/native-v2/configuration-message.mjs';
+import { nativeConfigurationMessage } from '../../../native-v2/presentation/native-configuration-message.mjs';
 import { plain, unwrap, fingerprint } from './presentation.mjs';
 
 export function createPurposeIdentity(session) {
@@ -42,6 +42,12 @@ export function createPurposeIdentity(session) {
                   ? session.label('尚未连接', 'Disconnected')
                   : session.label('尚未准备', 'Not prepared')),
           [
+            [session.label('读取并验证服务信息', 'Read and verify service information'), () => void session.run(
+              async () => unwrap(await session.nativeTools.call('galaxy_native_discovery', {})),
+              (info) => session.info(session.label('服务信息已验证', 'Service information verified'),
+                [plain(info.displayName), plain(info.operator), plain(info.endpoint), session.label('签名有效；未因此连接或授权。', 'Signature valid; this does not connect or authorize.')].join('\n'),
+                () => identity(onReady, back)),
+            )],
             ...(!status.identity
               ? [
                   [
@@ -74,6 +80,12 @@ export function createPurposeIdentity(session) {
                       ],
                 ]
               : []),
+            ...(status.identity ? [[session.label('保存身份恢复码', 'Save an identity recovery code'), () => recoveryPage('set', () => identity(null, back))]] : []),
+            [session.label('使用恢复码找回原身份', 'Recover an identity with its code'), () => recoveryPage('recover', () => identity(null, back))],
+            [session.label('继续原恢复操作', 'Continue a recovery operation'), () => {
+              session.stopMessages(); const v=++session.version;
+              session.prompt({title:session.label('输入原恢复操作编号（不是恢复码）','Enter the original recovery operation ID, not the recovery code'),placeholder:'',value:'',onCancel:()=>identity(null,back),onConfirm:(value)=>{if(session.alive(v)) recoveryPage('resume',()=>identity(null,back),value.trim());}});
+            }],
             ...(status.connected === true
               ? [
                   [
@@ -132,6 +144,18 @@ export function createPurposeIdentity(session) {
         );
       },
       back,
+    );
+  }
+
+  function recoveryPage(action, back, operationId = '') {
+    void session.run(
+      async () => unwrap(await session.nativeTools.call('galaxy_identity_recovery', {action, ...(operationId ? {operationId} : {})})),
+      async (value) => {
+        const url = new URL(value.url);
+        if (value.state !== 'user-choice-needs-browser' || url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port || url.username || url.password || url.search || url.hash || !/^\/identity-recovery\/[a-f0-9]{48}$/.test(url.pathname)) throw Error('identity_recovery_local_url_invalid');
+        await session.nativeTools.openLink?.(url.href);
+        session.info(session.label('本机身份恢复','Local identity recovery'), session.label('在本机页面完成本人选择；恢复码只在该页面输入和显示，不要发送给助手。恢复后的连接需另行确认。','Complete your choice on the local page. Enter and view the recovery code only there; do not send it to the assistant. Reconnecting requires a separate choice.') + '\n\n' + url.href, () => {session.owner = null; back();});
+      }, back,
     );
   }
 

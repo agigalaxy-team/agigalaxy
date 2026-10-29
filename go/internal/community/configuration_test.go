@@ -31,7 +31,11 @@ func TestForumPolicyOriginalFileContract(t *testing.T) {
 	}
 }
 func TestCommunityPolicyKeepsOriginalLimitsPromotionAndHash(t *testing.T) {
-	f := object(t, node(t, "postgres://127.0.0.1/galaxy_go_test_policy", "community-policy-fixture"))
+	raw, e := os.ReadFile("testdata/community-policy-fixture.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	f := object(t, raw)
 	defaults, e := LoadCommunityPolicy("")
 	if e != nil {
 		t.Fatal(e)

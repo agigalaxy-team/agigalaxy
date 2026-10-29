@@ -1,4 +1,4 @@
-import { hasTaskMaterials, taskMaterialSubmissionSchema } from '../../../../galaxy-official/src/shared/task-material-v1-schema.mjs';
+import { hasTaskMaterials, taskMaterialSubmissionSchema } from '../../../../galaxy-contracts/src/task-material-v1-schema.mjs';
 
 // One per-runtime queue owns local journal updates and business dispatch state.
 // Receipt reconciliation, identity leases and user decisions stay with the caller.

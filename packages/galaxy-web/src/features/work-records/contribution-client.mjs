@@ -1,5 +1,5 @@
-import {contributionPublicationSchema} from "../../../../galaxy-official/src/shared/contribution-sharing-v2-schema.mjs";
-import {sha256Hex} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {contributionPublicationSchema} from "../../../../galaxy-contracts/src/contribution-sharing-v2-schema.mjs";
+import {sha256Hex} from "../../../../galaxy-contracts/src/web-primitives.mjs";
 /** @typedef {{retry?:boolean,reauthorize?:boolean,confirmed?:boolean,expectedOperationId?:string,expectedPayloadHash?:string}} ContributionRecoveryOptions */
 const instances=new WeakMap();
 export function getContributionClient(runtime,subjectId,{now=()=>Math.floor(Date.now()/1000)}={}){

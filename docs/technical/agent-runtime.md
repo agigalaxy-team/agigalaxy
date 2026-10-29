@@ -1,6 +1,6 @@
 # AgentOS、模型网关与固定策略
 
-Python Agno AgentOS负责原生会话、run、持久队列与HumanReview；Node负责业务计划、当前权威、命令和回执。通用授权及未知操作处理见[接口](interfaces.md#管理身份与原操作)，部署发行见[部署](../operations/deployment.md)。本页只保存原生协议、存储和配置合同。
+Python Agno AgentOS负责原生会话、run、持久队列与HumanReview；Go负责业务计划、当前权威、命令和回执。通用授权及未知操作处理见[接口](interfaces.md#管理身份与原操作)，部署发行见[部署](../operations/deployment.md)。本页只保存原生协议、存储和配置合同。
 
 ## 构建与配置入口
 
@@ -18,7 +18,7 @@ python services/galaxy-model-gateway/prepare-source-context.py --output <新cont
 docker build -f <新context>/services/galaxy-model-gateway/Dockerfile <新context>
 ```
 
-Node通过 `GALAXY_AGENTOS_CONFIG_FILE` 读取严格 `{version:1,endpoint,url,signingKey,serviceKey}`，加载器为 `src/infrastructure/operations-agentos-configuration.mjs`。endpoint匹配业务地址，url为无路径/query/凭据的HTTPS或允许loopback HTTP origin；`allowInternalHttp`不是该JSON字段。Python `config.py`独立读取 `GALAXY_AGENTOS_DATABASE_URL`、authority URL/verification/service keys、Gateway origin/key和模型bindings引用，Python的 `GALAXY_AGENTOS_ALLOW_INTERNAL_HTTP` 不能复制到Node JSON。签名/验签与双方service key须匹配；Agno用独立PG身份/库/schema，不访问业务表。Node按同发行完整registry/SQL角色部署，初始迁移105不代表完整接线。
+Go通过 `GALAXY_AGENTOS_CONFIG_FILE` 读取严格 `{version:1,endpoint,url,signingKey,serviceKey}`，加载器归 `go/internal/runtimeconfig`。endpoint匹配业务地址，url为无路径/query/凭据的HTTPS或允许loopback HTTP origin；`allowInternalHttp`不是该JSON字段。Python `config.py`独立读取 `GALAXY_AGENTOS_DATABASE_URL`、authority URL/verification/service keys、Gateway origin/key和模型bindings引用，Python的 `GALAXY_AGENTOS_ALLOW_INTERNAL_HTTP` 不能复制到Go业务配置 JSON。签名/验签与双方service key须匹配；Agno用独立PG身份/库/schema，不访问业务表。Go按同发行完整registry/SQL角色部署，初始迁移105不代表完整接线。
 
 原生监听限选定私网/loopback。`/v1/internal/agentos/`先验服务身份再解析闭合请求，公网/BFF拒绝；Python `/galaxy/`元数据走外层service key，业务/run另核原生JWT，不误送service key到JWT parser。
 
@@ -28,9 +28,9 @@ Node通过 `GALAXY_AGENTOS_CONFIG_FILE` 读取严格 `{version:1,endpoint,url,si
 |---|---|
 | `conversation:<UUID>` | 当前person/session/domain/AI账户的普通会话，无需创建automation grant；原生RunContext提供session/run，原操作提供turn |
 | `execution:<UUID>` | 已准备的grant、领域、对象、revision和intent，沿专项事项及真实HumanReview等待 |
-| `autonomy:<UUID>` | Node的稳定AI账户、计划、task、purpose/versions；不携带管理浏览器会话，pg-boss调度原任务 |
+| `autonomy:<UUID>` | Go的稳定AI账户、计划、task、purpose/versions；不携带管理浏览器会话，River调度原任务 |
 
-conversation工具源为 `conversation_tools.py`、Node `operations-agentos-query-schema.mjs` / action catalog：current_summary、query_operations、read_operation_object、list_authorized_work、run_authorized_work、prepare_operation分别对应当前摘要、闭合查询、精确对象、获准事项、原事项接续和操作卡准备。Node收到 `{conversationId,sessionId,turnId,runId,callId,tool,arguments}`，这些可信坐标不是模型参数。字段/动作随代码维护，不复制固定工具数；通用查询不接受任意SQL/HTTP或整项command。
+conversation工具源为 `conversation_tools.py`、共享 `galaxy-contracts/src/operations-agentos-query-schema.mjs` / action catalog：current_summary、query_operations、read_operation_object、list_authorized_work、run_authorized_work、prepare_operation分别对应当前摘要、闭合查询、精确对象、获准事项、原事项接续和操作卡准备。Go收到 `{conversationId,sessionId,turnId,runId,callId,tool,arguments}`，这些可信坐标不是模型参数。字段/动作随代码维护，不复制固定工具数；通用查询不接受任意SQL/HTTP或整项command。
 
 浏览器 `/v1/operations/agentos` dispatcher提供status/options/executions；原execution的events/runs/review/continue；按domain的conversations/runs、operations/:uuid、cards/:uuid及confirm；全局runs仅audit元数据。实际方法/DTO由dispatcher/schema定义。准备卡必须同时有 `state=prepared`、`card.state=prepared`、真实cardId，preparationFeedback只扩充原结果说明。一般查询仅返回显式安全投影；公开帖子/回复仍带受控来源，私聊/案件/反馈/邮件正文不因模块名或workbench.read进入通用对话。选定内容工具从execution当前选集取引用，不把空集合扩大为全站，不产生画像事件。
 
@@ -40,18 +40,18 @@ conversation工具源为 `conversation_tools.py`、Node `operations-agentos-quer
 |---|---|
 | POST `/runs` | 空 `{}`、Idempotency-Key=taskId；原生queue去重，不接prompt/model/tool列表 |
 | GET 基础路径 | 读原owned run；无记录为NOT_RECORDED |
-| POST `/cancel` | 同空body/key；Node先fence，原生停止旧run |
-| POST `/continue` | 同空body/key；仅真实PAUSED、原pending tools与Node原结果/人决匹配时原run原ticket续行 |
+| POST `/cancel` | 同空body/key；Go先fence，原生停止旧run |
+| POST `/continue` | 同空body/key；仅真实PAUSED、原pending tools与Go原结果/人决匹配时原run原ticket续行 |
 
-callbacks为固定private prefix的autonomy/authorize、tools/execute、report。waiting-human在post-tool barrier建立external-execution requirement，续接只注入原操作结果，不再运行writer。人类会话可带taskId进入原卡路径，不把cancelled run重启成后台工作。queue并发2、max_attempts=1、SDK外层3600秒；task冻结roundSeconds为30..3600（默认600），旧任务缺值才用 `GALAXY_AGENTOS_WORK_TIMEOUT_SECONDS`。timeout先写原生cancel cause再取消，Node代码动作也查deadline；事项重叠/事件合并由Node处理。
+callbacks为固定private prefix的autonomy/authorize、tools/execute、report。waiting-human在post-tool barrier建立external-execution requirement，续接只注入原操作结果，不再运行writer。人类会话可带taskId进入原卡路径，不把cancelled run重启成后台工作。queue并发2、max_attempts=1、SDK外层3600秒；task冻结roundSeconds为30..3600（默认600），旧任务缺值才用 `GALAXY_AGENTOS_WORK_TIMEOUT_SECONDS`。timeout先写原生cancel cause再取消，Go代码动作也查deadline；事项重叠/事件合并由Go处理。
 
 ## 持久化、调用与有限恢复
 
-`store_tool_messages=False`不清除RunOutput.tools或event body。`conversation_storage.py`对普通save、atomic error与attempt-fenced worker写共同投影，移除工具参数/结果、event body/additional_input，保闭合ID/错误/时间/metrics。用户输入/最终回答是会话历史，Node绑定来源失效时轮换/withhold会话；不宣称物理擦除旧行或新增保留期。Duty存元数据与真实usage，目的材料/卡/命令仍归Node账本。trace不含prompt/completion/tool正文或异常原文。
+`store_tool_messages=False`不清除RunOutput.tools或event body。`conversation_storage.py`对普通save、atomic error与attempt-fenced worker写共同投影，移除工具参数/结果、event body/additional_input，保闭合ID/错误/时间/metrics。用户输入/最终回答是会话历史，Go绑定来源失效时轮换/withhold会话；不宣称物理擦除旧行或新增保留期。Duty存元数据与真实usage，目的材料/卡/命令仍归Go账本。trace不含prompt/completion/tool正文或异常原文。
 
 provider工具ID/UUID5配对规则见[接口](interfaces.md#管理身份与原操作)。调用计数在实际provider入口、current authority后、attempt fence内记账，包含follow-up；metrics.details分组不是次数，token取SDK累计值，旧无计数行未知。暂停续接duration累计活动时段，排除等待。async admission/history/model授权以threads卸载阻塞IO且保ContextVars，同步模型入口沿原线程；调用前后均查当前session/source。模型版本在provider调用前与attempt/owner/status CAS共同保存，缺版本不以当前配置回填。
 
-会话失败重试由Node核同person/岗位/原失败operation且尚无业务处理，再用Agno regenerate关联原run、保原失败，不追加用户消息或清未发送草稿。工具只修复当前schema支持的表示格式，临时只读失败有限重取，写入不自动重发。人工配置的备用模型仅在单次模型请求边界使用，保已完成工具结果，流式失败片段不拼接备用回答。Gateway单alias路由本身无fallback/retry；AgentOS只使用明确批准且场景兼容的fallbacks，两层不能混同。
+会话失败重试由Go核同person/岗位/原失败operation且尚无业务处理，再用Agno regenerate关联原run、保原失败，不追加用户消息或清未发送草稿。工具只修复当前schema支持的表示格式，临时只读失败有限重取，写入不自动重发。人工配置的备用模型仅在单次模型请求边界使用，保已完成工具结果，流式失败片段不拼接备用回答。Gateway单alias路由本身无fallback/retry；AgentOS只使用明确批准且场景兼容的fallbacks，两层不能混同。
 
 ## Gateway原生准入与模型配置
 
@@ -75,10 +75,10 @@ provider reference和analysis语义测试分别用 `test_provider_call_reference
 
 ## P13固定Workflow与普通维护
 
-固定 `galaxy-p13-selected-content-v1` version1复用Agno3.1.7 Workflow，注册ComponentType.WORKFLOW并去连接配置；发布定义漂移拒绝，改模板需新ID/version，旧在办版本仍可加载。Node存目标/策略/样本/演练/执行绑定，原生存workflow/ticket/run/steps/pause。只连接已准备的单个公开post/reply content-visibility命令，经execute-prepared-command及原领域回执；数值判定复用P14三值计算，P14引用仅new-writes-only，不能提供可见性授权。
+固定 `galaxy-p13-selected-content-v1` version1复用Agno3.1.7 Workflow，注册ComponentType.WORKFLOW并去连接配置；发布定义漂移拒绝，改模板需新ID/version，旧在办版本仍可加载。Go存目标/策略/样本/演练/执行绑定，原生存workflow/ticket/run/steps/pause。只连接已准备的单个公开post/reply content-visibility命令，经execute-prepared-command及原领域回执；数值判定复用P14三值计算，P14引用仅new-writes-only，不能提供可见性授权。
 
 四种主导路由为固定代码、复杂语义adviser、普通人工、显式pause。semantic无模型不入queue，code/human可无模型，adviser无effect工具且只存闭合决定，公开正文瞬时使用、不进workflow input/memory。Agno3.1.7的Condition内Step不执行自身pre-step human review，所以采用顶层dynamic output-review Step，续接读原native requirement。native retry attempts=1、step retries=0。
 
 普通工具read-selected-strategy、save-selected-strategy-draft、publish-selected-strategy只处理P10 grant/P105 attested execution选中的strategy UUID；权限为strategies.read/ordinary.configure/ordinary.publish。ordinaryBounds:null不给范围。允许人给定范围内textLength/linkCount/attachmentCount原rule-index数值、获准mode/日常启停，不改field/operator/结构、目标边界、重要人工策略、待决人工草稿或模型。发布使用人工选择的样本完成当前program qualification，只影响新事项，保同一不可变样本祖先。
 
-部署按完整registry包含对应P13结构/API grants，不给Worker新增P13写或Python业务表权。Node与新native image同批，私有p13/context、p13/step先验service key，native核execution JWT、matter、workflow、session与最新context。health必须回读固定workflow ID/version；启用前由人提供目标、策略、样本与成功分类演练，初始空/停用。它不接消息发送、文件purge、整站恢复、任意参数维护或自动全领域事项发现。
+部署按完整registry包含对应P13结构/API grants，不给Worker新增P13写或Python业务表权。Go与新native image同批，私有p13/context、p13/step先验service key，native核execution JWT、matter、workflow、session与最新context。health必须回读固定workflow ID/version；启用前由人提供目标、策略、样本与成功分类演练，初始空/停用。它不接消息发送、文件purge、整站恢复、任意参数维护或自动全领域事项发现。

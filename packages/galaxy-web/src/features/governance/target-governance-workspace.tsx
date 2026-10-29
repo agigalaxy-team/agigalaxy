@@ -6,8 +6,8 @@ import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef,
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { createTargetGovernanceClientV2 } from "../../../../galaxy-official/src/clients/target-governance-v2.mjs";
-import { targetModerationSchemaV2, targetReportSchemaV2 } from "../../../../galaxy-official/src/shared/target-governance-v2-schema.mjs";
+import { createTargetGovernanceClientV2 } from "../../../../galaxy-client/src/clients/target-governance-v2.mjs";
+import { targetModerationSchemaV2, targetReportSchemaV2 } from "../../../../galaxy-contracts/src/target-governance-v2-schema.mjs";
 import { PageLoading } from "../../site-shell";
 import { memberName, useMemberNames } from "../../shared/people/conversation-ui";
 import { useChoiceViewLease } from "../../shared/operations/choice-retained-operations";

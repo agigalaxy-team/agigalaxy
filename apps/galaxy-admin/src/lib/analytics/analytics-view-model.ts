@@ -1,5 +1,5 @@
 import type {AnalyticsAudienceBasis,AnalyticsBusinessCounts,AnalyticsBusinessData,AnalyticsFlowData,AnalyticsFlowNode,AnalyticsKind,AnalyticsLocation,AnalyticsOverviewData,AnalyticsRetentionData,AnalyticsSeriesPoint} from "../../components/analytics/analytics-types";
-import {normalizeAnalyticsRetention} from "../../../../../packages/galaxy-official/src/shared/analytics-retention.mjs";
+import {normalizeAnalyticsRetention} from "../../../../../packages/galaxy-contracts/src/analytics-retention.mjs";
 
 const record=(value:unknown):Record<string,unknown>|null=>value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null;
 export function analyticsValue(value:unknown){return typeof value==='number'&&Number.isFinite(value)&&value>=0?value:null;}

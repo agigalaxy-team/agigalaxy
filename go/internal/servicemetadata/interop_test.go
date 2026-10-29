@@ -13,10 +13,11 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
 )
 
 func TestOriginalPublicDiscoveryAndFirstDeviceHandshake(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	root, _ := filepath.Abs("../../..")
@@ -31,7 +32,7 @@ func TestOriginalPublicDiscoveryAndFirstDeviceHandshake(t *testing.T) {
 			t.Fatalf("original JS %s: %v %s", mode, e, out)
 		}
 	}
-	node("device-auth-interop.mjs", "setup")
+	deviceauthfixture.Prepare(t, owner, dir, []string{"binding", "history"})
 	pool, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_api")
 	if e != nil {
 		t.Fatal(e)
@@ -55,7 +56,7 @@ func TestOriginalPublicDiscoveryAndFirstDeviceHandshake(t *testing.T) {
 	node("service-metadata-interop.mjs", "official")
 	// The original connection client now follows successful public discovery;
 	// every binding/session request reaches this same Go handler chain.
-	node("device-auth-interop.mjs", "client")
+	node("device-client-fixture.mjs", "client")
 	before, tag, e := service.manifest(ctx)
 	if e != nil {
 		t.Fatal(e)

@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -18,36 +15,21 @@ import (
 	a "github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/autonomyfixture"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestWorkerOriginalDispatchFenceAndNativeReceiptRecovery(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
 	encode := func(v any) string { b, _ := json.Marshal(v); return string(b) }
-	node := func(mode string, input a.Object) a.Object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-autonomy-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		if input != nil {
-			cmd.Stdin = strings.NewReader(encode(input))
-		}
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original worker %s %v %s", mode, e, out)
-		}
-		var o a.Object
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid original worker result")
-		}
-		return o
-	}
-	base := node("setup", nil)
-	endpoint, accountID := base["endpoint"].(string), base["aiAccountId"].(string)
+	f := operationsfixture.NewEndpoint(t, owner, "https://autonomy.example.invalid")
+	automation := f.Automation(t)
+	base := autonomyfixture.Setup(t, f, automation)
+	endpoint, accountID := f.Endpoint, base["aiAccountId"].(string)
 	cfg, _ := pgxpool.ParseConfig(dsn)
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)
@@ -122,7 +104,10 @@ func TestWorkerOriginalDispatchFenceAndNativeReceiptRecovery(t *testing.T) {
 	mu.Lock()
 	nativeState = "COMPLETED"
 	mu.Unlock()
-	original := node("worker-execute", a.Object{"taskId": id, "origin": server.URL})
+	original, e := worker.Execute(ctx, a.Object{"taskId": id})
+	if e != nil {
+		t.Fatal(e)
+	}
 	if original["state"] != "waiting-human" {
 		t.Fatalf("model ended claimed inspection complete %s", encode(original))
 	}

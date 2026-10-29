@@ -1,8 +1,7 @@
+import {copyLegacyNativeFixture} from './legacy-native-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
 import {mkdtemp,writeFile,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
@@ -31,7 +30,7 @@ async function actualIframe(client,html,shown,title){
 test('official App/AppBridge reaches actual Go stdio and shipped local panel with private-only bodies and real browser choice',{skip:!executable&&'Set GALAXY_GO_UI_TEST_BINARY to a Go development binary with its existing dist artifact',timeout:30000},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'galaxy-go-apps-')),dataDirectory=join(directory,'data'),configPath=join(directory,'native.json');let client,app,bridge,transport;
  try{
-  await promisify(execFile)(process.execPath,['scripts/go/native-fixture.mjs',dataDirectory]);
+  await copyLegacyNativeFixture(dataDirectory);
   const expected=JSON.parse(await readFile(join(dataDirectory,'expected.json'),'utf8')),now=Math.floor(Date.now()/1000),key=generateKeyPairSync('ed25519').publicKey.export({type:'spki',format:'pem'});
   await writeFile(configPath,JSON.stringify({version:2,website:'https://selected.invalid',endpoint:'https://galaxy.invalid',dataDirectory,trustedKeys:{synthetic:{publicKeyPem:key,notBefore:now-1,notAfter:now+3600,revoked:false}}}));
   client=new Client({name:'synthetic-official-app-host',version:'1'},{capabilities:{extensions:{'io.modelcontextprotocol/ui':{mimeTypes:['text/html;profile=mcp-app']}}}});

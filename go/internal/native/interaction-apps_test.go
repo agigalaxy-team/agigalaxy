@@ -3,6 +3,7 @@ package native
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"runtime"
@@ -58,15 +59,14 @@ func TestInteractionAppsOriginalSnapshotAndPrivateResultProjection(t *testing.T)
 	}
 	archivePage, _ := interactionMap(archiveList)
 	archiveID := text(initializationMap(initializationArray(archivePage["items"])[0])["archiveSessionId"])
-	for _, input := range []interactionPanelInput{{View: "history"}, {View: "history", WorkID: workID}, {View: "archive"}, {View: "archive", ArchiveSessionID: archiveID}, {View: "privacy"}} {
+	for index, input := range []interactionPanelInput{{View: "history"}, {View: "history", WorkID: workID}, {View: "archive"}, {View: "archive", ArchiveSessionID: archiveID}, {View: "privacy"}} {
 		raw, _ := protocol.Encode(input)
 		t.Run(string(raw), func(t *testing.T) {
 			got, e := rt.interactionPanelSnapshot(context.Background(), input)
 			if e != nil {
 				t.Fatal(e)
 			}
-			script := `import {readFile} from 'node:fs/promises';import {join} from 'node:path';import {registerLocalWorkPanelTools} from './integrations/native-v2/compact-app/local-work-server.mjs';import {createLocalWorkHistory} from './packages/galaxy-core/src/work-history/index.mjs';import {createLocalConversationArchive} from './packages/galaxy-core/src/conversation-archive/index.mjs';import {getLocalUploadPrivacy} from './packages/galaxy-core/src/application/local-operations.mjs';import {createNativeWorkSync} from './packages/galaxy-edge-mcp/src/native-v2/work/sync.mjs';import {createNativeArchiveSync} from './packages/galaxy-edge-mcp/src/native-v2/work/archive-sync.mjs';const dataDirectory=process.argv[1],handlers=new Map(),getIdentity=async directory=>JSON.parse(await readFile(join(directory,'galaxy-id.json'),'utf8'));const server={registerTool:(name,config,handler)=>{handlers.set(name,handler);return{};}};registerLocalWorkPanelTools(server,{resourceUri:'ui://synthetic',local:{work:createLocalWorkHistory({dataDirectory}),archive:createLocalConversationArchive({dataDirectory}),privacyGet:()=>getLocalUploadPrivacy(dataDirectory),workCloud:createNativeWorkSync({dataDirectory,endpoint:'https://galaxy.invalid',getIdentity}),cloud:createNativeArchiveSync({dataDirectory,endpoint:'https://galaxy.invalid',getIdentity})}});const result=await handlers.get('galaxy_local_panel')(JSON.parse(process.argv[2]),{});const {kind,...snapshot}=result._meta.galaxyLocalWork;console.log(JSON.stringify(snapshot));`
-			want := initializationNode(t, script, store.Directory, string(raw))
+			want := readNativeContractFixture(t, fmt.Sprintf("interaction-%d.json", index))
 			same(t, want, got)
 			result := interactionComponent(got)
 			model, _ := protocol.Encode(struct {

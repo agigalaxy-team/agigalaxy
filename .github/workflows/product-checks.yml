@@ -56,18 +56,33 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
-      - if: matrix.component == 'hub' || matrix.component == 'native-client'
+      - if: matrix.component == 'hub' || matrix.component == 'native-client' || matrix.component == 'core' || matrix.component == 'a2a'
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
       - if: matrix.component != 'model-gateway' && matrix.component != 'discovery'
         run: npm run setup
+      - if: matrix.component == 'hub' || matrix.component == 'native-client' || matrix.component == 'core' || matrix.component == 'a2a'
+        name: Locate isolated PostgreSQL integration binaries
+        run: |
+          PG_BIN="$(pg_config --bindir)"
+          test -x "$PG_BIN/initdb"
+          test -x "$PG_BIN/pg_ctl"
+          echo "GALAXY_GO_TEST_PG_BIN=$PG_BIN" >> "$GITHUB_ENV"
       - if: matrix.component == 'admin'
         run: npm ci --ignore-scripts --no-audit --no-fund --prefix apps/galaxy-admin
       - if: matrix.component == 'admin'
         name: Prepare isolated Chromium for the existing Admin browser test
         run: node node_modules/playwright/cli.js install --with-deps chromium
+      - if: matrix.component == 'a2a'
+        name: Prepare the locked Python peer for current Go HTTP integration
+        run: |
+          python -m venv "$RUNNER_TEMP/galaxy-a2a-python"
+          "$RUNNER_TEMP/galaxy-a2a-python/bin/python" -m pip install --disable-pip-version-check --require-hashes --no-deps \
+            -r packages/galaxy-a2a/test/python/requirements.lock
+          "$RUNNER_TEMP/galaxy-a2a-python/bin/python" -m pip check
+          echo "GALAXY_A2A_PYTHON=$RUNNER_TEMP/galaxy-a2a-python/bin/python" >> "$GITHUB_ENV"
       - if: matrix.component == 'auth'
         uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:

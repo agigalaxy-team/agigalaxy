@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
-	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/cases"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/evidence"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
@@ -19,36 +19,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 )
 
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/civ2/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	raw, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original CI %s %v %s", mode, e, stderr.String())
-	}
-	var out Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if json.Unmarshal(line, &out) == nil && out != nil {
-			return out
-		}
-	}
-	t.Fatal("fixture result")
-	return nil
-}
 func same(t *testing.T, a, b any) {
 	t.Helper()
 	var x, y any
@@ -59,24 +34,11 @@ func same(t *testing.T, a, b any) {
 	}
 }
 func TestOriginalCIHTTPProofAndRequestBoundWorker(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	pub, key, _ := ed25519.GenerateKey(rand.Reader)
-	pem, _ := identity.PublicPEM(pub)
-	path := filepath.Join(t.TempDir(), "ci-fixture.json")
-	node(t, dsn, "setup", path, Object{"publicKey": pem})
-	raw, _ := os.ReadFile(path)
-	var f struct {
-		Endpoint                                                                                                      string
-		Clock                                                                                                         int64
-		Owner                                                                                                         struct{ Subject, Token string }
-		Root, OtherRoot, Evidence, First, Second, SecondGrant, Third, ThirdGrant, NextPreview, NextGrant, RevokeGrant Object
-		SeedID, NextID, RunJSON                                                                                       string
-		Pins                                                                                                          []json.RawMessage
-	}
-	if e := json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
-	}
+	seed := sha256.Sum256([]byte("galaxy-synthetic-ci-signing-fixture"))
+	key := ed25519.NewKeyFromSeed(seed[:])
+	f := setupCI(t, owner)
 	rolePool := func(role string) *pgxpool.Pool {
 		config := owner.Config()
 		config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE "+role); return e }
@@ -226,9 +188,17 @@ func TestOriginalCIHTTPProofAndRequestBoundWorker(t *testing.T) {
 	if fault.Code(e) != "case_unavailable" {
 		t.Fatal("CI reader escaped signed Case container", e)
 	}
+	stage := 0
 	compare := func(queries []Object) {
 		t.Helper()
-		want := node(t, dsn, "read", path, Object{"clock": clock, "queries": queries})["results"].([]any)
+		var capture struct {
+			Input   Object `json:"input"`
+			Results []any  `json:"results"`
+		}
+		fixtureJSON(t, fmt.Sprintf("read-%d", stage), &capture)
+		stage++
+		same(t, Object{"clock": clock, "queries": queries}, capture.Input)
+		want := capture.Results
 		for i, q := range queries {
 			var got Object
 			var err error

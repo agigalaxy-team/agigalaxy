@@ -12,9 +12,15 @@ go build ./cmd/...
 
 阶段成果后仅对本批受影响包和实际入口执行 `go test`，复用未修改部分的既有结果；不默认重复全模块检查。
 
+仓库组件检查直接使用 `node scripts/check-go.mjs hub` 或 `node scripts/check-go.mjs native-client`，分别执行明确的 Hub 边界回归和 Native／本机资料回归；这与编译、真实宿主验收分别记录。`GALAXY_BUILD_GO` 可指定 Go 可执行文件。`test:conformance` 执行当前 Go 领域用例，缺少前置环境或跳过的检查不计通过。
+
+`internal/databaseschema/sql/` 是业务迁移与四个角色 SQL 的唯一维护来源。迁移沿原编号至 133，120 未注册；不重写历史 SQL 或从最大编号推定连续。`go generate ./internal/databaseschema` 只按 SQL 文件生成有序版本目录，`node internal/databaseschema/generate.mjs --check` 检查目录是否同步，均不连接数据库。实际升级仍须显式运行 `galaxy-migrate`。
+
 跨语言检查还需要现行 Node 依赖。PostgreSQL 集成检查通过 `GALAXY_GO_TEST_PG_BIN` 指定 `initdb`、`pg_ctl` 所在绝对目录；检查器只创建操作系统临时目录中的独立数据库，监听 loopback，结束后关闭。未提供时会明确跳过，不能据此报告数据库检查通过。它不读取生产 `DATABASE_URL`。
 
 Native 开发入口：`galaxy native --config <现有绝对配置路径>`。只列出当前真正迁入的工具；不得据此改写正式宿主配置。`galaxy identity --config ...` 只读取公开身份资料。`galaxy host --config ...` 是宿主插件继承stdin/stdout的专用JSONL通道，用于原履历／原件持久处理，不是模型工具或网络服务。Go CLI的`host-configs`可生成候选宿主配置，`setup`先展示实际来源和目录、取得本人确认后才办理；当前仅在临时目录检查，不自动安装。命令参数见`galaxy --help`。
+
+服务版 Native 当前源码通过 `galaxy_identity_recovery` 的 `set`、`recover`、`resume` 打开限时本机本人操作页，恢复码不作为 MCP 参数或结果。恢复沿用同一 GUID，在所选服务撤销原设备与绑定并轮换下一代恢复码；本人保存新码后，连接须另行选择，本机资料及历史私有内容不会自动恢复。结果未知时查询原控制操作回执，仅本人确认且服务仍记录待提交时重试原签名字节。页面模板编入 Go 二进制，候选构建按 Go 依赖收集其源码摘要；此能力本机定向联测已通过，最终候选及真实宿主／平台验收状态见 [WORK_STATUS](../WORK_STATUS.md)。
 
 无服务配置的本机入口是 `galaxy integration-mcp --data-dir <目录>`；薄宿主菜单使用私有 `integration-host` 通道。二者忽略服务配置、不构造联网Runtime；目录依次取明确参数、`GALAXY_DATA_DIR`、默认 `.galaxy`。宿主源码默认Go，不隐式回退旧JavaScript持久核心。
 

@@ -1,4 +1,4 @@
-import { authoredRows,nativeStateLabel,nativeAudienceLabel,a2aParticipantContent } from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
+import { authoredRows,nativeStateLabel,nativeAudienceLabel,a2aParticipantContent } from '../presentation/native-result.mjs';
 
 export function workerPanelText(data) {
   const view=data.selected,preview=data.preview,result=data.actionResult;

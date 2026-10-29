@@ -1,8 +1,8 @@
 package experiencereviews
 
 import (
+	"bytes"
 	"encoding/json"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -20,16 +20,14 @@ func TestOriginalExperienceSchemaAndUTF16(t *testing.T) {
 		inputs = append(inputs, string(b))
 	}
 	root, _ := filepath.Abs("../../..")
-	file := filepath.Join(t.TempDir(), "schemas.json")
 	raw, _ = json.Marshal(inputs)
-	if e := os.WriteFile(file, raw, 0600); e != nil {
-		t.Fatal(e)
-	}
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/qualification-interop.mjs"), "experience-schema", file)
+	script := `import {experienceEventSchema} from './packages/galaxy-contracts/src/experience-review-schema.mjs';let text='';for await(const c of process.stdin)text+=c;console.log(JSON.stringify(JSON.parse(text).map(raw=>{try{return{accepted:true,json:JSON.stringify(experienceEventSchema.parse(JSON.parse(raw)))}}catch{return{accepted:false}}})))`
+	cmd := exec.Command("node", "--input-type=module", "-e", script)
 	cmd.Dir = root
+	cmd.Stdin = bytes.NewReader(raw)
 	out, e := cmd.CombinedOutput()
 	if e != nil {
-		t.Fatalf("original schemas: %v %s", e, out)
+		t.Fatalf("current contract schemas: %v %s", e, out)
 	}
 	var expected []struct {
 		Accepted bool

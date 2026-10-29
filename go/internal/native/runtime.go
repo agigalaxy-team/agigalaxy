@@ -16,6 +16,7 @@ type Runtime struct {
 	connection        *Connection
 	mu                sync.Mutex
 	connectMu         sync.Mutex
+	discoveryMu       sync.Mutex
 	connecting        bool
 	closed, stopped   bool
 	stopFingerprint   string
@@ -32,6 +33,17 @@ type Runtime struct {
 }
 
 func NewRuntime(store *Store, configuration Configuration, options ConnectionOptions) (*Runtime, error) {
+	if configuration.RootPins != nil {
+		pins := make(map[string]Pin, len(configuration.RootPins))
+		for id, pin := range configuration.RootPins {
+			if pin.TrustedUntil != nil {
+				value := *pin.TrustedUntil
+				pin.TrustedUntil = &value
+			}
+			pins[id] = pin
+		}
+		configuration.RootPins = pins
+	}
 	connection, e := NewConnection(store, configuration, options)
 	if e != nil {
 		return nil, e

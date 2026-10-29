@@ -4,48 +4,45 @@ import (
 	"encoding/json"
 	"math/big"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 )
 
-type oracleUsage struct {
+type fixtureUsage struct {
 	PayloadBytes  string `json:"payloadBytes"`
 	QueuedJobs    int64  `json:"queuedJobs"`
 	ActiveExports int64  `json:"activeExports"`
 }
 
-func (u oracleUsage) native() Usage {
+func (u fixtureUsage) native() Usage {
 	bytes, _ := new(big.Int).SetString(u.PayloadBytes, 10)
 	return Usage{bytes, u.QueuedJobs, u.ActiveExports}
 }
-func TestOriginalResourceBudgetPolicySQLAndGrowthParity(t *testing.T) {
+func TestResourceBudgetPolicyAndGrowth(t *testing.T) {
 	policy := DefaultPolicy()
 	type growthCase struct {
-		Before oracleUsage `json:"before"`
-		After  oracleUsage `json:"after"`
-		Policy Policy      `json:"policy"`
+		Before fixtureUsage `json:"before"`
+		After  fixtureUsage `json:"after"`
+		Policy Policy       `json:"policy"`
 	}
 	cases := []growthCase{}
-	add := func(before, after oracleUsage) { cases = append(cases, growthCase{before, after, policy}) }
-	add(oracleUsage{"0", 0, 0}, oracleUsage{"1048576", 32, 3})
-	add(oracleUsage{"1048576", 0, 0}, oracleUsage{"1048577", 0, 0})
-	add(oracleUsage{"1048577", 0, 0}, oracleUsage{"1048577", 0, 0})
-	add(oracleUsage{"1048578", 0, 0}, oracleUsage{"1048577", 0, 0})
-	add(oracleUsage{"0", 32, 0}, oracleUsage{"0", 33, 0})
-	add(oracleUsage{"0", 33, 0}, oracleUsage{"0", 33, 0})
-	add(oracleUsage{"0", 34, 0}, oracleUsage{"0", 33, 0})
-	add(oracleUsage{"0", 0, 3}, oracleUsage{"0", 0, 4})
-	add(oracleUsage{"0", 0, 4}, oracleUsage{"0", 0, 4})
-	add(oracleUsage{"0", 0, 5}, oracleUsage{"0", 0, 4})
-	add(oracleUsage{"9223372036854775808", 0, 0}, oracleUsage{"9223372036854775809", 0, 0})
-	add(oracleUsage{"9223372036854775808", 0, 0}, oracleUsage{"9223372036854775808", 0, 0})
-	add(oracleUsage{"0", 0, 0}, oracleUsage{"1048577", 33, 4})
-	add(oracleUsage{"0", 0, 0}, oracleUsage{"0", 33, 4})
+	add := func(before, after fixtureUsage) { cases = append(cases, growthCase{before, after, policy}) }
+	add(fixtureUsage{"0", 0, 0}, fixtureUsage{"1048576", 32, 3})
+	add(fixtureUsage{"1048576", 0, 0}, fixtureUsage{"1048577", 0, 0})
+	add(fixtureUsage{"1048577", 0, 0}, fixtureUsage{"1048577", 0, 0})
+	add(fixtureUsage{"1048578", 0, 0}, fixtureUsage{"1048577", 0, 0})
+	add(fixtureUsage{"0", 32, 0}, fixtureUsage{"0", 33, 0})
+	add(fixtureUsage{"0", 33, 0}, fixtureUsage{"0", 33, 0})
+	add(fixtureUsage{"0", 34, 0}, fixtureUsage{"0", 33, 0})
+	add(fixtureUsage{"0", 0, 3}, fixtureUsage{"0", 0, 4})
+	add(fixtureUsage{"0", 0, 4}, fixtureUsage{"0", 0, 4})
+	add(fixtureUsage{"0", 0, 5}, fixtureUsage{"0", 0, 4})
+	add(fixtureUsage{"9223372036854775808", 0, 0}, fixtureUsage{"9223372036854775809", 0, 0})
+	add(fixtureUsage{"9223372036854775808", 0, 0}, fixtureUsage{"9223372036854775808", 0, 0})
+	add(fixtureUsage{"0", 0, 0}, fixtureUsage{"1048577", 33, 4})
+	add(fixtureUsage{"0", 0, 0}, fixtureUsage{"0", 33, 4})
 	good, _ := json.Marshal(policy)
 	var values map[string]any
 	_ = json.Unmarshal(good, &values)
@@ -66,41 +63,17 @@ func TestOriginalResourceBudgetPolicySQLAndGrowthParity(t *testing.T) {
 		copy[key] = bad
 		policies = append(policies, copy)
 	}
-	input, _ := json.Marshal(map[string]any{"cases": cases, "policies": policies})
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/resource-budget-interop.mjs"), "oracle")
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(string(input))
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original JS budget oracle: %v %s", e, out)
+	if policy != (Policy{1, 1048576, 32, 3, 4, 1}) {
+		t.Fatal("published defaults", policy)
 	}
-	var oracle struct {
-		Queries       []string
-		DefaultPolicy Policy
-		Validations   []bool
-		Outcomes      []*string
-	}
-	if e = json.Unmarshal(out, &oracle); e != nil {
-		t.Fatal(e)
-	}
-	if !reflect.DeepEqual(oracle.DefaultPolicy, policy) {
-		t.Fatal("default policy differs from original loader")
-	}
-	for i, query := range []string{subjectPayloadSQL, subjectJobsSQL, subjectExportsSQL} {
-		if query != oracle.Queries[i] {
-			t.Fatalf("original SQL query %d differs", i)
-		}
-	}
+	outcomes := []string{"", "storage_quota_exceeded", "", "", "job_queue_quota_exceeded", "", "", "export_ticket_quota_exceeded", "", "", "storage_quota_exceeded", "", "storage_quota_exceeded", "job_queue_quota_exceeded"}
+	var e error
 	for i, c := range cases {
 		code := ""
 		if e = EnforceResourceGrowth(c.Before.native(), c.After.native(), c.Policy); e != nil {
 			code = fault.Code(e)
 		}
-		want := ""
-		if oracle.Outcomes[i] != nil {
-			want = *oracle.Outcomes[i]
-		}
+		want := outcomes[i]
 		if code != want {
 			t.Fatalf("growth case %d: %q want %q", i, code, want)
 		}
@@ -112,8 +85,8 @@ func TestOriginalResourceBudgetPolicySQLAndGrowthParity(t *testing.T) {
 			t.Fatal(e)
 		}
 		_, e = Load(file)
-		if (e == nil) != oracle.Validations[i] {
-			t.Fatalf("policy case %d differs from original parse", i)
+		if (e == nil) != (i == 0) {
+			t.Fatalf("policy case %d validation", i)
 		}
 	}
 	first, e := Load("")

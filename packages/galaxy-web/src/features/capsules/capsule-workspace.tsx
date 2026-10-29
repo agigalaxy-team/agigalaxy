@@ -21,8 +21,8 @@ import {AgentWorkContinuation} from "../local-galaxy/agent-work-continuation";
 import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from "../../shared/reading/directory-reading-state.mjs";
 import {helpOriginLocator} from "../help-search/help-origin-client.mjs";
 import {useChoiceViewLease,type ChoiceViewLease} from "../../shared/operations/choice-retained-operations";
-import {browserScopes} from "../../../../galaxy-official/src/browser-client.mjs";
-import {capsuleEventV2Schema,capsulePermissionV2Schema,capsuleUseV2Schema} from "../../../../galaxy-official/src/shared/capsule-v2-schema.mjs";
+import {browserScopes} from "../../../../galaxy-client/src/browser-client.mjs";
+import {capsuleEventV2Schema,capsulePermissionV2Schema,capsuleUseV2Schema} from "../../../../galaxy-contracts/src/capsule-v2-schema.mjs";
 import type {CapsuleAuthorMode,CapsuleCaseHistory,CapsuleDetail,CapsuleDirectoryItem,CapsuleDisclosure,CapsuleOperationKind,CapsuleOriginWork,CapsulePermissionView,CapsulePreview,CapsulePreviewContext,CapsulePreviewDisplay,CapsuleReceipt,CapsuleRegisterDraft,CapsuleUses,CapsuleUseView,CapsuleVersionItem,CapsuleVersions,CapsuleWorkspaceClient,CapsuleWorkspaceRuntime} from "./capsule-authoring-types";
 import "./capsule-reading.css";
 

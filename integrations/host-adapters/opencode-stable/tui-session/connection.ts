@@ -12,7 +12,7 @@ import type { GalaxyMenuSession } from './session-context.ts';
 import { divider, localBoundary, formatModules } from './presentation.ts';
 import { createPurposeMenu } from '../purpose-menu.mjs';
 import { unwrap, plain } from '../purpose/presentation.mjs';
-import { nativeConnectionMessage } from '../../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
+import { nativeConnectionMessage } from '../../../native-v2/presentation/native-result.mjs';
 
 export function createConnectionPages(session: GalaxyMenuSession) {
   async function showStatus(onBack: Action) {

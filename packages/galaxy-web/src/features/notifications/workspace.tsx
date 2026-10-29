@@ -17,7 +17,7 @@ import {applyNotificationChanges,saveNotificationSelection} from './settings-mod
 type Runtime=Awaited<ReturnType<typeof import('../../runtime.mjs').createWebRuntime>>;
 type Item={id:string;at:string;read:boolean;quiet:boolean;interruptiveEligible:boolean;presented:boolean;eventKind:string;title:string;actorId?:string;sourceExpiresAt?:string;object:{type:string;id:string;messageId?:string;roomId?:string}};
 type ReadItem=Item&{readUntil:number};
-type Options={revision:number;settings:import('zod/v4').infer<typeof import('../../../../galaxy-official/src/shared/notification-inbox-schema.mjs').inboxOptionsSchema>;externalDelivery:'disabled'};
+type Options={revision:number;settings:import('zod/v4').infer<typeof import('../../../../galaxy-contracts/src/notification-inbox-schema.mjs').inboxOptionsSchema>;externalDelivery:'disabled'};
 type Page={items:Item[];nextAfter:string|null;lastCheckedAt:string};
 type Prompt={item:ReadItem;claimId:string;deliveryClientId:string;lease:number;leaseUntil:string};
 type Props={runtime:Runtime|null;subjectId?:string;connected:boolean;navigate:(path:string)=>void};

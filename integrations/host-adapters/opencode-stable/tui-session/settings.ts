@@ -111,20 +111,6 @@ export function createSettingsPages(session: GalaxyMenuSession) {
       const nativeEntry =
         (kind: 'identity' | 'methods' | 'external' | 'projects'): Action =>
         async () => {
-          if (kind === 'identity' && session.workRecorder) {
-            try {
-              if (!(await session.workRecorder.history.identity()))
-                return session.showQuickInitialize(nativeEntry(kind));
-            } catch {
-              return session.showInfo(
-                'Galaxy',
-                chinese
-                  ? '本地身份暂不可读，请在保留资料的情况下恢复原目录。'
-                  : 'The local identity is unavailable. Keep the existing material and restore its location.',
-                () => showSettings(onReturn),
-              );
-            }
-          }
           const version = ++session.connectionGeneration;
           session.purposeMenu?.close();
           session.purposeMenu = createPurposeMenu({

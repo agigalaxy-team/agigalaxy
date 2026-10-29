@@ -1,0 +1,1962 @@
+{
+  "fixture": {
+    "endpoint": "https://records.example.invalid",
+    "clock": 2000000000,
+    "owner": {
+      "subject": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "token": "CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws"
+    },
+    "viewer": {
+      "subject": "GUID1501M61X70F089R3GYZ0G69TN4XA",
+      "token": "DAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw"
+    },
+    "root": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "kind": "case-created",
+      "eventId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "expectedVersion": 0,
+      "localRef": "11364bdf-6766-4bdc-a17f-265ce85280cd",
+      "title": "Original report ledger",
+      "summary": "Reports stay scoped",
+      "source": {
+        "kind": "local",
+        "reference": "e3160c0d-b68f-4381-b1c2-5f3cd6773a13"
+      },
+      "synthetic": false
+    },
+    "start": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "kind": "attempt-start",
+      "eventId": "25071741-4270-4f75-9b4a-c05e190b42f6",
+      "expectedVersion": 1,
+      "role": "author",
+      "strategy": "Controlled fixture",
+      "inputScopeSummary": "Isolated source",
+      "permissionScope": [
+        "test"
+      ]
+    },
+    "result": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "kind": "result-recorded",
+      "eventId": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+      "expectedVersion": 2,
+      "origin": {
+        "kind": "attempt",
+        "id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+        "version": 1
+      },
+      "scopeVersion": 1,
+      "deliverableRefs": [],
+      "reportedOutcome": "partial",
+      "summary": "Reported result",
+      "limitations": "Not independently verified"
+    },
+    "first": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "synthetic": false,
+      "kind": "evidence",
+      "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+      "operationId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+      "expectedVersion": 0,
+      "evidenceType": "test-result",
+      "source": {
+        "originSystem": "controlled-test",
+        "externalStableId": "original-source",
+        "contentVersion": "version-1",
+        "originalAt": "2033-05-18T03:32:20.000Z",
+        "issuer": "Author-reported source"
+      },
+      "observedAt": "2033-05-18T03:33:20.000Z",
+      "reportedSourceState": "available",
+      "summary": "  Exact retained raw summary  ",
+      "expiresAt": null
+    },
+    "firstGrant": {
+      "consentId": "fd401dca-4a4c-460c-bf20-e19385b571b2",
+      "payloadJson": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"synthetic\":false,\"kind\":\"evidence\",\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"operationId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"expectedVersion\":0,\"evidenceType\":\"test-result\",\"source\":{\"originSystem\":\"controlled-test\",\"externalStableId\":\"original-source\",\"contentVersion\":\"version-1\",\"originalAt\":\"2033-05-18T03:32:20.000Z\",\"issuer\":\"Author-reported source\"},\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"reportedSourceState\":\"available\",\"summary\":\"  Exact retained raw summary  \",\"expiresAt\":null}"
+    },
+    "second": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "synthetic": true,
+      "kind": "evidence",
+      "id": "1faf3331-c78d-4a89-ba55-7246237daceb",
+      "operationId": "9e18ca74-8050-4cf0-b516-1ca4160ae390",
+      "expectedVersion": 0,
+      "evidenceType": "test-result",
+      "source": {
+        "originSystem": "controlled-test",
+        "externalStableId": "original-source",
+        "contentVersion": "version-1",
+        "originalAt": "2033-05-18T03:32:20.000Z",
+        "issuer": "Author-reported source"
+      },
+      "observedAt": "2033-05-18T03:33:20.000Z",
+      "reportedSourceState": "available",
+      "summary": "A second record of the same declared source",
+      "expiresAt": null
+    },
+    "verification": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "synthetic": false,
+      "kind": "verification",
+      "id": "86309116-2676-43ca-852e-edd7969885fe",
+      "operationId": "cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3",
+      "expectedVersion": 0,
+      "target": {
+        "type": "result",
+        "id": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+        "version": 1
+      },
+      "scopeVersion": 1,
+      "method": "unit-test",
+      "scope": "  Declared scope only  ",
+      "conditions": {
+        "platform": "controlled",
+        "count": 1
+      },
+      "observation": "passed",
+      "summary": "  Derived report  ",
+      "evidenceRefs": [
+        {
+          "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+          "version": 1
+        }
+      ],
+      "relationship": "independent",
+      "observedAt": "2033-05-18T03:33:20.000Z",
+      "expiresAt": null
+    },
+    "firstCorrection": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "synthetic": true,
+      "kind": "evidence",
+      "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+      "operationId": "ec4d539a-4192-4112-a6af-3bd2d3b9cbc4",
+      "expectedVersion": 1,
+      "evidenceType": "test-result",
+      "source": {
+        "originSystem": "controlled-test",
+        "externalStableId": "original-source",
+        "contentVersion": "version-1",
+        "originalAt": "2033-05-18T03:32:20.000Z",
+        "issuer": "Author-reported source"
+      },
+      "observedAt": "2033-05-18T03:33:20.000Z",
+      "reportedSourceState": "available",
+      "summary": "Retained corrected source",
+      "expiresAt": null,
+      "reason": " Explicit source correction "
+    },
+    "badCorrection": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "synthetic": false,
+      "kind": "verification",
+      "id": "86309116-2676-43ca-852e-edd7969885fe",
+      "operationId": "0a511526-7c94-4447-8d36-600fd2a391c0",
+      "expectedVersion": 1,
+      "target": {
+        "type": "result",
+        "id": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+        "version": 1
+      },
+      "scopeVersion": 1,
+      "method": "unit-test",
+      "scope": "  Declared scope only  ",
+      "conditions": {
+        "platform": "controlled",
+        "count": 1
+      },
+      "observation": "passed",
+      "summary": "  Derived report  ",
+      "evidenceRefs": [
+        {
+          "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+          "version": 2
+        }
+      ],
+      "relationship": "independent",
+      "observedAt": "2033-05-18T03:33:20.000Z",
+      "expiresAt": null,
+      "reason": "Cannot infer a nonsynthetic source"
+    },
+    "goodCorrection": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "synthetic": true,
+      "kind": "verification",
+      "id": "86309116-2676-43ca-852e-edd7969885fe",
+      "operationId": "1727617b-02ae-45b7-92a6-6d1aa3734fb2",
+      "expectedVersion": 1,
+      "target": {
+        "type": "result",
+        "id": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+        "version": 1
+      },
+      "scopeVersion": 1,
+      "method": "unit-test",
+      "scope": "  Declared scope only  ",
+      "conditions": {
+        "platform": "controlled",
+        "count": 1
+      },
+      "observation": "passed",
+      "summary": "  Derived report  ",
+      "evidenceRefs": [
+        {
+          "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+          "version": 2
+        }
+      ],
+      "relationship": "independent",
+      "observedAt": "2033-05-18T03:33:20.000Z",
+      "expiresAt": null,
+      "reason": "Explicit true correction with current source"
+    },
+    "revoke": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "synthetic": true,
+      "kind": "revoke",
+      "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+      "objectType": "evidence",
+      "operationId": "f658d32a-d876-4228-851f-659c398de21c",
+      "expectedVersion": 2,
+      "reason": "Owner withdraws this source"
+    },
+    "requests": {
+      "second": {
+        "consentId": "2ebdd17e-9709-46eb-b4a3-82a9b75721e4",
+        "payloadJson": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"synthetic\":true,\"kind\":\"evidence\",\"id\":\"1faf3331-c78d-4a89-ba55-7246237daceb\",\"operationId\":\"9e18ca74-8050-4cf0-b516-1ca4160ae390\",\"expectedVersion\":0,\"evidenceType\":\"test-result\",\"source\":{\"originSystem\":\"controlled-test\",\"externalStableId\":\"original-source\",\"contentVersion\":\"version-1\",\"originalAt\":\"2033-05-18T03:32:20.000Z\",\"issuer\":\"Author-reported source\"},\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"reportedSourceState\":\"available\",\"summary\":\"A second record of the same declared source\",\"expiresAt\":null}"
+      },
+      "verification": {
+        "consentId": "6a17a0bc-6580-4d33-812e-5c4176802d9b",
+        "payloadJson": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"synthetic\":false,\"kind\":\"verification\",\"id\":\"86309116-2676-43ca-852e-edd7969885fe\",\"operationId\":\"cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3\",\"expectedVersion\":0,\"target\":{\"type\":\"result\",\"id\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"version\":1},\"scopeVersion\":1,\"method\":\"unit-test\",\"scope\":\"  Declared scope only  \",\"conditions\":{\"platform\":\"controlled\",\"count\":1},\"observation\":\"passed\",\"summary\":\"  Derived report  \",\"evidenceRefs\":[{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"version\":1}],\"relationship\":\"independent\",\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"expiresAt\":null}"
+      },
+      "firstCorrection": {
+        "consentId": "36672238-398c-4efc-8ec7-423951bb807b",
+        "payloadJson": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"synthetic\":true,\"kind\":\"evidence\",\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"operationId\":\"ec4d539a-4192-4112-a6af-3bd2d3b9cbc4\",\"expectedVersion\":1,\"evidenceType\":\"test-result\",\"source\":{\"originSystem\":\"controlled-test\",\"externalStableId\":\"original-source\",\"contentVersion\":\"version-1\",\"originalAt\":\"2033-05-18T03:32:20.000Z\",\"issuer\":\"Author-reported source\"},\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"reportedSourceState\":\"available\",\"summary\":\"Retained corrected source\",\"expiresAt\":null,\"reason\":\" Explicit source correction \"}"
+      },
+      "badCorrection": {
+        "consentId": "f2fbe730-9ae4-472a-9c7d-28dc10f21035",
+        "payloadJson": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"synthetic\":false,\"kind\":\"verification\",\"id\":\"86309116-2676-43ca-852e-edd7969885fe\",\"operationId\":\"0a511526-7c94-4447-8d36-600fd2a391c0\",\"expectedVersion\":1,\"target\":{\"type\":\"result\",\"id\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"version\":1},\"scopeVersion\":1,\"method\":\"unit-test\",\"scope\":\"  Declared scope only  \",\"conditions\":{\"platform\":\"controlled\",\"count\":1},\"observation\":\"passed\",\"summary\":\"  Derived report  \",\"evidenceRefs\":[{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"version\":2}],\"relationship\":\"independent\",\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"expiresAt\":null,\"reason\":\"Cannot infer a nonsynthetic source\"}"
+      },
+      "goodCorrection": {
+        "consentId": "f6fd0702-605f-4eb0-92a6-799f9b4bbd37",
+        "payloadJson": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"synthetic\":true,\"kind\":\"verification\",\"id\":\"86309116-2676-43ca-852e-edd7969885fe\",\"operationId\":\"1727617b-02ae-45b7-92a6-6d1aa3734fb2\",\"expectedVersion\":1,\"target\":{\"type\":\"result\",\"id\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"version\":1},\"scopeVersion\":1,\"method\":\"unit-test\",\"scope\":\"  Declared scope only  \",\"conditions\":{\"platform\":\"controlled\",\"count\":1},\"observation\":\"passed\",\"summary\":\"  Derived report  \",\"evidenceRefs\":[{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"version\":2}],\"relationship\":\"independent\",\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"expiresAt\":null,\"reason\":\"Explicit true correction with current source\"}"
+      },
+      "revoke": {
+        "consentId": "838e5c8e-6b65-46ab-90bf-218f802ffa50",
+        "payloadJson": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"synthetic\":true,\"kind\":\"revoke\",\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"objectType\":\"evidence\",\"operationId\":\"f658d32a-d876-4228-851f-659c398de21c\",\"expectedVersion\":2,\"reason\":\"Owner withdraws this source\"}"
+      }
+    },
+    "intervention": {
+      "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+      "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+      "kind": "intervention",
+      "eventId": "6512858f-4b41-4601-a573-e05777bf3e2d",
+      "expectedVersion": 3,
+      "types": [
+        "review"
+      ],
+      "affectsAttemptIds": [
+        "25071741-4270-4f75-9b4a-c05e190b42f6"
+      ],
+      "description": "Public event with a private content dependency",
+      "sourceRefs": [
+        {
+          "kind": "evidence",
+          "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+          "version": 1
+        }
+      ],
+      "observedEffect": "Reported only"
+    },
+    "interventionGrant": {
+      "consentId": "c0f74115-f37c-4e98-be55-61a350355062",
+      "payloadJson": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"kind\":\"intervention\",\"eventId\":\"6512858f-4b41-4601-a573-e05777bf3e2d\",\"expectedVersion\":3,\"types\":[\"review\"],\"affectsAttemptIds\":[\"25071741-4270-4f75-9b4a-c05e190b42f6\"],\"description\":\"Public event with a private content dependency\",\"sourceRefs\":[{\"kind\":\"evidence\",\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"version\":1}],\"observedEffect\":\"Reported only\"}"
+    },
+    "pins": [
+      [
+        "fixture",
+        {
+          "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAHwf4ByIHmJaPZKByPOKvpmFZsgNoNUQP30yn9lZAQH0=\n-----END PUBLIC KEY-----\n",
+          "notBefore": 1999999999,
+          "notAfter": 2000200000,
+          "revoked": false
+        }
+      ]
+    ]
+  },
+  "rows": {
+    "subjects": [
+      {
+        "id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6JjrZmQA6PgLWOgZWITOI/qh12MN+jHHAgKZTRsCrQk=\n-----END PUBLIC KEY-----\n",
+        "genesis_proof": {
+          "nonce": "W8BQzMMheIQ-OjfrmdbF1qIz1ouiRSRdxpYzJdiCemg",
+          "version": 1,
+          "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6JjrZmQA6PgLWOgZWITOI/qh12MN+jHHAgKZTRsCrQk=\n-----END PUBLIC KEY-----\n"
+        },
+        "created_at": "2026-10-28T18:43:59.004Z"
+      },
+      {
+        "id": "GUID1501M61X70F089R3GYZ0G69TN4XA",
+        "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAB3+dGeqT8YPXQSzYK9dgCVcYCZjbADQ7wNgx8HzlS3A=\n-----END PUBLIC KEY-----\n",
+        "genesis_proof": {
+          "nonce": "OIyJxFo1mePQD8FH8TWnkwIuChqVC0yde7FiM0h8W9w",
+          "version": 1,
+          "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAB3+dGeqT8YPXQSzYK9dgCVcYCZjbADQ7wNgx8HzlS3A=\n-----END PUBLIC KEY-----\n"
+        },
+        "created_at": "2026-10-28T18:43:59.081Z"
+      }
+    ],
+    "binding_challenges": [
+      {
+        "id": "9e6acf9c-9872-4f19-b44f-dfbef197872e",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "payload": {
+          "scopes": [
+            "binding",
+            "consent",
+            "case-teaser",
+            "evidence",
+            "proof",
+            "history"
+          ],
+          "purpose": "bind",
+          "endpoint": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "genesisProof": {
+            "nonce": "W8BQzMMheIQ-OjfrmdbF1qIz1ouiRSRdxpYzJdiCemg",
+            "version": 1,
+            "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6JjrZmQA6PgLWOgZWITOI/qh12MN+jHHAgKZTRsCrQk=\n-----END PUBLIC KEY-----\n"
+          },
+          "installationId": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+          "bindingExpiresAt": 2000086400,
+          "clientSessionHash": "5371a6aa05ef8c5e5374a23d64af15b225b39b262652a2136780bfea8df5ff47"
+        },
+        "token_hash": "2d8ce0be69bd1553a9c64a26b41c493247b58b3170e1b26802dcea5e05949806",
+        "expires_at": "2033-05-18T03:36:20.000Z",
+        "consumed_at": "2033-05-18T03:33:20.000Z",
+        "created_at": "2026-10-28T18:43:58.995Z"
+      },
+      {
+        "id": "83e7698c-d2ea-4853-839c-a8078ba3d3e2",
+        "subject_id": "GUID1501M61X70F089R3GYZ0G69TN4XA",
+        "payload": {
+          "scopes": [
+            "binding",
+            "consent",
+            "case-teaser",
+            "evidence",
+            "proof",
+            "history"
+          ],
+          "purpose": "bind",
+          "endpoint": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70F089R3GYZ0G69TN4XA",
+          "genesisProof": {
+            "nonce": "OIyJxFo1mePQD8FH8TWnkwIuChqVC0yde7FiM0h8W9w",
+            "version": 1,
+            "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAB3+dGeqT8YPXQSzYK9dgCVcYCZjbADQ7wNgx8HzlS3A=\n-----END PUBLIC KEY-----\n"
+          },
+          "installationId": "42811a76-4783-47a3-b851-ef98222fb164",
+          "bindingExpiresAt": 2000086400,
+          "clientSessionHash": "7ec30fefb3194529faa53927ce6452a1bf5d29ed6754b08460cc1dc126f5cb8d"
+        },
+        "token_hash": "405ff068a9262828f36777c2eea17c9b8787a82f1fb40a419204edbba519dd33",
+        "expires_at": "2033-05-18T03:36:20.000Z",
+        "consumed_at": "2033-05-18T03:33:20.000Z",
+        "created_at": "2026-10-28T18:43:59.078Z"
+      }
+    ],
+    "bindings": [
+      {
+        "id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "challenge_id": "9e6acf9c-9872-4f19-b44f-dfbef197872e",
+        "request_hash": "2d8ce0be69bd1553a9c64a26b41c493247b58b3170e1b26802dcea5e05949806",
+        "audience": "https://records.example.invalid",
+        "scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "receipt": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWJpbmRpbmctcmVjZWlwdCtqd3QiLCJraWQiOiJmaXh0dXJlIn0.eyJkYXRhIjp7ImJpbmRpbmdJZCI6IjhhNzkzMGMxLTI5ZGQtNDE3ZS04Zjk0LWMxZTlmZmZjZTQ4MCIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwicHVibGljS2V5RmluZ2VycHJpbnQiOiJlNTgwOTEzZGZlYTZlNzlkNDEzM2M4ZGI0YTk0MjQyY2Y2YmEzN2EyNjVmZDIzM2FiNTQ4NjEzMjhmYzdhMGEwIiwiaW5zdGFsbGF0aW9uSWQiOiI4Njc1YjAzYy04NWZhLTQ4ZDMtOTYzNS0zMzg2MWEyYTNlYWQiLCJlbmRwb2ludCI6Imh0dHBzOi8vcmVjb3Jkcy5leGFtcGxlLmludmFsaWQiLCJzY29wZXMiOlsiYmluZGluZyIsImNvbnNlbnQiLCJjYXNlLXRlYXNlciIsImV2aWRlbmNlIiwicHJvb2YiLCJoaXN0b3J5Il0sImV4cGlyZXNBdCI6MjAwMDA4NjQwMCwicmV2b2tlUGF0aCI6Ii92MS9iaW5kaW5ncy84YTc5MzBjMS0yOWRkLTQxN2UtOGY5NC1jMWU5ZmZmY2U0ODAvcmV2b2tlIiwiYXVkaXRSZWZlcmVuY2UiOiI5ZTZhY2Y5Yy05ODcyLTRmMTktYjQ0Zi1kZmJlZjE5Nzg3MmUifSwiaXNzIjoiaHR0cHM6Ly9yZWNvcmRzLmV4YW1wbGUuaW52YWxpZCIsImF1ZCI6Imh0dHBzOi8vcmVjb3Jkcy5leGFtcGxlLmludmFsaWQiLCJpYXQiOjIwMDAwMDAwMDAsIm5iZiI6MjAwMDAwMDAwMCwiZXhwIjoyMDAwMDg2NDAwLCJqdGkiOiI4YTc5MzBjMS0yOWRkLTQxN2UtOGY5NC1jMWU5ZmZmY2U0ODAifQ.0gJes5BhGhv2-UytzAwMnsMzoFPcMtm5Rl1-zXIBjvSRv2r1D_nQKLE8m6hwBgqfPCeCDbgmRUSk0ESd_3FZAA",
+        "expires_at": "2033-05-19T03:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.004Z",
+        "device_id": null,
+        "key_id": null,
+        "control_epoch": null,
+        "revocation_kind": null,
+        "revocation_control_event_id": null,
+        "revocation_request_id": null
+      },
+      {
+        "id": "9ab28a42-7364-4b48-bb63-7da57a592567",
+        "subject_id": "GUID1501M61X70F089R3GYZ0G69TN4XA",
+        "challenge_id": "83e7698c-d2ea-4853-839c-a8078ba3d3e2",
+        "request_hash": "405ff068a9262828f36777c2eea17c9b8787a82f1fb40a419204edbba519dd33",
+        "audience": "https://records.example.invalid",
+        "scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "receipt": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWJpbmRpbmctcmVjZWlwdCtqd3QiLCJraWQiOiJmaXh0dXJlIn0.eyJkYXRhIjp7ImJpbmRpbmdJZCI6IjlhYjI4YTQyLTczNjQtNGI0OC1iYjYzLTdkYTU3YTU5MjU2NyIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwRjA4OVIzR1laMEc2OVRONFhBIiwicHVibGljS2V5RmluZ2VycHJpbnQiOiJmN2FlYzM1MWNlMGUwNTVjMGVlMzcwMmJlNjAyOTBiNWVlNGE4YmZhYTJmYmY4ZmRmYWExYTUzMzBlNjg0YzA1IiwiaW5zdGFsbGF0aW9uSWQiOiI0MjgxMWE3Ni00NzgzLTQ3YTMtYjg1MS1lZjk4MjIyZmIxNjQiLCJlbmRwb2ludCI6Imh0dHBzOi8vcmVjb3Jkcy5leGFtcGxlLmludmFsaWQiLCJzY29wZXMiOlsiYmluZGluZyIsImNvbnNlbnQiLCJjYXNlLXRlYXNlciIsImV2aWRlbmNlIiwicHJvb2YiLCJoaXN0b3J5Il0sImV4cGlyZXNBdCI6MjAwMDA4NjQwMCwicmV2b2tlUGF0aCI6Ii92MS9iaW5kaW5ncy85YWIyOGE0Mi03MzY0LTRiNDgtYmI2My03ZGE1N2E1OTI1NjcvcmV2b2tlIiwiYXVkaXRSZWZlcmVuY2UiOiI4M2U3Njk4Yy1kMmVhLTQ4NTMtODM5Yy1hODA3OGJhM2QzZTIifSwiaXNzIjoiaHR0cHM6Ly9yZWNvcmRzLmV4YW1wbGUuaW52YWxpZCIsImF1ZCI6Imh0dHBzOi8vcmVjb3Jkcy5leGFtcGxlLmludmFsaWQiLCJpYXQiOjIwMDAwMDAwMDAsIm5iZiI6MjAwMDAwMDAwMCwiZXhwIjoyMDAwMDg2NDAwLCJqdGkiOiI5YWIyOGE0Mi03MzY0LTRiNDgtYmI2My03ZGE1N2E1OTI1NjcifQ.B_YBAqAlxMxhYU3B4Wp2ruLuroV5sr7lHhYvGiPn3n_1ofrZVVRohggIjzghpxLBRtzaFVwkHpTd04OnoCTgDQ",
+        "expires_at": "2033-05-19T03:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.081Z",
+        "device_id": null,
+        "key_id": null,
+        "control_epoch": null,
+        "revocation_kind": null,
+        "revocation_control_event_id": null,
+        "revocation_request_id": null
+      }
+    ],
+    "access_credentials": [
+      {
+        "token_hash": "f1fd1cb08dcb526cb44ec83e392afc010fce70067ed80f6b3c65bce927f5eba6",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "expires_at": "2033-05-18T03:43:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.052Z",
+        "device_id": null,
+        "key_id": null,
+        "control_epoch": null
+      },
+      {
+        "token_hash": "b0bc9af7f323ccf883996da7e3a0c52377b51337ed048f807d873f6e9cf46b27",
+        "binding_id": "9ab28a42-7364-4b48-bb63-7da57a592567",
+        "scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "expires_at": "2033-05-18T03:43:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.095Z",
+        "device_id": null,
+        "key_id": null,
+        "control_epoch": null
+      }
+    ],
+    "consents": [
+      {
+        "id": "dfb0231a-96fb-48e5-b949-d72ebe8dd822",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "dfb0231a-96fb-48e5-b949-d72ebe8dd822",
+          "action": "case.teaser.publish",
+          "fields": [
+            "caseId",
+            "actorId",
+            "kind",
+            "eventId",
+            "expectedVersion",
+            "localRef",
+            "title",
+            "summary",
+            "source",
+            "synthetic"
+          ],
+          "purpose": "public-profile",
+          "version": 1,
+          "viewers": [],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Public",
+          "payloadHash": "d176c8be83a68f0d652f00dff4bee381eba2b7aecccef747a8f801a0203e204a",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "50478f51a8762c9f5f9088fc79bce09717c6209d169840ba95324f100ff353e0",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.183Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6ImRmYjAyMzFhLTk2ZmItNDhlNS1iOTQ5LWQ3MmViZThkZDgyMiIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiJhOTYzZWZiMS0zYWRhLTRlOTMtYWViZi05YWRmYWIwMjYwMzEiLCJhY3Rpb24iOiJjYXNlLnRlYXNlci5wdWJsaXNoIiwicHVycG9zZSI6InB1YmxpYy1wcm9maWxlIiwicmVjaXBpZW50IjoiaHR0cHM6Ly9yZWNvcmRzLmV4YW1wbGUuaW52YWxpZCIsImZpZWxkcyI6WyJjYXNlSWQiLCJhY3RvcklkIiwia2luZCIsImV2ZW50SWQiLCJleHBlY3RlZFZlcnNpb24iLCJsb2NhbFJlZiIsInRpdGxlIiwic3VtbWFyeSIsInNvdXJjZSIsInN5bnRoZXRpYyJdLCJ2aXNpYmlsaXR5IjoiUHVibGljIiwidmlld2VycyI6W10sInBheWxvYWRIYXNoIjoiZDE3NmM4YmU4M2E2OGYwZDY1MmYwMGRmZjRiZWUzODFlYmEyYjdhZWNjY2VmNzQ3YThmODAxYTAyMDNlMjA0YSIsInBvbGljeVZlcnNpb24iOiIwLjEiLCJpc3N1ZWRBdCI6MjAwMDAwMDAwMCwiZXhwaXJlc0F0IjoyMDAwMDAzNjAwfQ.jBYqdl7k-7Laydv2niWNH2f22UfBCnOQfb57Ix2Cuk5uus8NnkTzhGUMdRQKEVRaHlzshODXcTAqtCziUJmGAg",
+        "signed_payload_text": "{\"version\":1,\"id\":\"dfb0231a-96fb-48e5-b949-d72ebe8dd822\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"action\":\"case.teaser.publish\",\"purpose\":\"public-profile\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"actorId\",\"kind\",\"eventId\",\"expectedVersion\",\"localRef\",\"title\",\"summary\",\"source\",\"synthetic\"],\"visibility\":\"Public\",\"viewers\":[],\"payloadHash\":\"d176c8be83a68f0d652f00dff4bee381eba2b7aecccef747a8f801a0203e204a\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      },
+      {
+        "id": "31ff68eb-1aa7-4e82-b598-cf42ffcf0313",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "31ff68eb-1aa7-4e82-b598-cf42ffcf0313",
+          "action": "case.teaser.publish",
+          "fields": [
+            "caseId",
+            "actorId",
+            "kind",
+            "eventId",
+            "expectedVersion",
+            "role",
+            "strategy",
+            "inputScopeSummary",
+            "permissionScope"
+          ],
+          "purpose": "public-profile",
+          "version": 1,
+          "viewers": [],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "25071741-4270-4f75-9b4a-c05e190b42f6",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Public",
+          "payloadHash": "59214df35f2ba49d2b587f16e621800060157b2b88e6895b359171ab38d0e57c",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "d0abb9375530feb1e26ec62c5b6a176588233dbebf9e64c9d7d0db1d855930bf",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.235Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6IjMxZmY2OGViLTFhYTctNGU4Mi1iNTk4LWNmNDJmZmNmMDMxMyIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiIyNTA3MTc0MS00MjcwLTRmNzUtOWI0YS1jMDVlMTkwYjQyZjYiLCJhY3Rpb24iOiJjYXNlLnRlYXNlci5wdWJsaXNoIiwicHVycG9zZSI6InB1YmxpYy1wcm9maWxlIiwicmVjaXBpZW50IjoiaHR0cHM6Ly9yZWNvcmRzLmV4YW1wbGUuaW52YWxpZCIsImZpZWxkcyI6WyJjYXNlSWQiLCJhY3RvcklkIiwia2luZCIsImV2ZW50SWQiLCJleHBlY3RlZFZlcnNpb24iLCJyb2xlIiwic3RyYXRlZ3kiLCJpbnB1dFNjb3BlU3VtbWFyeSIsInBlcm1pc3Npb25TY29wZSJdLCJ2aXNpYmlsaXR5IjoiUHVibGljIiwidmlld2VycyI6W10sInBheWxvYWRIYXNoIjoiNTkyMTRkZjM1ZjJiYTQ5ZDJiNTg3ZjE2ZTYyMTgwMDA2MDE1N2IyYjg4ZTY4OTViMzU5MTcxYWIzOGQwZTU3YyIsInBvbGljeVZlcnNpb24iOiIwLjEiLCJpc3N1ZWRBdCI6MjAwMDAwMDAwMCwiZXhwaXJlc0F0IjoyMDAwMDAzNjAwfQ.pQmbU9-ux0cetZWita4A0hXIcW0BedHVRKG_4dkuGpouXoecSyQ8naR7DgTXwXi-ypvwIcVQMNUyhIU9xBwOBg",
+        "signed_payload_text": "{\"version\":1,\"id\":\"31ff68eb-1aa7-4e82-b598-cf42ffcf0313\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"action\":\"case.teaser.publish\",\"purpose\":\"public-profile\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"actorId\",\"kind\",\"eventId\",\"expectedVersion\",\"role\",\"strategy\",\"inputScopeSummary\",\"permissionScope\"],\"visibility\":\"Public\",\"viewers\":[],\"payloadHash\":\"59214df35f2ba49d2b587f16e621800060157b2b88e6895b359171ab38d0e57c\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      },
+      {
+        "id": "4af529cf-1eb3-4420-aa11-d6658b6b9daa",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "4af529cf-1eb3-4420-aa11-d6658b6b9daa",
+          "action": "case.teaser.publish",
+          "fields": [
+            "caseId",
+            "actorId",
+            "kind",
+            "eventId",
+            "expectedVersion",
+            "origin",
+            "scopeVersion",
+            "deliverableRefs",
+            "reportedOutcome",
+            "summary",
+            "limitations"
+          ],
+          "purpose": "public-profile",
+          "version": 1,
+          "viewers": [],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Public",
+          "payloadHash": "bcfaf2b93125aef346eb5c9d78eddc951d5cf55d37f640cdf42cf732d6a09e78",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "dd7595ac65d8fa34d622ce26f00867f7d0f75b177e9dbc1a23d557f46ef67ef9",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.259Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6IjRhZjUyOWNmLTFlYjMtNDQyMC1hYTExLWQ2NjU4YjZiOWRhYSIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiI4N2I0MTZmNC1lMDNhLTQ0OWUtYTI4NC02NmVmNmY4ZDAzNmUiLCJhY3Rpb24iOiJjYXNlLnRlYXNlci5wdWJsaXNoIiwicHVycG9zZSI6InB1YmxpYy1wcm9maWxlIiwicmVjaXBpZW50IjoiaHR0cHM6Ly9yZWNvcmRzLmV4YW1wbGUuaW52YWxpZCIsImZpZWxkcyI6WyJjYXNlSWQiLCJhY3RvcklkIiwia2luZCIsImV2ZW50SWQiLCJleHBlY3RlZFZlcnNpb24iLCJvcmlnaW4iLCJzY29wZVZlcnNpb24iLCJkZWxpdmVyYWJsZVJlZnMiLCJyZXBvcnRlZE91dGNvbWUiLCJzdW1tYXJ5IiwibGltaXRhdGlvbnMiXSwidmlzaWJpbGl0eSI6IlB1YmxpYyIsInZpZXdlcnMiOltdLCJwYXlsb2FkSGFzaCI6ImJjZmFmMmI5MzEyNWFlZjM0NmViNWM5ZDc4ZWRkYzk1MWQ1Y2Y1NWQzN2Y2NDBjZGY0MmNmNzMyZDZhMDllNzgiLCJwb2xpY3lWZXJzaW9uIjoiMC4xIiwiaXNzdWVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMH0.fuOfbQRn8Mas8MBuTLBfkOSR-OiMrY7PhMyR4fo8-on9HvnMxHSWciJ7UAHDFltuapJDvmg84NSHAhdrGMUYDQ",
+        "signed_payload_text": "{\"version\":1,\"id\":\"4af529cf-1eb3-4420-aa11-d6658b6b9daa\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"action\":\"case.teaser.publish\",\"purpose\":\"public-profile\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"actorId\",\"kind\",\"eventId\",\"expectedVersion\",\"origin\",\"scopeVersion\",\"deliverableRefs\",\"reportedOutcome\",\"summary\",\"limitations\"],\"visibility\":\"Public\",\"viewers\":[],\"payloadHash\":\"bcfaf2b93125aef346eb5c9d78eddc951d5cf55d37f640cdf42cf732d6a09e78\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      },
+      {
+        "id": "fd401dca-4a4c-460c-bf20-e19385b571b2",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "fd401dca-4a4c-460c-bf20-e19385b571b2",
+          "action": "evidence.submit",
+          "fields": [
+            "caseId",
+            "reportedBy",
+            "synthetic",
+            "kind",
+            "id",
+            "operationId",
+            "expectedVersion",
+            "evidenceType",
+            "source",
+            "observedAt",
+            "reportedSourceState",
+            "summary",
+            "expiresAt"
+          ],
+          "purpose": "operational",
+          "version": 1,
+          "viewers": [
+            "GUID1501M61X70F089R3GYZ0G69TN4XA"
+          ],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Private",
+          "payloadHash": "7fd61b9a9e2154530c6b46b6194e19c5b175106fc283ae93e691b55e895984bc",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "8ef156f34a226a0c67de192f31ebc7f1f9c14969ebe1e23324b94ba8abc0c054",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.285Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6ImZkNDAxZGNhLTRhNGMtNDYwYy1iZjIwLWUxOTM4NWI1NzFiMiIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiIwMGUyZjNhYy00ODllLTRiMGItOTg4Zi0zNzg0MWRiYWJjNGQiLCJhY3Rpb24iOiJldmlkZW5jZS5zdWJtaXQiLCJwdXJwb3NlIjoib3BlcmF0aW9uYWwiLCJyZWNpcGllbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwiZmllbGRzIjpbImNhc2VJZCIsInJlcG9ydGVkQnkiLCJzeW50aGV0aWMiLCJraW5kIiwiaWQiLCJvcGVyYXRpb25JZCIsImV4cGVjdGVkVmVyc2lvbiIsImV2aWRlbmNlVHlwZSIsInNvdXJjZSIsIm9ic2VydmVkQXQiLCJyZXBvcnRlZFNvdXJjZVN0YXRlIiwic3VtbWFyeSIsImV4cGlyZXNBdCJdLCJ2aXNpYmlsaXR5IjoiUHJpdmF0ZSIsInZpZXdlcnMiOlsiR1VJRDE1MDFNNjFYNzBGMDg5UjNHWVowRzY5VE40WEEiXSwicGF5bG9hZEhhc2giOiI3ZmQ2MWI5YTllMjE1NDUzMGM2YjQ2YjYxOTRlMTljNWIxNzUxMDZmYzI4M2FlOTNlNjkxYjU1ZTg5NTk4NGJjIiwicG9saWN5VmVyc2lvbiI6IjAuMSIsImlzc3VlZEF0IjoyMDAwMDAwMDAwLCJleHBpcmVzQXQiOjIwMDAwMDM2MDB9.jaqPXRYN-LQYPw39ZCPvcFAIxBNOLHqkNjn3FuqABa6Kx6TPPCuRW2PWjIxYx7W3LZFlO46YiZZVJ51R4GesCA",
+        "signed_payload_text": "{\"version\":1,\"id\":\"fd401dca-4a4c-460c-bf20-e19385b571b2\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"action\":\"evidence.submit\",\"purpose\":\"operational\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"reportedBy\",\"synthetic\",\"kind\",\"id\",\"operationId\",\"expectedVersion\",\"evidenceType\",\"source\",\"observedAt\",\"reportedSourceState\",\"summary\",\"expiresAt\"],\"visibility\":\"Private\",\"viewers\":[\"GUID1501M61X70F089R3GYZ0G69TN4XA\"],\"payloadHash\":\"7fd61b9a9e2154530c6b46b6194e19c5b175106fc283ae93e691b55e895984bc\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      },
+      {
+        "id": "2ebdd17e-9709-46eb-b4a3-82a9b75721e4",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "2ebdd17e-9709-46eb-b4a3-82a9b75721e4",
+          "action": "evidence.submit",
+          "fields": [
+            "caseId",
+            "reportedBy",
+            "synthetic",
+            "kind",
+            "id",
+            "operationId",
+            "expectedVersion",
+            "evidenceType",
+            "source",
+            "observedAt",
+            "reportedSourceState",
+            "summary",
+            "expiresAt"
+          ],
+          "purpose": "operational",
+          "version": 1,
+          "viewers": [
+            "GUID1501M61X70F089R3GYZ0G69TN4XA"
+          ],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "9e18ca74-8050-4cf0-b516-1ca4160ae390",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Private",
+          "payloadHash": "139a2341f1263d94adae42f4dd43c42f0738c033e715426fa8fa5cbfed9ba349",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "2e11d37298dfe1ff8f7fba4ca86a3ab535b5c4e3772be4a6c385f4ea70b9cb60",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.321Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6IjJlYmRkMTdlLTk3MDktNDZlYi1iNGEzLTgyYTliNzU3MjFlNCIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiI5ZTE4Y2E3NC04MDUwLTRjZjAtYjUxNi0xY2E0MTYwYWUzOTAiLCJhY3Rpb24iOiJldmlkZW5jZS5zdWJtaXQiLCJwdXJwb3NlIjoib3BlcmF0aW9uYWwiLCJyZWNpcGllbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwiZmllbGRzIjpbImNhc2VJZCIsInJlcG9ydGVkQnkiLCJzeW50aGV0aWMiLCJraW5kIiwiaWQiLCJvcGVyYXRpb25JZCIsImV4cGVjdGVkVmVyc2lvbiIsImV2aWRlbmNlVHlwZSIsInNvdXJjZSIsIm9ic2VydmVkQXQiLCJyZXBvcnRlZFNvdXJjZVN0YXRlIiwic3VtbWFyeSIsImV4cGlyZXNBdCJdLCJ2aXNpYmlsaXR5IjoiUHJpdmF0ZSIsInZpZXdlcnMiOlsiR1VJRDE1MDFNNjFYNzBGMDg5UjNHWVowRzY5VE40WEEiXSwicGF5bG9hZEhhc2giOiIxMzlhMjM0MWYxMjYzZDk0YWRhZTQyZjRkZDQzYzQyZjA3MzhjMDMzZTcxNTQyNmZhOGZhNWNiZmVkOWJhMzQ5IiwicG9saWN5VmVyc2lvbiI6IjAuMSIsImlzc3VlZEF0IjoyMDAwMDAwMDAwLCJleHBpcmVzQXQiOjIwMDAwMDM2MDB9.SBN4EnZg6fOPeGGiH6XOnHCf1Q1yxVQDVFNjC5_5Bpjwb3gU0LRJR0u108cpMarGc58aYBL2AacdAD_Nek4WAw",
+        "signed_payload_text": "{\"version\":1,\"id\":\"2ebdd17e-9709-46eb-b4a3-82a9b75721e4\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"9e18ca74-8050-4cf0-b516-1ca4160ae390\",\"action\":\"evidence.submit\",\"purpose\":\"operational\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"reportedBy\",\"synthetic\",\"kind\",\"id\",\"operationId\",\"expectedVersion\",\"evidenceType\",\"source\",\"observedAt\",\"reportedSourceState\",\"summary\",\"expiresAt\"],\"visibility\":\"Private\",\"viewers\":[\"GUID1501M61X70F089R3GYZ0G69TN4XA\"],\"payloadHash\":\"139a2341f1263d94adae42f4dd43c42f0738c033e715426fa8fa5cbfed9ba349\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      },
+      {
+        "id": "6a17a0bc-6580-4d33-812e-5c4176802d9b",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "6a17a0bc-6580-4d33-812e-5c4176802d9b",
+          "action": "evidence.submit",
+          "fields": [
+            "caseId",
+            "reportedBy",
+            "synthetic",
+            "kind",
+            "id",
+            "operationId",
+            "expectedVersion",
+            "target",
+            "scopeVersion",
+            "method",
+            "scope",
+            "conditions",
+            "observation",
+            "summary",
+            "evidenceRefs",
+            "relationship",
+            "observedAt",
+            "expiresAt"
+          ],
+          "purpose": "public-profile",
+          "version": 1,
+          "viewers": [],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Public",
+          "payloadHash": "416dcc607d3f483e0fa3e4d34f13cffe607938d6bb8f67bd2b2e15779e409497",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "112831c31a092513c0ac63e6ec71b00b66bfb26ecf7dc0b256fca05baeff7a6b",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.335Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6IjZhMTdhMGJjLTY1ODAtNGQzMy04MTJlLTVjNDE3NjgwMmQ5YiIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiJjYmYwMjI4NC0zMjQ0LTRjNmYtYWI0MS04YTFlZjFmOWU5ZjMiLCJhY3Rpb24iOiJldmlkZW5jZS5zdWJtaXQiLCJwdXJwb3NlIjoicHVibGljLXByb2ZpbGUiLCJyZWNpcGllbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwiZmllbGRzIjpbImNhc2VJZCIsInJlcG9ydGVkQnkiLCJzeW50aGV0aWMiLCJraW5kIiwiaWQiLCJvcGVyYXRpb25JZCIsImV4cGVjdGVkVmVyc2lvbiIsInRhcmdldCIsInNjb3BlVmVyc2lvbiIsIm1ldGhvZCIsInNjb3BlIiwiY29uZGl0aW9ucyIsIm9ic2VydmF0aW9uIiwic3VtbWFyeSIsImV2aWRlbmNlUmVmcyIsInJlbGF0aW9uc2hpcCIsIm9ic2VydmVkQXQiLCJleHBpcmVzQXQiXSwidmlzaWJpbGl0eSI6IlB1YmxpYyIsInZpZXdlcnMiOltdLCJwYXlsb2FkSGFzaCI6IjQxNmRjYzYwN2QzZjQ4M2UwZmEzZTRkMzRmMTNjZmZlNjA3OTM4ZDZiYjhmNjdiZDJiMmUxNTc3OWU0MDk0OTciLCJwb2xpY3lWZXJzaW9uIjoiMC4xIiwiaXNzdWVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMH0.Ck4kG6dL2MDujLxpQ4kAMS2lAsMmUEoDwABD6OaxIVlJIzOYDy_fpc1ml2OEx_JQ6CeTnv99PR8s-DSFrrZzAQ",
+        "signed_payload_text": "{\"version\":1,\"id\":\"6a17a0bc-6580-4d33-812e-5c4176802d9b\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3\",\"action\":\"evidence.submit\",\"purpose\":\"public-profile\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"reportedBy\",\"synthetic\",\"kind\",\"id\",\"operationId\",\"expectedVersion\",\"target\",\"scopeVersion\",\"method\",\"scope\",\"conditions\",\"observation\",\"summary\",\"evidenceRefs\",\"relationship\",\"observedAt\",\"expiresAt\"],\"visibility\":\"Public\",\"viewers\":[],\"payloadHash\":\"416dcc607d3f483e0fa3e4d34f13cffe607938d6bb8f67bd2b2e15779e409497\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      },
+      {
+        "id": "36672238-398c-4efc-8ec7-423951bb807b",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "36672238-398c-4efc-8ec7-423951bb807b",
+          "action": "evidence.submit",
+          "fields": [
+            "caseId",
+            "reportedBy",
+            "synthetic",
+            "kind",
+            "id",
+            "operationId",
+            "expectedVersion",
+            "evidenceType",
+            "source",
+            "observedAt",
+            "reportedSourceState",
+            "summary",
+            "expiresAt",
+            "reason"
+          ],
+          "purpose": "operational",
+          "version": 1,
+          "viewers": [
+            "GUID1501M61X70F089R3GYZ0G69TN4XA"
+          ],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "ec4d539a-4192-4112-a6af-3bd2d3b9cbc4",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Private",
+          "payloadHash": "43d78ec109786b8146c54f38b095b4108c3daf1e593e3ff3b62237721796dce5",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "da770a87eb341e4a6fd1ab025bca27e9228c9970fb250c52452c0160e95cb6f4",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.344Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6IjM2NjcyMjM4LTM5OGMtNGVmYy04ZWM3LTQyMzk1MWJiODA3YiIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiJlYzRkNTM5YS00MTkyLTQxMTItYTZhZi0zYmQyZDNiOWNiYzQiLCJhY3Rpb24iOiJldmlkZW5jZS5zdWJtaXQiLCJwdXJwb3NlIjoib3BlcmF0aW9uYWwiLCJyZWNpcGllbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwiZmllbGRzIjpbImNhc2VJZCIsInJlcG9ydGVkQnkiLCJzeW50aGV0aWMiLCJraW5kIiwiaWQiLCJvcGVyYXRpb25JZCIsImV4cGVjdGVkVmVyc2lvbiIsImV2aWRlbmNlVHlwZSIsInNvdXJjZSIsIm9ic2VydmVkQXQiLCJyZXBvcnRlZFNvdXJjZVN0YXRlIiwic3VtbWFyeSIsImV4cGlyZXNBdCIsInJlYXNvbiJdLCJ2aXNpYmlsaXR5IjoiUHJpdmF0ZSIsInZpZXdlcnMiOlsiR1VJRDE1MDFNNjFYNzBGMDg5UjNHWVowRzY5VE40WEEiXSwicGF5bG9hZEhhc2giOiI0M2Q3OGVjMTA5Nzg2YjgxNDZjNTRmMzhiMDk1YjQxMDhjM2RhZjFlNTkzZTNmZjNiNjIyMzc3MjE3OTZkY2U1IiwicG9saWN5VmVyc2lvbiI6IjAuMSIsImlzc3VlZEF0IjoyMDAwMDAwMDAwLCJleHBpcmVzQXQiOjIwMDAwMDM2MDB9.Q155hXb1yY2XL6VtP3SXF8GQDLZRw6OQ4i5JueycU69kwyFoZw0YlBB2i-3jlCtiZb_a4GjFzWfrtYJkxq6wCg",
+        "signed_payload_text": "{\"version\":1,\"id\":\"36672238-398c-4efc-8ec7-423951bb807b\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"ec4d539a-4192-4112-a6af-3bd2d3b9cbc4\",\"action\":\"evidence.submit\",\"purpose\":\"operational\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"reportedBy\",\"synthetic\",\"kind\",\"id\",\"operationId\",\"expectedVersion\",\"evidenceType\",\"source\",\"observedAt\",\"reportedSourceState\",\"summary\",\"expiresAt\",\"reason\"],\"visibility\":\"Private\",\"viewers\":[\"GUID1501M61X70F089R3GYZ0G69TN4XA\"],\"payloadHash\":\"43d78ec109786b8146c54f38b095b4108c3daf1e593e3ff3b62237721796dce5\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      },
+      {
+        "id": "f2fbe730-9ae4-472a-9c7d-28dc10f21035",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "f2fbe730-9ae4-472a-9c7d-28dc10f21035",
+          "action": "evidence.submit",
+          "fields": [
+            "caseId",
+            "reportedBy",
+            "synthetic",
+            "kind",
+            "id",
+            "operationId",
+            "expectedVersion",
+            "target",
+            "scopeVersion",
+            "method",
+            "scope",
+            "conditions",
+            "observation",
+            "summary",
+            "evidenceRefs",
+            "relationship",
+            "observedAt",
+            "expiresAt",
+            "reason"
+          ],
+          "purpose": "public-profile",
+          "version": 1,
+          "viewers": [],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "0a511526-7c94-4447-8d36-600fd2a391c0",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Public",
+          "payloadHash": "1e7ea527d898f7e2d43592696fb32a42c0c036d306a7e8d8839283e170944818",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "2757af1ed4803808282038ba2ba2e78fbfa3dd0e3cdeb1ebc000eab3f1102b1b",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.353Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6ImYyZmJlNzMwLTlhZTQtNDcyYS05YzdkLTI4ZGMxMGYyMTAzNSIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiIwYTUxMTUyNi03Yzk0LTQ0NDctOGQzNi02MDBmZDJhMzkxYzAiLCJhY3Rpb24iOiJldmlkZW5jZS5zdWJtaXQiLCJwdXJwb3NlIjoicHVibGljLXByb2ZpbGUiLCJyZWNpcGllbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwiZmllbGRzIjpbImNhc2VJZCIsInJlcG9ydGVkQnkiLCJzeW50aGV0aWMiLCJraW5kIiwiaWQiLCJvcGVyYXRpb25JZCIsImV4cGVjdGVkVmVyc2lvbiIsInRhcmdldCIsInNjb3BlVmVyc2lvbiIsIm1ldGhvZCIsInNjb3BlIiwiY29uZGl0aW9ucyIsIm9ic2VydmF0aW9uIiwic3VtbWFyeSIsImV2aWRlbmNlUmVmcyIsInJlbGF0aW9uc2hpcCIsIm9ic2VydmVkQXQiLCJleHBpcmVzQXQiLCJyZWFzb24iXSwidmlzaWJpbGl0eSI6IlB1YmxpYyIsInZpZXdlcnMiOltdLCJwYXlsb2FkSGFzaCI6IjFlN2VhNTI3ZDg5OGY3ZTJkNDM1OTI2OTZmYjMyYTQyYzBjMDM2ZDMwNmE3ZThkODgzOTI4M2UxNzA5NDQ4MTgiLCJwb2xpY3lWZXJzaW9uIjoiMC4xIiwiaXNzdWVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMH0.T_w9cKqhJsm3y5MjnNF5mffUPelsuBAW9G9o6gXGkyyuChptPKwE9WFgRKgn5B-JjWgFXL2JltpcxrWZI3vMBA",
+        "signed_payload_text": "{\"version\":1,\"id\":\"f2fbe730-9ae4-472a-9c7d-28dc10f21035\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"0a511526-7c94-4447-8d36-600fd2a391c0\",\"action\":\"evidence.submit\",\"purpose\":\"public-profile\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"reportedBy\",\"synthetic\",\"kind\",\"id\",\"operationId\",\"expectedVersion\",\"target\",\"scopeVersion\",\"method\",\"scope\",\"conditions\",\"observation\",\"summary\",\"evidenceRefs\",\"relationship\",\"observedAt\",\"expiresAt\",\"reason\"],\"visibility\":\"Public\",\"viewers\":[],\"payloadHash\":\"1e7ea527d898f7e2d43592696fb32a42c0c036d306a7e8d8839283e170944818\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      },
+      {
+        "id": "f6fd0702-605f-4eb0-92a6-799f9b4bbd37",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "f6fd0702-605f-4eb0-92a6-799f9b4bbd37",
+          "action": "evidence.submit",
+          "fields": [
+            "caseId",
+            "reportedBy",
+            "synthetic",
+            "kind",
+            "id",
+            "operationId",
+            "expectedVersion",
+            "target",
+            "scopeVersion",
+            "method",
+            "scope",
+            "conditions",
+            "observation",
+            "summary",
+            "evidenceRefs",
+            "relationship",
+            "observedAt",
+            "expiresAt",
+            "reason"
+          ],
+          "purpose": "public-profile",
+          "version": 1,
+          "viewers": [],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "1727617b-02ae-45b7-92a6-6d1aa3734fb2",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Public",
+          "payloadHash": "a1e302150e63e2ee608ac6ed1c6a70bf50c098e0e20530d38b03a84407dbc478",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "030ae43821ead1eed64e1acefae4d1e1c3072067af34e1ebb925dbf002a1d8f7",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.363Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6ImY2ZmQwNzAyLTYwNWYtNGViMC05MmE2LTc5OWY5YjRiYmQzNyIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiIxNzI3NjE3Yi0wMmFlLTQ1YjctOTJhNi02ZDFhYTM3MzRmYjIiLCJhY3Rpb24iOiJldmlkZW5jZS5zdWJtaXQiLCJwdXJwb3NlIjoicHVibGljLXByb2ZpbGUiLCJyZWNpcGllbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwiZmllbGRzIjpbImNhc2VJZCIsInJlcG9ydGVkQnkiLCJzeW50aGV0aWMiLCJraW5kIiwiaWQiLCJvcGVyYXRpb25JZCIsImV4cGVjdGVkVmVyc2lvbiIsInRhcmdldCIsInNjb3BlVmVyc2lvbiIsIm1ldGhvZCIsInNjb3BlIiwiY29uZGl0aW9ucyIsIm9ic2VydmF0aW9uIiwic3VtbWFyeSIsImV2aWRlbmNlUmVmcyIsInJlbGF0aW9uc2hpcCIsIm9ic2VydmVkQXQiLCJleHBpcmVzQXQiLCJyZWFzb24iXSwidmlzaWJpbGl0eSI6IlB1YmxpYyIsInZpZXdlcnMiOltdLCJwYXlsb2FkSGFzaCI6ImExZTMwMjE1MGU2M2UyZWU2MDhhYzZlZDFjNmE3MGJmNTBjMDk4ZTBlMjA1MzBkMzhiMDNhODQ0MDdkYmM0NzgiLCJwb2xpY3lWZXJzaW9uIjoiMC4xIiwiaXNzdWVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMH0.CFCAu-HyGjVuPZuj9tBHzHGQif8DOxNHn2fkc7J4I1m4cM_Fm6PoKxUhzsKnj4Fx0Rq6wB0B2Hm2kaTH0SKbCg",
+        "signed_payload_text": "{\"version\":1,\"id\":\"f6fd0702-605f-4eb0-92a6-799f9b4bbd37\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"1727617b-02ae-45b7-92a6-6d1aa3734fb2\",\"action\":\"evidence.submit\",\"purpose\":\"public-profile\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"reportedBy\",\"synthetic\",\"kind\",\"id\",\"operationId\",\"expectedVersion\",\"target\",\"scopeVersion\",\"method\",\"scope\",\"conditions\",\"observation\",\"summary\",\"evidenceRefs\",\"relationship\",\"observedAt\",\"expiresAt\",\"reason\"],\"visibility\":\"Public\",\"viewers\":[],\"payloadHash\":\"a1e302150e63e2ee608ac6ed1c6a70bf50c098e0e20530d38b03a84407dbc478\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      },
+      {
+        "id": "838e5c8e-6b65-46ab-90bf-218f802ffa50",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "838e5c8e-6b65-46ab-90bf-218f802ffa50",
+          "action": "evidence.submit",
+          "fields": [
+            "caseId",
+            "reportedBy",
+            "synthetic",
+            "kind",
+            "id",
+            "objectType",
+            "operationId",
+            "expectedVersion",
+            "reason"
+          ],
+          "purpose": "operational",
+          "version": 1,
+          "viewers": [
+            "GUID1501M61X70F089R3GYZ0G69TN4XA"
+          ],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "f658d32a-d876-4228-851f-659c398de21c",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Private",
+          "payloadHash": "215e76e94a8af8b5e81ed8d50b5f6851033aead7816d192ed29712104e25f400",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "794777c1d0b0a20c97e20b303de44cde57b799ebf8aaafe07443c290cc26c8d8",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.373Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6IjgzOGU1YzhlLTZiNjUtNDZhYi05MGJmLTIxOGY4MDJmZmE1MCIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiJmNjU4ZDMyYS1kODc2LTQyMjgtODUxZi02NTljMzk4ZGUyMWMiLCJhY3Rpb24iOiJldmlkZW5jZS5zdWJtaXQiLCJwdXJwb3NlIjoib3BlcmF0aW9uYWwiLCJyZWNpcGllbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwiZmllbGRzIjpbImNhc2VJZCIsInJlcG9ydGVkQnkiLCJzeW50aGV0aWMiLCJraW5kIiwiaWQiLCJvYmplY3RUeXBlIiwib3BlcmF0aW9uSWQiLCJleHBlY3RlZFZlcnNpb24iLCJyZWFzb24iXSwidmlzaWJpbGl0eSI6IlByaXZhdGUiLCJ2aWV3ZXJzIjpbIkdVSUQxNTAxTTYxWDcwRjA4OVIzR1laMEc2OVRONFhBIl0sInBheWxvYWRIYXNoIjoiMjE1ZTc2ZTk0YThhZjhiNWU4MWVkOGQ1MGI1ZjY4NTEwMzNhZWFkNzgxNmQxOTJlZDI5NzEyMTA0ZTI1ZjQwMCIsInBvbGljeVZlcnNpb24iOiIwLjEiLCJpc3N1ZWRBdCI6MjAwMDAwMDAwMCwiZXhwaXJlc0F0IjoyMDAwMDAzNjAwfQ.qLxC8Db2YOEzrDs96FF9y7YLLNtS6AeKpnZFJVLpO5gMkbQitvOROmpVDg20iIG4Eetg-NxJLksEMyXKyFkQBg",
+        "signed_payload_text": "{\"version\":1,\"id\":\"838e5c8e-6b65-46ab-90bf-218f802ffa50\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"f658d32a-d876-4228-851f-659c398de21c\",\"action\":\"evidence.submit\",\"purpose\":\"operational\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"reportedBy\",\"synthetic\",\"kind\",\"id\",\"objectType\",\"operationId\",\"expectedVersion\",\"reason\"],\"visibility\":\"Private\",\"viewers\":[\"GUID1501M61X70F089R3GYZ0G69TN4XA\"],\"payloadHash\":\"215e76e94a8af8b5e81ed8d50b5f6851033aead7816d192ed29712104e25f400\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      },
+      {
+        "id": "c0f74115-f37c-4e98-be55-61a350355062",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "intent": {
+          "id": "c0f74115-f37c-4e98-be55-61a350355062",
+          "action": "case.teaser.publish",
+          "fields": [
+            "caseId",
+            "actorId",
+            "kind",
+            "eventId",
+            "expectedVersion",
+            "types",
+            "affectsAttemptIds",
+            "description",
+            "sourceRefs",
+            "observedEffect"
+          ],
+          "purpose": "public-profile",
+          "version": 1,
+          "viewers": [],
+          "endpoint": "https://records.example.invalid",
+          "issuedAt": 2000000000,
+          "objectId": "6512858f-4b41-4601-a573-e05777bf3e2d",
+          "bindingId": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+          "expiresAt": 2000003600,
+          "recipient": "https://records.example.invalid",
+          "subjectId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "visibility": "Public",
+          "payloadHash": "b6b1a91b474ed31167c8c8a840ef6cd5e89356d6ca7191442fae7bb21b4d437c",
+          "policyVersion": "0.1"
+        },
+        "signature_hash": "a208947d6d12465423645fcaad7dbbd0db3b55a91226cc5375c99d1fbe02a8eb",
+        "expires_at": "2033-05-18T04:33:20.000Z",
+        "revoked_at": null,
+        "created_at": "2026-10-28T18:43:59.382Z",
+        "signature_envelope": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LWNvbnNlbnQrandzIn0.eyJ2ZXJzaW9uIjoxLCJpZCI6ImMwZjc0MTE1LWYzN2MtNGU5OC1iZTU1LTYxYTM1MDM1NTA2MiIsInN1YmplY3RJZCI6IkdVSUQxNTAxTTYxWDcwQkVROFlINTc4Q1FSM1FIVkM4IiwiYmluZGluZ0lkIjoiOGE3OTMwYzEtMjlkZC00MTdlLThmOTQtYzFlOWZmZmNlNDgwIiwiZW5kcG9pbnQiOiJodHRwczovL3JlY29yZHMuZXhhbXBsZS5pbnZhbGlkIiwib2JqZWN0SWQiOiI2NTEyODU4Zi00YjQxLTQ2MDEtYTU3My1lMDU3NzdiZjNlMmQiLCJhY3Rpb24iOiJjYXNlLnRlYXNlci5wdWJsaXNoIiwicHVycG9zZSI6InB1YmxpYy1wcm9maWxlIiwicmVjaXBpZW50IjoiaHR0cHM6Ly9yZWNvcmRzLmV4YW1wbGUuaW52YWxpZCIsImZpZWxkcyI6WyJjYXNlSWQiLCJhY3RvcklkIiwia2luZCIsImV2ZW50SWQiLCJleHBlY3RlZFZlcnNpb24iLCJ0eXBlcyIsImFmZmVjdHNBdHRlbXB0SWRzIiwiZGVzY3JpcHRpb24iLCJzb3VyY2VSZWZzIiwib2JzZXJ2ZWRFZmZlY3QiXSwidmlzaWJpbGl0eSI6IlB1YmxpYyIsInZpZXdlcnMiOltdLCJwYXlsb2FkSGFzaCI6ImI2YjFhOTFiNDc0ZWQzMTE2N2M4YzhhODQwZWY2Y2Q1ZTg5MzU2ZDZjYTcxOTE0NDJmYWU3YmIyMWI0ZDQzN2MiLCJwb2xpY3lWZXJzaW9uIjoiMC4xIiwiaXNzdWVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMH0.3gg7DvqPGPM4FfQwPeTAc4VDNQ28LCImoOeDWfuDivK5WFgU_ZyN6dAhS4KANcpbxDDaa4fscFfj7hb894o7Dw",
+        "signed_payload_text": "{\"version\":1,\"id\":\"c0f74115-f37c-4e98-be55-61a350355062\",\"subjectId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"bindingId\":\"8a7930c1-29dd-417e-8f94-c1e9fffce480\",\"endpoint\":\"https://records.example.invalid\",\"objectId\":\"6512858f-4b41-4601-a573-e05777bf3e2d\",\"action\":\"case.teaser.publish\",\"purpose\":\"public-profile\",\"recipient\":\"https://records.example.invalid\",\"fields\":[\"caseId\",\"actorId\",\"kind\",\"eventId\",\"expectedVersion\",\"types\",\"affectsAttemptIds\",\"description\",\"sourceRefs\",\"observedEffect\"],\"visibility\":\"Public\",\"viewers\":[],\"payloadHash\":\"b6b1a91b474ed31167c8c8a840ef6cd5e89356d6ca7191442fae7bb21b4d437c\",\"policyVersion\":\"0.1\",\"issuedAt\":2000000000,\"expiresAt\":2000003600}",
+        "signer_key_id": "e580913dfea6e79d4133c8db4a94242cf6ba37a265fd233ab54861328fc7a0a0",
+        "control_epoch": 0,
+        "control_event_hash": null
+      }
+    ],
+    "cases": [
+      {
+        "id": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "local_ref": "11364bdf-6766-4bdc-a17f-265ce85280cd",
+        "source_ref": "e3160c0d-b68f-4381-b1c2-5f3cd6773a13",
+        "version": 3,
+        "state": "open",
+        "created_at": "2026-10-28T18:43:59.209Z"
+      }
+    ],
+    "case_events": [
+      {
+        "id": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "case_id": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "kind": "case-created",
+        "version": 1,
+        "consent_id": "dfb0231a-96fb-48e5-b949-d72ebe8dd822",
+        "payload": {
+          "kind": "case-created",
+          "title": "Original report ledger",
+          "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+          "source": {
+            "kind": "local",
+            "reference": "e3160c0d-b68f-4381-b1c2-5f3cd6773a13"
+          },
+          "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "eventId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+          "summary": "Reports stay scoped",
+          "localRef": "11364bdf-6766-4bdc-a17f-265ce85280cd",
+          "synthetic": false,
+          "expectedVersion": 0
+        },
+        "payload_text": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"kind\":\"case-created\",\"eventId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"expectedVersion\":0,\"localRef\":\"11364bdf-6766-4bdc-a17f-265ce85280cd\",\"title\":\"Original report ledger\",\"summary\":\"Reports stay scoped\",\"source\":{\"kind\":\"local\",\"reference\":\"e3160c0d-b68f-4381-b1c2-5f3cd6773a13\"},\"synthetic\":false}",
+        "payload_hash": "d176c8be83a68f0d652f00dff4bee381eba2b7aecccef747a8f801a0203e204a",
+        "created_at": "2026-10-28T18:43:59.209Z"
+      },
+      {
+        "id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+        "case_id": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "kind": "attempt-start",
+        "version": 2,
+        "consent_id": "31ff68eb-1aa7-4e82-b598-cf42ffcf0313",
+        "payload": {
+          "kind": "attempt-start",
+          "role": "author",
+          "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+          "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "eventId": "25071741-4270-4f75-9b4a-c05e190b42f6",
+          "strategy": "Controlled fixture",
+          "expectedVersion": 1,
+          "permissionScope": [
+            "test"
+          ],
+          "inputScopeSummary": "Isolated source"
+        },
+        "payload_text": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"kind\":\"attempt-start\",\"eventId\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"expectedVersion\":1,\"role\":\"author\",\"strategy\":\"Controlled fixture\",\"inputScopeSummary\":\"Isolated source\",\"permissionScope\":[\"test\"]}",
+        "payload_hash": "59214df35f2ba49d2b587f16e621800060157b2b88e6895b359171ab38d0e57c",
+        "created_at": "2026-10-28T18:43:59.246Z"
+      },
+      {
+        "id": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+        "case_id": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "kind": "result-recorded",
+        "version": 3,
+        "consent_id": "4af529cf-1eb3-4420-aa11-d6658b6b9daa",
+        "payload": {
+          "kind": "result-recorded",
+          "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+          "origin": {
+            "id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+            "kind": "attempt",
+            "version": 1
+          },
+          "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "eventId": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+          "summary": "Reported result",
+          "limitations": "Not independently verified",
+          "scopeVersion": 1,
+          "deliverableRefs": [],
+          "expectedVersion": 2,
+          "reportedOutcome": "partial"
+        },
+        "payload_text": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"kind\":\"result-recorded\",\"eventId\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"expectedVersion\":2,\"origin\":{\"kind\":\"attempt\",\"id\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"version\":1},\"scopeVersion\":1,\"deliverableRefs\":[],\"reportedOutcome\":\"partial\",\"summary\":\"Reported result\",\"limitations\":\"Not independently verified\"}",
+        "payload_hash": "bcfaf2b93125aef346eb5c9d78eddc951d5cf55d37f640cdf42cf732d6a09e78",
+        "created_at": "2026-10-28T18:43:59.270Z"
+      }
+    ],
+    "verification_objects": [
+      {
+        "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "object_type": "evidence",
+        "case_id": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "subject_id": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "version": 1,
+        "state": "active",
+        "created_at": "2026-10-28T18:43:59.300Z"
+      }
+    ],
+    "verification_events": [
+      {
+        "operation_id": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+        "object_id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "version": 1,
+        "consent_id": "fd401dca-4a4c-460c-bf20-e19385b571b2",
+        "payload": {
+          "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+          "kind": "evidence",
+          "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+          "source": {
+            "issuer": "Author-reported source",
+            "originalAt": "2033-05-18T03:32:20.000Z",
+            "originSystem": "controlled-test",
+            "contentVersion": "version-1",
+            "externalStableId": "original-source"
+          },
+          "summary": "  Exact retained raw summary  ",
+          "expiresAt": null,
+          "synthetic": false,
+          "observedAt": "2033-05-18T03:33:20.000Z",
+          "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "operationId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+          "evidenceType": "test-result",
+          "expectedVersion": 0,
+          "reportedSourceState": "available"
+        },
+        "payload_text": "{\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"synthetic\":false,\"kind\":\"evidence\",\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"operationId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"expectedVersion\":0,\"evidenceType\":\"test-result\",\"source\":{\"originSystem\":\"controlled-test\",\"externalStableId\":\"original-source\",\"contentVersion\":\"version-1\",\"originalAt\":\"2033-05-18T03:32:20.000Z\",\"issuer\":\"Author-reported source\"},\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"reportedSourceState\":\"available\",\"summary\":\"  Exact retained raw summary  \",\"expiresAt\":null}",
+        "payload_hash": "7fd61b9a9e2154530c6b46b6194e19c5b175106fc283ae93e691b55e895984bc",
+        "context": {
+          "sourceKey": "declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31",
+          "synthetic": false,
+          "importedAt": "2033-05-18T03:33:20.000Z",
+          "recordedAt": "2033-05-18T03:33:20.000Z",
+          "claimAuthority": "authenticated-subject-report",
+          "sourceStrength": "submitter-reported-reference",
+          "capabilityVerified": false,
+          "currentSourceState": "not-checked",
+          "externalRevocation": "unknown",
+          "sourceIdentityVerified": false,
+          "independentExecutionVerified": false
+        },
+        "created_at": "2026-10-28T18:43:59.300Z"
+      }
+    ],
+    "audit_events": [
+      {
+        "sequence": "1",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "binding.create",
+        "object_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "request_id": "9e6acf9c-9872-4f19-b44f-dfbef197872e",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.004Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "binding",
+        "consent_id": null,
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "9e6acf9c-9872-4f19-b44f-dfbef197872e",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": null,
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "2",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "session.create",
+        "object_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "request_id": "19821990-6688-4f63-b144-3b5c0d44c661",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.052Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "binding",
+        "consent_id": null,
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "19821990-6688-4f63-b144-3b5c0d44c661",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "3",
+        "actor": "GUID1501M61X70F089R3GYZ0G69TN4XA",
+        "action": "binding.create",
+        "object_id": "9ab28a42-7364-4b48-bb63-7da57a592567",
+        "request_id": "83e7698c-d2ea-4853-839c-a8078ba3d3e2",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.081Z",
+        "context_version": 1,
+        "client_id": "42811a76-4783-47a3-b851-ef98222fb164",
+        "audience": "https://records.example.invalid",
+        "scope": "binding",
+        "consent_id": null,
+        "binding_id": "9ab28a42-7364-4b48-bb63-7da57a592567",
+        "http_request_id": null,
+        "idempotency_key": "83e7698c-d2ea-4853-839c-a8078ba3d3e2",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": null,
+        "caller_binding_id": "9ab28a42-7364-4b48-bb63-7da57a592567",
+        "caller_client_id": "42811a76-4783-47a3-b851-ef98222fb164",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "4",
+        "actor": "GUID1501M61X70F089R3GYZ0G69TN4XA",
+        "action": "session.create",
+        "object_id": "9ab28a42-7364-4b48-bb63-7da57a592567",
+        "request_id": "36878364-09cb-49ba-b06f-0cb86e283597",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.095Z",
+        "context_version": 1,
+        "client_id": "42811a76-4783-47a3-b851-ef98222fb164",
+        "audience": "https://records.example.invalid",
+        "scope": "binding",
+        "consent_id": null,
+        "binding_id": "9ab28a42-7364-4b48-bb63-7da57a592567",
+        "http_request_id": null,
+        "idempotency_key": "36878364-09cb-49ba-b06f-0cb86e283597",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "9ab28a42-7364-4b48-bb63-7da57a592567",
+        "caller_client_id": "42811a76-4783-47a3-b851-ef98222fb164",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "5",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "dfb0231a-96fb-48e5-b949-d72ebe8dd822",
+        "request_id": "dfb0231a-96fb-48e5-b949-d72ebe8dd822",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.183Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "dfb0231a-96fb-48e5-b949-d72ebe8dd822",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "dfb0231a-96fb-48e5-b949-d72ebe8dd822",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "6",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "case.case-created",
+        "object_id": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "request_id": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.209Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "case-teaser",
+        "consent_id": "dfb0231a-96fb-48e5-b949-d72ebe8dd822",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "7",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "31ff68eb-1aa7-4e82-b598-cf42ffcf0313",
+        "request_id": "31ff68eb-1aa7-4e82-b598-cf42ffcf0313",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.235Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "31ff68eb-1aa7-4e82-b598-cf42ffcf0313",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "31ff68eb-1aa7-4e82-b598-cf42ffcf0313",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "8",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "case.attempt-start",
+        "object_id": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "request_id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.246Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "case-teaser",
+        "consent_id": "31ff68eb-1aa7-4e82-b598-cf42ffcf0313",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "25071741-4270-4f75-9b4a-c05e190b42f6",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "9",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "4af529cf-1eb3-4420-aa11-d6658b6b9daa",
+        "request_id": "4af529cf-1eb3-4420-aa11-d6658b6b9daa",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.259Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "4af529cf-1eb3-4420-aa11-d6658b6b9daa",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "4af529cf-1eb3-4420-aa11-d6658b6b9daa",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "10",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "case.result-recorded",
+        "object_id": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "request_id": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.270Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "case-teaser",
+        "consent_id": "4af529cf-1eb3-4420-aa11-d6658b6b9daa",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "11",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "fd401dca-4a4c-460c-bf20-e19385b571b2",
+        "request_id": "fd401dca-4a4c-460c-bf20-e19385b571b2",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.285Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "fd401dca-4a4c-460c-bf20-e19385b571b2",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "fd401dca-4a4c-460c-bf20-e19385b571b2",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "12",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "verification-record.evidence",
+        "object_id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "request_id": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.300Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "evidence",
+        "consent_id": "fd401dca-4a4c-460c-bf20-e19385b571b2",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "13",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "2ebdd17e-9709-46eb-b4a3-82a9b75721e4",
+        "request_id": "2ebdd17e-9709-46eb-b4a3-82a9b75721e4",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.321Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "2ebdd17e-9709-46eb-b4a3-82a9b75721e4",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "2ebdd17e-9709-46eb-b4a3-82a9b75721e4",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "14",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "6a17a0bc-6580-4d33-812e-5c4176802d9b",
+        "request_id": "6a17a0bc-6580-4d33-812e-5c4176802d9b",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.335Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "6a17a0bc-6580-4d33-812e-5c4176802d9b",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "6a17a0bc-6580-4d33-812e-5c4176802d9b",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "15",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "36672238-398c-4efc-8ec7-423951bb807b",
+        "request_id": "36672238-398c-4efc-8ec7-423951bb807b",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.344Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "36672238-398c-4efc-8ec7-423951bb807b",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "36672238-398c-4efc-8ec7-423951bb807b",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "16",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "f2fbe730-9ae4-472a-9c7d-28dc10f21035",
+        "request_id": "f2fbe730-9ae4-472a-9c7d-28dc10f21035",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.353Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "f2fbe730-9ae4-472a-9c7d-28dc10f21035",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "f2fbe730-9ae4-472a-9c7d-28dc10f21035",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "17",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "f6fd0702-605f-4eb0-92a6-799f9b4bbd37",
+        "request_id": "f6fd0702-605f-4eb0-92a6-799f9b4bbd37",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.363Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "f6fd0702-605f-4eb0-92a6-799f9b4bbd37",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "f6fd0702-605f-4eb0-92a6-799f9b4bbd37",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "18",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "838e5c8e-6b65-46ab-90bf-218f802ffa50",
+        "request_id": "838e5c8e-6b65-46ab-90bf-218f802ffa50",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.373Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "838e5c8e-6b65-46ab-90bf-218f802ffa50",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "838e5c8e-6b65-46ab-90bf-218f802ffa50",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      },
+      {
+        "sequence": "19",
+        "actor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+        "action": "consent.create",
+        "object_id": "c0f74115-f37c-4e98-be55-61a350355062",
+        "request_id": "c0f74115-f37c-4e98-be55-61a350355062",
+        "outcome": "accepted",
+        "created_at": "2026-10-28T18:43:59.382Z",
+        "context_version": 1,
+        "client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "audience": "https://records.example.invalid",
+        "scope": "consent",
+        "consent_id": "c0f74115-f37c-4e98-be55-61a350355062",
+        "binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "http_request_id": null,
+        "idempotency_key": "c0f74115-f37c-4e98-be55-61a350355062",
+        "binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "credential_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ],
+        "caller_binding_id": "8a7930c1-29dd-417e-8f94-c1e9fffce480",
+        "caller_client_id": "8675b03c-85fa-48d3-9635-33861a2a3ead",
+        "caller_audience": "https://records.example.invalid",
+        "caller_binding_scopes": [
+          "binding",
+          "consent",
+          "case-teaser",
+          "evidence",
+          "proof",
+          "history"
+        ]
+      }
+    ]
+  }
+}

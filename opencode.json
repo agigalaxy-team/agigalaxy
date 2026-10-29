@@ -3,7 +3,7 @@
   "mcp": {
     "galaxy": {
       "type": "local",
-      "command": ["node", "packages/galaxy-edge-mcp/src/index.mjs"],
+      "command": ["node", "scripts/hub-runtime.mjs", "integration-mcp"],
       "cwd": ".",
       "enabled": true,
       "timeout": 10000

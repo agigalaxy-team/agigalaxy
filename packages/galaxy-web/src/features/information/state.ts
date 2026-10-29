@@ -1,6 +1,6 @@
 import type {z} from 'zod/v4';
-import {informationQuerySchema,informationSelectionSchema} from "../../../../galaxy-official/src/shared/information-v2-schema.mjs";
-import type {informationWatchCommandSchema,informationWatchPlanSchema} from "../../../../galaxy-official/src/shared/information-v2-schema.mjs";
+import {informationQuerySchema,informationSelectionSchema} from "../../../../galaxy-contracts/src/information-v2-schema.mjs";
+import type {informationWatchCommandSchema,informationWatchPlanSchema} from "../../../../galaxy-contracts/src/information-v2-schema.mjs";
 import type {createWebRuntime} from "../../runtime.mjs";
 import type {HistoryFactsRecord} from "../work-records/history-types";
 

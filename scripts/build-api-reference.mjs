@@ -1,31 +1,28 @@
 import { readFile,writeFile,readdir } from 'node:fs/promises';
 import { fileURLToPath,pathToFileURL } from 'node:url';
 import { resolve,relative } from 'node:path';
-import { createHash } from 'node:crypto';
-import ts from 'typescript';
-import { businessApiReference,specialApiReference } from '../packages/galaxy-official/api-reference.mjs';
-import { migrations } from '../packages/galaxy-official/src/infrastructure/migrations.mjs';
+import { businessApiReference,specialApiReference } from './reference/http-api-entries.mjs';
+import { readMigrations } from '../go/internal/databaseschema/generate.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-const sha=value=>createHash('sha256').update(value).digest('hex');
 async function sourceFiles(directory){const files=[];for(const entry of await readdir(directory,{withFileTypes:true})){
   if(entry.isDirectory())files.push(...await sourceFiles(resolve(directory,entry.name)));
-  else if(entry.name.endsWith('.mjs'))files.push(resolve(directory,entry.name));
+  else if(entry.name.endsWith('.go')&&!entry.name.endsWith('_test.go'))files.push(resolve(directory,entry.name));
 }return files.sort((a,b)=>a<b?-1:a>b?1:0);}
 export async function buildApiReference({check=false}={}) {
-  const sources={},errors=[];
-  for(const path of await sourceFiles(resolve(root,'packages/galaxy-official/src'))){
-    const name=relative(root,path).replaceAll('\\','/'),source=await readFile(path,'utf8');sources[name]=sha(source);
-    const tree=ts.createSourceFile(name,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);
-    const visit=node=>{
-      if(ts.isNewExpression(node)&&node.expression.getText(tree)==='ServiceError'&&node.arguments?.length&&ts.isStringLiteral(node.arguments[0])){
-        const status=node.arguments[1];errors.push({code:node.arguments[0].text,status:status===undefined?400:ts.isNumericLiteral(status)?Number(status.text):null,
-          source:name,line:tree.getLineAndCharacterOfPosition(node.getStart(tree)).line+1});
-      }
-      ts.forEachChild(node,visit);
-    };visit(tree);
+  const errors=[];
+  const migrations=await readMigrations();
+  for(const path of await sourceFiles(resolve(root,'go'))){
+    const name=relative(root,path).replaceAll('\\','/'),source=await readFile(path,'utf8');
+    // A literal index only: dynamic fault helpers and route reachability are
+    // intentionally not inferred from this source scan.
+    for(const match of source.matchAll(/\bfault\.New\(\s*"([^"\\]*)"\s*,\s*(\d+)\s*\)/g))
+      errors.push({code:match[1],status:Number(match[2]),source:name,line:source.slice(0,match.index).split('\n').length});
   }
   const entries=[...businessApiReference,...specialApiReference];
+  // Track only the files contributing literal declarations, rather than a
+  // whole-Go source fingerprint that invalidates API docs on unrelated edits.
+  const sources=[...new Set(errors.map(error=>error.source))];
   const catalog={version:1,kind:'development-source-reference-not-deployed-api',publicApiEndpoints:[],
     coverage:'authored-subset-not-complete-current-http-surface',migrationVersions:migrations.map(item=>item.version),
     serviceVersion:JSON.parse(await readFile(resolve(root,'packages/galaxy-official/package.json'),'utf8')).version,schema:migrations.at(-1).version,
@@ -38,6 +35,6 @@ export async function buildApiReference({check=false}={}) {
     if(check){if(await readFile(resolve(root,name),'utf8')!==content)throw new Error('Stale generated API reference: '+name);}
     else await writeFile(resolve(root,name),content);
   }
-  return {businessRoutes:businessApiReference.length,specialRoutes:specialApiReference.length,errorDeclarations:errors.length,sourceFiles:Object.keys(sources).length,check};
+  return {businessRoutes:businessApiReference.length,specialRoutes:specialApiReference.length,errorDeclarations:errors.length,sourceFiles:sources.length,check};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)console.log(JSON.stringify(await buildApiReference({check:process.argv.includes('--check')})));

@@ -1,5 +1,5 @@
-import {taskRequestV2Schema,taskEnvelopeV2Schema} from "../../../../galaxy-official/src/shared/task-schema-v2.mjs";
-import {qualificationEvidenceV2Schema} from "../../../../galaxy-official/src/shared/qualification-v2-schema.mjs";
+import {taskRequestV2Schema,taskEnvelopeV2Schema} from "../../../../galaxy-contracts/src/task-schema-v2.mjs";
+import {qualificationEvidenceV2Schema} from "../../../../galaxy-contracts/src/qualification-v2-schema.mjs";
 import {helpOriginPayload} from "../help-search/help-origin-client.mjs";
 import {hasMaterialText,isTaskText,localTaskTextView,activeDraftMaterials} from "./materials/task-material-client.mjs";
 

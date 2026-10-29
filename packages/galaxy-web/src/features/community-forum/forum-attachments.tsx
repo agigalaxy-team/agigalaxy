@@ -5,7 +5,7 @@ import {LoadingFeedback} from "../../shared/feedback/interaction-feedback";
 import {useReadTasks} from "../../shared/reading/use-read-task";
 import {forumAttachmentError,type createForumAttachmentsClient,type forumDraftAttachmentSchema} from './forum-attachment-client.mjs';
 import type {z} from 'zod/v4';
-import type {forumAttachmentSourceSchema} from "../../../../galaxy-official/src/shared/forum-attachments-v1-schema.mjs";
+import type {forumAttachmentSourceSchema} from "../../../../galaxy-contracts/src/forum-attachments-v1-schema.mjs";
 import './forum-attachments.css';
 
 export type ForumDraftAttachment=z.infer<typeof forumDraftAttachmentSchema>;

@@ -1,9 +1,9 @@
 import pg from 'pg';
 import {mkdir} from 'node:fs/promises';
-import {migrate} from "../../src/infrastructure/database.mjs";
 import {postgresSqlArguments,noSymlinkPath} from '../operations-stack/host.mjs';
 import {replayNativeCurrentFacts} from './current-facts.mjs';
 import {replayDeletionRecoveryContribution} from './deletion-contribution.mjs';
+import {recoveryExecutable,recoveryCall,cloneConnection,forumPolicyReference} from './go-recovery.mjs';
 
 const fail=code=>Object.assign(Error(code),{code});
 const sqlName=value=>{if(!/^[a-z][a-z0-9_]{0,62}$/.test(value))throw fail('maintenance_database_name_invalid');return '"'+value+'"';};
@@ -26,7 +26,7 @@ export class MaintenanceHostDatabase{
   if(!clone?.socketDirectory||clone.network!=='none'||clone.ports.length)throw fail('maintenance_private_recovery_socket_required');
   const database=this.connect({host:clone.socketDirectory,user:live.administrator,database:live.database,port:5432});
   try{
-   await migrate(database,{roles:['api','worker','deletion-review','content-publisher']});
+   await recoveryCall(await recoveryExecutable(context),{mode:'migrate',...cloneConnection(context,this.config)},this.run);
    await database.query("INSERT INTO recovery_state(singleton,recovery_id,snapshot_id,status) VALUES(true,$1,$2,'quarantined') ON CONFLICT(singleton) DO UPDATE SET recovery_id=EXCLUDED.recovery_id,snapshot_id=EXCLUDED.snapshot_id,status='quarantined'",[context.intent.operationId,context.intent.pointId]);
    // Preserve exact point-owned storage pointers before the original SQL
    // deletion replay can minimize a row. Never recover ownership from an S3 key.
@@ -35,7 +35,7 @@ export class MaintenanceHostDatabase{
     objectPointers=await captureObjects(database);
    }
    context.artifacts.security=await replayNativeCurrentFacts({database,contribution:context.currentFacts.current,controlDirectory:this.controlDirectory,endpoint:context.authority.endpoint,recoveryId:context.intent.operationId});
-   context.artifacts.deletion=await replayDeletionRecoveryContribution({database,contribution:context.currentFacts.deletion,recoveryId:context.intent.operationId,endpoint:context.authority.endpoint,executorRef:'maintenance-native-fixed',controlDirectory:this.controlDirectory});
+   context.artifacts.deletion=await replayDeletionRecoveryContribution({context,config:this.config,run:this.run,contribution:context.currentFacts.deletion,recoveryId:context.intent.operationId,endpoint:context.authority.endpoint,executorRef:'maintenance-native-fixed',controlDirectory:this.controlDirectory,forumPolicyFile:await forumPolicyReference()});
    // Run native body receipts and the original chat room-transition rules on
    // this quarantine BEFORE pg_dump seals the database transferred to live.
    if(context.intent.moduleIds.includes('chat')){

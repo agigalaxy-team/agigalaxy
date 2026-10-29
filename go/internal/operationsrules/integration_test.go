@@ -9,14 +9,12 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/publicwrites"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/resourcebudget"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -34,29 +32,20 @@ func (d currentDirectory) RolesFresh(context.Context, string, string) ([]string,
 	}
 	return []string{}, nil
 }
-func fixture(t *testing.T, dsn, script, mode string, input Object) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	b, _ := json.Marshal(input)
-	c := exec.Command("node", filepath.Join(root, "scripts/go/"+script), mode)
-	c.Dir = root
-	c.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	c.Stdin = strings.NewReader(string(b))
-	raw, e := c.CombinedOutput()
-	if e != nil {
-		t.Fatalf("source %s %v %s", mode, e, raw)
-	}
-	var o Object
-	if json.Unmarshal(raw, &o) != nil {
-		t.Fatalf("source JSON %s", raw)
-	}
-	return o
-}
 func TestRulesOriginalPublicationSamplesAndAdoptionPG(t *testing.T) {
 	admin, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	base := fixture(t, dsn, "strategies-interop.mjs", "setup", Object{})
-	node := func(mode string, x Object) Object { return fixture(t, dsn, "rules-interop.mjs", mode, x) }
+	management := operationsfixture.NewEndpoint(t, admin, "https://strategies.example.invalid")
+	base := Object{"endpoint": management.Endpoint, "issuer": management.Issuer, "operatorId": management.Root.ID}
+	reference := &Service{Pool: management.Pool, Endpoint: management.Endpoint, Authority: management.Gateway, Now: management.Now}
+	referenceAuthorize := func() (Actor, error) { return management.Root, nil }
+	read := func(value Object, err error) Object {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
 	cfg, _ := pgxpool.ParseConfig(dsn)
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)
@@ -84,7 +73,11 @@ func TestRulesOriginalPublicationSamplesAndAdoptionPG(t *testing.T) {
 	if e = s.Initialize(ctx); e != nil {
 		t.Fatal(e)
 	}
-	node("initialize", Object{})
+	func() {
+		if e := reference.Initialize(ctx); e != nil {
+			t.Fatal(e)
+		}
+	}()
 	h := Handler{Service: s}
 	call := func(method, path string, x Object, auth bool) (int, Object) {
 		t.Helper()
@@ -109,7 +102,7 @@ func TestRulesOriginalPublicationSamplesAndAdoptionPG(t *testing.T) {
 		t.Fatalf("legacy direct write %d", code)
 	}
 	code, goView := call("GET", "/overview", nil, true)
-	if code != 200 || !same(goView, node("overview", Object{})) {
+	if code != 200 || !same(goView, read(reference.Overview(ctx, management.Root))) {
 		t.Fatalf("baseline overview %d %#v", code, goView)
 	}
 	controls := EmptyControls()
@@ -130,11 +123,11 @@ func TestRulesOriginalPublicationSamplesAndAdoptionPG(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("draft %d %#v", code, saved)
 	}
-	if node("draft", Object{"key": "business-controls", "input": draft})["replayed"] != true {
+	if read(reference.SaveDraft(ctx, management.Root, "business-controls", draft, referenceAuthorize))["replayed"] != true {
 		t.Fatal("original cannot replay Go draft")
 	}
 	code, detail := call("GET", "/business-controls/detail", nil, true)
-	if code != 200 || !same(detail, node("get", Object{"key": "business-controls"})) {
+	if code != 200 || !same(detail, read(reference.Get(ctx, management.Root, "business-controls"))) {
 		t.Fatalf("detail mismatch %#v", detail)
 	}
 	changed := clone(draft)
@@ -145,21 +138,21 @@ func TestRulesOriginalPublicationSamplesAndAdoptionPG(t *testing.T) {
 	for _, sample := range []Object{{"target": "forum-post", "text": "xx abc yy", "links": []any{}}, {"target": "forum-post", "links": []any{}}, {"target": "forum-upload", "fileBytes": 16}} {
 		input := Object{"versionId": saved["versionId"], "sample": sample}
 		code, o := call("POST", "/business-controls/sample", input, true)
-		source := node("sample", Object{"key": "business-controls", "input": input})
+		source := read(reference.Sample(ctx, management.Root, "business-controls", input))
 		if code != 200 || !same(o, source) {
 			a, _ := json.Marshal(o)
 			b, _ := json.Marshal(source)
-			t.Fatalf("sample mismatch %d\nGo%s\nJS%s", code, a, b)
+			t.Fatalf("sample mismatch %d\nGo%s\nReference%s", code, a, b)
 		}
 	}
 	publish := Object{"operationId": uuid.NewString(), "expectedRevision": 1, "reason": "人工发布", "versionId": saved["versionId"]}
-	source := node("publish", Object{"key": "business-controls", "input": publish})
+	source := read(reference.Publish(ctx, management.Root, "business-controls", publish, referenceAuthorize))
 	code, published := call("POST", "/business-controls/publish", publish, true)
 	if code != 200 || published["replayed"] != true || !same(published["publishedVersion"], source["publishedVersion"]) {
-		t.Fatalf("Go replay JS publish %d %#v", code, published)
+		t.Fatalf("HTTP replay current domain publish %d %#v", code, published)
 	}
 	code, versions := call("GET", "/business-controls/versions?limit=2", nil, true)
-	if code != 200 || !same(versions, node("versions", Object{"key": "business-controls", "input": Object{"limit": 2}})) {
+	if code != 200 || !same(versions, read(reference.Versions(ctx, management.Root, "business-controls", Object{"limit": 2}))) {
 		t.Fatalf("versions mismatch %#v", versions)
 	}
 	if code, _ := call("GET", "/business-controls/versions?after=2147483648", nil, true); code != 400 {
@@ -170,7 +163,7 @@ func TestRulesOriginalPublicationSamplesAndAdoptionPG(t *testing.T) {
 	if code != 200 || num(restored["publishedVersion"]) != 3 {
 		t.Fatalf("restore %d %#v", code, restored)
 	}
-	if !same(node("operation", Object{"id": restore["operationId"]}), func() Object { _, o := call("GET", "/operations/"+str(restore["operationId"]), nil, true); return o }()) {
+	if !same(read(reference.Operation(ctx, management.Root, str(restore["operationId"]))), func() Object { _, o := call("GET", "/operations/"+str(restore["operationId"]), nil, true); return o }()) {
 		t.Fatal("operation projection")
 	}
 	// Publishing is ordered behind the original live business shared lock.

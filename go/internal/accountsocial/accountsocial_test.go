@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -28,29 +26,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func node(t *testing.T, dsn, mode, path string, stdin []byte) Object {
-	t.Helper()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/accountsocial/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(stdin)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original social %s: %v %s", mode, e, stderr.String())
-	}
-	lines := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-	for i := len(lines) - 1; i >= 0; i-- {
-		var o Object
-		if json.Unmarshal(lines[i], &o) == nil && o != nil {
-			return o
-		}
-	}
-	t.Fatalf("invalid original fixture output (%d bytes)", len(out))
-	return nil
-}
 func normal(v any) any { var o any; _ = json.Unmarshal(encode(v), &o); return o }
 func same(t *testing.T, a, b any) {
 	t.Helper()
@@ -66,21 +41,9 @@ func expect(t *testing.T, e error, c string) {
 }
 func clone(o Object) Object { return normal(o).(map[string]any) }
 func TestOriginalSocialLedgersHTTPCurrentSourcesAndLifecycle(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "social-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
-	var f struct {
-		Endpoint, Issuer, Owner, Target, Token, Subject                                 string
-		Now                                                                             int64
-		Targets                                                                         []string
-		Posts                                                                           []Reference
-		Follow, Save, Personal, LinkedSave, FollowReceipt, SaveReceipt, PersonalReceipt Object
-	}
-	if json.Unmarshal(raw, &f) != nil {
-		t.Fatal("fixture")
-	}
+	f := setupSocial(t, owner)
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -134,7 +97,8 @@ func TestOriginalSocialLedgersHTTPCurrentSourcesAndLifecycle(t *testing.T) {
 		_ = json.Unmarshal(w.Body.Bytes(), &o)
 		return o
 	}
-	original := node(t, dsn, "read", path, nil)
+	initial := socialGolden(t, "read-initial")
+	original := initial
 	same(t, call(request("/v1/account/follows/query", Object{}, true), 200), original["follows"])
 	same(t, call(request("/v1/account/bookmarks/query", Object{}, true), 200), original["bookmarks"])
 	same(t, call(request("/v2/reading-bookmarks/query", Object{}, false), 200), original["personal"])
@@ -144,16 +108,16 @@ func TestOriginalSocialLedgersHTTPCurrentSourcesAndLifecycle(t *testing.T) {
 	if pages != 0 {
 		t.Fatal("absent pagination position consumed quota")
 	}
-	for _, target := range f.Targets[1:] {
-		cmd := Object{"operationId": uuid.NewString(), "targetAccountId": target, "following": true, "expectedRevision": 0}
+	for index, target := range f.Targets[1:] {
+		cmd := Object{"operationId": uuid.NewSHA1(uuid.NameSpaceOID, []byte(fmt.Sprintf("social-follow-%d", index))).String(), "targetAccountId": target, "following": true, "expectedRevision": 0}
 		call(request("/v1/account/follows/command", cmd, true), 200)
 	}
 	// New Go mutations are visible to the original JavaScript readers.
-	save := Object{"operationId": uuid.NewString(), "reference": f.Posts[2], "saved": true, "expectedRevision": 0}
+	save := Object{"operationId": uuid.NewSHA1(uuid.NameSpaceOID, []byte("social-save-third")).String(), "reference": f.Posts[2], "saved": true, "expectedRevision": 0}
 	ack := call(request("/v1/account/bookmarks/command", save, true), 200)
-	original = node(t, dsn, "read", path, nil)
-	same(t, call(request("/v1/account/bookmarks/query", Object{}, true), 200), original["bookmarks"])
-	same(t, call(request("/v1/account/follows/query", Object{}, true), 200), original["follows"])
+	original = socialGolden(t, "read-after")
+	compareAfter(t, call(request("/v1/account/bookmarks/query", Object{}, true), 200), original["bookmarks"].(map[string]any), initial["bookmarks"].(map[string]any), "bookmarks")
+	compareAfter(t, call(request("/v1/account/follows/query", Object{}, true), 200), original["follows"].(map[string]any), initial["follows"].(map[string]any), "follows")
 	// Same original UUID + hash recovers the committed operation after lost ACK.
 	receipt := call(request("/v1/account/bookmarks/receipt", Object{"operationId": save["operationId"], "payloadHash": ack["payloadHash"]}, true), 200)
 	same(t, receipt, ack)
@@ -253,24 +217,16 @@ func TestOriginalSocialLedgersHTTPCurrentSourcesAndLifecycle(t *testing.T) {
 }
 
 func TestOriginalCommandSchemaHashOrder(t *testing.T) {
-	// No database or network is needed for the exact Zod parse/JSON.stringify
-	// comparison; fixture runner only receives a disposable loopback DB locator.
-	dsn := "postgres://unused@127.0.0.1:1/galaxy_go_test_schema"
-	path := filepath.Join(t.TempDir(), "social-fixture.json")
-	variants := []Object{}
-	refs := []Reference{{Kind: "forum-post", PostID: uuid.NewString()}, {Kind: "capsule", CapsuleID: uuid.NewString(), VersionID: uuid.NewString()}, {Kind: "project", ProjectID: uuid.NewString()}, {Kind: "person", SubjectID: "GUID" + strings.Repeat("A", 28)}, {Kind: "chat-message", RoomID: uuid.NewString(), MessageID: uuid.NewString()}}
-	for _, ref := range refs {
-		variants = append(variants, Object{"follow": false, "value": Object{"expectedRevision": 0, "saved": true, "reference": ref, "operationId": uuid.NewString()}})
+	var fixture struct {
+		Items  []Object `json:"items"`
+		Checks []Object `json:"checks"`
 	}
-	variants = append(variants, Object{"follow": true, "value": Object{"expectedRevision": 0, "following": true, "targetAccountId": uuid.NewString(), "operationId": uuid.NewString()}})
-	invalid := clone(variants[0]["value"].(map[string]any))
-	invalid["extra"] = true
-	variants = append(variants, Object{"follow": false, "value": invalid})
-	expected := node(t, dsn, "hashes", path, encode(variants))["checks"].([]any)
+	captured(t, "hashes", &fixture)
+	variants, expected := fixture.Items, fixture.Checks
 	for i, item := range variants {
 		follow := item["follow"].(bool)
 		p, e := parse(encode(item["value"]), "command", follow, true)
-		want := expected[i].(map[string]any)
+		want := expected[i]
 		if (e == nil) != want["accepted"] {
 			t.Fatalf("Zod parse mismatch %d", i)
 		}

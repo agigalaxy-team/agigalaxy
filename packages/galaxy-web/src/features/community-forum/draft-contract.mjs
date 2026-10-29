@@ -1,6 +1,6 @@
 import * as z from 'zod/v4';
-import { forumTopicSchema, forumReadTopicSchema } from "../../../../galaxy-official/src/shared/community-forum-topics-v1.mjs";
-import { forumAudienceSchema } from "../../../../galaxy-official/src/shared/community-forum-access-v2.mjs";
+import { forumTopicSchema, forumReadTopicSchema } from "../../../../galaxy-contracts/src/community-forum-topics-v1.mjs";
+import { forumAudienceSchema } from "../../../../galaxy-contracts/src/community-forum-access-v2.mjs";
 import { forumDraftAttachmentsSchema } from "./forum-attachment-client.mjs";
 
 export const draftSchema = z.strictObject({

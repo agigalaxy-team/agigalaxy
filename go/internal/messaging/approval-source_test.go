@@ -2,7 +2,7 @@ package messaging
 
 import (
 	"encoding/json"
-	"os/exec"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -44,22 +44,20 @@ func TestOriginalPersistedApprovalSourceStrictMatch(t *testing.T) {
 		copy[field] = "changed"
 		vectors = append(vectors, vector{Plan: plan, Input: copy})
 	}
-	raw, _ := json.Marshal(vectors)
-	root, _ := filepath.Abs("../../..")
-	script := `import{MessagingBase}from './packages/galaxy-official/src/operations/messaging/base.mjs';let v=JSON.parse(process.argv[1]);for(let x of v){const s=new MessagingBase({});s.planWithin=async()=>x.Plan;s.autonomy={validatePersistedOperationWithin:async()=>({allowed:true})};x.Allowed=(await s.validatePersistedApprovalWithin({},x.Input)).allowed}console.log(JSON.stringify(v))`
-	cmd := exec.Command("node", "--input-type=module", "-e", script, string(raw))
-	cmd.Dir = root
-	out, e := cmd.CombinedOutput()
+	out, e := os.ReadFile(filepath.Join("testdata", "approval-source-original.json"))
 	if e != nil {
-		t.Fatalf("original %v %s", e, out)
+		t.Fatal(e)
 	}
 	var original []vector
 	if e = json.Unmarshal(out, &original); e != nil {
 		t.Fatal(e)
 	}
-	for i, v := range original {
-		if got := persistedApprovalSource(v.Plan, v.Input); got != v.Allowed {
-			t.Errorf("source %d Go %v JS %v", i, got, v.Allowed)
+	if len(vectors) != len(original) {
+		t.Fatal("approval vectors changed")
+	}
+	for i, v := range vectors {
+		if got := persistedApprovalSource(v.Plan, v.Input); got != original[i].Allowed {
+			t.Errorf("source %d Go %v JS %v", i, got, original[i].Allowed)
 		}
 	}
 	if !persistedApprovalSource(plan, input) {

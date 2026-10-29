@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -22,15 +23,48 @@ func TestOriginalMaintenanceInventoryAndSignedApprovalPreparation(t *testing.T) 
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
 	defer cancel()
-	root, _ := filepath.Abs("../../..")
 	dir := t.TempDir()
-	for _, mode := range []string{"setup", "maintenance", "limited"} {
-		cmd := exec.CommandContext(ctx, "node", filepath.Join(root, "scripts/go/subject-lifecycle-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN=http://127.0.0.1")
-		if out, e := cmd.CombinedOutput(); e != nil {
-			t.Fatalf("original maintenance %s: %v %s", mode, e, out)
-		}
+	prepared := deviceauthfixture.New(t, pool, dir, []string{"binding", "data-export", "data-delete"})
+	if _, e := databaseschema.Migrate(ctx, pool, []string{"deletion-review"}); e != nil {
+		t.Fatal(e)
+	}
+	svc := &Service{Pool: pool, Endpoint: prepared.Service.Endpoint, Devices: prepared.Service, Now: func() time.Time { return time.Unix(2000000000, 0) }}
+	requestID, approvalID := uuid.NewString(), uuid.NewString()
+	intent := map[string]any{"version": 1, "id": requestID, "endpoint": prepared.Service.Endpoint, "subjectId": prepared.Actor.SubjectID, "bindingId": prepared.Actor.BindingID, "issuedAt": int64(2000000000), "expiresAt": int64(2000000300), "action": "request", "scope": "all-owned-service-data", "reason": "privacy", "takeout": "not-needed"}
+	intentRaw, e := protocol.EncodeJS(intent)
+	if e != nil {
+		t.Fatal(e)
+	}
+	private, e := identity.PrivatePEM([]byte(prepared.Materials.OwnerPrivate))
+	if e != nil {
+		t.Fatal(e)
+	}
+	signed, e := identity.SignIdentityPayload(private, string(intentRaw), "galaxy-deletion-intent+jws")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = svc.SubmitDeletion(ctx, Actor{Actor: prepared.Actor}, signed); e != nil {
+		t.Fatal(e)
+	}
+	plan := &DeletionPlan{PolicyID: "fixture-policy", PolicyVersion: "1", ExternalCopies: "outside-service-control"}
+	plan.Primary.Action, plan.Primary.NotBefore, plan.Primary.Basis = "delete-owned-data", 2000000000, "fixture"
+	plan.Audit.Action, plan.Audit.Until, plan.Audit.Basis = "retain-minimum", 2000000100, "fixture"
+	plan.Backups.Action, plan.Backups.Until, plan.Backups.Basis = "expire-snapshots-and-replay-deletions", 2000000200, "fixture"
+	approval := ReviewCommand{Version: 1, ID: approvalID, RequestID: requestID, Endpoint: prepared.Service.Endpoint, ExpectedRevision: 1, ReviewerRef: "isolated-reviewer", Decision: "approve", Explanation: "isolated fixture only", Plan: plan}
+	approvalRaw, e := protocol.EncodeJS(approval)
+	if e != nil {
+		t.Fatal(e)
+	}
+	reviewer, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_deletion_reviewer")
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer reviewer.Close()
+	if _, e = postgres.InTx(ctx, reviewer, func(tx pgx.Tx) (Object, error) { return ReviewDeletionWithin(ctx, tx, approvalRaw) }); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE access_credentials SET scopes='["data-export"]'::jsonb WHERE token_hash=$1`, identity.Digest([]byte(prepared.Credential))); e != nil {
+		t.Fatal(e)
 	}
 	var fixture struct {
 		Command  ExecutionCommand
@@ -40,10 +74,14 @@ func TestOriginalMaintenanceInventoryAndSignedApprovalPreparation(t *testing.T) 
 		}
 		Targets map[string]string
 	}
-	raw, _ := os.ReadFile(filepath.Join(dir, "maintenance.json"))
+	raw, e := os.ReadFile("testdata/original-maintenance-catalog.json")
+	if e != nil {
+		t.Fatal(e)
+	}
 	if e := json.Unmarshal(raw, &fixture); e != nil {
 		t.Fatal(e)
 	}
+	fixture.Command = ExecutionCommand{Version: 1, ID: uuid.NewString(), RequestID: requestID, ApprovalID: approvalID, Endpoint: prepared.Service.Endpoint, ExpectedRevision: 2, ExecutorRef: "isolated-executor"}
 	if len(fixture.Targets) != len(maintenanceCatalog.Targets) {
 		t.Fatal("original deletion target catalog changed")
 	}
@@ -74,11 +112,8 @@ func TestOriginalMaintenanceInventoryAndSignedApprovalPreparation(t *testing.T) 
 	}
 	// A real original credential containing only data-export must reach the
 	// lifecycle reader without silently borrowing the normal binding scope.
-	devices, e := deviceauth.Load(ctx, pool, deviceauth.Configuration{Endpoint: "https://device.example.invalid", SigningKeyID: "fixture", SigningKeyFile: filepath.Join(dir, "hub-private.pem"), RootPinsFile: filepath.Join(dir, "root-pins.json"), KeyringFile: filepath.Join(dir, "keyring.json"), TrustDirectory: filepath.Join(dir, "trust"), Now: func() time.Time { return time.Unix(2000000000, 0) }})
-	if e != nil {
-		t.Fatal(e)
-	}
-	token, _ := os.ReadFile(filepath.Join(dir, "limited-credential.txt"))
+	devices := prepared.Service
+	token := []byte(prepared.Credential)
 	actor, e := devices.Authenticate(ctx, string(token), "data-export")
 	if e != nil {
 		t.Fatal(e)

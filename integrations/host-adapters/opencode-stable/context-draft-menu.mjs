@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { contextDraftSource,sameContextSource } from '../../../packages/galaxy-official/src/shared/context-draft.mjs';
+import { contextDraftSource,sameContextSource } from '../../../packages/galaxy-contracts/src/context-draft.mjs';
 export function createContextDraftMenu({controller,select,prompt,info,language,isCurrent,onBack,onConfirm,onOpenGrant,canSubmit=true}){
   const label=(a,b)=>language==='en-US'?b:a;
   const plain=value=>String(value??'').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ').slice(0,1200);

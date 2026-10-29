@@ -6,9 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -18,18 +15,13 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/feedback"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/feedbackfixture"
 	"github.com/google/uuid"
 )
 
 func TestOriginalPortalCookiesAndCurrentRolesProtectGoFeedback(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts", "go", "feedback-fixture.mjs"), "setup")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	if out, e := cmd.CombinedOutput(); e != nil {
-		t.Fatalf("actual schema: %v %s", e, out)
-	}
+	pool, _ := testsupport.PostgreSQL(t)
+	feedbackfixture.Create(t, pool)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	now := time.Unix(2000000000, 0)

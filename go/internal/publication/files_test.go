@@ -14,15 +14,16 @@ import (
 	"github.com/google/uuid"
 )
 
-func node(t *testing.T, dsn string, args ...string) []byte {
+// Read the produced files through the current Next site consumer and current
+// shared snapshot schema, without loading a retired publication service.
+func siteContract(t *testing.T, args ...string) []byte {
 	t.Helper()
 	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", append([]string{filepath.Join(root, "scripts/go/publication-interop.mjs")}, args...)...)
+	cmd := exec.Command("node", append([]string{"--import", "tsx", "go/internal/publication/testdata/site-contract.mjs"}, args...)...)
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original JS fixture: %v %s", e, out)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("current site consumer: %v %s", err, out)
 	}
 	return out
 }
@@ -64,8 +65,8 @@ func fixtureFiles(t *testing.T) (Config, *Filesystem, Snapshot, []byte, string) 
 	}
 	return config, files, snapshot, image, configPath
 }
-func TestOriginalJSReadsGoSnapshotAndSelectedMedia(t *testing.T) {
-	config, files, snapshot, image, configPath := fixtureFiles(t)
+func TestCurrentSiteReadsGoSnapshotAndSelectedMedia(t *testing.T) {
+	config, files, snapshot, image, _ := fixtureFiles(t)
 	ctx := context.Background()
 	id := uuid.NewString()
 	artifact, e := files.Prepare(ctx, id, snapshot)
@@ -82,11 +83,11 @@ func TestOriginalJSReadsGoSnapshotAndSelectedMedia(t *testing.T) {
 		Current  any
 		Files    []string
 	}
-	if e = json.Unmarshal(node(t, "", "read-files", configPath, artifact.Directory), &original); e != nil {
+	if e = json.Unmarshal(siteContract(t, "read-files", artifact.Directory), &original); e != nil {
 		t.Fatal(e)
 	}
 	if len(original.Media) != 1 || original.Media["配图 +.png"] != base64.StdEncoding.EncodeToString(image) {
-		t.Fatal("original JS read different selected media bytes")
+		t.Fatal("current site read different selected media bytes")
 	}
 	if len(original.Snapshot["media"].([]any)) != 1 {
 		t.Fatal("unselected draft became public")
@@ -96,30 +97,22 @@ func TestOriginalJSReadsGoSnapshotAndSelectedMedia(t *testing.T) {
 			t.Fatal("publisher generated/copied static application")
 		}
 	}
-	// Original JS preparation is accepted by the Go activation path as well.
-	snapshotFile := filepath.Join(filepath.Dir(configPath), "snapshot.json")
-	b, _ := json.Marshal(snapshot)
-	os.WriteFile(snapshotFile, b, 0600)
-	var jsArtifact struct {
-		PublicationID string `json:"publicationId"`
-		SiteVersion   string `json:"siteVersion"`
-		Directory     string `json:"directory"`
-	}
-	if e = json.Unmarshal(node(t, "", "prepare", configPath, snapshotFile, uuid.NewString()), &jsArtifact); e != nil {
+	firstArtifact, e := files.Prepare(ctx, uuid.NewString(), snapshot)
+	if e != nil {
 		t.Fatal(e)
 	}
-	if e = files.Activate(ctx, Artifact{jsArtifact.PublicationID, jsArtifact.SiteVersion, jsArtifact.Directory}); e != nil {
+	if e = files.Activate(ctx, firstArtifact); e != nil {
 		t.Fatalf("first activation: %v", e)
 	}
 	current, e := files.Current(ctx)
-	if e != nil || current.PublicationID != jsArtifact.PublicationID {
-		t.Fatalf("Go did not accept JS marker: %v %v", current, e)
+	if e != nil || current.PublicationID != firstArtifact.PublicationID {
+		t.Fatalf("current activation marker: %v %v", current, e)
 	}
 	// Replacement must use the same directory symlink protocol on supported hosts.
 	t.Run("atomic replacement of existing directory symlink", func(t *testing.T) {
 		if e = files.Activate(ctx, artifact); e != nil {
 			if runtime.GOOS == "windows" && os.IsPermission(e) {
-				t.Skip("Windows cannot atomically replace the directory symlink used by the original publisher; Linux host verification is required")
+				t.Skip("Windows cannot atomically replace the directory symlink used by the publisher; Linux host verification is required")
 			}
 			t.Fatalf("replace current publication link: %v", e)
 		}
@@ -128,8 +121,8 @@ func TestOriginalJSReadsGoSnapshotAndSelectedMedia(t *testing.T) {
 				PublicationID string `json:"publicationId"`
 			}
 		}
-		if e = json.Unmarshal(node(t, "", "read-files", configPath, artifact.Directory), &activeOriginal); e != nil || activeOriginal.Current.PublicationID != id {
-			t.Fatalf("original JS did not recognize Go replacement marker: %+v %v", activeOriginal, e)
+		if e = json.Unmarshal(siteContract(t, "read-files", artifact.Directory), &activeOriginal); e != nil || activeOriginal.Current.PublicationID != id {
+			t.Fatalf("current site did not recognize Go replacement marker: %+v %v", activeOriginal, e)
 		}
 	})
 	// A mismatched marker, foreign origin and changed selected media fail before

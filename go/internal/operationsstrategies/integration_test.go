@@ -6,15 +6,13 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/access"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -44,25 +42,10 @@ func (t maintenanceTransport) RoundTrip(r *http.Request) (*http.Response, error)
 func TestStrategiesOriginalVersionsRehearsalAndOrdinaryPG(t *testing.T) {
 	admin, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	node := func(mode string, input Object) Object {
-		t.Helper()
-		b, _ := json.Marshal(input)
-		c := exec.Command("node", filepath.Join(root, "scripts/go/strategies-interop.mjs"), mode)
-		c.Dir = root
-		c.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		c.Stdin = strings.NewReader(string(b))
-		raw, e := c.CombinedOutput()
-		if e != nil {
-			t.Fatalf("source %s %v %s", mode, e, raw)
-		}
-		var o Object
-		if json.Unmarshal(raw, &o) != nil {
-			t.Fatal("source reply")
-		}
-		return o
-	}
-	base := node("setup", Object{})
+	currentFixture := operationsfixture.New(t, admin)
+	base := Object{"endpoint": currentFixture.Endpoint, "issuer": currentFixture.Issuer, "operatorId": currentFixture.Root.ID}
+	reference := &Service{Pool: currentFixture.Pool, Endpoint: currentFixture.Endpoint, Authority: currentFixture.Gateway, Now: currentFixture.Now}
+	referenceAuthorize := func() (Actor, error) { return currentFixture.Root, nil }
 	now := func() time.Time { return time.Unix(2000000000, 0) }
 	cfg, _ := pgxpool.ParseConfig(dsn)
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
@@ -108,16 +91,22 @@ func TestStrategiesOriginalVersionsRehearsalAndOrdinaryPG(t *testing.T) {
 	if code != 200 || saved["state"] != "saved" {
 		t.Fatalf("draft %d %#v", code, saved)
 	}
-	source := node("draft", Object{"input": draft})
+	source, e := reference.SaveDraft(ctx, currentFixture.Root, draft, referenceAuthorize)
+	if e != nil {
+		t.Fatal(e)
+	}
 	if source["replayed"] != true {
 		t.Fatal("JS cannot replay Go command")
 	}
 	code, overview := call("GET", "/overview", nil, true)
-	source = node("get", Object{})
+	source, e = reference.Get(ctx, currentFixture.Root)
+	if e != nil {
+		t.Fatal(e)
+	}
 	if code != 200 || !same(overview, source) {
 		a, _ := json.Marshal(overview)
 		b, _ := json.Marshal(source)
-		t.Fatalf("overview mismatch %d\nGo%s\nJS%s", code, a, b)
+		t.Fatalf("overview mismatch %d\nGo%s\nReference%s", code, a, b)
 	}
 	publish := Object{"operationId": uuid.NewString(), "expectedRevision": 1, "versionId": saved["versionId"], "rehearsalId": uuid.NewString(), "reason": "人工发布"}
 	if code, _ := call("POST", "/publish", publish, true); code != 409 {
@@ -128,7 +117,10 @@ func TestStrategiesOriginalVersionsRehearsalAndOrdinaryPG(t *testing.T) {
 	if code != 200 || rehearsal["valid"] != true || rehearsal["sideEffects"] != false {
 		t.Fatalf("rehearsal %d %#v", code, rehearsal)
 	}
-	source = node("rehearsal", Object{"input": rehearsalInput})
+	source, e = reference.Rehearsal(ctx, currentFixture.Root, rehearsalInput)
+	if e != nil {
+		t.Fatal(e)
+	}
 	if source["replayed"] != true {
 		t.Fatal("source rehearsal replay unavailable")
 	}
@@ -153,28 +145,37 @@ func TestStrategiesOriginalVersionsRehearsalAndOrdinaryPG(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	source = node("ordinaryRead", Object{"id": strategyID})
+	source, e = reference.ReadOrdinary(ctx, currentFixture.Root, strategyID)
+	if e != nil {
+		t.Fatal(e)
+	}
 	if !same(read, source) {
 		a, _ := json.Marshal(read)
 		b, _ := json.Marshal(source)
-		t.Fatalf("ordinary read mismatch\nGo%s\nJS%s", a, b)
+		t.Fatalf("ordinary read mismatch\nGo%s\nReference%s", a, b)
 	}
 	ordinaryPublish := Object{"operationId": uuid.NewString(), "expectedRevision": 3, "strategyId": strategyID, "versionId": savedOrdinary["versionId"]}
 	out, e := service.CommandOrdinary(ctx, actor, "publish", ordinaryPublish)
 	if e != nil || out["newMattersOnly"] != true {
 		t.Fatalf("ordinary publish %v %#v", e, out)
 	}
-	source = node("ordinaryCommand", Object{"kind": "publish", "input": ordinaryPublish})
+	source, e = reference.CommandOrdinary(ctx, currentFixture.Root, "publish", ordinaryPublish)
+	if e != nil {
+		t.Fatal(e)
+	}
 	if source["replayed"] != true {
 		t.Fatal("original ordinary immutable receipt differs")
 	}
 	for _, path := range []string{"versions", "records"} {
 		code, goView := call("GET", "/"+path, nil, true)
-		source = node(path, Object{})
+		source, e = map[string]func(context.Context, Actor, Object) (Object, error){"versions": reference.Versions, "records": reference.Records}[path](ctx, currentFixture.Root, Object{})
+		if e != nil {
+			t.Fatal(e)
+		}
 		if code != 200 || !same(goView, source) {
 			a, _ := json.Marshal(goView)
 			b, _ := json.Marshal(source)
-			t.Fatalf("%s mismatch %d\nGo%s\nJS%s", path, code, a, b)
+			t.Fatalf("%s mismatch %d\nGo%s\nReference%s", path, code, a, b)
 		}
 	}
 	ordinary["operationId"] = uuid.NewString()

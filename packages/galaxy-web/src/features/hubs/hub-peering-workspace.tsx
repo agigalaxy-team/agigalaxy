@@ -2,7 +2,7 @@ import {ReadingDetails,ReadingSummary} from "../../shared/reading/reading-detail
 import React,{useEffect,useEffectEvent,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {useCurrentTaskMaterialTree} from "../tasks/materials/task-material-view";
-import {peeringAgreementSchema,peeringEventSchema,peeringPartySchema,peeringSummaryFields} from "../../../../galaxy-official/src/shared/hub-peering-v2-schema.mjs";
+import {peeringAgreementSchema,peeringEventSchema,peeringPartySchema,peeringSummaryFields} from "../../../../galaxy-contracts/src/hub-peering-v2-schema.mjs";
 import {MemberAvatar,memberName,useMemberNames} from "../../shared/people/conversation-ui";
 import {useGovernanceDraft} from "../governance/governance-presentation";
 import {CiProofView,ciTime} from "../ci/ci-proof-view";

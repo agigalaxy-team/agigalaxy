@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { verifyTrustPackage } from "../src/verification/trust-package.mjs";
+import { verifyTrustPackage } from "../../galaxy-contracts/src/verification/trust-package.mjs";
 const path = process.argv[2];
 if (!path || process.argv.length !== 3) throw new Error('Usage: node verify-trust-package.mjs <local-package.json>');
 if ((await stat(path)).size > 4500000) throw new Error('Local package exceeds 4.5 MB limit.');

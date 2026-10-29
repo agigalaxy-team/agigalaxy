@@ -1,4 +1,4 @@
-import {historyV2QuerySchema} from "../../../../galaxy-official/src/shared/history-v2-schema.mjs";
+import {historyV2QuerySchema} from "../../../../galaxy-contracts/src/history-v2-schema.mjs";
 
 // The server's existing query is the contract. Environment is comparison
 // context, not a hard filter or an inferred compatibility claim.

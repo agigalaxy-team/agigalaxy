@@ -1,6 +1,6 @@
 import {randomUUID,createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {loadAttachmentConfiguration} from '../src/infrastructure/attachment-configuration.mjs';
+import {loadAttachmentConfiguration} from '../deploy/support/attachment-configuration.mjs';
 // Explicit synthetic infrastructure verification: no account, room or message.
 let config,key;
 try {

@@ -22,7 +22,7 @@ func TestOriginalSearchSettingsNormalizationAndNativeProjection(t *testing.T) {
 	}
 	input := fixture{Settings: settings, Normalized: []string{"İSTANBUL", "ΣΟΣ", "\u0085 A \u0085", "\ufeff A\u00a0 Ｂ "}}
 	root, _ := filepath.Abs("../../..")
-	script := `import{searchQualitySettingsSchema,canonicalSearchSettings,nativeSearchSettings,editableSearchSettings,normalizeSearchTerm}from './packages/galaxy-official/src/shared/operations-search-quality-schema.mjs';let x=JSON.parse(process.argv[1]);x.Canonical=canonicalSearchSettings(searchQualitySettingsSchema.parse(x.Settings));x.Native=nativeSearchSettings(x.Canonical);x.Editable=editableSearchSettings(x.Native);x.Normalized=x.Normalized.map(normalizeSearchTerm);console.log(JSON.stringify(x))`
+	script := `import{searchQualitySettingsSchema,canonicalSearchSettings,nativeSearchSettings,editableSearchSettings,normalizeSearchTerm}from './packages/galaxy-contracts/src/operations-search-quality-schema.mjs';let x=JSON.parse(process.argv[1]);x.Canonical=canonicalSearchSettings(searchQualitySettingsSchema.parse(x.Settings));x.Native=nativeSearchSettings(x.Canonical);x.Editable=editableSearchSettings(x.Native);x.Normalized=x.Normalized.map(normalizeSearchTerm);console.log(JSON.stringify(x))`
 	cmd := exec.Command("node", "--input-type=module", "-e", script, jsonString(input))
 	cmd.Dir = root
 	raw, e := cmd.CombinedOutput()

@@ -1,5 +1,5 @@
 import type * as z from 'zod/v4';
-import type {peeringAgreementSchema,peeringEventSchema,peeringPartySchema,peeringSourceSchema} from "../../../../galaxy-official/src/shared/hub-peering-v2-schema.mjs";
+import type {peeringAgreementSchema,peeringEventSchema,peeringPartySchema,peeringSourceSchema} from "../../../../galaxy-contracts/src/hub-peering-v2-schema.mjs";
 import type {HubIntake} from './hub-workspace-types';
 
 export type PeeringEvent=z.infer<typeof peeringEventSchema>;

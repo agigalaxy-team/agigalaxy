@@ -1,0 +1,22 @@
+{
+  "input": [
+    {
+      "actor": true,
+      "input": {
+        "query": "Fixture"
+      },
+      "kind": "query-wire",
+      "options": {
+        "publicOnly": true,
+        "sourceSearch": false
+      }
+    }
+  ],
+  "results": [
+    {
+      "value": {
+        "wire": "{\"items\":[{\"builderId\":\"00157e21-c31c-44c3-8214-ab5ec92652fe\",\"ownerId\":\"GUID1501M61XNTKCXKC1CG3ZVSG2AA32\",\"type\":\"worker\",\"name\":\"Synthetic worker\",\"version\":\"0.1.0\",\"registration\":{\"state\":\"registered\",\"control\":\"authenticated registry owner; Node approval is separate; endpoint control not established\"},\"nodeControl\":{\"state\":\"unverified\",\"capabilityVerified\":false,\"endpointControlVerified\":false},\"compatibility\":{\"state\":\"unverified\",\"fullScopeState\":\"unverified\",\"blockedByMaintenance\":false,\"capabilityVerified\":false},\"reachability\":{\"state\":\"unknown\",\"endpointProbed\":false,\"endpointReachable\":null,\"capabilityVerified\":false,\"scope\":\"owner-heartbeat-only\",\"endpointControlVerified\":false},\"evidence\":\"none-current\",\"securityIssue\":false}],\"nextAfter\":null,\"windowLimited\":false,\"automaticEndpointProbes\":false}"
+      }
+    }
+  ]
+}

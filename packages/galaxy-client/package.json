@@ -1,0 +1,14 @@
+{
+  "name": "@galaxy/client-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "canonicalize": "4.0.0",
+    "jose": "6.2.12",
+    "zod": "4.5.4",
+    "ipaddr.js": "2.5.0",
+    "pino": "10.3.1",
+    "rotating-file-stream": "3.2.10"
+  }
+}

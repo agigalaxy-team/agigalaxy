@@ -2,8 +2,8 @@ import {
   taskCommentV2Schema,
   commentReportV2Schema,
   commentModerationV2Schema,
-} from "../../../../../galaxy-official/src/shared/task-comment-v2-schema.mjs";
-import { equalJson, sha256Hex } from "../../../../../galaxy-official/src/shared/web-primitives.mjs";
+} from "../../../../../galaxy-contracts/src/task-comment-v2-schema.mjs";
+import { equalJson, sha256Hex } from "../../../../../galaxy-contracts/src/web-primitives.mjs";
 import { createCommentEditorDraft } from "./editor-draft.mjs";
 
 const operationQueues = new WeakMap();

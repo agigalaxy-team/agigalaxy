@@ -11,7 +11,7 @@ import {useGovernanceDraft} from "../governance/governance-presentation";
 import {MemberLink,memberName,useMemberNames} from "../../shared/people/conversation-ui";
 import {DiscoveryTabs,discoveryTarget} from "../discovery/navigation";
 import {helpOriginLocator} from "../help-search/help-origin-client.mjs";
-import {discoveryQueryV2Schema} from "../../../../galaxy-official/src/shared/discovery-schema-v2.mjs";
+import {discoveryQueryV2Schema} from "../../../../galaxy-contracts/src/discovery-schema-v2.mjs";
 import "./discovery.css";
 import type {ProjectRuntime,DiscoveryPage,Opportunity,VisibleOpportunity,OpportunityDetail,UnavailableOpportunityDetail,DiscoveryQuery} from "./contracts";
 import {bodyFreeOpportunity,contactDraftRuntime} from "../help-search/help-contact-view-types";

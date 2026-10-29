@@ -55,15 +55,3 @@ function textParts(parts) {
   return parts.filter(p => p.content?.$case === 'text').map(p => p.content.value).join('\n').slice(0, 1200);
 }
 
-export function resultDraft(link, caseVersion, id) {
-  const peer = link.peer;
-  if (link.status !== 'observed' || !terminal(peer?.state)) throw new Error('Observed terminal A2A task required.');
-  const failed = ['failed', 'rejected'].includes(peer.state);
-  return { kind: 'result', id, caseId: link.caseId, attemptId: link.attemptId, expectedVersion: caseVersion,
-    outcome: peer.state === 'completed' ? 'succeeded' : failed ? 'failed' : 'inconclusive',
-    summary: peer.text || `A2A peer reported ${peer.state}; ${peer.artifacts.length} artifact(s).`,
-    failureReason: failed ? peer.text || `A2A peer reported ${peer.state}.` : '',
-    limitations: ['External peer report; no independent execution or capability verification.',
-      `A2A state: ${peer.state}; association: ${link.id}; response SHA-256: ${peer.responseHash}`,
-      'Artifact hashes identify received content/references. Referenced URLs were not fetched; this is not a Proof.'] };
-}

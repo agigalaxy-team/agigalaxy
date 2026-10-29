@@ -1,5 +1,5 @@
 import {showExactChoice} from './exact-choice.mjs';
-import {nativeStateLabel} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
+import {nativeStateLabel} from '../../native-v2/presentation/native-result.mjs';
 export function createIdentityMenu({ controller, select, prompt, info, language, isCurrent, onBack }) {
   const label = (zh,en) => language === 'en-US' ? en : zh;
   let generation = 0;

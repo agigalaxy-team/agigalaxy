@@ -1,0 +1,348 @@
+{
+  "input": [
+    {
+      "input": {
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+        "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534",
+        "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96"
+      },
+      "kind": "manifest"
+    },
+    {
+      "input": {
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe"
+      },
+      "kind": "support"
+    },
+    {
+      "actor": true,
+      "input": {
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe"
+      },
+      "kind": "support"
+    }
+  ],
+  "results": [
+    {
+      "value": {
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+        "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+        "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534",
+        "authorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+        "declarationId": "58f09d72-ccad-4184-9b68-169ec82c0368",
+        "manifest": {
+          "profile": "galaxy-worker-pack/1",
+          "name": "Synthetic worker",
+          "version": "0.1.0",
+          "source": "https://builder.example/artifact",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "license": "Fixture licence declaration",
+          "licenseSource": "https://builder.example/license",
+          "dependencies": [
+            {
+              "kind": "mcp",
+              "name": "fixture-mcp",
+              "version": "1",
+              "source": "https://builder.example/mcp",
+              "license": "Fixture"
+            }
+          ],
+          "modelRequirements": "Owner supplied model",
+          "environment": "Fixture environment",
+          "permissions": [
+            {
+              "resource": "Selected task",
+              "purpose": "Read explicitly granted context",
+              "required": true
+            }
+          ],
+          "configurationRequirements": "Link a real separately recorded Configuration before actual work",
+          "capabilities": [
+            "Read selected metadata"
+          ],
+          "changes": "Initial synthetic fixture",
+          "installation": "Use original publisher mechanism",
+          "upgrade": "Choose a new version",
+          "rollback": "Return to prior host configuration",
+          "runtimeLocation": "user-controlled",
+          "automaticActivation": false
+        },
+        "versionStatus": "current",
+        "delisted": false,
+        "securityIssue": false,
+        "installationPerformed": false,
+        "workerStarted": false,
+        "capabilityVerified": false
+      }
+    },
+    {
+      "value": {
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+        "ownerId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+        "type": "worker",
+        "revision": 3,
+        "declarationId": "58f09d72-ccad-4184-9b68-169ec82c0368",
+        "declarationHash": "dc21c33a87a2eff1a5d50b522bd3d654d8a4fe6b79eeb71cd90a504e6105cb92",
+        "release": {
+          "version": "0.1.0",
+          "buildHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "artifact": "https://builder.example/artifact",
+          "dependencies": [
+            {
+              "name": "fixture",
+              "version": "1.0.0",
+              "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ],
+          "upgrade": "Preserve existing node ID and local state",
+          "rollback": "Restore previous build with the same identity"
+        },
+        "support": {
+          "state": "current",
+          "eventId": "e726a879-aa61-452a-9084-a4b32496047b",
+          "payloadHash": "c09e87b93f11e6c00605e7a4667bb2d0c05478cf3e4e79c145bc4488ae97e3e9",
+          "revision": 2,
+          "record": {
+            "profile": "galaxy-builder-support/2",
+            "implementation": {
+              "name": "Synthetic worker",
+              "version": "0.1.0"
+            },
+            "galaxySchema": "2",
+            "protocols": [
+              {
+                "name": "MCP",
+                "version": "fixture-version"
+              }
+            ],
+            "sdks": [],
+            "objectActions": [
+              "case.read",
+              "attempt.map",
+              "proof.export"
+            ],
+            "missingCapabilities": [
+              "worker.execute"
+            ],
+            "authorization": "Exact signed consent for selected objects",
+            "limitations": "Synthetic compatibility scenario, not a tested real third-party product"
+          },
+          "testedScopes": [
+            {
+              "action": "case.read",
+              "state": "not-tested",
+              "observations": [],
+              "authority": "scoped-assessor-report; no professional certification"
+            },
+            {
+              "action": "attempt.map",
+              "state": "not-tested",
+              "observations": [],
+              "authority": "scoped-assessor-report; no professional certification"
+            },
+            {
+              "action": "proof.export",
+              "state": "not-tested",
+              "observations": [],
+              "authority": "scoped-assessor-report; no professional certification"
+            }
+          ]
+        },
+        "pack": {
+          "state": "current",
+          "eventId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+          "payloadHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534",
+          "revision": 3,
+          "record": {
+            "profile": "galaxy-worker-pack/1",
+            "name": "Synthetic worker",
+            "version": "0.1.0",
+            "source": "https://builder.example/artifact",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "license": "Fixture licence declaration",
+            "licenseSource": "https://builder.example/license",
+            "dependencies": [
+              {
+                "kind": "mcp",
+                "name": "fixture-mcp",
+                "version": "1",
+                "source": "https://builder.example/mcp",
+                "license": "Fixture"
+              }
+            ],
+            "modelRequirements": "Owner supplied model",
+            "environment": "Fixture environment",
+            "permissions": [
+              {
+                "resource": "Selected task",
+                "purpose": "Read explicitly granted context",
+                "required": true
+              }
+            ],
+            "configurationRequirements": "Link a real separately recorded Configuration before actual work",
+            "capabilities": [
+              "Read selected metadata"
+            ],
+            "changes": "Initial synthetic fixture",
+            "installation": "Use original publisher mechanism",
+            "upgrade": "Choose a new version",
+            "rollback": "Return to prior host configuration",
+            "runtimeLocation": "user-controlled",
+            "automaticActivation": false
+          },
+          "packId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+          "authorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+          "identityMeaning": "typed pack reference within this worker registration",
+          "installation": "not-performed-by-registry",
+          "runtime": "not-started-by-registry",
+          "actualUseCount": null
+        },
+        "reports": [],
+        "delisted": false,
+        "securityIssue": false,
+        "checkedAt": 2000000000,
+        "capabilityVerified": false,
+        "canSubmitReport": false,
+        "disclosure": null,
+        "reportDisclosure": null
+      }
+    },
+    {
+      "value": {
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+        "ownerId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+        "type": "worker",
+        "revision": 3,
+        "declarationId": "58f09d72-ccad-4184-9b68-169ec82c0368",
+        "declarationHash": "dc21c33a87a2eff1a5d50b522bd3d654d8a4fe6b79eeb71cd90a504e6105cb92",
+        "release": {
+          "version": "0.1.0",
+          "buildHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "artifact": "https://builder.example/artifact",
+          "dependencies": [
+            {
+              "name": "fixture",
+              "version": "1.0.0",
+              "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ],
+          "upgrade": "Preserve existing node ID and local state",
+          "rollback": "Restore previous build with the same identity"
+        },
+        "support": {
+          "state": "current",
+          "eventId": "e726a879-aa61-452a-9084-a4b32496047b",
+          "payloadHash": "c09e87b93f11e6c00605e7a4667bb2d0c05478cf3e4e79c145bc4488ae97e3e9",
+          "revision": 2,
+          "record": {
+            "profile": "galaxy-builder-support/2",
+            "implementation": {
+              "name": "Synthetic worker",
+              "version": "0.1.0"
+            },
+            "galaxySchema": "2",
+            "protocols": [
+              {
+                "name": "MCP",
+                "version": "fixture-version"
+              }
+            ],
+            "sdks": [],
+            "objectActions": [
+              "case.read",
+              "attempt.map",
+              "proof.export"
+            ],
+            "missingCapabilities": [
+              "worker.execute"
+            ],
+            "authorization": "Exact signed consent for selected objects",
+            "limitations": "Synthetic compatibility scenario, not a tested real third-party product"
+          },
+          "testedScopes": [
+            {
+              "action": "case.read",
+              "state": "not-tested",
+              "observations": [],
+              "authority": "scoped-assessor-report; no professional certification"
+            },
+            {
+              "action": "attempt.map",
+              "state": "not-tested",
+              "observations": [],
+              "authority": "scoped-assessor-report; no professional certification"
+            },
+            {
+              "action": "proof.export",
+              "state": "not-tested",
+              "observations": [],
+              "authority": "scoped-assessor-report; no professional certification"
+            }
+          ]
+        },
+        "pack": {
+          "state": "current",
+          "eventId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+          "payloadHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534",
+          "revision": 3,
+          "record": {
+            "profile": "galaxy-worker-pack/1",
+            "name": "Synthetic worker",
+            "version": "0.1.0",
+            "source": "https://builder.example/artifact",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "license": "Fixture licence declaration",
+            "licenseSource": "https://builder.example/license",
+            "dependencies": [
+              {
+                "kind": "mcp",
+                "name": "fixture-mcp",
+                "version": "1",
+                "source": "https://builder.example/mcp",
+                "license": "Fixture"
+              }
+            ],
+            "modelRequirements": "Owner supplied model",
+            "environment": "Fixture environment",
+            "permissions": [
+              {
+                "resource": "Selected task",
+                "purpose": "Read explicitly granted context",
+                "required": true
+              }
+            ],
+            "configurationRequirements": "Link a real separately recorded Configuration before actual work",
+            "capabilities": [
+              "Read selected metadata"
+            ],
+            "changes": "Initial synthetic fixture",
+            "installation": "Use original publisher mechanism",
+            "upgrade": "Choose a new version",
+            "rollback": "Return to prior host configuration",
+            "runtimeLocation": "user-controlled",
+            "automaticActivation": false
+          },
+          "packId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+          "authorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+          "identityMeaning": "typed pack reference within this worker registration",
+          "installation": "not-performed-by-registry",
+          "runtime": "not-started-by-registry",
+          "actualUseCount": null
+        },
+        "reports": [],
+        "delisted": false,
+        "securityIssue": false,
+        "checkedAt": 2000000000,
+        "capabilityVerified": false,
+        "canSubmitReport": false,
+        "disclosure": {
+          "visibility": "Public",
+          "viewers": []
+        },
+        "reportDisclosure": null
+      }
+    }
+  ]
+}

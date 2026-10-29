@@ -32,11 +32,7 @@ func TestRemoteCommunityAnonymousFixedRoutesAndOriginalSchemas(t *testing.T) {
 	id := "00000000-0000-4000-8000-000000000001"
 	subject := "GUID1000000000000000000000000000"
 	cases := []map[string]any{{"name": "galaxy_community_query", "input": map[string]any{"accountId": id, "query": strings.Repeat(" ", 200) + "银河"}}, {"name": "galaxy_community_read", "input": map[string]any{"postId": id}}, {"name": "galaxy_community_read", "input": map[string]any{"postId": id, "versionId": id, "accountId": id}}, {"name": "galaxy_community_replies", "input": map[string]any{"postId": id, "postVersionId": id}}, {"name": "galaxy_community_versions", "input": map[string]any{"postId": id}}, {"name": "galaxy_account_public_profile", "input": map[string]any{"accountId": id}}, {"name": "galaxy_account_public_ids", "input": map[string]any{"accountId": id, "after": subject, "limit": 50}}, {"name": "galaxy_account_public_credentials", "input": map[string]any{"accountId": id}}, {"name": "galaxy_account_public_posts", "input": map[string]any{"accountId": id}}, {"name": "galaxy_account_public_by_id", "input": map[string]any{"subjectId": subject}}}
-	fixture := filepath.Join(t.TempDir(), "cases.json")
-	if e := writeJSON(fixture, cases); e != nil {
-		t.Fatal(e)
-	}
-	original := initializationNode(t, `import {readFile} from 'node:fs/promises';import {nativeHttpDefinitions} from './packages/galaxy-edge-mcp/src/native-v2/tools/http.mjs';const calls=[],api={call:(path,input,options)=>{calls.push({path,input:input??null,options:options??null});return {items:[]}}},tools=nativeHttpDefinitions(api),cases=JSON.parse(await readFile(process.argv[1],'utf8')),normalized=[];for(const c of cases){const parsed=tools[c.name].inputSchema.parse(c.input);normalized.push(parsed);await tools[c.name].run(parsed)}console.log(JSON.stringify({calls,normalized}));`, fixture)
+	original := nativeContractFixture(t)
 	store, e := NewStore(filepath.Join(t.TempDir(), "blank"), "https://community.invalid")
 	if e != nil {
 		t.Fatal(e)

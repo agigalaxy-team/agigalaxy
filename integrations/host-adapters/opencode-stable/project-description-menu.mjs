@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { projectDescriptionSchema } from '../../../packages/galaxy-official/src/shared/discovery-schema.mjs';
+import { projectDescriptionSchema } from '../../../packages/galaxy-contracts/src/discovery-schema.mjs';
 
 // Only edits the containing Profile draft. Publication keeps its existing exact
 // Consent preview and local signature; no workspace inspection occurs here.

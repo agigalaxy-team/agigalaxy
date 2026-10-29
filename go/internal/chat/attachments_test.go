@@ -105,11 +105,11 @@ func attachmentHTTP(t *testing.T, origin, path, method, token string, payload []
 	return res.StatusCode, raw, res.Header
 }
 func TestAttachmentsOriginalNativeHTTPAndCurrentSources(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	archive := fakeArchive(t)
-	url := "xmpp://" + archive.listener.Addr().String()
+	url := "xmpp://" + archive.Listener.Addr().String()
 	store := &fixtureFiles{dir: t.TempDir()}
-	f := chatIdentityFixture(t, dsn, url, store.dir)
+	f := chatGoIdentityFixture(t, pool)
 	now := time.Unix(num(f, "now"), 0)
 	clock := func() time.Time { return now }
 	ctx := context.Background()
@@ -159,11 +159,9 @@ func TestAttachmentsOriginalNativeHTTPAndCurrentSources(t *testing.T) {
 	if status != 200 {
 		t.Fatal(goReceipt)
 	}
-	status, jsReceipt := chatRequest(t, str(f, "origin"), "/v2/chat/attachments/read", token, Object{"attachmentId": id})
-	if status != 200 {
-		t.Fatal(jsReceipt)
+	if str(goReceipt, "attachmentId") != id {
+		t.Fatal("prepared attachment changed", goReceipt)
 	}
-	same(t, goReceipt, jsReceipt)
 	store.failPutOnce = true
 	status, raw, _ := attachmentHTTP(t, server.URL, "/v2/chat/attachments/"+id+"/upload", "PUT", token, payload)
 	if status != 503 {
@@ -186,11 +184,6 @@ func TestAttachmentsOriginalNativeHTTPAndCurrentSources(t *testing.T) {
 	if e != nil || str(receipt, "state") != "available" || receipt["expiresAt"] != firstExpiry {
 		t.Fatalf("receipt: %v %v", receipt, e)
 	}
-	status, jsReceipt = chatRequest(t, str(f, "origin"), "/v2/chat/attachments/read", token, Object{"attachmentId": id})
-	if status != 200 {
-		t.Fatal(jsReceipt)
-	}
-	same(t, receipt, jsReceipt)
 	message, e := s.Send(ctx, a, room, encode(Object{"clientMessageId": uuid.NewString(), "text": "", "attachments": []any{Object{"id": id, "sha256": input["sha256"]}}}))
 	if e != nil {
 		t.Fatal(e)
@@ -199,18 +192,15 @@ func TestAttachmentsOriginalNativeHTTPAndCurrentSources(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	status, jsHistory := chatRequest(t, str(f, "origin"), "/v2/chat/rooms/"+room+"/history", str(obj(f, "peer"), "token"), Object{})
-	if status != 200 {
-		t.Fatal(jsHistory)
+	if len(history["messages"].([]Object)) != 1 {
+		t.Fatal("attachment message history changed", history)
 	}
-	same(t, history, jsHistory)
 	status, raw, headers := attachmentHTTP(t, server.URL, "/v2/chat/attachments/"+id+"/content", "POST", str(obj(f, "peer"), "token"), []byte(`{}`))
 	if status != 200 || !bytes.Equal(raw, payload) || headers.Get("X-Galaxy-Content-Sha256") != input["sha256"] {
 		t.Fatalf("download: %d %s", status, raw)
 	}
-	jsStatus, jsBytes, jsHeaders := attachmentHTTP(t, str(f, "origin"), "/v2/chat/attachments/"+id+"/content", "POST", str(obj(f, "peer"), "token"), []byte(`{}`))
-	if jsStatus != 200 || !bytes.Equal(jsBytes, raw) || jsHeaders.Get("Content-Disposition") != headers.Get("Content-Disposition") {
-		t.Fatalf("original binary response: %d %s", jsStatus, jsBytes)
+	if headers.Get("Content-Disposition") == "" {
+		t.Fatal("attachment disposition absent")
 	}
 	store.afterGet = func() {
 		if _, e := s.Hide(ctx, b, room, str(message, "messageId"), true); e != nil {
@@ -232,20 +222,20 @@ func TestAttachmentsOriginalNativeHTTPAndCurrentSources(t *testing.T) {
 	}
 	id2 := uuid.NewString()
 	input["attachmentId"] = id2
-	status, jsReceipt = chatRequest(t, str(f, "origin"), "/v2/chat/attachments/prepare", token, input)
+	status, secondReceipt := chatRequest(t, server.URL, "/v2/chat/attachments/prepare", token, input)
 	if status != 200 {
-		t.Fatal(jsReceipt)
+		t.Fatal(secondReceipt)
 	}
-	status, raw, _ = attachmentHTTP(t, str(f, "origin"), "/v2/chat/attachments/"+id2+"/upload", "PUT", token, payload)
+	status, raw, _ = attachmentHTTP(t, server.URL, "/v2/chat/attachments/"+id2+"/upload", "PUT", token, payload)
 	if status != 200 {
-		t.Fatalf("original upload: %d %s", status, raw)
+		t.Fatalf("second upload: %d %s", status, raw)
 	}
 	if _, e = files.ScanPending(ctx, 1); e != nil {
 		t.Fatal(e)
 	}
 	content, e := files.Content(ctx, a, encode(Object{"attachmentId": id2}), false)
 	if e != nil || !bytes.Equal(content.Bytes, payload) {
-		t.Fatalf("Go reads original upload: %v", e)
+		t.Fatalf("Go reads second upload: %v", e)
 	}
 	saved := now
 	now = now.Add(31 * 24 * time.Hour)

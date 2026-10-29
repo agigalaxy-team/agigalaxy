@@ -2,7 +2,7 @@ import React,{useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react
 import type {ReactNode} from 'react';
 import {Button} from '@/components/ui/button';
 import {capsuleCaseSources,capsuleRefKey} from './capsule-workspace-client.mjs';
-import {capsuleSourceV2Schema} from "../../../../galaxy-official/src/shared/capsule-v2-schema.mjs";
+import {capsuleSourceV2Schema} from "../../../../galaxy-contracts/src/capsule-v2-schema.mjs";
 import {MemberAvatar,memberName,useMemberNames} from "../../shared/people/conversation-ui";
 import {useChoiceViewLease} from "../../shared/operations/choice-retained-operations";
 import type {CapsuleAuthorClient,CapsuleAuthorLease,CapsuleAuthorRuntime,CapsuleCaseHistory,CapsuleHistoryState,CapsuleInputDraft,CapsulePeople,CapsuleRegisterDraft,CapsuleSourceItem,CapsuleSourceRef} from './capsule-authoring-types';

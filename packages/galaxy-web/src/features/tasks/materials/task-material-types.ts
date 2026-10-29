@@ -1,5 +1,5 @@
 import {z} from 'zod/v4';
-import {taskMaterialDescriptorSchema,taskMaterialPrepareSchema,taskTextSegmentSchema} from "../../../../../galaxy-official/src/shared/task-material-v1-schema.mjs";
+import {taskMaterialDescriptorSchema,taskMaterialPrepareSchema,taskTextSegmentSchema} from "../../../../../galaxy-contracts/src/task-material-v1-schema.mjs";
 
 export const draftTaskTextSchema=z.union([z.string(),z.strictObject({format:z.literal('task-text-v1'),segments:z.array(taskTextSegmentSchema).max(8)})]);
 export const draftMaterialBodySchema=z.strictObject({materialId:z.uuid(),text:z.string().max(10000)});

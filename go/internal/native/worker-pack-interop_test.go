@@ -9,8 +9,6 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -49,7 +47,7 @@ func (w *workerFailureTransport) RoundTrip(r *http.Request) (*http.Response, err
 func TestWorkerPackActualSourcesAndDoubleAbsentRenewal(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	store, meta, transport := workUploadServiceFixtureDatabase(t, dsn)
+	store, meta, transport := nativeGoUploadFixtureDatabase(t, dsn)
 	clock := meta.Now
 	now := func() time.Time { return time.Unix(clock, 0) }
 	devices := &deviceauth.Service{Pool: pool, Endpoint: meta.Configuration.Endpoint, Now: now}
@@ -87,16 +85,7 @@ func TestWorkerPackActualSourcesAndDoubleAbsentRenewal(t *testing.T) {
 	if _, e = r.SetUploadPrivacyReviewed(ctx, UploadPrivacySelection{Level: "work-content"}, &scope); e != nil {
 		t.Fatal(e)
 	}
-	command := exec.Command("node", "--input-type=module", "-e", `import {builderDeclaration} from './packages/galaxy-official/test/builders-workflow.mjs';import {packFor,supportFor} from './packages/galaxy-official/test/builder-support-v2-workflow.mjs';import {configurationExample} from './packages/galaxy-official/test/configuration-v2-workflow.mjs';const declaration=builderDeclaration('worker',process.argv[1]);console.log(JSON.stringify({declaration,support:supportFor(declaration),manifest:packFor(declaration),configuration:configurationExample({subjectId:process.argv[1]})}));`, scope.Owner)
-	command.Dir, _ = filepath.Abs("../../..")
-	raw, e := command.Output()
-	if e != nil {
-		t.Fatal(e)
-	}
-	var shapes map[string]any
-	if protocol.Decode(raw, &shapes) != nil {
-		t.Fatal("source shapes")
-	}
+	shapes := nativeSourceShape(t, "worker-source-v1.json", scope.Owner)
 	submit := func(path, action string, event map[string]any, public bool) map[string]any {
 		t.Helper()
 		objectID := event["operationId"]

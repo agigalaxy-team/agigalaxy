@@ -1,32 +1,20 @@
-# Galaxy Hub 业务服务
+# Galaxy Hub 运行接线与公开资料
 
-本组件实现银河的 Hub 业务 API、Worker、持久数据和权限协调。产品关系见[项目概览](../../docs/technical/architecture.md)及[架构](../../docs/technical/architecture.md)，具体业务接口见[开发 API 目录](../../docs/technical/interfaces.md)。
+业务 API、Worker、Information Worker、迁移和内容发布的现行核心在 [go/](../../go/README.md)。本目录维护公开资料及编译器、部署配置、反代、邮件与模型服务采用、监控、备份恢复和平台辅助接线，不提供第二套 Node 业务服务。
 
-## 职责与边界
-
-服务处理主体和设备控制、内容与社区、账户参与、通信协调、工作事实、来源、资料许可及开放接入。程序完成签名、权限、当前来源检查、稳定操作和恢复；模型整理和参与者报告保留其来源，不自动成为独立验证或目标解决。
-
-PostgreSQL 是业务持久化入口，迁移显式执行；运行 API 不自动修改 schema。API、Worker、migration 与 CMS 使用准确的角色、配置和数据边界。CMS 内容与业务事实分别保存。
-
-`src/`顶层保留启动、服务装配与公共合同。业务实现在accounts、identity、community、tasks、chat及operations等领域；可移植客户端与本机流程在clients，纯合同在shared，数据库和迁移在infrastructure。内部调用直接使用所属实现，不依赖旧根目录转发层；完整定位见主仓库架构正文。
-
-## 启动入口与配置
-
-| 入口 | 用途 |
+| 工作 | 当前入口 |
 |---|---|
-| [server.mjs](src/server.mjs) | API 启动、实际配置加载、权限与路由 |
-| [worker.mjs](src/worker.mjs) | 后台持久任务与业务接续 |
-| [migrate.mjs](src/migrate.mjs) | 显式数据库迁移及所选角色配置 |
-| [database.mjs](src/infrastructure/database.mjs) | 连接、事务和迁移规则 |
-| [runtime-environment.mjs](src/infrastructure/runtime-environment.mjs) | 环境、数据库与签名材料路径约束 |
-| [deploy](deploy) / [scripts](scripts) | Linux、代理、消息、监控、备份及运行工具 |
+| API / Worker / Information Worker | `go/cmd/galaxy-api`、`galaxy-worker`、`galaxy-information-worker` |
+| 显式迁移、生命周期维护、内容发布 | `galaxy-migrate`、`galaxy-lifecycle`、`galaxy-publisher` |
+| JS/Go 共享合同与权限投影 | `packages/galaxy-contracts`、`scripts/go/generate-permission-catalog.mjs` |
+| 浏览器与 Node HTTP SDK | `packages/galaxy-client` |
+| 系统与外部组件接线 | 本目录 `deploy/`；`support/` 仅提供平台辅助，不复制业务服务 |
+| 公开文档 | `public-docs/manifest.json` 与 `scripts/build_public_docs.py` |
 
-当前服务开发要求 Node.js 24.13+。根 setup 安装本组件锁定依赖。服务运行还需要 PostgreSQL、目标环境、受信签名材料、准确 HTTPS 地址及所用业务配置，不是仅运行 npm start 即可得到完整新实例。
+`npm start`、`npm run worker` 等是选择已有 Go 产物的本地启动便利命令，要求明确 `GALAXY_RELEASE_DIRECTORY` 及对应发行/配置引用，不构建、不迁移、不自行启动外部组件。构建使用根 `npm run build:hub`，定向 Go 检查使用 `node scripts/check-go.mjs hub`。Node 依赖服务于保留的平台工具与网页，不代表业务进程仍由 Node 运行。
 
-详见[部署指南](../../docs/operations/deployment.md)、[运行环境](../../docs/technical/development.md)、[Linux 准备](../../docs/operations/deployment.md)。认证、Prosody、文件存储、扫描器和管理 OIDC 按启用功能分别接线。
+平台工具保留真实调用链：`deploy/maintenance-agent/server.mjs` 使用受限本机接口及 Go lifecycle 恢复桥；`deploy/system-settings/` 负责邮件和外部服务配置、探测与读取采用回执。API 和 Worker 的实际采用回执由 Go `internal/systemsettings/adoption.go` 产生，平台端只确认对应版本、进程和已加载配置。`deploy/operations-stack/manage.mjs` 管理备份和隔离恢复；`scripts/verify-attachment-adapters.mjs` 是需要显式配置的对象存储与扫描器检查，`scripts/collect-oci-cost.mjs` 是监控服务的采集入口。公开资料生成器与信任包、治理材料和 Caddy 候选工具也保持独立命令，不启动旧业务服务。
 
-## 验证与运行
+这些 Node 平台入口直接使用 `zod`（配置校验）、`pg`（维护数据库连接）、`@aws-sdk/client-s3`（对象存储恢复/检查）和 `nodemailer`（邮件探测与配置）；共享合同和治理工具各自还通过其所属包使用 `canonicalize`、`jose` 和 `zod`。具体安装与锁文件由对应工作区维护；本说明不将其他已退役业务服务依赖当成平台要求。
 
-按受影响代码使用[开发检查](../../docs/technical/development.md)。隔离 PGlite、合成 OIDC 或测试消息传输只能证明对应范围；实际 PostgreSQL、邮件、Prosody、S3、ClamAV 与模型需相应环境。
-
-健康和就绪读取说明有限状态，不能代替业务流程。来源观察与远程签名的当前合同见[来源观察](../../docs/technical/source-observations.md)，旧执行历史留在仓库外。当前版本差额见[项目状态](../../WORK_STATUS.md)。
+PostgreSQL 的业务角色、迁移角色、CMS、认证、Prosody 与对象存储边界保持分离；公开健康状态不能代替真实业务回执。隔离回归、真实外部检查和平台验收分别说明，当前剩余工作见 [WORK_STATUS](../../WORK_STATUS.md)。架构与运行说明分别见 [architecture](../../docs/technical/architecture.md)、[deployment](../../docs/operations/deployment.md)。

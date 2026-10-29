@@ -3,7 +3,7 @@ import {isDeepStrictEqual} from 'node:util';
 import {createHash,timingSafeEqual} from 'node:crypto';
 import {ModelConfigurationRuntime,readModelConfigurationControl} from './model-configuration.mjs';
 import {compileModelConfiguration,credentialVariable} from './model-configuration-codec.mjs';
-import {modelSettingsDomains} from '../../src/shared/operations-model-settings-schema.mjs';
+import {modelSettingsDomains} from '../../../galaxy-contracts/src/operations-model-settings-schema.mjs';
 import {noSymlinkPath} from '../operations-stack/host.mjs';
 
 const fail=()=>Object.assign(Error('maintenance_current_model_binding_unconfirmed'),{code:'maintenance_current_model_binding_unconfirmed'});

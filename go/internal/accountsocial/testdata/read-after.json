@@ -1,0 +1,151 @@
+{
+  "follows": {
+    "accountId": "571a5718-8761-4fc5-9112-6318037fa8e5",
+    "items": [
+      {
+        "relationship": {
+          "id": "d052aa4b-f875-4c1f-8d8f-399210699166",
+          "targetAccountId": "1e9b6dd5-fc5b-4925-90e6-7b2bb14b02e2",
+          "following": true,
+          "revision": 1,
+          "followedAt": "2026-10-28T18:36:51.000Z",
+          "updatedAt": "2026-10-28T18:36:51.000Z"
+        },
+        "source": {
+          "state": "available",
+          "profile": {
+            "accountId": "1e9b6dd5-fc5b-4925-90e6-7b2bb14b02e2",
+            "uid": "GG37UUL9EVT3",
+            "displayName": "GG37UUL9EVT3",
+            "subjectType": null
+          }
+        }
+      },
+      {
+        "relationship": {
+          "id": "934fabd6-0c38-46d0-9084-865e3424eac3",
+          "targetAccountId": "458624a3-2cd1-4735-a456-ebfed2a53ad3",
+          "following": true,
+          "revision": 1,
+          "followedAt": "2026-10-28T18:36:51.000Z",
+          "updatedAt": "2026-10-28T18:36:51.000Z"
+        },
+        "source": {
+          "state": "available",
+          "profile": {
+            "accountId": "458624a3-2cd1-4735-a456-ebfed2a53ad3",
+            "uid": "GVKA0GKPX1C1",
+            "displayName": "GVKA0GKPX1C1",
+            "subjectType": null
+          }
+        }
+      },
+      {
+        "relationship": {
+          "id": "8da1aea3-92b3-4c73-a0ae-6c35b2ce36cb",
+          "targetAccountId": "3663b1da-d470-4a06-b0b0-b0c4729dffae",
+          "following": true,
+          "revision": 1,
+          "followedAt": "2026-10-28T18:36:51.000Z",
+          "updatedAt": "2026-10-28T18:36:51.000Z"
+        },
+        "source": {
+          "state": "available",
+          "profile": {
+            "accountId": "3663b1da-d470-4a06-b0b0-b0c4729dffae",
+            "uid": "GHS117WZSEC8",
+            "displayName": "GHS117WZSEC8",
+            "subjectType": null
+          }
+        }
+      }
+    ],
+    "nextAfter": null,
+    "checkedAt": 1793212611,
+    "readExpiresAt": 1793212641,
+    "visibility": "Private"
+  },
+  "bookmarks": {
+    "accountId": "571a5718-8761-4fc5-9112-6318037fa8e5",
+    "items": [
+      {
+        "reference": {
+          "kind": "forum-post",
+          "postId": "8d632c80-67d3-8109-8aab-7d2f08a92f7f"
+        },
+        "saved": true,
+        "revision": 1,
+        "id": "aab4a474-ae69-4084-b891-9708f33e5cb0",
+        "savedAt": "2026-10-28T18:36:51.000Z",
+        "source": {
+          "state": "available",
+          "title": "Isolated bookmark source 2",
+          "summary": "Source body stays in the original signed forum ledger 2",
+          "path": "/app/community/posts/8d632c80-67d3-8109-8aab-7d2f08a92f7f",
+          "availableUntil": 1793212626
+        }
+      },
+      {
+        "reference": {
+          "kind": "forum-post",
+          "postId": "717a01c2-82ba-8d5f-b374-b0f3c0998499"
+        },
+        "saved": true,
+        "revision": 1,
+        "id": "5677c695-8aa7-494e-a56d-8f17911bea83",
+        "savedAt": "2026-10-28T18:36:51.000Z",
+        "source": {
+          "state": "available",
+          "title": "Isolated bookmark source 1",
+          "summary": "Source body stays in the original signed forum ledger 1",
+          "path": "/app/community/posts/717a01c2-82ba-8d5f-b374-b0f3c0998499",
+          "availableUntil": 1793212626
+        }
+      },
+      {
+        "reference": {
+          "kind": "forum-post",
+          "postId": "e15f245c-1afe-8490-b058-f21f1a785fba"
+        },
+        "saved": true,
+        "revision": 1,
+        "id": "5089cae1-f25a-4527-8de4-e4966f4643bb",
+        "savedAt": "2026-10-28T18:36:51.000Z",
+        "source": {
+          "state": "available",
+          "title": "Isolated bookmark source 0",
+          "summary": "Source body stays in the original signed forum ledger 0",
+          "path": "/app/community/posts/e15f245c-1afe-8490-b058-f21f1a785fba",
+          "availableUntil": 1793212626
+        }
+      }
+    ],
+    "nextAfter": null,
+    "checkedAt": 1793212611,
+    "visibility": "Private"
+  },
+  "personal": {
+    "items": [
+      {
+        "reference": {
+          "kind": "forum-post",
+          "postId": "e15f245c-1afe-8490-b058-f21f1a785fba"
+        },
+        "saved": true,
+        "revision": 1,
+        "id": "b99c8c3e-538a-4838-920a-ff938b653547",
+        "savedAt": "2026-10-28T18:36:51.000Z",
+        "source": {
+          "state": "available",
+          "title": "Isolated bookmark source 0",
+          "summary": "Source body stays in the original signed forum ledger 0",
+          "path": "/app/community/posts/e15f245c-1afe-8490-b058-f21f1a785fba",
+          "availableUntil": 1793212626
+        }
+      }
+    ],
+    "nextAfter": null,
+    "checkedAt": 1793212611,
+    "visibility": "Private"
+  }
+}

@@ -13,36 +13,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 )
 
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/context/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	raw, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original Context %s: %v %s", mode, e, stderr.String())
-	}
-	var out Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if json.Unmarshal(line, &out) == nil && out != nil {
-			return out
-		}
-	}
-	t.Fatal("fixture result")
-	return nil
-}
 func same(t *testing.T, a, b any) {
 	t.Helper()
 	var x, y any
@@ -56,11 +31,8 @@ func same(t *testing.T, a, b any) {
 type fixtureGrant struct{ Payload, Authorization, Accept, AcceptGrant, Decline, DeclineGrant, Revoke, RevokeGrant Object }
 
 func TestOriginalContextHTTPCurrentTaskScopeAndReceipts(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "context-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
 	var f struct {
 		Endpoint                                        string
 		Clock                                           int64
@@ -70,9 +42,13 @@ func TestOriginalContextHTTPCurrentTaskScopeAndReceipts(t *testing.T) {
 		Grants, Legacy                                  []fixtureGrant
 		ScopeGrant, ScopeConfirmGrant, LegacyScopeGrant Object
 	}
-	if e := json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
+	setupContext(t, owner, &f)
+	var reads []struct {
+		Input   Object   `json:"input"`
+		Results []Object `json:"results"`
 	}
+	fixtureJSON(t, "read", &reads)
+	readIndex := 0
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -129,7 +105,13 @@ func TestOriginalContextHTTPCurrentTaskScopeAndReceipts(t *testing.T) {
 	}
 	compare := func(queries []Object) {
 		t.Helper()
-		expected := list(node(t, dsn, "read", path, Object{"now": clock, "queries": queries})["results"])
+		if readIndex >= len(reads) {
+			t.Fatal("missing captured context read")
+		}
+		entry := reads[readIndex]
+		readIndex++
+		same(t, Object{"now": clock, "queries": queries}, entry.Input)
+		expected := entry.Results
 		for i, q := range queries {
 			a := actors[text(q, "actor")]
 			v2 := q["v2"] == true
@@ -155,7 +137,7 @@ func TestOriginalContextHTTPCurrentTaskScopeAndReceipts(t *testing.T) {
 					got, e = s.ReceiptV1(ctx, a, encode(q["input"]))
 				}
 			}
-			want := obj(expected[i])
+			want := expected[i]
 			if e != nil {
 				if fault.Code(e) != want["error"] || float64(fault.Status(e)) != want["status"] {
 					t.Fatalf("query%d %v Go=%v JS=%v", i, q, e, want)
@@ -240,6 +222,9 @@ func TestOriginalContextHTTPCurrentTaskScopeAndReceipts(t *testing.T) {
 	compare([]Object{get("recipient", false, f.Legacy[0].Payload["id"])})
 	must("owner", "POST", "/v1/context-grants/"+text(f.Legacy[0].Payload, "id")+"/revoke", Object{})
 	compare([]Object{Object{"actor": "recipient", "kind": "receipt", "input": Object{"kind": "accept", "grantId": f.Legacy[0].Payload["id"], "eventId": f.Legacy[0].Accept["id"], "payloadHash": identity.Digest([]byte(text(f.Legacy[0].AcceptGrant, "payloadJson")))}}})
+	if readIndex != len(reads) {
+		t.Fatalf("unconsumed captured context reads: %d", len(reads)-readIndex)
+	}
 	var leaked bool
 	if e = owner.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM audit_events WHERE scope='context' AND row_to_json(audit_events)::text LIKE '%Explicit original selected material%')`).Scan(&leaked); e != nil || leaked {
 		t.Fatalf("audit copied selected text %v %v", leaked, e)

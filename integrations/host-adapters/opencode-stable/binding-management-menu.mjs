@@ -24,7 +24,7 @@ export function createBindingManagementMenu({controller,select,prompt,info,langu
       ],back),back);
   }
   function detail(item,back){
-    menu(`${item.installationId}\n${item.bindingId}\n${stateName(item.state)}\n${label('建立','Created')}: ${item.createdAt}\n${label('到期','Expires')}: ${item.expiresAt}\n${label('撤销','Revoked')}: ${item.revokedAt??'-'}\nScopes: ${item.scopes.join(', ')}\n${label('身份私钥泄露时，撤销绑定不能阻止持钥者重新绑定；当前不支持保留原ID换钥或找回。','Revoking a binding cannot prevent someone holding the identity key from binding again. Same-ID key rotation and recovery are not supported.')}`,[
+    menu(`${item.installationId}\n${item.bindingId}\n${stateName(item.state)}\n${label('建立','Created')}: ${item.createdAt}\n${label('到期','Expires')}: ${item.expiresAt}\n${label('撤销','Revoked')}: ${item.revokedAt??'-'}\nScopes: ${item.scopes.join(', ')}\n${label('撤销绑定只结束此绑定；同一身份的设备撤销或恢复码恢复另行由本人确认。','Revoking a binding ends only that binding. Device revocation or same-identity recovery requires separate personal confirmation.')}`,[
       ...(item.state!=='revoked'?[[label('预览撤销此绑定','Preview revoking this binding'),()=>revoke(item.bindingId,back)]]:[]),
       [label('查看此安装实例的全部绑定','List bindings for this installation'),()=>open({installationId:item.installationId})],
       [label('返回列表','Back to list'),back],

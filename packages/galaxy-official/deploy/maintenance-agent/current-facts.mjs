@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile,lstat} from 'node:fs/promises';
-import {currentRecoveryFactsCaptureSql,reconcileCurrentRecoveryFacts} from '../../src/operations/maintenance-recovery-facts.mjs';
+import {currentRecoveryFactsCaptureSql,reconcileCurrentRecoveryFacts} from './recovery-facts.mjs';
 import {noSymlinkPath,postgresSqlArguments,runCommand} from '../operations-stack/host.mjs';
 
 const fail=code=>Object.assign(Error(code),{code});

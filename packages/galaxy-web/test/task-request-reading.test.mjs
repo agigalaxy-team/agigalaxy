@@ -5,8 +5,8 @@ import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {tsImport} from 'tsx/esm/api';
 import {registerHooks} from 'node:module';
-import {assistanceRequestSchema} from '../../galaxy-official/src/shared/assistance-schema.mjs';
-import {taskRequestV2Schema} from '../../galaxy-official/src/shared/task-schema-v2.mjs';
+import {assistanceRequestSchema} from '../../galaxy-contracts/src/assistance-schema.mjs';
+import {taskRequestV2Schema} from '../../galaxy-contracts/src/task-schema-v2.mjs';
 // Plain Node supports erased .ts types, but JSX needs the installed compiler.
 // Load the actual component in this scoped import; keep the rendering and all
 // original v1/v2 assertions on the product implementation.

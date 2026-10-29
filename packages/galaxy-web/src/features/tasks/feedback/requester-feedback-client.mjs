@@ -1,5 +1,5 @@
-import {participationEventV2Schema} from "../../../../../galaxy-official/src/shared/task-schema-v2.mjs";
-import {equalJson,sha256Hex} from "../../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {participationEventV2Schema} from "../../../../../galaxy-contracts/src/task-schema-v2.mjs";
+import {equalJson,sha256Hex} from "../../../../../galaxy-contracts/src/web-primitives.mjs";
 
 export const requesterFeedbackAvailable=(task,participant,subjectId)=>participant.subjectId===subjectId
   && Number.isSafeInteger(participant.confirmedAt)

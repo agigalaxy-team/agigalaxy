@@ -6,19 +6,21 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"reflect"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/objectremoval"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/publicationfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,22 +29,64 @@ import (
 type accountAuthority struct{}
 
 func (accountAuthority) Account(context.Context, pgx.Tx, string, string) error { return nil }
-func originalNode(t *testing.T, dsn string, script bool, args ...string) []byte {
+func forumFixture(t *testing.T, dsn string, args ...string) []byte {
 	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	command := []string{}
-	if script {
-		command = append(command, "--input-type=module", "-e")
-	} else {
-		command = append(command, filepath.Join(root, "scripts/go/community-interop.mjs"))
+	if len(args) == 0 {
+		t.Fatal("fixture mode required")
 	}
-	command = append(command, args...)
-	cmd := exec.Command("node", command...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	raw, e := cmd.CombinedOutput()
+	if args[0] == "bind" {
+		var p community.Object
+		if len(args) != 4 || json.Unmarshal([]byte(args[3]), &p) != nil || !community.BindForumIDs(args[1], args[2], p) {
+			t.Fatal("invalid forum locator fixture")
+		}
+		raw, e := json.Marshal(p)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return raw
+	}
+	u, e := url.Parse(dsn)
+	if e != nil || u.Hostname() != "127.0.0.1" || !strings.HasPrefix(u.Path, "/galaxy_go_test_") || args[0] != "setup" {
+		t.Fatal("isolated community database required")
+	}
+	ctx := context.Background()
+	pool, e := pgxpool.New(ctx, dsn)
 	if e != nil {
-		t.Fatalf("original isolated fixture %v %s", e, raw)
+		t.Fatal(e)
+	}
+	defer pool.Close()
+	if _, e = databaseschema.Migrate(ctx, pool, []string{"api", "worker"}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = postgres.InTx(ctx, pool, func(tx pgx.Tx) (bool, error) {
+		if e := objectremoval.MigrateWithin(ctx, tx); e != nil {
+			return false, e
+		}
+		return true, objectremoval.ProvisionRolesWithin(ctx, tx)
+	}); e != nil {
+		t.Fatal(e)
+	}
+	endpoint := "https://go-community.example.invalid"
+	now := func() time.Time { return time.Unix(2000000000, 0) }
+	f := publicationfixture.Prepare(t, pool, endpoint, now)
+	f["endpoint"] = endpoint
+	svc := &accounts.Service{Endpoint: endpoint, Now: now}
+	second, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (accounts.Account, error) {
+		a, e := svc.EnsureAccountWithin(ctx, tx, accounts.VerifiedIdentity{Issuer: "https://login.example.invalid", ExternalSubject: uuid.NewString(), VerificationMethod: "external-account", VerifiedAt: now()})
+		if e != nil {
+			return a, e
+		}
+		kind := "person"
+		_, e = svc.EnsureProfileWithin(ctx, tx, a.ID, &kind)
+		return a, e
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+	f["accounts"] = append(f["accounts"].([]any), second.ID)
+	raw, e := json.Marshal(f)
+	if e != nil {
+		t.Fatal(e)
 	}
 	return raw
 }
@@ -50,24 +94,22 @@ func TestOriginalPublicSourceAndActualIndexSearchUnderWorkerRole(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
 	defer cancel()
-	var fixture Object
-	if e := decode(originalNode(t, dsn, false, "setup"), &fixture); e != nil {
+	if _, e := databaseschema.Migrate(ctx, pool, []string{"api", "worker"}); e != nil {
 		t.Fatal(e)
 	}
-	endpoint := str(fixture, "endpoint")
-	root, _ := filepath.Abs("../../..")
-	for _, name := range []string{"api-role.sql", "worker-role.sql"} {
-		raw, e := os.ReadFile(filepath.Join(root, "packages/galaxy-official/src/infrastructure", name))
-		if e != nil {
-			t.Fatal(e)
+	if _, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (bool, error) {
+		if e := objectremoval.MigrateWithin(ctx, tx); e != nil {
+			return false, e
 		}
-		if _, e = pool.Exec(ctx, string(raw)); e != nil {
-			t.Fatal(e)
-		}
+		return true, objectremoval.ProvisionRolesWithin(ctx, tx)
+	}); e != nil {
+		t.Fatal(e)
 	}
+	endpoint := "https://go-community.example.invalid"
+	now := func() time.Time { return time.Unix(2000000000, 0) }
+	fixture := publicationfixture.Prepare(t, pool, endpoint, now)
 	account := fixture["accounts"].([]any)[0].(string)
 	payload := object(fixture["payload"])
-	now := func() time.Time { return time.Unix(2_000_000_000, 0) }
 	forum := &community.Service{Pool: pool, Endpoint: endpoint, Authority: accountAuthority{}, Now: now}
 	if _, e := forum.Publish(ctx, account, jsonString(payload)); e != nil {
 		t.Fatal("real forum publication", e)
@@ -91,20 +133,9 @@ func TestOriginalPublicSourceAndActualIndexSearchUnderWorkerRole(t *testing.T) {
 	if e != nil || document == nil {
 		t.Fatalf("actual restricted source: %v %+v", e, document)
 	}
-	script := `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import{createDiscoveryReadOnlySource}from './packages/galaxy-official/src/discovery-runtime/public-content-source.mjs';const db=new pg.Pool({connectionString:process.env.GALAXY_GO_TEST_DATABASE_URL});try{const s=createDiscoveryReadOnlySource({db,endpoint:process.argv[1],now:()=>2000000000});const d=await s.load(JSON.parse(process.argv[2]));console.log(JSON.stringify({document:d,view:s.view(d)}))}finally{await db.end()}`
-	var original Object
-	if e = decode(originalNode(t, dsn, true, script, endpoint, jsonString(reference)), &original); e != nil {
-		t.Fatal(e)
-	}
-	var got Object
-	_ = decode([]byte(jsonString(document)), &got)
-	if !reflect.DeepEqual(got, object(original["document"])) {
-		t.Fatalf("source projection/hash differs Go %s JS %s", jsonString(got), jsonString(original["document"]))
-	}
-	var view Object
-	_ = decode([]byte(jsonString(View(document))), &view)
-	if !reflect.DeepEqual(view, object(original["view"])) {
-		t.Fatalf("view differs Go %s JS %s", jsonString(view), jsonString(original["view"]))
+	view := View(document)
+	if document.SourceID != reference.ID || document.Version != str(payload, "versionId") || document.Title != str(payload, "title") || document.Body != str(payload, "body") || document.IndexVersion == "" || view["source"] != "current-public-community" || view["id"] != reference.ID {
+		t.Fatalf("current qualified source: %+v %v", document, view)
 	}
 	var mu sync.Mutex
 	paths := []string{}

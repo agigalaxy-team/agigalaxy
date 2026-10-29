@@ -8,18 +8,13 @@ import { createNativeA2aHostV2 } from '../src/hosts/host-flow-v2.mjs';
 import { createA2aFactsV2 } from '../src/facts/facts-v2.mjs';
 import { discoverA2aCard } from '../src/protocol/card-discovery.mjs';
 import { hash } from '../src/storage/journal.mjs';
-import { serviceFixture } from '../../galaxy-official/test/service-fixture.mjs';
-import { createApi } from '../../galaxy-official/src/http.mjs';
+import { goDomainFixture } from './go-domain-fixture.mjs';
 import { pythonPeer } from './python-peer.mjs';
 
 test('official Python 1.1.2 HelloWorld → actual HTTP v2 Attempt/Result; original unknown operations survive restart',
   { skip: !process.env.GALAXY_A2A_PYTHON, timeout: 120000 }, async t => {
   const peer = await pythonPeer(process.env.GALAXY_A2A_PYTHON); t.after(() => peer.close());
-  const f = await serviceFixture(); t.after(() => f.db.close());
-  const api = createApi({ ...f, rateLimit: 300, failureAudit: async () => 'stored' });
-  await new Promise(r => api.listen(0, '127.0.0.1', r));
-  t.after(() => new Promise(r => { api.close(r); api.closeAllConnections(); }));
-  const local = 'http://127.0.0.1:' + api.address().port;
+  const {owner:f,origin:local}=await goDomainFixture(t);
   let loseResult = true, resultWrites = 0, current = f.actor.subjectId;
   let forbidCaseRead = false, receiptUnavailable = false, switchReceiptOwner = false;
   let generation = 1, switchReceiptGeneration = false, switchPeerGeneration = false, authorizationMutation;

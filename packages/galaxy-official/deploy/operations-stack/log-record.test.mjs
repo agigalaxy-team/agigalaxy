@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeOperationalRecord, safeOperationalPath } from './log-record.mjs';
 import { createDockerLogDecoder, dockerLogArguments } from './component-logs.mjs';
-import { runtimeDiagnosticFields } from '../../src/shared/runtime-diagnostics.mjs';
+import { runtimeDiagnosticFields } from '../../../galaxy-client/src/node/runtime-diagnostics.mjs';
 import { adminLog } from '../../../../apps/galaxy-admin/src/lib/runtime-log.mjs';
 
 test('safe projection retains operational facts without request, credential, code or private content', () => {

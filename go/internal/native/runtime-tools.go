@@ -11,6 +11,13 @@ import (
 )
 
 func registerRuntimeTools(server *mcp.Server, tools *toolRuntime, runtime *Runtime) {
+	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_discovery", Description: "Explicitly read and verify the selected service's public Manifest and root-managed keyring, persisting its public trust state. This does not connect or grant authorization.", InputSchema: objectSchema(map[string]any{}), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}}, "native_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		result, e := runtime.Discover(ctx)
+		if e != nil {
+			return toolError(e)
+		}
+		return toolResult(result)
+	})
 	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_status", Description: "Read current local identity and restore only its existing saved connection choice. Does not initialize, upload or start a model.", InputSchema: objectSchema(map[string]any{}), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}}, "native_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		result, e := runtime.Status(ctx, RuntimeStatusOptions{RestoreSelected: true})
 		if e != nil {

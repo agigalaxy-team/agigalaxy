@@ -1,4 +1,4 @@
-import {accountAvatarKey} from "../../../../../packages/galaxy-official/src/shared/account-profile-presentation.mjs";
+import {accountAvatarKey} from "../../../../../packages/galaxy-contracts/src/account-profile-presentation.mjs";
 import {registeredProfileDraftFields} from './registered-users-view-model';
 import type {RegisteredCommandKind,RegisteredCommandReceipt,RegisteredCommandResult,RegisteredEffect,RegisteredUserDetail} from "../../components/accounts/registered-users-types";
 

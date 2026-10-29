@@ -1,5 +1,5 @@
-import { taskEnvelopeV2Schema } from "../../../../../galaxy-official/src/shared/task-schema-v2.mjs";
-import { sha256Hex } from "../../../../../galaxy-official/src/shared/web-primitives.mjs";
+import { taskEnvelopeV2Schema } from "../../../../../galaxy-contracts/src/task-schema-v2.mjs";
+import { sha256Hex } from "../../../../../galaxy-contracts/src/web-primitives.mjs";
 const guid = (value) => /^GUID[A-Z0-9]{28}$/.test(value ?? '');
 
 // Retains original event IDs and monotone progress in the shared local batch.

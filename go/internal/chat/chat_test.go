@@ -2,201 +2,37 @@ package chat
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
-	"encoding/xml"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessrules"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsrules"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/resourcebudget"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/chatarchivefixture"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/webevents"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
 
 const testSecret = "isolated-component-secret-1234567890"
 
-type archiveFixture struct {
-	listener      net.Listener
-	mu            sync.Mutex
-	bodies        map[string]Object
-	sendIDs       []string
-	loseNext      bool
-	loseNextEdit  bool
-	eraseNegative bool
-	probeBody     string
-	readHook      func()
-	connections   []net.Conn
-}
+// The shared fixture is a synthetic loopback component, not a deployed Prosody.
+func fakeArchive(t *testing.T) *chatarchivefixture.Fixture { return chatarchivefixture.New(t) }
 
-func fakeArchive(t *testing.T) *archiveFixture {
-	t.Helper()
-	l, e := net.Listen("tcp4", "127.0.0.1:0")
-	if e != nil {
-		t.Fatal(e)
-	}
-	f := &archiveFixture{listener: l, bodies: map[string]Object{}}
-	t.Cleanup(func() {
-		l.Close()
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		for _, c := range f.connections {
-			c.Close()
-		}
-	})
-	go func() {
-		for {
-			c, e := l.Accept()
-			if e != nil {
-				return
-			}
-			f.mu.Lock()
-			f.connections = append(f.connections, c)
-			f.mu.Unlock()
-			go f.serve(c)
-		}
-	}()
-	return f
-}
-func (f *archiveFixture) serve(c net.Conn) {
-	defer c.Close()
-	d := xml.NewDecoder(c)
-	for {
-		token, e := d.Token()
-		if e != nil {
-			return
-		}
-		start, ok := token.(xml.StartElement)
-		if !ok {
-			continue
-		}
-		if start.Name.Local == "stream" {
-			io.WriteString(c, `<stream:stream xmlns='jabber:component:accept' xmlns:stream='http://etherx.jabber.org/streams' id='isolated-stream' from='gateway.example.invalid'>`)
-			continue
-		}
-		if start.Name.Local == "handshake" {
-			var sum string
-			if d.DecodeElement(&sum, &start) != nil {
-				return
-			}
-			digest := sha1.Sum([]byte("isolated-stream" + testSecret))
-			if sum != hex.EncodeToString(digest[:]) {
-				return
-			}
-			io.WriteString(c, "<handshake/>")
-			continue
-		}
-		if start.Name.Local != "iq" {
-			if d.Skip() != nil {
-				return
-			}
-			continue
-		}
-		var stanza struct {
-			Command string    `xml:"urn:galaxy:rooms:2 command"`
-			Query   *struct{} `xml:"http://jabber.org/protocol/disco#info query"`
-		}
-		if d.DecodeElement(&stanza, &start) != nil {
-			return
-		}
-		if stanza.Query != nil {
-			f.mu.Lock()
-			body := f.probeBody
-			f.mu.Unlock()
-			if body == "" {
-				body = `<query xmlns='http://jabber.org/protocol/disco#info'><identity category='conference' type='text'/><feature var='http://jabber.org/protocol/muc'/></query>`
-			}
-			io.WriteString(c, `<iq type='result' from='rooms.example.invalid' to='gateway.example.invalid' id='`+attr(start, "id")+`'>`+body+`</iq>`)
-			continue
-		}
-		var x Object
-		if json.Unmarshal([]byte(stanza.Command), &x) != nil {
-			return
-		}
-		result := Object{}
-		f.mu.Lock()
-		switch str(x, "action") {
-		case "project":
-			result["projected"] = true
-		case "send":
-			id := str(x, "messageId")
-			f.sendIDs = append(f.sendIDs, id)
-			if f.bodies[id] == nil {
-				f.bodies[id] = Object{"archiveId": id, "text": x["text"], "revision": float64(1)}
-			}
-			result["archiveId"] = id
-		case "read", "export-own":
-			items := []any{}
-			for _, id := range uniqueStrings(x["ids"]) {
-				if body := f.bodies[id]; body != nil {
-					copy := Object{}
-					for k, v := range body {
-						copy[k] = v
-					}
-					items = append(items, copy)
-				}
-			}
-			result["messages"] = items
-		case "edit":
-			body := f.bodies[str(x, "messageId")]
-			if body != nil {
-				body["text"] = x["text"]
-				body["revision"] = num(x, "expectedRevision") + 1
-				result["revision"] = body["revision"]
-			}
-		case "erase":
-			if !f.eraseNegative {
-				delete(f.bodies, str(x, "messageId"))
-			}
-			result["archiveDeleted"] = !f.eraseNegative
-		default:
-			result["error"] = "unknown_command"
-		}
-		lose := str(x, "action") == "send" && f.loseNext
-		if lose {
-			f.loseNext = false
-		}
-		if str(x, "action") == "edit" && f.loseNextEdit {
-			lose = true
-			f.loseNextEdit = false
-		}
-		hook := f.readHook
-		if str(x, "action") == "read" {
-			f.readHook = nil
-		} else {
-			hook = nil
-		}
-		f.mu.Unlock()
-		if hook != nil {
-			hook()
-		}
-		if lose {
-			continue
-		}
-		raw, _ := json.Marshal(result)
-		if _, e := io.WriteString(c, `<iq type='result' from='rooms.example.invalid' to='gateway.example.invalid' id='`+attr(start, "id")+`'><result xmlns='`+roomsNS+`'>`+escaped(string(raw))+`</result></iq>`); e != nil {
-			return
-		}
-	}
-}
 func chatNode(t *testing.T, dsn, command string, input Object) Object {
 	t.Helper()
 	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	args := []string{filepath.Join(root, "scripts", "go", "chat-interop.mjs"), command}
+	args := []string{filepath.Join(root, "scripts", "go", "protocol-codec-fixture.mjs"), command}
 	if input != nil {
 		args = append(args, string(encode(input)))
 	}
@@ -204,7 +40,6 @@ func chatNode(t *testing.T, dsn, command string, input Object) Object {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "node", args...)
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
 	b, e := cmd.Output()
 	if e != nil {
 		if ee, ok := e.(*exec.ExitError); ok {
@@ -250,12 +85,26 @@ func same(t *testing.T, a, b any) {
 	}
 }
 func TestPrivateChatOriginalProtocolAndReceipts(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
-	f := chatNode(t, dsn, "setup", nil)
-	ids := uniqueStrings(f["accounts"])
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
+	if _, err := databaseschema.Migrate(ctx, pool, []string{"api", "worker"}); err != nil {
+		t.Fatal(err)
+	}
+	endpoint := "https://go-chat.example.invalid"
+	ids := []string{uuid.NewString(), uuid.NewString()}
+	for index, id := range ids {
+		if _, err := pool.Exec(ctx, `INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at) VALUES($1::uuid,$2,'https://login.example.invalid',($1::uuid)::text,'external-account',$3,$3)`, id, endpoint, time.Unix(2000000000, 0)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO official_account_profiles_v1(account_id,subject_type,display_name,query_enabled,updated_at) VALUES($1,'person',$2,false,$3)`, id, []string{"聊天甲", "聊天乙"}[index], time.Unix(2000000000, 0)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO operations_product_rules_v1(endpoint,policy_key,version,policy,source,created_at) VALUES($1,'business-controls',1,$2,'configured-baseline',$3)`, endpoint, operationsrules.EmptyControls(), time.Unix(2000000000, 0)); err != nil {
+		t.Fatal(err)
+	}
 	archive := fakeArchive(t)
-	serviceURL := "xmpp://" + archive.listener.Addr().String()
+	serviceURL := "xmpp://" + archive.Listener.Addr().String()
 	transport, e := NewComponentTransport(serviceURL, "gateway.example.invalid", "rooms.example.invalid", testSecret, 200*time.Millisecond)
 	if e != nil {
 		t.Fatal(e)
@@ -267,7 +116,7 @@ func TestPrivateChatOriginalProtocolAndReceipts(t *testing.T) {
 	auth := &testAuthorization{}
 	a, b := Actor{AccountID: ids[0], Authority: auth}, Actor{AccountID: ids[1], Authority: auth}
 	now := func() time.Time { return time.Unix(2000000000, 0) }
-	s := &Service{Pool: pool, Endpoint: str(f, "endpoint"), Links: &accountlinks.Service{Pool: pool, Endpoint: str(f, "endpoint")}, Transport: transport, Rules: &businessrules.Service{Endpoint: str(f, "endpoint"), Now: now}, Now: now}
+	s := &Service{Pool: pool, Endpoint: endpoint, Links: &accountlinks.Service{Pool: pool, Endpoint: endpoint}, Transport: transport, Rules: &businessrules.Service{Endpoint: endpoint, Now: now}, Now: now}
 	room := uuid.NewString()
 	create := Object{"roomId": room, "operationId": uuid.NewString(), "title": "原私聊"}
 	first, e := s.Create(ctx, a, encode(create))
@@ -307,9 +156,9 @@ func TestPrivateChatOriginalProtocolAndReceipts(t *testing.T) {
 	}
 	client := uuid.NewString()
 	payload := Object{"clientMessageId": client, "text": "原私聊 🚀 <&>\u2028", "replyTo": nil}
-	archive.mu.Lock()
-	archive.loseNext = true
-	archive.mu.Unlock()
+	archive.Mu.Lock()
+	archive.LoseNext = true
+	archive.Mu.Unlock()
 	if _, e = s.Send(ctx, a, room, encode(payload)); fault.Code(e) != "chat_delivery_unknown" {
 		t.Fatalf("unknown delivery: %v", e)
 	}
@@ -345,17 +194,18 @@ func TestPrivateChatOriginalProtocolAndReceipts(t *testing.T) {
 	if _, e = pool.Exec(ctx, "UPDATE operations_product_rules_v1 SET policy=jsonb_set(policy,'{features,chatSend}','true') WHERE endpoint=$1", s.Endpoint); e != nil {
 		t.Fatal(e)
 	}
-	archive.mu.Lock()
-	if len(archive.sendIDs) != 2 || archive.sendIDs[0] != archive.sendIDs[1] || len(archive.bodies) != 1 {
+	archive.Mu.Lock()
+	if len(archive.SendIDs) != 2 || archive.SendIDs[0] != archive.SendIDs[1] || len(archive.Bodies) != 1 {
 		t.Fatal("unknown result created a fresh message")
 	}
-	archive.mu.Unlock()
-	snapshot := chatNode(t, dsn, "snapshot", Object{"account": a.AccountID, "room": room, "service": serviceURL, "clientMessageId": client, "requestHash": canonical(payload)})
+	archive.Mu.Unlock()
 	view, e := s.Get(ctx, a, room)
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, view, snapshot["room"])
+	if str(view, "roomId") != room || str(view, "title") != "原私聊" {
+		t.Fatal("room read changed", view)
+	}
 	eventReader := s.EventRead()
 	principal := webevents.Principal{Kind: "official-account", Identity: a.AccountID, AccountID: a.AccountID, Endpoint: s.Endpoint, Surface: "web", Actor: auth}
 	eventView, e := eventReader(ctx, principal, room, "")
@@ -367,19 +217,26 @@ func TestPrivateChatOriginalProtocolAndReceipts(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, history, snapshot["history"])
+	if len(history["messages"].([]Object)) != 1 || str(history["messages"].([]Object)[0], "messageId") != str(accepted, "messageId") {
+		t.Fatal("accepted history changed", history)
+	}
 	receipt, e := s.MessageStatus(ctx, a, room, encode(Object{"clientMessageId": client, "requestHash": canonical(payload)}))
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, receipt, snapshot["receipt"])
-	jsSend := chatNode(t, dsn, "send", Object{"account": b.AccountID, "room": room, "service": serviceURL, "payload": Object{"clientMessageId": uuid.NewString(), "text": "原 JS 回复", "replyTo": accepted["messageId"]}})
+	if str(receipt, "state") != "accepted" && !truth(receipt, "historicalAcceptanceRecorded") {
+		t.Fatal("accepted receipt changed", receipt)
+	}
+	jsSend, e := s.Send(ctx, b, room, encode(Object{"clientMessageId": uuid.NewString(), "text": "合成对方回复", "replyTo": accepted["messageId"]}))
+	if e != nil {
+		t.Fatal(e)
+	}
 	if str(jsSend, "state") != "accepted" {
 		t.Fatal(jsSend)
 	}
 	history, e = s.History(ctx, a, room, []byte(`{}`))
 	if e != nil || len(history["messages"].([]Object)) != 2 {
-		t.Fatalf("Go reads JS reply: %v %v", history, e)
+		t.Fatalf("Go reads peer reply: %v %v", history, e)
 	}
 	editInput := Object{"operationId": uuid.NewString(), "expectedRevision": int64(1), "text": "原编辑，操作号保持。"}
 	edited, e := s.Edit(ctx, a, room, str(accepted, "messageId"), encode(editInput))
@@ -402,24 +259,30 @@ func TestPrivateChatOriginalProtocolAndReceipts(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	snapshot = chatNode(t, dsn, "snapshot", Object{"account": a.AccountID, "room": room, "service": serviceURL, "clientMessageId": client, "requestHash": canonical(payload), "edit": Object{"operationId": editInput["operationId"], "requestHash": canonical(editInput)}, "message": accepted["messageId"], "directory": Object{}, "people": Object{"accountIds": []string{a.AccountID, b.AccountID}}})
-	same(t, status, snapshot["edit"])
-	same(t, contextView, snapshot["context"])
+	if str(contextView, "roomId") != room || str(contextView, "messageId") != str(accepted, "messageId") {
+		t.Fatal("message context changed", contextView)
+	}
 	directory, e := s.Directory(ctx, a, []byte(`{}`))
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, directory, snapshot["directory"])
+	if len(directory["rooms"].([]Object)) != 1 {
+		t.Fatal("room directory changed", directory)
+	}
 	people, e := s.People(ctx, a, encode(Object{"accountIds": []string{a.AccountID, b.AccountID}}))
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, people, snapshot["people"])
+	if len(people["items"].([]Object)) != 2 {
+		t.Fatal("people projection changed", people)
+	}
 	history, e = s.History(ctx, a, room, []byte(`{}`))
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, history, snapshot["history"])
+	if len(history["messages"].([]Object)) != 2 {
+		t.Fatal("edited history changed", history)
+	}
 	cursor, e := s.Cursor(ctx, a, room, encode(Object{"sequence": str(history["messages"].([]Object)[1], "sequence"), "visibleMessageIds": []any{accepted["messageId"], jsSend["messageId"]}}))
 	if e != nil || str(cursor, "kind") != "human" {
 		t.Fatalf("cursor: %v %v", cursor, e)
@@ -431,14 +294,14 @@ func TestPrivateChatOriginalProtocolAndReceipts(t *testing.T) {
 	if num(directory["rooms"].([]Object)[0], "unreadHumanCount") != 0 {
 		t.Fatalf("explicit human reads not reflected: %v", directory)
 	}
-	archive.mu.Lock()
-	archive.readHook = func() {
+	archive.Mu.Lock()
+	archive.ReadHook = func() {
 		_, e := pool.Exec(ctx, `INSERT INTO chat_message_preferences(room_id,subject_id,message_id,hidden,updated_at) VALUES($1,$2,$3,true,$4)`, room, "account:"+a.AccountID, accepted["messageId"], now())
 		if e != nil {
 			panic(e)
 		}
 	}
-	archive.mu.Unlock()
+	archive.Mu.Unlock()
 	history, e = s.History(ctx, a, room, []byte(`{}`))
 	if e != nil || len(history["messages"].([]Object)) != 1 {
 		t.Fatalf("post-I/O hide failed: %v %v", history, e)

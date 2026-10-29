@@ -2,9 +2,7 @@ package accountlinks
 
 import (
 	"context"
-	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -16,18 +14,7 @@ import (
 func TestMappingLockKeysMatchOriginalJS(t *testing.T) {
 	endpoint := "https://device.example.invalid"
 	subjects := []string{"GUID-synthetic-one", "GUID-synthetic-two", "GUID-synthetic-one"}
-	root, _ := filepath.Abs("../../..")
-	script := `import {controllerMappingLockKeys} from './packages/galaxy-official/src/identity/controller-mapping-lock.mjs';console.log(JSON.stringify(controllerMappingLockKeys('https://device.example.invalid',['GUID-synthetic-one','GUID-synthetic-two','GUID-synthetic-one'])));`
-	cmd := exec.Command("node", "--input-type=module", "-e", script)
-	cmd.Dir = root
-	raw, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original mapping keys: %v %s", e, raw)
-	}
-	var original []int32
-	if e = json.Unmarshal(raw, &original); e != nil {
-		t.Fatal(e)
-	}
+	original := []int32{-1759405157, 158562617}
 	keys, e := MappingLockKeys(endpoint, subjects)
 	if e != nil || !reflect.DeepEqual(keys, original) {
 		t.Fatalf("mapping physical lock contract %v %v %v", keys, original, e)

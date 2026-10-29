@@ -11,7 +11,7 @@ import (
 func TestIdentityGroupOriginalZodOrderAndUnicodeBounds(t *testing.T) {
 	root, _ := filepath.Abs("../../..")
 	script := `
-import {identityGroupIntentSchema,identityGroupSubmitSchema} from './packages/galaxy-official/src/shared/identity-group-v2-schema.mjs';
+import {identityGroupIntentSchema,identityGroupSubmitSchema} from './packages/galaxy-contracts/src/identity-group-v2-schema.mjs';
 const a='GUID15'+'0'.repeat(26),b=a.slice(0,-1)+'1',id='10000000-0000-4000-8000-000000000001',op='10000000-0000-4000-8000-000000000002',source={originalSubjectId:a,sourceHash:'a'.repeat(64),caseId:id,version:1,id,kind:'case-event'};
 const base={accessGranted:false,capabilityMerged:false,purpose:'canonical-display-only',attributionCorrections:[{reason:'中文<>&\u2028\ud800',displaySubjectId:b,source}],sourceRefs:[source],viewers:[],visibility:'Private',canonicalDisplayId:a,memberIds:[a,b],kind:'create',expiresAt:2000000300,issuedAt:2000000000,previousOperationId:null,expectedVersion:0,endpoint:'https://isolated.example.invalid',groupId:id,operationId:op,schemaVersion:2};
 const samples=[];for(const reason of ['中文<>&\u2028\ud800','😀'.repeat(800),'😀'.repeat(801)]){const input=structuredClone(base);input.attributionCorrections[0].reason=reason;const parsed=identityGroupIntentSchema.safeParse(input);samples.push({input,valid:parsed.success,payload:parsed.success?JSON.stringify(parsed.data):null})};

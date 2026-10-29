@@ -4,19 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"reflect"
 	"testing"
 )
 
 func TestOriginalDutyAuthorityRejectionStatus(t *testing.T) {
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-autonomy-interop.mjs"), "authority-errors")
-	cmd.Dir = root
-	out, e := cmd.CombinedOutput()
+	out, e := os.ReadFile("testdata/original-duty-errors.json")
 	if e != nil {
-		t.Fatalf("authority error source %v %s", e, out)
+		t.Fatal(e)
 	}
 	var expected Object
 	if json.Unmarshal(out, &expected) != nil {

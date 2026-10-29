@@ -1,7 +1,7 @@
 import React,{useEffect,useEffectEvent,useId,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {ReadingSurface} from "../../shared/reading/reading-details";
-import {forumAudienceSchema} from "../../../../galaxy-official/src/shared/community-forum-access-v2.mjs";
+import {forumAudienceSchema} from "../../../../galaxy-contracts/src/community-forum-access-v2.mjs";
 import type {ForumAccessOptions,ForumAudience,ForumAudienceRule,ForumClient,ForumAccountChoice} from './community-forum-view-types';
 import './forum-audience.css';
 

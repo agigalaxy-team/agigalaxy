@@ -61,7 +61,7 @@ Independent Hubs can operate their own brands, members, services and data rules.
 
 | Area | Implementation |
 |---|---|
-| Website and browser workspace | Dynamic Next.js / React pages and Python public-content compilation in `apps/galaxy-site/`; shared TypeScript, React and Tailwind CSS interactions in `packages/galaxy-web/`, with Vite retained for the standalone browser diagnostic entry |
+| Website and browser workspace | Dynamic Next.js / React pages and Python public-content compilation in `apps/galaxy-site/`; shared TypeScript, React and Tailwind CSS interactions in `packages/galaxy-web/` |
 | Hub business services | Go, PostgreSQL and River in `go/cmd/galaxy-*` and `go/internal/`; API, Worker, Information Worker, publisher and maintenance commands retain separate responsibilities and permissions |
 | Local client and integrations | Local identity, data, MCP and connections in `go/cmd/galaxy/` and `go/internal/native/`; host JavaScript / TypeScript, model SDKs, Skills and panel resources remain under `integrations/` |
 | Agent collaboration | Peer, task, result and A2A integration in the Go core; host adapters and specialist runtimes retain their own responsibilities |
@@ -71,7 +71,7 @@ Independent Hubs can operate their own brands, members, services and data rules.
 | Authentication, chat and files | Keycloak, server-side Prosody / XMPP, S3-compatible storage and ClamAV; clients use Galaxy HTTPS business APIs |
 | Build and operations | Component-aware tooling in `scripts/`, deployment materials in `deploy/` and owning components |
 
-This is a shared-source monorepo, not a requirement to run every directory as a separate service. `go/` holds the Hub and Native core, executable entry points and runtime examples; `packages/` retains shared browser code, contracts, resources and original interoperability references. `docs/` holds current product, technical, operational and public documentation; `originals/` holds source materials and key discussions. See [source architecture](docs/technical/architecture.md), [component catalog](repository-components.json), [interfaces](docs/technical/interfaces.md) and [dependency provenance](docs/technical/source-and-licensing.md).
+This is a shared-source monorepo, not a requirement to run every directory as a separate service. `go/` holds the Hub and Native core, executable entry points and runtime examples; `packages/` retains shared browser code, contracts, resources. `docs/` holds current product, technical, operational and public documentation; `originals/` holds source materials and key discussions. See [source architecture](docs/technical/architecture.md), [component catalog](repository-components.json), [interfaces](docs/technical/interfaces.md) and [dependency provenance](docs/technical/source-and-licensing.md).
 
 ## Develop or deploy
 
@@ -80,7 +80,7 @@ Full source development uses **Go 1.27.3**, **Node.js 24.13+**, npm and Git. Pub
 ```sh
 git clone https://github.com/agigalaxy-team/agigalaxy.git
 cd agigalaxy
-npm ci --ignore-scripts --no-audit --no-fund
+npm run setup
 npm run build:site
 npm run dev
 ```

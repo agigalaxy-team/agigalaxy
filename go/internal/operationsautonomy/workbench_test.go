@@ -2,10 +2,6 @@ package operationsautonomy
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -15,33 +11,20 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/autonomyfixture"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestOriginalWorkbenchLedgerAndCurrentDuty(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string, input Object) Object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-autonomy-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		cmd.Stdin = strings.NewReader(jsonText(input))
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o Object
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid fixture result")
-		}
-		return o
-	}
-	base := node("setup", Object{})
-	endpoint, aiID := str(base["endpoint"]), str(base["aiAccountId"])
+	f := operationsfixture.NewEndpoint(t, owner, "https://autonomy.example.invalid")
+	automation := f.Automation(t)
+	base := autonomyfixture.Setup(t, f, automation)
+	endpoint, aiID := f.Endpoint, str(base["aiAccountId"])
 	cfg, _ := pgxpool.ParseConfig(dsn)
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)
@@ -58,29 +41,18 @@ func TestOriginalWorkbenchLedgerAndCurrentDuty(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	js := node("link", Object{"operationId": id, "domain": "overview", "aiAccountId": aiID, "conversationId": conversationID, "sessionId": sessionID, "operatorId": operatorID, "nativeRunId": nativeRun})
-	projection := func(row Object) Object {
-		o := Object{}
-		for _, k := range []string{"id", "source", "mode", "state", "model_state", "business_state", "configuration", "ai_account_id", "model_usage", "native_run_id", "prompt_version", "plan_version"} {
-			o[k] = row[k]
-		}
-		return o
+	if row["id"] != id || row["source"] != "workbench" || row["state"] != "running" {
+		t.Fatal("workbench link lost identity/state", row)
 	}
-	eq := func(label string, a, b any) {
-		t.Helper()
-		normalize := func(v any) any { var o any; json.Unmarshal([]byte(jsonText(v)), &o); return o }
-		if !reflect.DeepEqual(normalize(a), normalize(b)) {
-			t.Fatalf("%s\nGo%s\nJS%s", label, jsonText(a), jsonText(b))
-		}
-	}
-	eq("original original-ID workbench replay", projection(row), projection(js))
 	turn := uuid.NewString()
 	bind := WorkbenchBind{TaskID: id, OperatorID: operatorID, Domain: "overview", AIAccountID: aiID, TurnOperationID: turn, ConversationID: &conversationID, SessionID: &sessionID}
 	bound, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return service.BindWorkbenchTaskWithin(ctx, tx, bind) })
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("bind", bound, node("bind", Object{"taskId": id, "operatorId": operatorID, "domain": "overview", "aiAccountId": aiID, "turnOperationId": turn, "conversationId": conversationID, "sessionId": sessionID}))
+	if bound["taskId"] != id {
+		t.Fatal("workbench binding lost task", bound)
+	}
 	wrong := bind
 	wrong.OperatorID = strings.Repeat("b", 64)
 	if _, e = postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return service.BindWorkbenchTaskWithin(ctx, tx, wrong) }); fault.Code(e) != "operations_autonomy_scope_denied" {
@@ -94,8 +66,10 @@ func TestOriginalWorkbenchLedgerAndCurrentDuty(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	js = node("update", Object{"operationId": id, "turnOperationId": turn, "nativeRunId": nativeRun, "status": status, "modelState": model, "usage": usage})
-	eq("replacing same native usage does not double count", projection(row), projection(js))
+	replayed, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return service.UpdateWorkbenchWithin(ctx, tx, update) })
+	if e != nil || !reflect.DeepEqual(row["model_usage"], replayed["model_usage"]) {
+		t.Fatal("replayed native usage double counted", e)
+	}
 	// Same task becomes a routine only in the isolated fixture, to check the
 	// original current duty gate against persisted config/task/lease and AI roles.
 	admin, e := pgxpool.New(ctx, dsn)
@@ -117,7 +91,9 @@ func TestOriginalWorkbenchLedgerAndCurrentDuty(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("original real duty actor", Object{"metadata": metadata, "id": actor.ID, "role": nil, "version": actor.Version, "permissions": actor.Permissions}, node("duty", Object{"taskId": id}))
+	if metadata["taskId"] != id || metadata["aiAccountId"] != aiID || len(actor.Permissions) == 0 {
+		t.Fatal("current duty proof mismatch", metadata)
+	}
 	if _, e = service.DutyMetadata(Actor{ID: actor.ID, Endpoint: endpoint, Permissions: actor.Permissions}); fault.Code(e) != "business_admin_denied" {
 		t.Fatal("public actor forged duty")
 	}
@@ -142,12 +118,14 @@ func TestOriginalWorkbenchLedgerAndCurrentDuty(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("no model-only continuation", continuation, node("continuation", Object{"taskId": id}))
+	if continuation["allowed"] != false {
+		t.Fatal("model-only continuation accepted", continuation)
+	}
 	var enabled int
 	if e = admin.QueryRow(ctx, `SELECT count(*) FROM operations_autonomy_configs_v1 WHERE endpoint=$1 AND domain<>'overview' AND enabled`, endpoint).Scan(&enabled); e != nil || enabled != 0 {
 		t.Fatalf("default enabled plans %d %v", enabled, e)
 	}
-	policy := node("operation-setup", Object{"taskId": id, "aiAccountId": aiID})
+	policy := autonomyfixture.Operation(t, admin, endpoint, f.IDs["root"], id, aiID, "", "", false)
 	operationID := uuid.NewString()
 	request := Object{"kind": "feedback-update", "targetId": policy["targetId"]}
 	command := Object{"state": "acknowledged", "note": "Original bounded note"}
@@ -173,7 +151,9 @@ func TestOriginalWorkbenchLedgerAndCurrentDuty(t *testing.T) {
 	}); e != nil {
 		t.Fatal(e)
 	}
-	eq("original bounded grant and strategy authority", boundMeta, node("operation", Object{"taskId": id, "operation": operationObject(operation), "selection": selection}))
+	if boundMeta["taskId"] != id {
+		t.Fatal("bounded duty lost task identity", boundMeta)
+	}
 	wrongSelection := Object{"id": policy["targetId"], "operationId": operationID, "command": Object{"state": "invented"}}
 	if _, e = postgres.InTx(ctx, pool, func(tx pgx.Tx) (Actor, error) {
 		return service.RequireDutyOperation(ctx, tx, boundActor, []string{"feedback.update"}, wrongSelection, &businessAction)

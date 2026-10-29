@@ -1,4 +1,4 @@
-import { nextCaseReviewStates } from '../../../packages/galaxy-official/src/domain/case-review.mjs';
+import { nextCaseReviewStates } from '../../../packages/galaxy-contracts/src/case-review.mjs';
 import {showExactChoice} from './exact-choice.mjs';
 
 export function createCaseReviewMenu({controller,caseId,sourceVersion,select,prompt,info,language,isCurrent,onBack}){

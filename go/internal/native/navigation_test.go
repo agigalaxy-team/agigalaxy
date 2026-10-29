@@ -52,15 +52,17 @@ func TestNavigationOriginalJournalPathsAndReturnScope(t *testing.T) {
 	if strings.Contains(launched, "private") || opened["opened"] != "unverified" || opened["businessMutation"] != false {
 		t.Fatal(opened, launched)
 	}
-	script := `import {createNativeStore} from './packages/galaxy-edge-mcp/src/native-v2/store.mjs';import {createNativeNavigation} from './packages/galaxy-edge-mcp/src/native-v2/interaction/navigation.mjs';const navigation=createNativeNavigation({website:'https://website.invalid',store:createNativeStore(process.argv[1]),captureLease:async()=>({subjectId:null,endpoint:'https://navigation.invalid',assertCurrent(){}}),openBrowser:async()=>({state:'launch-requested',launched:true}),refresh:async()=>{throw Error('unexpected refresh')}});console.log(JSON.stringify(await navigation.resume(process.argv[2])));`
-	original := initializationNode(t, script, store.Directory, text(opened["navigationId"]))
+	fixture := readNativeContractFixture(t, "navigation-v1.json")
 	resumed, e := navigation.Resume(ctx, text(opened["navigationId"]))
-	if e != nil || !connectionEqual(resumed, original) {
-		t.Fatal("original journal return differs", resumed, original, e)
+	if e != nil || resumed["navigationId"] != opened["navigationId"] {
+		t.Fatal("journal return ID differs", resumed, e)
 	}
-	reference := initializationNode(t, `import {createNativeStore} from './packages/galaxy-edge-mcp/src/native-v2/store.mjs';import {createNativeNavigation} from './packages/galaxy-edge-mcp/src/native-v2/interaction/navigation.mjs';const navigation=createNativeNavigation({website:'https://website.invalid',store:createNativeStore(process.argv[1]),captureLease:async()=>({subjectId:null,endpoint:'https://navigation.invalid',assertCurrent(){}}),openBrowser:async()=>({state:'launch-requested',launched:true}),refresh:async()=>{throw Error('unexpected refresh')}});console.log(JSON.stringify(await navigation.prepare({object:{kind:'community',topic:'technology',query:'  A~* +/😀  '},origin:{host:'synthetic-host',workRef:'private original prompt'}})));`, store.Directory)
-	if opened["targetPath"] != reference["targetPath"] {
-		t.Fatal("WHATWG route differs", opened, reference)
+	delete(resumed, "navigationId")
+	if !connectionEqual(resumed, fixture["resumed"]) {
+		t.Fatal("journal return differs", resumed, fixture["resumed"])
+	}
+	if opened["targetPath"] != fixture["targetPath"] {
+		t.Fatal("WHATWG route differs", opened, fixture)
 	}
 	prepared, e := navigation.Prepare(ctx, map[string]any{"object": map[string]any{"kind": "post", "id": transport.id}})
 	if e != nil {

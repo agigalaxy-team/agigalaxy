@@ -3,9 +3,9 @@ package operationsstrategies
 import (
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -39,6 +39,11 @@ func TestOriginalStrategiesSchemaConditionsAndOrdinaryBounds(t *testing.T) {
 	obj(list(tooDeep["strategies"])[0])["condition"] = group
 	obj(list(tooDeep["strategies"])[0])["ordinaryBounds"] = nil
 	configurations = append(configurations, tooDeep)
+	sort.Slice(configurations, func(i, j int) bool {
+		a, _ := json.Marshal(configurations[i])
+		b, _ := json.Marshal(configurations[j])
+		return string(a) < string(b)
+	})
 	id := "11111111-1111-4111-8111-111111111111"
 	base := Object{"configuration": c, "input": Object{"strategyId": id, "parameterEdits": []any{Object{"path": []int{0}, "value": 20}}}}
 	invalidBound := deepClone(base)
@@ -54,14 +59,9 @@ func TestOriginalStrategiesSchemaConditionsAndOrdinaryBounds(t *testing.T) {
 	badNative := deepClone(native)
 	obj(list(badNative["steps"])[0])["type"] = strings.Repeat("😀", 31)
 	input["nativeMetadata"] = []Object{native, badNative, {"runId": nil, "status": "NOT_RECORDED", "awaitingHuman": false, "workflowId": WorkflowID, "workflowVersion": 1}}
-	root, _ := filepath.Abs("../../..")
-	raw, _ := json.Marshal(input)
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/strategies-interop.mjs"), "schema")
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(string(raw))
-	b, e := cmd.CombinedOutput()
+	b, e := os.ReadFile("testdata/strategies-schema.json")
 	if e != nil {
-		t.Fatalf("source %v %s", e, b)
+		t.Fatal(e)
 	}
 	var expected Object
 	_ = json.Unmarshal(b, &expected)

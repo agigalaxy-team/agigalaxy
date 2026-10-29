@@ -15,15 +15,19 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
 
 type ServiceConfigurationRequest struct {
-	Website       string `json:"website"`
-	Endpoint      string `json:"endpoint,omitempty"`
-	DataDirectory string `json:"dataDirectory,omitempty"`
-	Output        string `json:"output,omitempty"`
+	Website        string `json:"website"`
+	Endpoint       string `json:"endpoint,omitempty"`
+	DataDirectory  string `json:"dataDirectory,omitempty"`
+	Output         string `json:"output,omitempty"`
+	RootPinsFile   string `json:"rootPinsFile,omitempty"`
+	TrustDirectory string `json:"trustDirectory,omitempty"`
+	NetworkType    string `json:"networkType,omitempty"`
 }
 type ServiceConfigurationOptions struct {
 	HTTPClient *http.Client
@@ -48,6 +52,31 @@ type ServiceConfigurationInspection struct {
 
 func serviceConfigurationError(code string) error {
 	return fault.New("native_service_configuration_"+code, 400)
+}
+
+func readSelectedRootPins(path string) ([]byte, error) {
+	before, err := os.Lstat(path)
+	if err != nil || !before.Mode().IsRegular() || before.Mode()&os.ModeSymlink != 0 || before.Size() > 65536 {
+		return nil, serviceConfigurationError("root_pins_invalid")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, serviceConfigurationError("root_pins_invalid")
+	}
+	defer file.Close()
+	opened, err := file.Stat()
+	if err != nil || !os.SameFile(before, opened) {
+		return nil, serviceConfigurationError("root_pins_invalid")
+	}
+	raw, err := io.ReadAll(io.LimitReader(file, 65537))
+	if err != nil || len(raw) > 65536 {
+		return nil, serviceConfigurationError("root_pins_invalid")
+	}
+	after, err := file.Stat()
+	if err != nil || after.Size() != int64(len(raw)) || !after.ModTime().Equal(opened.ModTime()) {
+		return nil, serviceConfigurationError("root_pins_invalid")
+	}
+	return raw, nil
 }
 func serviceConfigurationOrigin(value string) bool {
 	u, e := url.Parse(value)
@@ -184,11 +213,73 @@ func PrepareServiceConfiguration(ctx context.Context, input ServiceConfiguration
 	if !serviceConfigurationOrigin(input.Website) || !serviceConfigurationOrigin(input.Endpoint) || !filepath.IsAbs(input.DataDirectory) || !filepath.IsAbs(input.Output) || filepath.Clean(input.DataDirectory) == filepath.Clean(input.Output) {
 		return nil, serviceConfigurationError("paths_invalid")
 	}
+	if (input.RootPinsFile != "") != (input.TrustDirectory != "") || input.RootPinsFile != "" && (!filepath.IsAbs(input.RootPinsFile) || !filepath.IsAbs(input.TrustDirectory)) || input.NetworkType != "" && input.NetworkType != "official" && input.NetworkType != "hub" {
+		return nil, serviceConfigurationError("paths_invalid")
+	}
+	var rootPins map[string]Pin
+	if input.RootPinsFile != "" {
+		raw, err := readSelectedRootPins(input.RootPinsFile)
+		if err != nil {
+			return nil, serviceConfigurationError("root_pins_invalid")
+		}
+		if protocol.Decode(raw, &rootPins) != nil {
+			// Accept the existing public root-pins document as well as a keyed
+			// host configuration map. It must bind the explicitly chosen origin.
+			document, decodeError := connectionObject(raw)
+			if decodeError != nil || !connectionExact(document, "version", "endpoint", "sequence", "keys") || !connectionSafeInteger(document["sequence"]) {
+				return nil, serviceConfigurationError("root_pins_invalid")
+			}
+			for _, value := range uploadRows(document["keys"]) {
+				row := uploadObject(value)
+				if !connectionExact(row, "kid", "publicKeyPem", "notBefore", "notAfter", "revoked") || !connectionSafeInteger(row["notBefore"]) || !connectionSafeInteger(row["notAfter"]) {
+					return nil, serviceConfigurationError("root_pins_invalid")
+				}
+				if _, ok := row["revoked"].(bool); !ok {
+					return nil, serviceConfigurationError("root_pins_invalid")
+				}
+			}
+			var source struct {
+				Version  int    `json:"version"`
+				Endpoint string `json:"endpoint"`
+				Sequence int64  `json:"sequence"`
+				Keys     []Pin  `json:"keys"`
+			}
+			if protocol.Decode(raw, &source) != nil || source.Version != 1 || source.Endpoint != input.Endpoint || source.Sequence < 1 || source.Sequence > 9007199254740991 {
+				return nil, serviceConfigurationError("root_pins_invalid")
+			}
+			rootPins = map[string]Pin{}
+			for _, pin := range source.Keys {
+				if !discoveryKID.MatchString(pin.KID) || !connectionCanonicalPublic(pin.PublicKeyPEM) {
+					return nil, serviceConfigurationError("root_pins_invalid")
+				}
+				if _, exists := rootPins[pin.KID]; exists {
+					return nil, serviceConfigurationError("root_pins_invalid")
+				}
+				rootPins[pin.KID] = pin
+			}
+		} else {
+			value, err := connectionObject(raw)
+			if err != nil || !discoveryRootPinsValid(value) {
+				return nil, serviceConfigurationError("root_pins_invalid")
+			}
+		}
+		if len(rootPins) == 0 || len(rootPins) > 32 {
+			return nil, serviceConfigurationError("root_pins_invalid")
+		}
+		for id, pin := range rootPins {
+			if !discoveryKID.MatchString(id) || pin.NotBefore < 0 || pin.NotAfter <= pin.NotBefore || len(pin.PublicKeyPEM) > 256 {
+				return nil, serviceConfigurationError("root_pins_invalid")
+			}
+			if _, err = connectionPublicPEM(pin.PublicKeyPEM); err != nil {
+				return nil, serviceConfigurationError("root_pins_invalid")
+			}
+		}
+	}
 	inspected, e := InspectServiceConfiguration(ctx, input, options)
 	if e != nil {
 		return nil, e
 	}
-	configuration := Configuration{Version: 2, Endpoint: input.Endpoint, Website: input.Website, DataDirectory: filepath.Clean(input.DataDirectory), TrustedKeys: inspected.TrustedKeys}
+	configuration := Configuration{Version: 2, Endpoint: input.Endpoint, Website: input.Website, DataDirectory: filepath.Clean(input.DataDirectory), TrustedKeys: inspected.TrustedKeys, RootPins: rootPins, TrustDirectory: input.TrustDirectory, NetworkType: input.NetworkType}
 	raw, e := protocol.Encode(configuration)
 	if e != nil {
 		return nil, e
@@ -214,5 +305,18 @@ func PrepareServiceConfiguration(ctx context.Context, input ServiceConfiguration
 	if closeError != nil {
 		return nil, closeError
 	}
-	return map[string]any{"configured": true, "output": filepath.Clean(input.Output), "website": input.Website, "endpoint": input.Endpoint, "publicFingerprints": inspected.PublicFingerprints, "publicConfigurationSha256": inspected.PublicConfigurationSHA256, "trustSource": "explicitly-selected-website-over-HTTPS", "connected": false, "identityCreated": false, "dataDirectoryCreated": false, "automaticKeyRefresh": false}, nil
+	trustSource := "explicitly-selected-website-over-HTTPS"
+	rootFingerprints := []PublicKeyFingerprint{}
+	if len(rootPins) > 0 {
+		trustSource = "explicitly-selected-root-pins"
+		for id, pin := range rootPins {
+			rootFingerprints = append(rootFingerprints, PublicKeyFingerprint{KID: id, SHA256: identity.Digest([]byte(pin.PublicKeyPEM)), NotBefore: pin.NotBefore, NotAfter: pin.NotAfter, Revoked: pin.Revoked})
+		}
+		sort.Slice(rootFingerprints, func(i, j int) bool { return rootFingerprints[i].KID < rootFingerprints[j].KID })
+	}
+	result := map[string]any{"configured": true, "output": filepath.Clean(input.Output), "website": input.Website, "endpoint": input.Endpoint, "publicFingerprints": inspected.PublicFingerprints, "publicConfigurationSha256": inspected.PublicConfigurationSHA256, "trustSource": trustSource, "connected": false, "identityCreated": false, "dataDirectoryCreated": false, "automaticKeyRefresh": false}
+	if len(rootPins) > 0 {
+		result["rootFingerprints"] = rootFingerprints
+	}
+	return result, nil
 }

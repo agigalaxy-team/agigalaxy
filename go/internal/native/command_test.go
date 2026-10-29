@@ -2,11 +2,14 @@ package native
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func commandRuntime(t *testing.T, store *Store) *Runtime {
@@ -25,8 +28,9 @@ func TestCommandOriginalLocalPresentationAndReadBoundaries(t *testing.T) {
 		t.Fatal(e)
 	}
 	r := commandRuntime(t, store)
-	for _, input := range []CommandInput{{Command: "help"}, {Command: "language"}, {Command: "open", Language: "zh-CN", Stage: 3}, {Command: "setup", Language: "en-US", Stage: 5}} {
-		original := initializationNode(t, `import {getGalaxyCommandSurface} from './packages/galaxy-core/src/local-store.mjs';console.log(JSON.stringify(await getGalaxyCommandSurface(process.argv[1],process.argv[2],{language:process.argv[3]||undefined,stage:Number(process.argv[4])||undefined})));`, store.Directory, input.Command, input.Language, fmtInt(input.Stage))
+	fixture := readNativeContractFixture(t, "commands-v1.json")
+	for i, input := range []CommandInput{{Command: "help"}, {Command: "language"}, {Command: "open", Language: "zh-CN", Stage: 3}, {Command: "setup", Language: "en-US", Stage: 5}} {
+		original := uploadObject(uploadRows(fixture["previews"])[i])
 		got, e := r.Command(ctx, input)
 		if e != nil {
 			t.Fatal(e)
@@ -60,11 +64,26 @@ func TestCommandOriginalLocalPresentationAndReadBoundaries(t *testing.T) {
 	if _, e = store.Initialize(ctx, InitializationInput{Profile: "minimal"}, true, &scope); e != nil {
 		t.Fatal(e)
 	}
-	for _, name := range []string{"open", "case", "hub", "setup"} {
-		original := initializationNode(t, `import {getGalaxyCommandSurface} from './packages/galaxy-core/src/local-store.mjs';console.log(JSON.stringify(await getGalaxyCommandSurface(process.argv[1],process.argv[2],{language:'en-US'})));`, store.Directory, name)
+	for i, name := range []string{"open", "case", "hub", "setup"} {
+		original := uploadObject(uploadRows(fixture["initialized"])[i])
 		got, e := r.Command(ctx, CommandInput{Command: name, Language: "en-US"})
 		if e != nil {
 			t.Fatal(e)
+		}
+		if name == "open" || name == "setup" {
+			module := uploadObject(uploadRows(uploadObject(got)["enabledModules"])[0])
+			if _, err := time.Parse(time.RFC3339Nano, text(module["enabledAt"])); err != nil {
+				t.Fatal("invalid module timestamp", err)
+			}
+			uploadObject(uploadRows(original["enabledModules"])[0])["enabledAt"] = module["enabledAt"]
+		}
+		if name == "open" {
+			status := uploadObject(uploadObject(uploadObject(got)["console"])["localStatus"])
+			owner, err := store.Owner(ctx)
+			if err != nil || status["galaxyId"] != owner {
+				t.Fatal("command lost current owner", err)
+			}
+			uploadObject(uploadObject(original["console"])["localStatus"])["galaxyId"] = owner
 		}
 		if !connectionEqual(got, commandNativeReferences(original)) {
 			t.Fatalf("initialized command differs %s: got=%v original=%v", name, got, original)
@@ -78,18 +97,88 @@ func TestCommandOriginalLocalPresentationAndReadBoundaries(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	originalExport := initializationNode(t, `import {exportLocalData} from './packages/galaxy-core/src/local-store.mjs';console.log(JSON.stringify(await exportLocalData(process.argv[1])));`, store.Directory)
-	delete(originalExport, "exportedAt")
-	delete(uploadObject(exported), "exportedAt")
-	if !connectionEqual(exported, originalExport) {
-		t.Fatalf("export differs %v / %v", exported, originalExport)
-	}
+	compareLegacyCommandSnapshot(t, "export", exported)
+	assertInitializationIdentity(t, store.Directory, uploadObject(uploadObject(exported)["identity"]))
+
 }
-func fmtInt(n int) string {
-	if n == 0 {
-		return "0"
+
+// Original JS projections, with per-run identity and timestamps checked and substituted.
+func compareLegacyCommandSnapshot(t *testing.T, kind string, got any) {
+	t.Helper()
+	expected := readNativeContractFixture(t, "command-"+kind+"-legacy.json")
+	encoded, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return string(rune('0' + n))
+	var actual map[string]any
+	if err = protocol.Decode(encoded, &actual); err != nil {
+		t.Fatal(err)
+	}
+	local := uploadObject(actual["identity"])
+	original := uploadObject(expected["identity"])
+	if !connectionGenesis(text(local["id"]), initializationMap(local["genesisProof"])) {
+		t.Fatal("invalid identity genesis")
+	}
+	for _, key := range []string{"id", "createdAt", "publicKeyFingerprint"} {
+		original[key] = local[key]
+	}
+	for _, key := range []string{"publicKeyPem", "nonce"} {
+		uploadObject(original["genesisProof"])[key] = uploadObject(local["genesisProof"])[key]
+	}
+	var substitute func(any, any)
+	substitute = func(want, have any) {
+		switch w := want.(type) {
+		case map[string]any:
+			a, ok := have.(map[string]any)
+			if !ok {
+				return
+			}
+			for key, item := range w {
+				if item == "__TIME__" {
+					stamp, ok := a[key].(string)
+					if !ok {
+						t.Fatal("missing timestamp", key)
+					}
+					if _, e := time.Parse(time.RFC3339Nano, stamp); e != nil {
+						t.Fatal(e)
+					}
+					w[key] = stamp
+				} else if item == "__OWNER__" {
+					if a[key] != local["id"] {
+						t.Fatal("audit subject differs from identity")
+					}
+					w[key] = a[key]
+				} else if item == "__EVENT__" {
+					if text(a[key]) == "" {
+						t.Fatal("missing audit event")
+					}
+					w[key] = a[key]
+				} else {
+					substitute(item, a[key])
+				}
+			}
+		case []any:
+			a, ok := have.([]any)
+			if !ok || len(a) != len(w) {
+				return
+			}
+			for i := range w {
+				substitute(w[i], a[i])
+			}
+		}
+	}
+	substitute(expected["state"], actual["state"])
+	if _, ok := expected["dataDir"]; ok {
+		expected["dataDir"] = actual["dataDir"]
+	}
+	if _, ok := expected["exportedAt"]; ok {
+		stamp := text(actual["exportedAt"])
+		if _, e := time.Parse(time.RFC3339Nano, stamp); e != nil {
+			t.Fatal(e)
+		}
+		expected["exportedAt"] = stamp
+	}
+	same(t, expected, actual)
 }
 
 func TestCommandOfflineFallbackWithoutAuthority(t *testing.T) {
@@ -116,9 +205,15 @@ func TestCommandOfflineFallbackWithoutAuthority(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	original := initializationNode(t, `import {initializeLocalGalaxyId} from './packages/galaxy-core/src/local-store.mjs';console.log(JSON.stringify(await initializeLocalGalaxyId(process.argv[1],{subjectType:'organization'})));`, directory)
-	if !connectionEqual(snapshot, original) {
-		t.Fatal("offline original differs")
+	compareLegacyCommandSnapshot(t, "offline", snapshot)
+	assertInitializationIdentity(t, directory, uploadObject(uploadObject(snapshot)["identity"]))
+	currentScope, e := store.ChoiceScope(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	repeated, e := store.InitializeLocalIdentity(ctx, "organization", true, &currentScope)
+	if e != nil || !connectionEqual(snapshot, repeated) {
+		t.Fatal("offline identity initialization was not idempotent", e)
 	}
 	if _, e = os.Stat(filepath.Join(directory, "native-v2")); !os.IsNotExist(e) {
 		t.Fatal("offline fallback created Native service records")
@@ -143,9 +238,11 @@ func TestCommandWorkerOriginalInteropAndParentScope(t *testing.T) {
 	if identity["subjectType"] != "agent" || identity["clientKind"] != "worker" {
 		t.Fatal(worker)
 	}
-	original := initializationNode(t, `import {initializeLocalWorkerGalaxyId} from './packages/galaxy-core/src/local-store.mjs';console.log(JSON.stringify(await initializeLocalWorkerGalaxyId(process.argv[1],{workerId:'first'})));`, store.Directory)
-	if !connectionEqual(worker, original) {
-		t.Fatal("original JS did not retain same Worker", worker, original)
+	compareLegacyCommandSnapshot(t, "worker", worker)
+	assertInitializationIdentity(t, filepath.Join(store.Directory, "workers", "first"), identity)
+	repeated, e := store.InitializeWorkerIdentity(ctx, "first", true, &scope)
+	if e != nil || !connectionEqual(worker, repeated) {
+		t.Fatal("worker initialization was not idempotent", e)
 	}
 	if owner, e := store.Owner(ctx); e != nil || owner != "" {
 		t.Fatal("Worker altered parent identity", e)

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createCommunityForumClient,newForumDraft,forumDraftPayload} from "../src/features/community-forum/community-forum-client.mjs";
 import {createOfficialAccountClient} from "../src/features/accounts/official-account-client.mjs";
 import {rememberForumLoginDraft,forumLoginDraft,forumOwnsContent} from "../src/features/community-forum/forum-account-state.mjs";
-import {defaultForumPolicy} from "../../galaxy-official/src/community/community-forum-policy-v1.mjs";
+import {defaultForumPolicy} from "../../galaxy-contracts/src/policies/forum-quota.mjs";
 
 const endpoint='https://official.example.org',website='https://galaxy.example.org';
 const id='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';

@@ -8,14 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 )
@@ -44,18 +43,6 @@ func (a *fixtureAuthority) AuthorizeModule(_ context.Context, _ Principal, _ str
 func (a *fixtureAuthority) AuthorizeSource(context.Context, Principal, Event) (SourceDecision, error) {
 	return Denied, fault.New("domain_authority_unavailable", 503)
 }
-func node(t *testing.T, dsn string, args ...string) []byte {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", append([]string{filepath.Join(root, "scripts/go/web-events-interop.mjs")}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original JS: %v %s", e, out)
-	}
-	return out
-}
 func normalize(t *testing.T, v any) any {
 	t.Helper()
 	b, e := json.Marshal(v)
@@ -69,16 +56,24 @@ func normalize(t *testing.T, v any) any {
 	return out
 }
 func TestCurrentSchemaInteropAndHTTP(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
 	defer cancel()
-	var originalCatalog any
-	if e := json.Unmarshal(node(t, dsn, "setup"), &originalCatalog); e != nil {
+	if _, e := databaseschema.Migrate(ctx, pool, nil); e != nil {
 		t.Fatal(e)
 	}
-	// A producer change must update the one fixed catalog consumed by Go.
+	// Captured from the original Node reader and its topics catalog.
+	var originalCatalog any
+	fixture, e := os.ReadFile("testdata/original-catalog.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = json.Unmarshal(fixture, &originalCatalog); e != nil {
+		t.Fatal(e)
+	}
+	// The current catalog must preserve the captured browser wire mapping.
 	if !reflect.DeepEqual(normalize(t, catalog), originalCatalog) {
-		t.Fatal("Go catalog differs from current JS topics")
+		t.Fatal("Go catalog differs from captured topics")
 	}
 	auth := &fixtureAuthority{}
 	s := &Service{Pool: pool, Endpoint: "https://events.invalid", Authority: auth}
@@ -139,12 +134,13 @@ func TestCurrentSchemaInteropAndHTTP(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	// Exact original frame projection captured for this isolated scenario.
 	var original any
-	if e = json.Unmarshal(node(t, dsn, "read", "0", "model-settings"), &original); e != nil {
+	if e = json.Unmarshal([]byte(`[{"cursor":"2","module":"model-settings","operationId":null,"type":"change","version":"0"},{"cursor":"2","modules":["model-settings"],"type":"snapshot"}]`), &original); e != nil {
 		t.Fatal(e)
 	}
 	if !reflect.DeepEqual(normalize(t, frames), original) {
-		t.Fatalf("Go/JS event mismatch: %v / %v", frames, original)
+		t.Fatalf("event projection mismatch: %v / %v", frames, original)
 	}
 	if len(frames) != 2 || frames[0].Type != "change" || frames[0].Cursor != "2" {
 		t.Fatalf("endpoint isolation: %+v", frames)

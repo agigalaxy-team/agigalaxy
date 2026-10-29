@@ -1,5 +1,5 @@
-import { canonicalInformationCommand as canonicalize } from '../../../../galaxy-official/src/shared/information-canonical.mjs';
-import { informationWatchCommandSchema, informationSelectionSchema } from '../../../../galaxy-official/src/shared/information-v2-schema.mjs';
+import { canonicalInformationCommand as canonicalize } from '../../../../galaxy-contracts/src/information-canonical.mjs';
+import { informationWatchCommandSchema, informationSelectionSchema } from '../../../../galaxy-contracts/src/information-v2-schema.mjs';
 import * as z from 'zod/v4';
 const inputText = z.string().max(16000);
 const composerSchemas = {

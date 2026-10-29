@@ -1,9 +1,9 @@
 package summaries
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jstext"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -44,18 +44,15 @@ func TestOriginalSummarySchemaAndIntent(t *testing.T) {
 	appendInput("list", Object{})
 	appendInput("list", Object{"after": nil})
 	appendInput("receipt", Object{"summaryId": id, "versionId": version, "extra": false})
-	dir := t.TempDir()
-	file := filepath.Join(dir, "schema.json")
-	b, _ := json.Marshal(inputs)
-	if e := os.WriteFile(file, b, 0600); e != nil {
-		t.Fatal(e)
-	}
 	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/personal-summary-interop.mjs"), "schema", file)
+	script := `import {canonicalInformationCommand as canonicalize} from './packages/galaxy-contracts/src/information-canonical.mjs';import {digest} from './packages/galaxy-contracts/src/digest.mjs';import * as schemas from './packages/galaxy-contracts/src/personal-summary-schema.mjs';const names={'preferences/save':'summaryPreferenceSchema',put:'summaryPutSchema',list:'summaryPageSchema',receipt:'summaryReceiptSchema'};let text='';for await(const c of process.stdin)text+=c;console.log(JSON.stringify(JSON.parse(text).map(x=>{let parsed;try{parsed=schemas[names[x.action]].parse(JSON.parse(x.raw))}catch{return{accepted:false}}const r={accepted:true,json:JSON.stringify(parsed)};if(x.action==='put'){const{preferenceRevision,...intent}=parsed;try{r.hash=digest(canonicalize(intent))}catch{r.hashError=true}}return r})))`
+	cmd := exec.Command("node", "--input-type=module", "-e", script)
 	cmd.Dir = root
+	rawInputs, _ := json.Marshal(inputs)
+	cmd.Stdin = bytes.NewReader(rawInputs)
 	b, e := cmd.CombinedOutput()
 	if e != nil {
-		t.Fatalf("original schema %v %s", e, b)
+		t.Fatalf("current contract schema %v %s", e, b)
 	}
 	var expected []struct {
 		Accepted   bool

@@ -1,6 +1,6 @@
-import {hubEventSchema} from "../../../../galaxy-official/src/shared/hubs-v2-schema.mjs";
-import {peeringEventSchema} from "../../../../galaxy-official/src/shared/hub-peering-v2-schema.mjs";
-import {equalJson,sha256Hex} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {hubEventSchema} from "../../../../galaxy-contracts/src/hubs-v2-schema.mjs";
+import {peeringEventSchema} from "../../../../galaxy-contracts/src/hub-peering-v2-schema.mjs";
+import {equalJson,sha256Hex} from "../../../../galaxy-contracts/src/web-primitives.mjs";
 const copy=value=>structuredClone(value);
 const error=(code,message)=>Object.assign(new Error(message),{code});
 export function createHubsWebClient(runtime,{subjectId=/** @type {string|null} */(null),now=()=>Math.floor(Date.now()/1000),locks=globalThis.navigator?.locks}={}){

@@ -6,6 +6,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/attachments"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/chat"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/objectremoval"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
@@ -14,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -71,12 +71,8 @@ func TestChatAttachmentWorkerReconcileAfterRoomFixture(t *testing.T) { testAttac
 func testAttachmentWorkers(t *testing.T, chatOnly bool) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", "--input-type=module", "-e", `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import{migrate}from './packages/galaxy-official/src/infrastructure/database.mjs';const u=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(u.hostname!=='127.0.0.1'||!u.pathname.startsWith('/galaxy_go_test_'))throw Error('isolated required');const db=new pg.Pool({connectionString:u.href});try{await migrate(db,{roles:['api','worker']})}finally{await db.end()}`)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	if b, e := cmd.CombinedOutput(); e != nil {
-		t.Fatalf("original migrations %v %s", e, b)
+	if _, err := databaseschema.Migrate(ctx, owner, []string{"api", "worker"}); err != nil {
+		t.Fatal(err)
 	}
 	if _, e := postgres.InTx(ctx, owner, func(tx pgx.Tx) (any, error) {
 		if e := objectremoval.MigrateWithin(ctx, tx); e != nil {
@@ -138,9 +134,6 @@ func testAttachmentWorkers(t *testing.T, chatOnly bool) {
 			t.Helper()
 			id, lease := uuid.NewString(), uuid.NewString()
 			key := keyPrefix + id
-			if e := s.Put(ctx, key, body, hash); e != nil {
-				t.Fatal(e)
-			}
 			leaseUntil := now.Add(-time.Minute)
 			if activeLease {
 				leaseUntil = now.Add(time.Hour)
@@ -158,8 +151,25 @@ func testAttachmentWorkers(t *testing.T, chatOnly bool) {
 				values += ",$22"
 				args = append(args, room)
 			}
-			_, e = owner.Exec(ctx, "INSERT INTO "+table+"("+columns+") VALUES("+values+")", args...)
+			_, e = postgres.InTx(ctx, owner, func(tx pgx.Tx) (any, error) {
+				if _, err := tx.Exec(ctx, "INSERT INTO "+table+"("+columns+") VALUES("+values+")", args...); err != nil {
+					return nil, err
+				}
+				// Current uploads establish a positive not-dispatched receipt
+				// when their source is first created. Pre-ledger cleanup
+				// failures intentionally lack it and remain reconcile-only.
+				if lastError != "attachment_cleanup_failed" {
+					removals := &objectremoval.Service{Pool: owner, Endpoint: endpoint, Now: clock}
+					if err := removals.RegisterNewObjectWithin(ctx, tx, objectremoval.Descriptor{Domain: domain, ObjectID: id, StorageKey: key, KeyID: s.KeyID(), SHA256: hash, ByteSize: int64(len(body))}); err != nil {
+						return nil, err
+					}
+				}
+				return nil, nil
+			})
 			if e != nil {
+				t.Fatal(e)
+			}
+			if e = s.Put(ctx, key, body, hash); e != nil {
 				t.Fatal(e)
 			}
 			return id, key, lease

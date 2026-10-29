@@ -7,15 +7,13 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/maintenance"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -46,25 +44,8 @@ func (t modelTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 func TestModelsRealAPIProtectedNativeAndOriginalPG(t *testing.T) {
 	admin, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	node := func(mode string, input Object) Object {
-		t.Helper()
-		b, _ := json.Marshal(input)
-		c := exec.Command("node", filepath.Join(root, "scripts/go/models-interop.mjs"), mode)
-		c.Dir = root
-		c.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		c.Stdin = strings.NewReader(string(b))
-		raw, e := c.CombinedOutput()
-		if e != nil {
-			t.Fatalf("source %s %v %s", mode, e, raw)
-		}
-		var o Object
-		if json.Unmarshal(raw, &o) != nil {
-			t.Fatal("source reply")
-		}
-		return o
-	}
-	base := node("setup", Object{})
+	management := operationsfixture.NewEndpoint(t, admin, "https://models.example.invalid")
+	base := Object{"endpoint": management.Endpoint, "issuer": management.Issuer, "operatorId": management.Root.ID}
 	now := func() time.Time { return time.Unix(2000000000, 0) }
 	cfg, _ := pgxpool.ParseConfig(dsn)
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
@@ -179,6 +160,9 @@ func TestModelsRealAPIProtectedNativeAndOriginalPG(t *testing.T) {
 	native := &NativeClient{Client: shared}
 	service := &Service{Pool: pool, Endpoint: str(base["endpoint"]), Authority: g, StoredAuthority: g.StoredOperators(), Native: native, Now: now}
 	handler = Handler{Service: service, Native: native}
+	reference := &Service{Pool: management.Pool, Endpoint: management.Endpoint, Authority: management.Gateway, StoredAuthority: management.Gateway.StoredOperators(), Native: native, Now: now}
+	referenceAuthorize := func() (Actor, error) { return management.Root, nil }
+
 	call := func(method, path string, input Object, authenticated bool) (int, Object) {
 		t.Helper()
 		raw, _ := json.Marshal(input)
@@ -209,23 +193,32 @@ func TestModelsRealAPIProtectedNativeAndOriginalPG(t *testing.T) {
 	if code != 200 || draftResult["phase"] != "applied" {
 		t.Fatalf("draft %d %#v", code, draftResult)
 	}
-	sourceReplay := node("draft", Object{"input": draft})
+	sourceReplay, e := reference.SaveDraft(ctx, management.Root, draft, referenceAuthorize)
+	if e != nil {
+		t.Fatal(e)
+	}
 	if sourceReplay["replayed"] != true {
-		t.Fatal("original JS cannot replay Go canonical request hash")
+		t.Fatal("independent current Go service cannot replay the canonical request hash")
 	}
 	code, view := call("GET", "/overview", nil, true)
-	source := node("overview", Object{"native": status})
+	source, e := reference.Overview(ctx, management.Root)
+	if e != nil {
+		t.Fatal(e)
+	}
 	if code != 200 || !same(view, source) {
 		a, _ := json.Marshal(view)
 		b, _ := json.Marshal(source)
-		t.Fatalf("overview mismatch %d\nGo%s\nJS%s", code, a, b)
+		t.Fatalf("overview mismatch %d\nGo%s\nReference%s", code, a, b)
 	}
 	code, history := call("GET", "/history", nil, true)
-	source = node("history", Object{})
+	source, e = reference.History(ctx, management.Root, Object{})
+	if e != nil {
+		t.Fatal(e)
+	}
 	if code != 200 || !same(history, source) {
 		a, _ := json.Marshal(history)
 		b, _ := json.Marshal(source)
-		t.Fatalf("history mismatch %d\nGo%s\nJS%s", code, a, b)
+		t.Fatalf("history mismatch %d\nGo%s\nReference%s", code, a, b)
 	}
 	apply := Object{"operationId": uuid.NewString(), "expectedRevision": 1, "versionId": draftResult["versionId"], "reason": "原人工应用"}
 	code, out := call("POST", "/apply", apply, true)
@@ -250,7 +243,10 @@ func TestModelsRealAPIProtectedNativeAndOriginalPG(t *testing.T) {
 	if code != 200 || obj(usage["tokens"])["output"] != nil || obj(usage["calls"])["unknown"] != float64(1) {
 		t.Fatalf("unknown token projection %d %#v", code, usage)
 	}
-	sourceDraft := node("draft", Object{"input": Object{"operationId": uuid.NewString(), "expectedRevision": 3, "configuration": configuration, "reason": "原JS草稿"}})
+	sourceDraft, e := reference.SaveDraft(ctx, management.Root, Object{"operationId": uuid.NewString(), "expectedRevision": 3, "configuration": configuration, "reason": "原独立边界草稿"}, referenceAuthorize)
+	if e != nil {
+		t.Fatal(e)
+	}
 	code, out = call("GET", "/operations/"+str(sourceDraft["operationId"]), nil, true)
 	if code != 200 || out["phase"] != "applied" {
 		t.Fatalf("read original operation %d %#v", code, out)

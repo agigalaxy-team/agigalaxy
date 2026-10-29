@@ -1,7 +1,7 @@
 import React,{useEffect,useEffectEvent,useMemo,useRef,useState} from "react";
 import {Button} from "@/components/ui/button";
 import {useGovernanceDraft} from "../governance/governance-presentation";
-import {discoveryPreferencesSchema} from "../../../../galaxy-official/src/shared/discovery-schema.mjs";
+import {discoveryPreferencesSchema} from "../../../../galaxy-contracts/src/discovery-schema.mjs";
 import {saveProjectContactPreferences,sameProjectContactPreferences} from "./clients/preferences.mjs";
 import {object,projectErrorText} from "./contracts";
 import type {DiscoveryPreferences,DiscoveryPurpose,PreferencesView,ProjectPreferencesView,ProjectRuntime,ProjectView} from "./contracts";

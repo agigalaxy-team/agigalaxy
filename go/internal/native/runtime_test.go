@@ -2,38 +2,17 @@ package native
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 )
 
-func originalRuntimeStatus(t *testing.T, s *Store, website string) map[string]any {
-	t.Helper()
-	_, file, _, _ := runtime.Caller(0)
-	root := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(file), "../../..")))
-	script := `import {createNativeRuntime} from 'file:///` + root + `/packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';const runtime=await createNativeRuntime({dataDirectory:process.argv[1],endpoint:process.argv[2],website:process.argv[3],trustedKeys:new Map([['fixture',{publicKeyPem:'unused in read-only status',notBefore:0,notAfter:9007199254740991,revoked:false}]]),fetch:()=>{throw Error('status performed unexpected network')},autoResumePrivateSync:false});console.log(JSON.stringify(await runtime.status()));await runtime.close();`
-	cmd := exec.Command("node", "--input-type=module", "-e", script, s.Directory, s.Endpoint, website)
-	raw, e := cmd.Output()
-	if e != nil {
-		if failure, ok := e.(*exec.ExitError); ok {
-			t.Fatalf("original runtime: %v %s", e, failure.Stderr)
-		}
-		t.Fatal(e)
-	}
-	var out map[string]any
-	if e = json.Unmarshal(raw, &out); e != nil {
-		t.Fatal(e)
-	}
-	return out
-}
 func TestRuntimeReadOnlyStatusMatchesOriginalWithoutCreatingData(t *testing.T) {
+	fixture := uploadRows(readNativeContractFixture(t, "runtime-status-v1.json")["states"])
 	ctx := context.Background()
 	dir := filepath.Join(t.TempDir(), "absent")
 	store, e := NewStore(dir, "https://status.invalid")
@@ -50,7 +29,7 @@ func TestRuntimeReadOnlyStatusMatchesOriginalWithoutCreatingData(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, originalRuntimeStatus(t, store, config.Website), status)
+	same(t, fixture[0], status)
 	if present, _ := exists(dir); present {
 		t.Fatal("empty status created a data directory")
 	}
@@ -70,7 +49,7 @@ func TestRuntimeReadOnlyStatusMatchesOriginalWithoutCreatingData(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, originalRuntimeStatus(t, store, config.Website), status)
+	same(t, fixture[1], status)
 	legacyActive := map[string]any{"subjectId": "adopted-owner", "deviceId": "isolated-device", "installationId": "isolated-installation", "genesisProof": map[string]any{}, "bootstrapOperationId": "retained-extra-field"}
 	if e = os.MkdirAll(filepath.Join(dir, "native-v2", "records"), 0700); e != nil {
 		t.Fatal(e)
@@ -90,7 +69,7 @@ func TestRuntimeReadOnlyStatusMatchesOriginalWithoutCreatingData(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, originalRuntimeStatus(t, store, config.Website), status)
+	same(t, fixture[2], status)
 	result, e := rt.Disconnect(ctx)
 	if e != nil || result["remoteBindingRevoked"] != false {
 		t.Fatalf("local disconnect: %v", e)
@@ -111,7 +90,7 @@ func TestRuntimeReadOnlyStatusMatchesOriginalWithoutCreatingData(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	same(t, originalRuntimeStatus(t, store, config.Website), status)
+	same(t, fixture[3], status)
 }
 
 type runtimeNoNetwork struct{ t *testing.T }

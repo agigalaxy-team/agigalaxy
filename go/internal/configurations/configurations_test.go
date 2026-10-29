@@ -15,36 +15,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 )
 
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/configurations/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	raw, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original Configuration %s: %v %s", mode, e, stderr.String())
-	}
-	var out Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if json.Unmarshal(line, &out) == nil && out != nil {
-			return out
-		}
-	}
-	t.Fatal("fixture result")
-	return nil
-}
 func same(t *testing.T, a, b any) {
 	t.Helper()
 	var x, y any
@@ -55,20 +30,21 @@ func same(t *testing.T, a, b any) {
 	}
 }
 func TestOriginalConfigurationHTTPVersionsHistoryAndControl(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "configuration-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
 	var f struct {
 		Endpoint                                                                             string
 		Clock                                                                                int64
 		Owner                                                                                struct{ Subject, Token string }
 		First, FirstGrant, Second, SecondGrant, Revoke, RevokeGrant, Rollback, RollbackGrant Object
 	}
-	if e := json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
+	setupConfigurations(t, owner, "setup", &f)
+	var reads []struct {
+		Input   []Object `json:"input"`
+		Results []Object `json:"results"`
 	}
+	fixtureJSON(t, "read", &reads)
+	readIndex := 0
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -98,7 +74,13 @@ func TestOriginalConfigurationHTTPVersionsHistoryAndControl(t *testing.T) {
 	}
 	compare := func(kind string, a *deviceauth.Actor, input Object) {
 		t.Helper()
-		want := obj(list(node(t, dsn, "read", path, []any{Object{"kind": kind, "actor": a != nil, "input": input}})["results"])[0])
+		if readIndex >= len(reads) {
+			t.Fatal("missing captured read")
+		}
+		entry := reads[readIndex]
+		readIndex++
+		same(t, []Object{{"kind": kind, "actor": a != nil, "input": input}}, entry.Input)
+		want := entry.Results[0]
 		var got Object
 		var e error
 		switch kind {
@@ -191,7 +173,16 @@ func TestOriginalConfigurationHTTPVersionsHistoryAndControl(t *testing.T) {
 		copy["summary"] = value
 		samples = append(samples, copy)
 	}
-	checks := list(node(t, dsn, "schema", path, samples)["values"])
+	var schemas []struct {
+		Input  []any `json:"input"`
+		Values []any `json:"values"`
+	}
+	fixtureJSON(t, "schema", &schemas)
+	same(t, samples, schemas[0].Input)
+	checks := schemas[0].Values
+	if readIndex != len(reads) {
+		t.Fatalf("unconsumed captured reads: %d", len(reads)-readIndex)
+	}
 	for i, sample := range samples {
 		v, e := parseEvent(string(encode(sample)))
 		expected := obj(checks[i])

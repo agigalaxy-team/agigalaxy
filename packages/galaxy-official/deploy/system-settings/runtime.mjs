@@ -2,9 +2,9 @@ import {randomUUID,createHmac} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {request as httpRequest} from 'node:http';
 import {MaintenanceControlJournal} from '../maintenance-agent/journal.mjs';
-import {maintenanceRequestSignature} from "../../src/operations/maintenance/native.mjs";
-import {systemSettingsNativeCommandSchema,systemSettingsOperationSchema,parseSystemSettings,credentialMetadata,safeSystemSettingsError} from '../../src/operations/system-settings/schema.mjs';
-import {systemSettingsNativeOverviewSchema} from '../../src/operations/system-settings/read-model.mjs';
+import {maintenanceRequestSignature} from "../support/maintenance-signature.mjs";
+import {systemSettingsNativeCommandSchema,systemSettingsOperationSchema,parseSystemSettings,credentialMetadata,safeSystemSettingsError} from '../../../galaxy-contracts/src/operations-system-settings-schema.mjs';
+import {systemSettingsNativeOverviewSchema} from '../../../galaxy-contracts/src/operations-system-settings-overview-schema.mjs';
 
 const failure=code=>Object.assign(Error(code),{code});
 const terminal=new Set(['completed','partial','failed']);

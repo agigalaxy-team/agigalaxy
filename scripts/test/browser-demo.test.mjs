@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createDemoNode, encodeDemoState, decodeDemoState, exportDemoState, demoStorageKey } from '../../lib/browser-demo.mjs';
-import { verifyGalaxyGenesis } from '../../packages/galaxy-core/src/galaxy-guid.mjs';
+import { verifyGalaxyGenesis } from '../../packages/galaxy-contracts/src/identity/galaxy-guid.mjs';
 
 test('browser data is explicitly simulated and cannot masquerade as Core identity or signed export', () => {
   const node = createDemoNode();

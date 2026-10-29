@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/cases"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
@@ -13,36 +14,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 )
 
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/verificationrecords/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	raw, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original VerificationRecord %s %v %s", mode, e, stderr.String())
-	}
-	var out Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if json.Unmarshal(line, &out) == nil && out != nil {
-			return out
-		}
-	}
-	t.Fatal("fixture result")
-	return nil
-}
 func same(t *testing.T, a, b any) {
 	t.Helper()
 	var x, y any
@@ -53,21 +29,9 @@ func same(t *testing.T, a, b any) {
 	}
 }
 func TestOriginalVerificationRecordsHTTPVersionsAndCurrentSources(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "verification-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
-	var f struct {
-		Endpoint                                                                           string
-		Clock                                                                              int64
-		Owner, Viewer                                                                      struct{ Subject, Token string }
-		Root, First, Second, Verification, GoodCorrection, Intervention, InterventionGrant Object
-		Requests                                                                           map[string]Object
-	}
-	if e := json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
-	}
+	f := setupRecords(t, owner)
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -119,9 +83,17 @@ func TestOriginalVerificationRecordsHTTPVersionsAndCurrentSources(t *testing.T) 
 	}
 	submit("verification")
 	receipt := Object{"type": "verification", "id": f.Verification["id"], "operationId": f.Verification["operationId"], "payloadHash": identity.Digest([]byte(str(f.Requests["verification"], "payloadJson")))}
+	stage := 0
 	compare := func(queries []Object) {
 		t.Helper()
-		expected := arr(node(t, dsn, "read", path, queries)["results"])
+		var captured struct {
+			Queries []Object `json:"queries"`
+			Results []any    `json:"results"`
+		}
+		fixtureJSON(t, fmt.Sprintf("read-%d", stage), &captured)
+		stage++
+		same(t, queries, captured.Queries)
+		expected := captured.Results
 		for i, q := range queries {
 			var actor *deviceauth.Actor
 			if q["actor"] == "owner" {
@@ -168,6 +140,16 @@ func TestOriginalVerificationRecordsHTTPVersionsAndCurrentSources(t *testing.T) 
 			} else {
 				if _, ok := want["value"]; !ok {
 					t.Fatalf("query %d unexpected success %s JS=%v", i, encode(got), want)
+				}
+				if q["kind"] == "receipt" {
+					// Acceptance uses the database clock for the newly written
+					// event. Compare it to that exact persisted instant while
+					// keeping every other original receipt field fixed.
+					var accepted time.Time
+					if e := owner.QueryRow(ctx, `SELECT created_at FROM verification_events WHERE operation_id=$1`, input["operationId"]).Scan(&accepted); e != nil {
+						t.Fatal(e)
+					}
+					obj(obj(want["value"])["receipt"])["acceptedAt"] = accepted.UTC().Format("2006-01-02T15:04:05.000Z")
 				}
 				same(t, got, want["value"])
 				if q["kind"] == "record" {

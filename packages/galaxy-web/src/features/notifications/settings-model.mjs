@@ -1,4 +1,4 @@
-import {inboxOptionsSchema} from '../../../../galaxy-official/src/shared/notification-inbox-schema.mjs';
+import {inboxOptionsSchema} from '../../../../galaxy-contracts/src/notification-inbox-schema.mjs';
 
 const sorted = settings => {
   const value=inboxOptionsSchema.parse(settings);

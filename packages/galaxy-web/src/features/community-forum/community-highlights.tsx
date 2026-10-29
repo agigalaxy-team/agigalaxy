@@ -7,7 +7,7 @@ import React,{useEffect,useState} from 'react';
 import {Search} from 'lucide-react';
 import {availableForumContent,type ForumCardView,type ForumPostView} from './community-forum-view-types';
 import {forumVersionPath} from './community-forum-origin.mjs';
-import {forumTopics} from "../../../../galaxy-official/src/shared/community-forum-topics-v1.mjs";
+import {forumTopics} from "../../../../galaxy-contracts/src/community-forum-topics-v1.mjs";
 import type {createWebRuntime} from "../../runtime.mjs";
 import {MemberLink,useMemberNames,memberName} from "../../shared/people/conversation-ui";
 import {ContentCover,contentCoverFromLinks,EmptyContent,type ContentImage} from './community-content-visuals';

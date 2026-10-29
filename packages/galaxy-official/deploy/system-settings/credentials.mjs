@@ -2,7 +2,7 @@ import {mkdir,lstat,readFile,writeFile,readdir} from 'node:fs/promises';
 import {isDeepStrictEqual} from 'node:util';
 import {z} from 'zod';
 import {noSymlinkPath} from '../operations-stack/host.mjs';
-import {systemSettingsCredentialSchema,systemSettingsCredentialRefSchema,parseSystemSettings} from '../../src/operations/system-settings/schema.mjs';
+import {systemSettingsCredentialSchema,systemSettingsCredentialRefSchema,parseSystemSettings} from '../../../galaxy-contracts/src/operations-system-settings-schema.mjs';
 
 const failure=code=>Object.assign(Error(code),{code});
 const refId=reference=>{

@@ -2,8 +2,8 @@ import {
   eventDraftFields,
   eventFromDraft,
   checkEventDraftTarget,
-} from '../../../../packages/galaxy-official/src/shared/assistance-event-draft.mjs';
-import { publicContributionEventKinds } from '../../../../packages/galaxy-official/src/shared/assistance-schema.mjs';
+} from '../../../../packages/galaxy-contracts/src/assistance-event-draft.mjs';
+import { publicContributionEventKinds } from '../../../../packages/galaxy-contracts/src/assistance-schema.mjs';
 
 export function createAssistanceDraftsEvents(session) {
   function renderEvent(row) {

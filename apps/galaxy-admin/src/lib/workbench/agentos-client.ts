@@ -61,7 +61,7 @@ export function nativeConversationRetryMessage(conversation:(AgentOsConversation
  return current.userInput;
 }
 export function nativeConversationFailureLabel(run:AgentOsNativeRun){const failure=nativeConversationFailure(run);return failure.title+'。'+failure.detail+failure.processingNotice;}
-import {operationsAiUseAllowed} from "../../../../../packages/galaxy-official/src/shared/operations-ai-use.mjs";
+import {operationsAiUseAllowed} from "../../../../../packages/galaxy-contracts/src/operations-ai-use.mjs";
 
 
 export function nativeConversationDisplayRuns(runs:readonly AgentOsNativeRun[]){

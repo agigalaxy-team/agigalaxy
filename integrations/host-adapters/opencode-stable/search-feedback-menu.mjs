@@ -1,4 +1,4 @@
-import { searchSourceTypes } from '../../../packages/galaxy-official/src/shared/search-schema.mjs';
+import { searchSourceTypes } from '../../../packages/galaxy-contracts/src/search-schema.mjs';
 import {searchSourceName} from './source-reading.mjs';
 const plain=value=>String(value??'').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ').slice(0,6000);
 function surface({select,info,language,isCurrent,onBack}){

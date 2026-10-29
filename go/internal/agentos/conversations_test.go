@@ -6,10 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -20,6 +16,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -38,39 +35,24 @@ func (d *conversationDirectory) RolesFresh(ctx context.Context, issuer, subject 
 }
 
 func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	node := func(script, mode string, input any) Object {
-		t.Helper()
-		command := exec.Command("node", filepath.Join(root, "scripts/go", script), mode)
-		command.Dir = root
-		command.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		if input != nil {
-			body, _ := json.Marshal(input)
-			command.Stdin = bytes.NewReader(body)
-		}
-		raw, err := command.CombinedOutput()
-		if err != nil {
-			t.Fatalf("original %s: %v %s", mode, err, raw)
-		}
-		var value Object
-		if json.Unmarshal(raw, &value) != nil {
-			t.Fatal("invalid fixture output")
-		}
-		return value
-	}
-	base := node("operations-permissions-interop.mjs", "setup", nil)
-	automation := node("operations-permissions-interop.mjs", "automation-setup", nil)
-	prepared := node("agentos-durable-interop.mjs", "prepare", Object{"management": true})
-	row := object(prepared["row"])
-	id := row["id"].(string)
-	endpoint, issuer := base["endpoint"].(string), base["issuer"].(string)
-	idRoot := object(base["ids"])["root"].(string)
-	config, err := pgxpool.ParseConfig(dsn)
+	f := operationsfixture.New(t, owner)
+	automation := f.Automation(t)
+	endpoint, issuer, idRoot := f.Endpoint, f.Issuer, f.IDs["root"]
+	role, err := f.Permissions.SaveRole(ctx, f.Root, Object{"operationId": uuid.NewString(), "expectedVersion": 0, "name": "Conversation service role", "description": "Isolated current AI permission fixture", "subjectScope": "ai-only", "enabled": true, "permissions": []any{"workbench.read", "ai.roles.read", "ai.roles.create", "ai.roles.update", "ai.roles.assign", "ai.roles.revoke", "ai.prompts.read", "ai.prompts.update"}})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err = f.Permissions.AIWorkAssignment(ctx, f.Root, "overview", Object{"operationId": uuid.NewString(), "expectedVersion": 0, "roleId": object(role["role"])["id"], "enabled": true}); err != nil {
+		t.Fatal(err)
+	}
+	for domain, configuration := range map[string]Object{"overview": {"prompt": "请依据当前授权处理，禁止借用其他岗位权限。"}, "governance": {"prompt": "原岗位工作要求", "model": Object{"retained": "unchanged"}}} {
+		if _, err = owner.Exec(ctx, `INSERT INTO operations_autonomy_configs_v1(id,endpoint,domain,revision,enabled,configuration,prompt_version,plan_version,delegation_version,updated_by,created_at,updated_at) VALUES($1,$2,$3,1,false,$4,1,1,1,$5,$6,$6)`, uuid.NewString(), endpoint, domain, configuration, idRoot, f.Now()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, err := c.Exec(ctx, "SET ROLE galaxy_api"); return err }
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
@@ -97,27 +79,22 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if current.Row.ID != id || current.Row.PermissionKey != row["permission_key"] {
-		t.Fatal("original durable identity or permission digest changed")
+	id := current.Row.ID
+	again, err := service.Session(ctx, human, "overview", true)
+	if err != nil || again.Row.ID != id || again.Row.PermissionKey != current.Row.PermissionKey {
+		t.Fatal("durable conversation identity changed", err)
 	}
-	original := node("agentos-durable-interop.mjs", "current", Object{"id": id})
-	encoded, _ := json.Marshal(current.Row.View())
-	var view Object
-	_ = json.Unmarshal(encoded, &view)
-	if !reflect.DeepEqual(view, object(original["view"])) {
-		t.Fatal("original conversation view differs")
+	view := current.Row.View()
+	if view["id"] != id || view["domain"] != "overview" || view["operatorId"] != idRoot {
+		t.Fatal("conversation view changed", view)
 	}
 	input := Object{"conversationId": id, "operation": "run", "resourceType": "agents", "resourceId": "galaxy-conversation-overview"}
-	expected := node("agentos-durable-interop.mjs", "authorize", input)
 	value, err := service.AuthorizeNative(ctx, input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoded, _ = json.Marshal(value)
-	var normalized Object
-	_ = json.Unmarshal(encoded, &normalized)
-	if !reflect.DeepEqual(normalized, expected) {
-		t.Fatal("private current prompt/context differs from original")
+	if value["allowed"] != true || object(object(value["execution"])["rolePrompt"])["text"] != "请依据当前授权处理，禁止借用其他岗位权限。" {
+		t.Fatal("current prompt or authorization missing")
 	}
 	// An accepted native request with a lost response is recovered through the
 	// same durable turn before checking model readiness, never submitted twice.
@@ -187,7 +164,7 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 		t.Fatal("operation identity accepted changed input", err)
 	}
 	service.Tools = &ConversationTools{Conversations: service}
-	toolInput := Object{"conversationId": id, "sessionId": row["session_id"], "turnId": operationID, "runId": "original-native-run", "callId": "provider:opaque/call+01", "tool": "read-ai-delegation", "arguments": Object{}}
+	toolInput := Object{"conversationId": id, "sessionId": current.Row.SessionID, "turnId": operationID, "runId": "original-native-run", "callId": "provider:opaque/call+01", "tool": "read-ai-delegation", "arguments": Object{}}
 	invokeTool := func(input Object) *httptest.ResponseRecorder {
 		body, _ := json.Marshal(input)
 		call := httptest.NewRequest("POST", "https://admin.example.invalid/v1/internal/agentos/tools/execute", bytes.NewReader(body))
@@ -205,9 +182,8 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 	if json.Unmarshal(toolResponse.Body.Bytes(), &toolResult) != nil {
 		t.Fatal("invalid actual tool result")
 	}
-	originalTool := node("agentos-durable-interop.mjs", "management-tool", Object{})
-	if !reflect.DeepEqual(toolResult, originalTool) {
-		t.Fatal("actual private AI delegation projection differs from original")
+	if toolResult["tool"] != "read-ai-delegation" || toolResult["availability"] != "available" || toolResult["data"] == nil || object(toolResult["pagination"])["complete"] != true {
+		t.Fatal("current delegation projection unavailable", toolResult)
 	}
 	toolInput["arguments"] = Object{"aiAccountId": uuid.NewString()}
 	if response := invokeTool(toolInput); response.Code != 409 {

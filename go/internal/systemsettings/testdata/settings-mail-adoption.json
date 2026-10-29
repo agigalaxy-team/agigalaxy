@@ -1,0 +1,30 @@
+{
+  "result": {
+    "state": "recorded",
+    "versionId": "<isolated-test-version-id>"
+  },
+  "receipt": {
+    "version": 1,
+    "versionId": "<isolated-test-version-id>",
+    "component": "api",
+    "pid": 1234,
+    "checkedAt": 2000000000,
+    "configurationVersion": 1,
+    "configuration": {
+      "enabled": true,
+      "host": "smtp.example.invalid",
+      "port": 465,
+      "tls": "implicit",
+      "credentialRef": "<isolated-test-credential-reference>",
+      "connectionTimeoutMs": 5000,
+      "greetingTimeoutMs": 5000,
+      "socketTimeoutMs": 5000,
+      "maxConnections": 2,
+      "rateLimit": 20,
+      "rateWindowSeconds": 60,
+      "dkimSelector": null
+    },
+    "credentialConfigured": true,
+    "credentialFile": "<isolated-test-credential-file>"
+  }
+}

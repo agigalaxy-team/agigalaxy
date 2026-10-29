@@ -2,12 +2,8 @@ package resourcebudget
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"math/big"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -44,26 +40,10 @@ func (t tracedTx) QueryRow(ctx context.Context, q string, args ...any) pgx.Row {
 	return t.Tx.QueryRow(ctx, q, args...)
 }
 func TestResourceWriteActualSQLLockOrderAndRollback(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	var subject string
-	node := func(mode string) []byte {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/resource-budget-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_BUDGET_SUBJECT="+subject)
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original JS %s: %v %s", mode, e, out)
-		}
-		return out
-	}
-	var fixture struct{ SubjectID, BindingID, CredentialHash, AccountID, ScopeID, PublicKeyPEM string }
-	if e := json.Unmarshal(node("setup"), &fixture); e != nil {
-		t.Fatal(e)
-	}
-	subject = fixture.SubjectID
+	fixture := seedBudgetFixture(t, owner)
+	subject := fixture.SubjectID
 	cfg := owner.Config()
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)
@@ -76,9 +56,10 @@ func TestResourceWriteActualSQLLockOrderAndRollback(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	var original oracleUsage
-	if e = json.Unmarshal(node("usage"), &original); e != nil || usage.PayloadBytes.Cmp(original.native().PayloadBytes) != 0 || usage.QueuedJobs != original.QueuedJobs || usage.ActiveExports != original.ActiveExports || usage.QueuedJobs != 2 || usage.ActiveExports != 1 {
-		t.Fatalf("Go/JS usage differs: %+v %+v %v", usage, original, e)
+	// Two multibyte work identifiers, the stored JSONB body and fixed
+	// work/scope reservations total exactly 1606 bytes for this synthetic row.
+	if usage.PayloadBytes.Cmp(big.NewInt(1606)) != 0 || usage.QueuedJobs != 2 || usage.ActiveExports != 1 {
+		t.Fatalf("resource accounting %+v", usage)
 	}
 	// The additional public audit fields come from the fresh row, not Actor cache.
 	authService := &deviceauth.Service{Pool: pool, Endpoint: "https://budget.example.invalid", Now: func() time.Time { return time.Unix(now, 0) }}
@@ -96,16 +77,26 @@ func TestResourceWriteActualSQLLockOrderAndRollback(t *testing.T) {
 	if e = LockSubjectResourceBudget(ctx, lockTx, subject); e != nil {
 		t.Fatal(e)
 	}
-	var lockResult struct{ Blocked, Locked bool }
-	if e = json.Unmarshal(node("original-lock"), &lockResult); e != nil || !lockResult.Blocked {
-		t.Fatal("original JS resource lock did not contend with Go")
+	contend := func() error {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(ctx)
+		if _, err = tx.Exec(ctx, "SET LOCAL lock_timeout='200ms'"); err != nil {
+			return err
+		}
+		return LockSubjectResourceBudget(ctx, tx, subject)
+	}
+	var blocked *pgconn.PgError
+	if err := contend(); !errors.As(err, &blocked) || blocked.Code != "55P03" {
+		t.Fatal("subject lock did not serialize contenders", err)
 	}
 	if e = lockTx.Rollback(ctx); e != nil {
 		t.Fatal(e)
 	}
-	lockResult.Blocked = false
-	if e = json.Unmarshal(node("original-lock"), &lockResult); e != nil || !lockResult.Locked {
-		t.Fatal("resource lock not released by transaction")
+	if e = contend(); e != nil {
+		t.Fatal("subject lock not released", e)
 	}
 	policy := DefaultPolicy()
 	policy.MaxPayloadBytesPerSubject = usage.PayloadBytes.Int64()

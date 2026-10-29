@@ -6,7 +6,7 @@ import {useAccountConnection} from "../accounts/account-center";
 import {useQueryReads} from "../../application/query-reads";
 import {useQueryClient} from '@tanstack/react-query';
 import {galaxyQueryKey} from '../../shared/runtime/query-client';
-import {accountFollowRelationshipSchema,type accountFollowStatusSchema} from '../../../../galaxy-official/src/shared/account-follows-schema.mjs';
+import {accountFollowRelationshipSchema,type accountFollowStatusSchema} from '../../../../galaxy-contracts/src/account-follows-schema.mjs';
 import {createAccountFollowsClient} from './client.mjs';
 import './account-follows.css';
 

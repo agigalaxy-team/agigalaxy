@@ -1,4 +1,4 @@
-import {discoveryPreferencesSchema} from "../../../../../galaxy-official/src/shared/discovery-schema.mjs";
+import {discoveryPreferencesSchema} from "../../../../../galaxy-contracts/src/discovery-schema.mjs";
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const compare = (left, right) => left < right ? -1 : left > right ? 1 : 0;

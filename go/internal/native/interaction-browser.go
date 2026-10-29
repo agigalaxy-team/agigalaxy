@@ -23,13 +23,14 @@ import (
 // without form elicitation. The HTTP page only records an allow/decline choice;
 // the original MCP call alone executes the exact operation under its scope.
 type BrowserChoices struct {
-	store   *Store
-	now     func() time.Time
-	mu      sync.Mutex
-	server  *http.Server
-	origin  string
-	entries map[string]*interactionBrowserEntry
-	closed  bool
+	store           *Store
+	now             func() time.Time
+	mu              sync.Mutex
+	server          *http.Server
+	origin          string
+	entries         map[string]*interactionBrowserEntry
+	recoveryEntries map[string]*recoveryBrowserEntry
+	closed          bool
 }
 type BrowserChoiceInput struct {
 	Name    string
@@ -67,6 +68,11 @@ func interactionKey(input BrowserChoiceInput) (string, error) {
 	return identity.Digest(raw), nil
 }
 func (b *BrowserChoices) pruneLocked() {
+	for path, entry := range b.recoveryEntries {
+		if !entry.expires.After(b.now()) {
+			delete(b.recoveryEntries, path)
+		}
+	}
 	for path, entry := range b.entries {
 		if !entry.expires.After(b.now()) && !entry.running {
 			delete(b.entries, path)
@@ -249,6 +255,11 @@ func (b *BrowserChoices) serve(w http.ResponseWriter, r *http.Request) {
 	if b.closed || expected == nil || r.Host != expected.Host || r.URL.IsAbs() {
 		b.mu.Unlock()
 		interactionResponse(w, 403, "本机审阅地址不匹配。")
+		return
+	}
+	if recovery := b.recoveryEntries[r.URL.Path]; recovery != nil {
+		b.mu.Unlock()
+		b.serveRecovery(w, r, recovery, origin)
 		return
 	}
 	entry := b.entries[r.URL.Path]

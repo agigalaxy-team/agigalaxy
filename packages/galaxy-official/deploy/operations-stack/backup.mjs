@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { lstat, mkdir, readFile, realpath, chmod, chown } from 'node:fs/promises';
 import { posix } from 'node:path';
-import { beginBackupStatus, finishBackupStatus } from '../../src/operations/backup-status.mjs';
+import { beginBackupStatus, finishBackupStatus } from '../support/backup-status.mjs';
 import { requireConfiguration, beneath } from './configuration.mjs';
 import { runCommand, ensureDirectory, atomicWrite, newTarget, removeOwnedTarget, withJobLock, resticEnvironment, inspectPostgres, postgresSqlArguments, quiesce } from './host.mjs';
 import { pgBackRestConfiguration } from './render.mjs';

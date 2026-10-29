@@ -1,15 +1,20 @@
 package native
 
 import (
+	"bytes"
 	"context"
+	"crypto/ed25519"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 )
 
@@ -21,7 +26,7 @@ func initializationNode(t *testing.T, script string, args ...string) map[string]
 	command.Dir = root
 	output, e := command.Output()
 	if e != nil {
-		t.Fatalf("initialization Node interop: %v: %s", e, output)
+		t.Fatalf("Node interop: %v: %s", e, output)
 	}
 	var result map[string]any
 	if e = protocol.Decode(output, &result); e != nil {
@@ -29,9 +34,123 @@ func initializationNode(t *testing.T, script string, args ...string) map[string]
 	}
 	return result
 }
+
+// Fixed synthetic contract observations from the original implementation.
+func nativeContractFixture(t *testing.T) map[string]any {
+	return readNativeContractFixture(t, t.Name()+".json")
+}
+func readNativeContractFixture(t *testing.T, name string) map[string]any {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "contracts", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]any
+	if err = protocol.Decode(raw, &result); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+// The original Node journal bytes, with only per-run identity, event and key values substituted.
+// No private key is stored in the fixture; initializationNew generates it for this test process.
+func legacyInitializationFixture(t *testing.T) (initializationRecord, []byte) {
+	t.Helper()
+	record, err := initializationNew("person")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var local, state map[string]any
+	if err = json.Unmarshal(record.Identity, &local); err != nil {
+		t.Fatal(err)
+	}
+	if err = json.Unmarshal(record.State, &state); err != nil {
+		t.Fatal(err)
+	}
+	proof := local["genesisProof"].(map[string]any)
+	event := state["auditEvents"].([]any)[0].(map[string]any)
+	raw, err := os.ReadFile(filepath.Join("testdata", "contracts", "legacy-initialization-journal-template.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, value := range map[string]string{"__ID__": local["id"].(string), "__PUBLIC__": record.PublicKeyPEM, "__PRIVATE__": record.PrivateKeyPEM, "__NONCE__": proof["nonce"].(string), "__FINGERPRINT__": local["publicKeyFingerprint"].(string), "__CREATED__": local["createdAt"].(string), "__EVENT__": event["id"].(string)} {
+		placeholder, _ := json.Marshal(name)
+		encoded, _ := json.Marshal(value)
+		if !bytes.Contains(raw, placeholder) {
+			t.Fatalf("fixture missing %s", name)
+		}
+		raw = bytes.ReplaceAll(raw, placeholder, encoded)
+	}
+	var original initializationRecord
+	if err = json.Unmarshal(raw, &original); err != nil {
+		t.Fatal(err)
+	}
+	if err = initializationValidate(original); err != nil {
+		t.Fatal(err)
+	}
+	return original, raw
+}
+func assertInitializationIdentity(t *testing.T, dir string, expected map[string]any) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(dir, "galaxy-id.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var local map[string]any
+	if err = protocol.Decode(data, &local); err != nil {
+		t.Fatal(err)
+	}
+	same(t, expected, local)
+	if !connectionGenesis(text(local["id"]), initializationMap(local["genesisProof"])) {
+		t.Fatal("invalid genesis")
+	}
+	priv, err := os.ReadFile(filepath.Join(dir, "galaxy-id-private-key.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := identity.PrivatePEM(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := identity.PublicPEM(key.Public().(ed25519.PublicKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, err := os.ReadFile(filepath.Join(dir, "galaxy-id-public-key.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pub != string(saved) || pub != initializationMap(local["genesisProof"])["publicKeyPem"] {
+		t.Fatal("identity key mismatch")
+	}
+	// Shared Genesis contract and the standard Node crypto implementation independently
+	// verify the generated local bytes; no retired Core implementation is loaded.
+	check := initializationNode(t, `import {readFile} from 'node:fs/promises';import {join} from 'node:path';import {createPrivateKey,createPublicKey,createHash} from 'node:crypto';import {verifyGalaxyGenesis} from './packages/galaxy-contracts/src/identity/galaxy-guid.mjs';const dir=process.argv[1],identity=JSON.parse(await readFile(join(dir,'galaxy-id.json'),'utf8')),pub=await readFile(join(dir,'galaxy-id-public-key.pem'),'utf8'),priv=await readFile(join(dir,'galaxy-id-private-key.pem'),'utf8');const fingerprint=createHash('sha256').update(pub).digest('hex').match(/.{1,4}/g).join(':');console.log(JSON.stringify({valid:verifyGalaxyGenesis(identity.id,identity.genesisProof)&&createPublicKey(createPrivateKey(priv)).export({type:'spki',format:'pem'})===pub&&identity.genesisProof.publicKeyPem===pub&&identity.publicKeyFingerprint===fingerprint}));`, dir)
+	if check["valid"] != true {
+		t.Fatal("shared Genesis contract or Node crypto rejected the identity")
+	}
+}
+func nativeSourceShape(t *testing.T, name, owner string) map[string]any {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "contracts", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const fixtureOwner = "GUID1500000000000000000000000000"
+	if name == "worker-source-v1.json" && !bytes.Contains(raw, []byte(fixtureOwner)) {
+		t.Fatal("worker source fixture missing owner")
+	}
+	raw = []byte(strings.ReplaceAll(string(raw), fixtureOwner, owner))
+	var result map[string]any
+	if err = protocol.Decode(raw, &result); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
 func TestInitializationPreviewMatchesOriginalCatalogAndSelection(t *testing.T) {
 	cases := []string{`{}`, `{"profile":"minimal"}`, `{"profile":"coding-case","subjectType":"organization"}`, `{"profile":"agent-workspace"}`, `{"modules":["agent-guidance"]}`, `{"modules":[]}`, `{"initializationPath":"personal-galaxy"}`, `{"initializationPath":"galaxy-worker"}`, `{"initializationPath":"galaxy-hub"}`, `{"uploadPrivacy":{"level":"conversation-archive","includeFullConversations":true,"sessionIds":[" one ","one"]}}`}
-	for _, raw := range cases {
+	fixture := readNativeContractFixture(t, "initialization-v1.json")
+	for index, raw := range cases {
 		t.Run(raw, func(t *testing.T) {
 			var input InitializationInput
 			if e := protocol.Decode([]byte(raw), &input); e != nil {
@@ -41,11 +160,11 @@ func TestInitializationPreviewMatchesOriginalCatalogAndSelection(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			want := initializationNode(t, `import {previewGalaxyIntegration} from './packages/galaxy-core/src/application/local-operations.mjs';console.log(JSON.stringify(previewGalaxyIntegration(JSON.parse(process.argv[1]))));`, raw)
+			want := uploadRows(fixture["previews"])[index]
 			same(t, want, got)
 		})
 	}
-	want := initializationNode(t, `import {listIntegrationModules} from './packages/galaxy-core/src/initialization/catalog.mjs';console.log(JSON.stringify(listIntegrationModules()));`)
+	want := fixture["catalog"]
 	same(t, want, InitializationCatalog())
 	for _, input := range []InitializationInput{{Profile: "missing"}, {Modules: []string{"remote-sync"}}, {SubjectType: "agent"}, {InitializationPath: "personal-galaxy", Profile: "minimal"}} {
 		if _, e := PreviewInitialization(input); e == nil {
@@ -79,14 +198,16 @@ func TestInitializationConfirmedLocalIdentityKeysAndModulesAreJSReadable(t *test
 		t.Fatal(e)
 	}
 	same(t, mergedPlan, result["result"].(map[string]any)["plan"])
-	const script = `import {readFile} from 'node:fs/promises';import {join} from 'node:path';import {createPrivateKey,createPublicKey} from 'node:crypto';import {getLocalSnapshot,getGalaxyIntegrationStatus} from './packages/galaxy-core/src/application/local-operations.mjs';import {verifyGalaxyGenesis} from './packages/galaxy-core/src/galaxy-guid.mjs';import {fingerprint} from './packages/galaxy-core/src/domain/local-model.mjs';const dir=process.argv[1],snapshot=await getLocalSnapshot(dir),id=snapshot.identity,pub=await readFile(join(dir,'galaxy-id-public-key.pem'),'utf8'),priv=await readFile(join(dir,'galaxy-id-private-key.pem'),'utf8');if(!verifyGalaxyGenesis(id.id,id.genesisProof)||createPublicKey(createPrivateKey(priv)).export({type:'spki',format:'pem'})!==pub||fingerprint(pub)!==id.publicKeyFingerprint)throw Error('identity/key mismatch');console.log(JSON.stringify({snapshot,status:await getGalaxyIntegrationStatus(dir)}));`
-	read := initializationNode(t, script, dir)
-	snapshot := read["snapshot"].(map[string]any)
-	same(t, result["result"].(map[string]any)["galaxyId"], snapshot["identity"])
-	if snapshot["identity"].(map[string]any)["subjectType"] != "organization" {
-		t.Fatal(read)
+	local := result["result"].(map[string]any)["galaxyId"].(map[string]any)
+	assertInitializationIdentity(t, dir, local)
+	if local["subjectType"] != "organization" {
+		t.Fatal(local)
 	}
-	status := read["status"].(map[string]any)
+	statusValue, e := store.IntegrationStatus(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	status := statusValue.(map[string]any)
 	if status["initialized"] != true || status["localOnly"] != true {
 		t.Fatal(status)
 	}
@@ -134,9 +255,16 @@ func TestInitializationJournalIsCompatibleWithOriginalRecoveryAndRefusesConflict
 	if e = os.WriteFile(filepath.Join(dir, "galaxy-id-private-key.pem"), []byte(record.PrivateKeyPEM), 0600); e != nil {
 		t.Fatal(e)
 	}
-	recovered := initializationNode(t, `import {resumeInitialization} from './packages/galaxy-core/src/storage/initialization.mjs';import {localPaths} from './packages/galaxy-core/src/storage/files.mjs';import {getLocalSnapshot} from './packages/galaxy-core/src/application/local-operations.mjs';await resumeInitialization(localPaths(process.argv[1]));console.log(JSON.stringify(await getLocalSnapshot(process.argv[1])));`, dir)
-	if !connectionGenesis(text(recovered["identity"].(map[string]any)["id"]), initializationMap(recovered["identity"].(map[string]any)["genesisProof"])) {
-		t.Fatal("Node could not recover original Go identity")
+	if e = initializationResume(dir); e != nil {
+		t.Fatal(e)
+	}
+	var expected map[string]any
+	if e = protocol.Decode(record.Identity, &expected); e != nil {
+		t.Fatal(e)
+	}
+	assertInitializationIdentity(t, dir, expected)
+	if e = initializationResume(dir); e != nil {
+		t.Fatal(e)
 	}
 	conflict := t.TempDir()
 	if e = os.WriteFile(filepath.Join(conflict, "galaxy-id-public-key.pem"), []byte("unrelated-existing-material"), 0600); e != nil {
@@ -219,16 +347,38 @@ func TestInitializationPreservesSelectedOtherIdentityAndOnlyStoresItsModules(t *
 
 func TestInitializationResumesOriginalJSJournalWithOriginalIdentity(t *testing.T) {
 	directory := t.TempDir()
-	read := initializationNode(t, `import {join} from 'node:path';import {mkdir,readFile} from 'node:fs/promises';import {initializeLocalGalaxyId} from './packages/galaxy-core/src/application/local-operations.mjs';import {publishInitialization} from './packages/galaxy-core/src/storage/initialization.mjs';import {localPaths} from './packages/galaxy-core/src/storage/files.mjs';const root=process.argv[1],seed=join(root,'seed'),dest=join(root,'pending');const first=await initializeLocalGalaxyId(seed,{subjectType:'person'});await mkdir(dest);const paths=localPaths(seed);const record={version:1,identity:first.identity,privateKeyPem:await readFile(paths.privateKey,'utf8'),publicKeyPem:await readFile(paths.publicKey,'utf8'),state:first.state};try{await publishInitialization(localPaths(dest),record,async phase=>{if(phase==='private-key')throw Error('synthetic interruption');});}catch(error){if(error.message!=='synthetic interruption')throw error;}console.log(JSON.stringify({id:first.identity.id}));`, directory)
-	store, _ := NewStore(filepath.Join(directory, "pending"), "")
+	record, raw := legacyInitializationFixture(t)
+	if e := os.WriteFile(filepath.Join(directory, ".galaxy-initialization.json"), raw, 0600); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(filepath.Join(directory, "galaxy-id-private-key.pem"), []byte(record.PrivateKeyPEM), 0600); e != nil {
+		t.Fatal(e)
+	}
+	var expected map[string]any
+	if e := protocol.Decode(record.Identity, &expected); e != nil {
+		t.Fatal(e)
+	}
+	store, _ := NewStore(directory, "")
 	out, e := store.Initialize(context.Background(), InitializationInput{Profile: "minimal"}, true, nil)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if out["identity"] != read["id"] {
+	if out["identity"] != expected["id"] {
 		t.Fatal("journal recovery changed identity")
 	}
-	if _, e = os.Stat(filepath.Join(store.Directory, ".galaxy-initialization.json")); !os.IsNotExist(e) {
+	assertInitializationIdentity(t, directory, expected)
+	if _, e = os.Stat(filepath.Join(directory, ".galaxy-initialization.json")); !os.IsNotExist(e) {
 		t.Fatal("recovery did not finish journal")
+	}
+	before, e := os.ReadFile(filepath.Join(directory, "galaxy-id-private-key.pem"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = store.Initialize(context.Background(), InitializationInput{Profile: "minimal"}, true, nil); e != nil {
+		t.Fatal(e)
+	}
+	after, e := os.ReadFile(filepath.Join(directory, "galaxy-id-private-key.pem"))
+	if e != nil || !bytes.Equal(before, after) {
+		t.Fatal("repeat initialization changed identity key")
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/opportunities"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/profiles"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http/httptest"
@@ -15,8 +17,7 @@ import (
 
 func TestDiscoveryV1OriginalProfilesCurrentPreferencesAndQuery(t *testing.T) {
 	admin, dsn := testsupport.PostgreSQL(t)
-	archive := fakeArchive(t)
-	f := chatNativeFixture(t, dsn, "xmpp://"+archive.listener.Addr().String(), "opportunities-server")
+	f := chatGoIdentityFixture(t, admin)
 	ctx := context.Background()
 	cfg, e := pgxpool.ParseConfig(dsn)
 	if e != nil {
@@ -34,31 +35,45 @@ func TestDiscoveryV1OriginalProfilesCurrentPreferencesAndQuery(t *testing.T) {
 	server := httptest.NewServer(opportunities.Handler{Service: source})
 	defer server.Close()
 	peerToken := str(obj(f, "peer"), "token")
-	ownerToken := str(obj(f, "owner"), "token")
-	input := obj(f, "contacts")
-	query := Object{"projectId": input["legacyProjectId"]}
+	owner := f["ownerFixture"].(deviceauthfixture.Fixture)
+	peer := f["peerFixture"].(deviceauthfixture.Fixture)
+	profileService := &profiles.Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Now: clock}
+	legacyProject := uuid.NewString()
+	publish := func(who deviceauthfixture.Fixture, name string, entries []any) string {
+		t.Helper()
+		id := uuid.NewString()
+		payload := Object{"id": id, "expectedRevision": 0, "selfDeclared": Object{"displayName": name, "projects": entries}, "sharing": Object{"visibility": "Public", "viewers": []any{}, "expiresAt": num(f, "now") + 3600}}
+		grant := who.Grant(t, payload, "profile.publish", id, "Public", nil)
+		if _, err := profileService.Publish(ctx, who.Actor, encode(grant), ""); err != nil {
+			t.Fatal("publish signed profile", err)
+		}
+		return grant["consentId"].(string)
+	}
+	publish(peer, "Parser participant", []any{Object{"id": legacyProject, "kind": "module", "title": "Legacy declared parser", "summary": "Current self-declaration", "functions": []any{"table-extraction"}, "discoverable": true}})
+	ownerConsent := publish(owner, "Matching declarations", []any{Object{"id": uuid.NewString(), "kind": "module", "title": "Full overlap", "summary": "Declared only", "functions": []any{"table-extraction"}, "discoverable": true}, Object{"id": uuid.NewString(), "kind": "project", "title": "Partial overlap", "summary": "Declared only", "functions": []any{"table-extraction", "normalization"}, "technologies": []any{"Go"}, "discoverable": true}})
+	for _, who := range []deviceauthfixture.Fixture{owner, peer} {
+		if _, err := source.SavePreferences(ctx, who.Actor, Object{"expectedRevision": 0, "preferences": Object{"enabled": true}}, nil); err != nil {
+			t.Fatal("enable discovery", err)
+		}
+	}
+	query := Object{"projectId": legacyProject}
 	compare := func(path string, body Object) Object {
 		t.Helper()
 		status, got := chatRequest(t, server.URL, path, peerToken, body)
 		if status != 200 {
 			t.Fatal("Go original discovery", status, got)
 		}
-		status, want := chatRequest(t, str(f, "origin"), path, peerToken, body)
-		if status != 200 {
-			t.Fatal("original discovery", status, want)
-		}
-		same(t, got, want)
 		return got
 	}
 	page := compare("/v1/discovery/query", query)
 	if len(page["items"].([]any)) != 2 {
 		t.Fatal("real declared-profile matches", page)
 	}
-	limited := compare("/v1/discovery/query", Object{"projectId": input["legacyProjectId"], "limit": 1})
+	limited := compare("/v1/discovery/query", Object{"projectId": legacyProject, "limit": 1})
 	if !truth(limited, "resultLimited") || len(limited["items"].([]any)) != 1 {
 		t.Fatal("original result window", limited)
 	}
-	status, missing := chatRequest(t, server.URL, "/v1/discovery/query", peerToken, Object{"projectId": obj(input, "project")["projectId"]})
+	status, missing := chatRequest(t, server.URL, "/v1/discovery/query", peerToken, Object{"projectId": uuid.NewString()})
 	if status != 404 || str(missing, "error") != "discovery_project_not_found" {
 		t.Fatal("V1 incorrectly expanded into ProjectV2", status, missing)
 	}
@@ -76,20 +91,15 @@ func TestDiscoveryV1OriginalProfilesCurrentPreferencesAndQuery(t *testing.T) {
 	if status != 409 || str(conflict, "error") != "notification_preferences_conflict" {
 		t.Fatal("original optimistic preferences", status, conflict)
 	}
-	status, restored := chatRequest(t, str(f, "origin"), "/v1/discovery/preferences/save", peerToken, Object{"expectedRevision": saved["revision"], "preferences": Object{"enabled": true}})
+	status, restored := chatRequest(t, server.URL, "/v1/discovery/preferences/save", peerToken, Object{"expectedRevision": saved["revision"], "preferences": Object{"enabled": true}})
 	if status != 200 {
 		t.Fatal(restored)
 	}
 	compare("/v1/discovery/query", query)
 	// Revoke the latest source, retaining bytes; no earlier public declaration
 	// may be substituted by the current profile projection.
-	var consent string
-	if e = admin.QueryRow(ctx, "SELECT consent_id::text FROM profile_statements WHERE subject_id=$1 ORDER BY revision DESC LIMIT 1", obj(f, "owner")["subjectId"]).Scan(&consent); e != nil {
-		t.Fatal(e)
-	}
-	status, result := chatRequest(t, str(f, "origin"), "/v1/consents/"+consent+"/revoke", ownerToken, Object{})
-	if status != 200 {
-		t.Fatal(result)
+	if _, e = devices.RevokeConsent(ctx, owner.Actor, ownerConsent, nil); e != nil {
+		t.Fatal("revoke source", e)
 	}
 	revoked := compare("/v1/discovery/query", query)
 	if len(revoked["items"].([]any)) != 0 {

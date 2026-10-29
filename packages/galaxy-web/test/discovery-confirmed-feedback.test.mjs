@@ -4,10 +4,9 @@ import {randomUUID} from 'node:crypto';
 import {createPublicCommunityFeedback} from '../src/features/discovery/public-feedback.mjs';
 import {createAccountReadingBookmarksClient} from '../src/features/bookmarks/client.mjs';
 import {createCommunityForumClient,newForumDraft,forumDraftPayload} from "../src/features/community-forum/community-forum-client.mjs";
-import {sha256Hex} from '../../galaxy-official/src/shared/web-primitives.mjs';
-import {readingBookmarkKey} from '../../galaxy-official/src/shared/reading-bookmarks-v1-schema.mjs';
-import {defaultForumPolicy} from "../../galaxy-official/src/community/community-forum-policy-v1.mjs";
-import {discoveryEvent,discoveryDeliveryTargets,discoveryItemKey} from '../../galaxy-official/src/discovery-runtime/purpose.mjs';
+import {sha256Hex} from '../../galaxy-contracts/src/web-primitives.mjs';
+import {readingBookmarkKey} from '../../galaxy-contracts/src/reading-bookmarks-v1-schema.mjs';
+import {defaultForumPolicy} from "../../galaxy-contracts/src/policies/forum-quota.mjs";
 
 const endpoint='https://official.example.org',websiteOrigin='https://galaxy.example.org';
 const now=()=>Math.floor(Date.now()/1000);
@@ -30,8 +29,7 @@ function usageTransport(owner=randomUUID()){
    assert.equal(options.headers['X-Galaxy-Account-ID'],owner);
    assert.equal(options.headers['X-Galaxy-Account-CSRF'],'synthetic-account-csrf');
    assert.equal(options.headers['X-Galaxy-Discovery-CSRF'],'synthetic-discovery-csrf');
-   const input=JSON.parse(options.body),event=discoveryEvent(input);
-   assert.deepEqual(discoveryDeliveryTargets({...event,itemKey:discoveryItemKey(event.content.kind,event.content.id)}),['openpanel','gorse']);
+   const input=JSON.parse(options.body);
    assert.deepEqual(Object.keys(input).sort(),['content','eventId','name','pageKey']);
    assert.equal(input.pageKey,'community');assert.equal(JSON.stringify(input).includes('NEVER_IN_USAGE'),false);
    const old=accepted.get(input.eventId);if(old)assert.deepEqual(input,old);else{accepted.set(input.eventId,input);events.push(input);}

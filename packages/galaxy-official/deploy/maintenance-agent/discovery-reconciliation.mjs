@@ -1,15 +1,14 @@
-import {readFile,lstat} from 'node:fs/promises';
-import pg from 'pg';
-import {createDiscoveryReadOnlySource} from '../../src/discovery-runtime/public-content-source.mjs';
-import {discoveryItemReference} from '../../src/discovery-runtime/purpose.mjs';
-import {MeilisearchClient,GorseClient} from '../../src/discovery-runtime/native-clients.mjs';
-import {loadDiscoveryConfiguration} from '../../src/infrastructure/discovery-configuration.mjs';
-import {loadForumPolicy} from "../../src/community/community-forum-policy-v1.mjs";
-import {workerReads} from '../../src/infrastructure/worker-reads.mjs';
-import {noSymlinkPath} from '../operations-stack/host.mjs';
+import {z} from 'zod';
+import {MeilisearchClient,GorseClient} from '../support/native-clients.mjs';
+import {loadDiscoveryConfiguration} from '../support/discovery-configuration.mjs';
+import {recoveryExecutable,recoverySource,cloneConnection,forumPolicyReference} from './go-recovery.mjs';
 
 const fail=code=>Object.assign(Error(code),{code});
 const maximum=100000,pageSize=200;
+function discoveryItemReference(key){
+ const match=/^(post|reply)_([a-f0-9-]{36})$/.exec(key??'');
+ return match&&z.uuid().safeParse(match[2]).success?{kind:match[1],id:match[2]}:null;
+}
 async function inventory(meili,gorse){
  const keys=new Set();let offset=0;let total=null;let cursor='';const seen=new Set();
  if(meili)for(;;){
@@ -58,24 +57,19 @@ export async function reconcileDiscoveryItems({source,meili=null,gorse=null}){
 }
 
 export class MaintenanceDiscoveryReconciliation{
- constructor({config,run,fetchImpl=fetch,connect=options=>new pg.Pool({...options,max:1,connectionTimeoutMillis:5000,statement_timeout:30000})}){Object.assign(this,{config,run,fetchImpl,connect});}
+ constructor({config,run,fetchImpl=fetch}){Object.assign(this,{config,run,fetchImpl});}
  async withSource(context,operation){
   const search=context.intent.moduleIds.includes('search'),recommendation=context.intent.moduleIds.includes('recommendation');if(!search&&!recommendation)return{required:false};
   const config=await loadDiscoveryConfiguration('/var/lib/galaxy/config/pilot/discovery-api-20261023.json',{endpoint:context.authority.endpoint});
   if(!config?.sourceMetadata)throw fail('maintenance_current_discovery_source_metadata_required');
-  const file='/etc/galaxy/pilot/worker.env';await noSymlinkPath(file);const info=await lstat(file);if(!info.isFile()||(info.mode&0o077)||info.size>262144)throw fail('maintenance_runtime_reference_invalid');
-  const refs=(await readFile(file,'utf8')).split(/\r?\n/).filter(x=>x.startsWith('GALAXY_FORUM_POLICY_FILE='));if(refs.length>1)throw fail('maintenance_runtime_reference_invalid');
-  const policy=refs[0]?.slice('GALAXY_FORUM_POLICY_FILE='.length),forumPolicy=await loadForumPolicy(policy);
-  const cluster=this.config.postgres.find(x=>x.id==='business'),clone=context.artifacts.databases.find(x=>x.stanza==='business');
-  if(!clone?.socketDirectory||clone.network!=='none'||clone.ports.length)throw fail('maintenance_private_recovery_socket_required');
+  const forumPolicyFile=await forumPolicyReference();
   // Reuse the exact private candidate after current facts/deletion replay. Its
   // socket is explicitly host-bound by the isolated restore; no live cluster
   // password or new public/privileged HTTP reader is introduced here.
-  const db=this.connect({host:clone.socketDirectory,user:cluster.administrator,database:cluster.database,port:5432});
+  const source=recoverySource(await recoveryExecutable(context),{...cloneConnection(context,this.config),forumPolicyFile,sourceMetadata:config.sourceMetadata});
   try{
-   const source=createDiscoveryReadOnlySource({db,endpoint:context.authority.endpoint,now:()=>Math.floor(Date.now()/1000),readGrant:workerReads.readGrant,forumPolicy,...config.sourceMetadata});
    return{required:true,...await operation({source,meili:search?new MeilisearchClient({...config.meilisearch,fetch:this.fetchImpl}):null,gorse:recommendation?new GorseClient({...config.gorse,fetch:this.fetchImpl}):null})};
-  }finally{await db.end();}
+  }finally{await source.close();}
  }
  reconcile(context){return this.withSource(context,reconcileDiscoveryItems);}
  verify(context){return this.withSource(context,async({source,meili,gorse})=>{const keys=await inventory(meili,gorse);for(const key of keys)if(!await source.load(discoveryItemReference(key)))throw fail('maintenance_discovery_reconciliation_unconfirmed');return{currentPublicSourcesReconciled:true,checked:keys.size};});}

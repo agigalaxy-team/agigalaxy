@@ -2,11 +2,7 @@ package operationspermissions_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +12,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	perms "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,28 +21,10 @@ import (
 func TestHumanAIWorkDelegatedRoleAndPromptOriginalPath(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string, input any) map[string]any {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		if input != nil {
-			cmd.Stdin = strings.NewReader(jsonText(input))
-		}
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o map[string]any
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid original output")
-		}
-		return o
-	}
-	base := node("setup", nil)
-	node("automation-setup", nil)
-	fixture := node("delegated-setup", nil)
+	currentFixture := operationsfixture.New(t, owner)
+	base := currentFixture.Data
+	currentFixture.Automation(t)
+	fixture := currentFixture.Delegated(t)
 	ids := object(base["ids"])
 	endpoint, issuer := text(base["endpoint"]), text(base["issuer"])
 	cfg, e := pgxpool.ParseConfig(dsn)
@@ -92,7 +71,7 @@ func TestHumanAIWorkDelegatedRoleAndPromptOriginalPath(t *testing.T) {
 		return a
 	}
 	actor := bind("query")
-	source := node("delegated-read", nil)
+	source := currentFixture.DelegatedRead(t, nil)
 	if !equal(map[string]any{"version": actor.Version, "permissions": actor.Permissions}, source["actor"]) {
 		t.Fatalf("human/AI version or intersection differs Go%s JS%s", jsonText(actor), jsonText(source["actor"]))
 	}
@@ -125,7 +104,7 @@ func TestHumanAIWorkDelegatedRoleAndPromptOriginalPath(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	source = node("delegated-read", map[string]any{"prepare": prepare})
+	source = currentFixture.DelegatedRead(t, map[string]any{"prepare": prepare})
 	if !equal(prepared, source["preparation"]) {
 		t.Fatal("preparation differs")
 	}
@@ -137,7 +116,7 @@ func TestHumanAIWorkDelegatedRoleAndPromptOriginalPath(t *testing.T) {
 	if role["subjectScope"] != "ai-only" {
 		t.Fatal("delegated role not AI-only")
 	}
-	source = node("delegated-read", map[string]any{"operationId": input["operationId"]})
+	source = currentFixture.DelegatedRead(t, map[string]any{"operationId": input["operationId"]})
 	receipt, e := service.DelegatedManagementOperation(ctx, actor, text(input["operationId"]), nil, nil)
 	if e != nil || !equal(receipt, source["operation"]) {
 		t.Fatalf("delegated receipt %v", e)
@@ -165,7 +144,7 @@ func TestHumanAIWorkDelegatedRoleAndPromptOriginalPath(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	source = node("delegated-read", map[string]any{"aiAccountId": target})
+	source = currentFixture.DelegatedRead(t, map[string]any{"aiAccountId": target})
 	if !equal(prompt, source["prompt"]) {
 		t.Fatal("prompt read differs")
 	}
@@ -181,7 +160,7 @@ func TestHumanAIWorkDelegatedRoleAndPromptOriginalPath(t *testing.T) {
 	if !equal(config["model"], original["model"]) || !equal(config["plan"], original["plan"]) {
 		t.Fatal("prompt save overwrote other configuration")
 	}
-	source = node("delegated-read", map[string]any{"aiAccountId": target, "operationId": promptInput["operationId"]})
+	source = currentFixture.DelegatedRead(t, map[string]any{"aiAccountId": target, "operationId": promptInput["operationId"]})
 	prompt, e = service.DelegatedPrompt(ctx, actor, map[string]any{"aiAccountId": target})
 	if e != nil || !equal(prompt, source["prompt"]) {
 		t.Fatal("Go prompt save differs from original JS read")

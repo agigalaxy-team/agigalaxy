@@ -29,7 +29,7 @@ func TestExecutionInputsMatchOriginalZodIncludingCodepointBounds(t *testing.T) {
 	unknown := makeInput("valid reason")
 	unknown["privateProof"] = "not-authority"
 	inputs = append(inputs, unknown)
-	source := `import {agentOsCreateSchema} from './packages/galaxy-official/src/shared/operations-agentos-schema.mjs';let raw='';for await(const b of process.stdin)raw+=b;console.log(JSON.stringify(JSON.parse(raw).map(x=>{const p=agentOsCreateSchema.safeParse(x);return p.success?{success:true,data:p.data}:{success:false}})));`
+	source := `import {agentOsCreateSchema} from './packages/galaxy-contracts/src/operations-agentos-schema.mjs';let raw='';for await(const b of process.stdin)raw+=b;console.log(JSON.stringify(JSON.parse(raw).map(x=>{const p=agentOsCreateSchema.safeParse(x);return p.success?{success:true,data:p.data}:{success:false}})));`
 	cmd := exec.Command("node", "--input-type=module", "-e", source)
 	cmd.Dir = root
 	body, _ := json.Marshal(inputs)

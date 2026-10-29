@@ -1,6 +1,6 @@
-import {sha256Hex} from '../../../../galaxy-official/src/shared/web-primitives.mjs';
+import {sha256Hex} from '../../../../galaxy-contracts/src/web-primitives.mjs';
 import {readWithTransientRecovery} from '../../../../../integrations/shared/read-task.mjs';
-import {accountFollowCommandSchema,accountFollowStatusSchema,accountFollowPageSchema,accountFollowReceiptSchema} from '../../../../galaxy-official/src/shared/account-follows-schema.mjs';
+import {accountFollowCommandSchema,accountFollowStatusSchema,accountFollowPageSchema,accountFollowReceiptSchema} from '../../../../galaxy-contracts/src/account-follows-schema.mjs';
 import {createCurrentOfficialAccount} from "../accounts/official-account-reading.mjs";
 
 const fail=(code)=>{throw Object.assign(Error(code),{code});};

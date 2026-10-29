@@ -10,6 +10,7 @@ import (
 )
 
 type Pin struct {
+	KID          string `json:"kid,omitempty"`
 	PublicKeyPEM string `json:"publicKeyPem"`
 	NotBefore    int64  `json:"notBefore"`
 	NotAfter     int64  `json:"notAfter"`
@@ -22,6 +23,9 @@ type Configuration struct {
 	Website           string          `json:"website"`
 	DataDirectory     string          `json:"dataDirectory"`
 	TrustedKeys       map[string]Pin  `json:"trustedKeys"`
+	RootPins          map[string]Pin  `json:"rootPins,omitempty"`
+	TrustDirectory    string          `json:"trustDirectory,omitempty"`
+	NetworkType       string          `json:"networkType,omitempty"`
 	A2A               json.RawMessage `json:"a2a,omitempty"`
 	WatchHost         json.RawMessage `json:"watchHost,omitempty"`
 	WorkerPacks       json.RawMessage `json:"workerPacks,omitempty"`
@@ -43,7 +47,16 @@ func ReadConfiguration(path string) (Configuration, error) {
 	if e = protocol.Decode(b, &c); e != nil {
 		return c, fault.New("native_configuration_invalid", 400)
 	}
-	if c.Version != 2 || !filepath.IsAbs(c.DataDirectory) || c.TrustedKeys == nil {
+	if len(c.RootPins) > 0 {
+		value, err := connectionObject(b)
+		if err != nil || !discoveryRootPinsValid(uploadObject(value["rootPins"])) {
+			return c, fault.New("native_configuration_invalid", 400)
+		}
+	}
+	if c.Version != 2 || !filepath.IsAbs(c.DataDirectory) || c.TrustedKeys == nil && len(c.RootPins) == 0 {
+		return c, fault.New("native_configuration_invalid", 400)
+	}
+	if (len(c.RootPins) > 0) != (c.TrustDirectory != "") || c.TrustDirectory != "" && !filepath.IsAbs(c.TrustDirectory) || c.NetworkType != "" && c.NetworkType != "official" && c.NetworkType != "hub" {
 		return c, fault.New("native_configuration_invalid", 400)
 	}
 	for _, s := range []string{c.Endpoint, c.Website} {

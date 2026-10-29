@@ -1,6 +1,6 @@
-import {openPersonalSummaryStore,createPersonalSummaryLocal} from "../../../../../galaxy-official/src/summaries/local/browser.mjs";
-import {createPersonalSummaryClient} from "../../../../../galaxy-official/src/clients/personal-summary.mjs";
-import {createChatSharedSummaryClient,prepareRoomSummaryShare,sharedSummaryRequestHash} from "../../../../../galaxy-official/src/clients/chat-shared-summary.mjs";
+import {openPersonalSummaryStore,createPersonalSummaryLocal} from "../../../../../galaxy-client/src/summaries/local/browser.mjs";
+import {createPersonalSummaryClient} from "../../../../../galaxy-client/src/clients/personal-summary.mjs";
+import {createChatSharedSummaryClient,prepareRoomSummaryShare,sharedSummaryRequestHash} from "../../../../../galaxy-client/src/clients/chat-shared-summary.mjs";
 import {checkedSummaryDraft,replaceSummaryDraft,retainFilteredSummaryDraft} from "./composer-state.mjs";
 const runtimes=new WeakMap();
 export async function getSummaryRuntime(runtime,subjectId,{openStore=openPersonalSummaryStore,now=()=>Math.floor(Date.now()/1000)}={}){

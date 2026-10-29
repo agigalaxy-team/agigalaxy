@@ -1,5 +1,5 @@
 import type {z} from 'zod/v4';
-import type {assistanceRequestSchema} from "../../../../galaxy-official/src/shared/assistance-schema.mjs";
+import type {assistanceRequestSchema} from "../../../../galaxy-contracts/src/assistance-schema.mjs";
 import type {WorkTask} from './work-task-types';
 
 type LegacyTaskPage=Pick<WorkTask,'taskId'|'caseId'|'requesterId'|'version'|'state'>&{

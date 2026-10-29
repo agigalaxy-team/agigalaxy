@@ -1,7 +1,7 @@
 import React,{useEffect,useEffectEvent,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
-import {verifyTrustPackage} from "../../../../galaxy-official/src/verification/trust-package.mjs";
-import {trustContainerSchema} from "../../../../galaxy-official/src/shared/trust-package-schema.mjs";
+import {verifyTrustPackage} from "../../../../galaxy-contracts/src/verification/trust-package.mjs";
+import {trustContainerSchema} from "../../../../galaxy-contracts/src/trust-package-schema.mjs";
 import {TrustPackageReading} from './trust-package-workspace';
 import {LoadingFeedback} from "../../shared/feedback/interaction-feedback";
 import type {HubRuntime} from "../hubs/hub-workspace-types";

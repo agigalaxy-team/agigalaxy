@@ -1,8 +1,8 @@
 import type * as z from 'zod/v4';
 import type {createWebRuntime} from "../../runtime.mjs";
-import type {caseEventSchema,caseEventV2Schema} from "../../../../galaxy-official/src/shared/cases-schema.mjs";
-import type {moderationEventSchema,moderationReceiptSchema,moderationReportSchema,moderationVerifierTargetSchema} from "../../../../galaxy-official/src/shared/moderation-schema.mjs";
-import type {governanceScopeSchemaV2,governanceTargetSchemaV2,targetReportSchemaV2} from "../../../../galaxy-official/src/shared/target-governance-v2-schema.mjs";
+import type {caseEventSchema,caseEventV2Schema} from "../../../../galaxy-contracts/src/cases-schema.mjs";
+import type {moderationEventSchema,moderationReceiptSchema,moderationReportSchema,moderationVerifierTargetSchema} from "../../../../galaxy-contracts/src/moderation-schema.mjs";
+import type {governanceScopeSchemaV2,governanceTargetSchemaV2,targetReportSchemaV2} from "../../../../galaxy-contracts/src/target-governance-v2-schema.mjs";
 
 export type GovernanceRuntime=Pick<Awaited<ReturnType<typeof createWebRuntime>>,'api'|'status'|'receiptStatus'|'getLocal'|'putLocal'|'updateLocal'>;
 export type WorkspaceProps={runtime:GovernanceRuntime;subjectId?:string;connected:boolean;navigate:(path:string)=>void;reportId?:string};

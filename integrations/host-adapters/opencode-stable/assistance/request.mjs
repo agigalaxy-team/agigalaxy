@@ -1,4 +1,4 @@
-import { publicContributionEventKinds } from '../../../../packages/galaxy-official/src/shared/assistance-schema.mjs';
+import { publicContributionEventKinds } from '../../../../packages/galaxy-contracts/src/assistance-schema.mjs';
 
 export function createAssistanceRequestMenu(session) {
   function detail(id, back = session.home, readFirst = true) {

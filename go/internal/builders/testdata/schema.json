@@ -1,0 +1,414 @@
+{
+  "input": [
+    {
+      "schema": "builderEventSchema",
+      "value": {
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+        "declaration": {
+          "capabilities": [
+            {
+              "claim": "Author-declared coding assistance",
+              "id": "coding",
+              "limitations": "No measured capability guarantee"
+            }
+          ],
+          "configuration": {
+            "id": "fixture-config-v1",
+            "maxConcurrentTasks": 1,
+            "modelFamily": "fixture",
+            "summary": "Public model family and tools only",
+            "taskTypes": [
+              "coding"
+            ],
+            "tools": [
+              "compiler"
+            ]
+          },
+          "contact": "https://builder.example/contact",
+          "name": "Synthetic worker",
+          "nodeId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+          "policy": "https://builder.example/policy",
+          "proofIds": [],
+          "redactionConfirmed": true,
+          "release": {
+            "artifact": "https://builder.example/artifact",
+            "buildHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "dependencies": [
+              {
+                "name": "fixture",
+                "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "version": "1.0.0"
+              }
+            ],
+            "rollback": "Restore previous build with the same identity",
+            "sourceCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "upgrade": "Preserve existing node ID and local state",
+            "version": "0.1.0"
+          },
+          "scope": "Fixture only",
+          "type": "worker"
+        },
+        "expectedRevision": 0,
+        "id": "58f09d72-ccad-4184-9b68-169ec82c0368",
+        "kind": "declare"
+      }
+    },
+    {
+      "schema": "builderExtensionEventSchema",
+      "value": {
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+        "declarationHash": "dc21c33a87a2eff1a5d50b522bd3d654d8a4fe6b79eeb71cd90a504e6105cb92",
+        "declarationId": "58f09d72-ccad-4184-9b68-169ec82c0368",
+        "expectedRevision": 1,
+        "id": "e726a879-aa61-452a-9084-a4b32496047b",
+        "kind": "support-profile",
+        "support": {
+          "authorization": "Exact signed consent for selected objects",
+          "galaxySchema": "2",
+          "implementation": {
+            "name": "Synthetic worker",
+            "version": "0.1.0"
+          },
+          "limitations": "Synthetic compatibility scenario, not a tested real third-party product",
+          "missingCapabilities": [
+            "worker.execute"
+          ],
+          "objectActions": [
+            "case.read",
+            "attempt.map",
+            "proof.export"
+          ],
+          "profile": "galaxy-builder-support/2",
+          "protocols": [
+            {
+              "name": "MCP",
+              "version": "fixture-version"
+            }
+          ],
+          "sdks": []
+        }
+      }
+    },
+    {
+      "schema": "builderExtensionEventSchema",
+      "value": {
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+        "declarationHash": "dc21c33a87a2eff1a5d50b522bd3d654d8a4fe6b79eeb71cd90a504e6105cb92",
+        "declarationId": "58f09d72-ccad-4184-9b68-169ec82c0368",
+        "expectedRevision": 2,
+        "id": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+        "kind": "pack-manifest",
+        "manifest": {
+          "automaticActivation": false,
+          "capabilities": [
+            "Read selected metadata"
+          ],
+          "changes": "Initial synthetic fixture",
+          "configurationRequirements": "Link a real separately recorded Configuration before actual work",
+          "dependencies": [
+            {
+              "kind": "mcp",
+              "license": "Fixture",
+              "name": "fixture-mcp",
+              "source": "https://builder.example/mcp",
+              "version": "1"
+            }
+          ],
+          "environment": "Fixture environment",
+          "installation": "Use original publisher mechanism",
+          "license": "Fixture licence declaration",
+          "licenseSource": "https://builder.example/license",
+          "modelRequirements": "Owner supplied model",
+          "name": "Synthetic worker",
+          "permissions": [
+            {
+              "purpose": "Read explicitly granted context",
+              "required": true,
+              "resource": "Selected task"
+            }
+          ],
+          "profile": "galaxy-worker-pack/1",
+          "rollback": "Return to prior host configuration",
+          "runtimeLocation": "user-controlled",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source": "https://builder.example/artifact",
+          "upgrade": "Choose a new version",
+          "version": "0.1.0"
+        }
+      }
+    },
+    {
+      "schema": "packUseEventSchema",
+      "value": {
+        "attempt": {
+          "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+          "version": 1
+        },
+        "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+        "configuration": {
+          "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+          "version": 1
+        },
+        "evidenceRefs": [],
+        "expectedVersion": 0,
+        "follows": null,
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+        "kind": "record",
+        "operationId": "59772b6f-df59-414b-8e5d-72fd88055b14",
+        "pack": {
+          "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+          "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534",
+          "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96"
+        },
+        "result": null,
+        "schemaVersion": 2,
+        "verificationRefs": []
+      }
+    },
+    {
+      "schema": "packUseEventSchema",
+      "value": {
+        "attempt": {
+          "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+          "version": 1
+        },
+        "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+        "configuration": {
+          "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+          "version": 1
+        },
+        "evidenceRefs": [],
+        "expectedVersion": 1,
+        "follows": null,
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+        "kind": "record",
+        "operationId": "7c392a14-ecb4-46a5-bd53-34b370e4d524",
+        "pack": {
+          "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+          "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534",
+          "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96"
+        },
+        "result": {
+          "id": "85cb3824-f95a-4c56-a69d-646e429ee8a2",
+          "version": 1
+        },
+        "schemaVersion": 2,
+        "verificationRefs": []
+      }
+    },
+    {
+      "schema": "packUseEventSchema",
+      "value": {
+        "expectedVersion": 2,
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+        "kind": "revoke",
+        "operationId": "58fcc3ef-eb40-4c72-99cb-e80d815b3690",
+        "reason": "Runner withdraws selected association",
+        "schemaVersion": 2
+      }
+    }
+  ],
+  "values": [
+    {
+      "value": {
+        "id": "58f09d72-ccad-4184-9b68-169ec82c0368",
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+        "expectedRevision": 0,
+        "kind": "declare",
+        "declaration": {
+          "name": "Synthetic worker",
+          "release": {
+            "version": "0.1.0",
+            "buildHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sourceCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "artifact": "https://builder.example/artifact",
+            "dependencies": [
+              {
+                "name": "fixture",
+                "version": "1.0.0",
+                "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ],
+            "upgrade": "Preserve existing node ID and local state",
+            "rollback": "Restore previous build with the same identity"
+          },
+          "policy": "https://builder.example/policy",
+          "contact": "https://builder.example/contact",
+          "scope": "Fixture only",
+          "redactionConfirmed": true,
+          "proofIds": [],
+          "type": "worker",
+          "nodeId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+          "configuration": {
+            "id": "fixture-config-v1",
+            "summary": "Public model family and tools only",
+            "modelFamily": "fixture",
+            "tools": [
+              "compiler"
+            ],
+            "taskTypes": [
+              "coding"
+            ],
+            "maxConcurrentTasks": 1
+          },
+          "capabilities": [
+            {
+              "id": "coding",
+              "claim": "Author-declared coding assistance",
+              "limitations": "No measured capability guarantee"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "value": {
+        "id": "e726a879-aa61-452a-9084-a4b32496047b",
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+        "expectedRevision": 1,
+        "declarationId": "58f09d72-ccad-4184-9b68-169ec82c0368",
+        "declarationHash": "dc21c33a87a2eff1a5d50b522bd3d654d8a4fe6b79eeb71cd90a504e6105cb92",
+        "kind": "support-profile",
+        "support": {
+          "profile": "galaxy-builder-support/2",
+          "implementation": {
+            "name": "Synthetic worker",
+            "version": "0.1.0"
+          },
+          "galaxySchema": "2",
+          "protocols": [
+            {
+              "name": "MCP",
+              "version": "fixture-version"
+            }
+          ],
+          "sdks": [],
+          "objectActions": [
+            "case.read",
+            "attempt.map",
+            "proof.export"
+          ],
+          "missingCapabilities": [
+            "worker.execute"
+          ],
+          "authorization": "Exact signed consent for selected objects",
+          "limitations": "Synthetic compatibility scenario, not a tested real third-party product"
+        }
+      }
+    },
+    {
+      "value": {
+        "id": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+        "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+        "expectedRevision": 2,
+        "declarationId": "58f09d72-ccad-4184-9b68-169ec82c0368",
+        "declarationHash": "dc21c33a87a2eff1a5d50b522bd3d654d8a4fe6b79eeb71cd90a504e6105cb92",
+        "kind": "pack-manifest",
+        "manifest": {
+          "profile": "galaxy-worker-pack/1",
+          "name": "Synthetic worker",
+          "version": "0.1.0",
+          "source": "https://builder.example/artifact",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "license": "Fixture licence declaration",
+          "licenseSource": "https://builder.example/license",
+          "dependencies": [
+            {
+              "kind": "mcp",
+              "name": "fixture-mcp",
+              "version": "1",
+              "source": "https://builder.example/mcp",
+              "license": "Fixture"
+            }
+          ],
+          "modelRequirements": "Owner supplied model",
+          "environment": "Fixture environment",
+          "permissions": [
+            {
+              "resource": "Selected task",
+              "purpose": "Read explicitly granted context",
+              "required": true
+            }
+          ],
+          "configurationRequirements": "Link a real separately recorded Configuration before actual work",
+          "capabilities": [
+            "Read selected metadata"
+          ],
+          "changes": "Initial synthetic fixture",
+          "installation": "Use original publisher mechanism",
+          "upgrade": "Choose a new version",
+          "rollback": "Return to prior host configuration",
+          "runtimeLocation": "user-controlled",
+          "automaticActivation": false
+        }
+      }
+    },
+    {
+      "value": {
+        "schemaVersion": 2,
+        "operationId": "59772b6f-df59-414b-8e5d-72fd88055b14",
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+        "expectedVersion": 0,
+        "kind": "record",
+        "pack": {
+          "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+          "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+          "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534"
+        },
+        "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+        "attempt": {
+          "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+          "version": 1
+        },
+        "configuration": {
+          "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+          "version": 1
+        },
+        "result": null,
+        "evidenceRefs": [],
+        "verificationRefs": [],
+        "follows": null
+      }
+    },
+    {
+      "value": {
+        "schemaVersion": 2,
+        "operationId": "7c392a14-ecb4-46a5-bd53-34b370e4d524",
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+        "expectedVersion": 1,
+        "kind": "record",
+        "pack": {
+          "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+          "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+          "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534"
+        },
+        "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+        "attempt": {
+          "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+          "version": 1
+        },
+        "configuration": {
+          "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+          "version": 1
+        },
+        "result": {
+          "id": "85cb3824-f95a-4c56-a69d-646e429ee8a2",
+          "version": 1
+        },
+        "evidenceRefs": [],
+        "verificationRefs": [],
+        "follows": null
+      }
+    },
+    {
+      "value": {
+        "schemaVersion": 2,
+        "operationId": "58fcc3ef-eb40-4c72-99cb-e80d815b3690",
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+        "expectedVersion": 2,
+        "kind": "revoke",
+        "reason": "Runner withdraws selected association"
+      }
+    }
+  ]
+}

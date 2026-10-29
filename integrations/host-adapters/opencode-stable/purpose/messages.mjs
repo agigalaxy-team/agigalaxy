@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { chatSendRequestHash } from '../../../../packages/galaxy-official/src/shared/chat-message-request-hash.mjs';
+import { chatSendRequestHash } from '../../../../packages/galaxy-contracts/src/chat-message-request-hash.mjs';
 import { nativeChoiceUrl } from '../../../native-v2/compact-app/browser-choice.mjs';
 import { plain, unwrap, fingerprint } from './presentation.mjs';
 

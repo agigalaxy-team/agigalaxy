@@ -1,10 +1,10 @@
 import type * as z from "zod/v4";
 import type {createWebRuntime} from "../../runtime.mjs";
-import type {projectDocumentV2Schema,projectEventV2Schema} from "../../../../galaxy-official/src/shared/projects-schema-v2.mjs";
-import type {recruitmentDocumentV2Schema,recruitmentEventV2Schema} from "../../../../galaxy-official/src/shared/recruitment-schema-v2.mjs";
-import type {contactEventV2Schema} from "../../../../galaxy-official/src/shared/contacts-schema-v2.mjs";
-import type {discoveryQueryV2Schema,opportunityRefV2Schema} from "../../../../galaxy-official/src/shared/discovery-schema-v2.mjs";
-import type {discoveryPreferencesSchema} from "../../../../galaxy-official/src/shared/discovery-schema.mjs";
+import type {projectDocumentV2Schema,projectEventV2Schema} from "../../../../galaxy-contracts/src/projects-schema-v2.mjs";
+import type {recruitmentDocumentV2Schema,recruitmentEventV2Schema} from "../../../../galaxy-contracts/src/recruitment-schema-v2.mjs";
+import type {contactEventV2Schema} from "../../../../galaxy-contracts/src/contacts-schema-v2.mjs";
+import type {discoveryQueryV2Schema,opportunityRefV2Schema} from "../../../../galaxy-contracts/src/discovery-schema-v2.mjs";
+import type {discoveryPreferencesSchema} from "../../../../galaxy-contracts/src/discovery-schema.mjs";
 import type {HistoryRecord} from "../work-records/record-workspace-types";
 import type {useGovernanceDraft} from "../governance/governance-presentation";
 

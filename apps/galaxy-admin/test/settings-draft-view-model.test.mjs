@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {modelSettingsNewModel,modelSettingsEmpty,modelSettingsWithFormat,modelSettingsValidBaseUrl,modelSettingsValidation} from "../src/lib/models/model-settings-view-model.ts";
 import {strategiesNewDefinition,strategiesMerge} from "../src/lib/strategies/strategies-view-model.ts";
 import {recommendationThemePolicyDraft,recommendationGlobalPolicyDraft,recommendationComposePolicyDraft,recommendationAfterPolicySaved} from "../src/lib/recommendation/recommendation-view-model.ts";
-import {modelSettingsModelSchema} from '../../../packages/galaxy-official/src/shared/operations-model-settings-schema.mjs';
+import {modelSettingsModelSchema} from '../../../packages/galaxy-contracts/src/operations-model-settings-schema.mjs';
 
 const id=n=>String(n).padStart(8,'0')+'-1111-4111-8111-'+String(n).padStart(12,'0');
 test('format transitions retain only declared compatible efforts and local validation matches the current literal URL/model boundary',()=>{

@@ -4,7 +4,7 @@ import type {z} from 'zod/v4';
 import {Button} from '@/components/ui/button';
 import {MemberAvatar,memberName,useMemberNames} from "../../shared/people/conversation-ui";
 import {useChoiceViewLease,type ChoiceViewLease} from "../../shared/operations/choice-retained-operations";
-import type {configurationEventV2Schema} from "../../../../galaxy-official/src/shared/configuration-v2-schema.mjs";
+import type {configurationEventV2Schema} from "../../../../galaxy-contracts/src/configuration-v2-schema.mjs";
 import type {CapsuleAuthorRuntime,CapsuleSourceItem} from "../capsules/capsule-authoring-types";
 import "../capsules/capsule-authoring.css";
 

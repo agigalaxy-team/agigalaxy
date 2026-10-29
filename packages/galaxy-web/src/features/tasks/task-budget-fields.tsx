@@ -1,7 +1,7 @@
 import {ReadingDetails,ReadingSummary} from "../../shared/reading/reading-details";
 import React from 'react';
 import type {z} from 'zod/v4';
-import type {taskRequestV2Schema} from "../../../../galaxy-official/src/shared/task-schema-v2.mjs";
+import type {taskRequestV2Schema} from "../../../../galaxy-contracts/src/task-schema-v2.mjs";
 import {budgetText} from './task-bounty-client.mjs';
 export type TaskConditions=Pick<z.infer<typeof taskRequestV2Schema>,'enrollmentExpiresAt'|'budget'|'qualification'|'capabilityId'>;
 export function TaskTerms({request}:{request:TaskConditions}){return <div className="task-terms">

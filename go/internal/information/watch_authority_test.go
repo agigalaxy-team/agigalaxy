@@ -1,7 +1,6 @@
 package information
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/cases"
@@ -11,38 +10,10 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/searchv2"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/taskmaterials"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 )
-
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/information/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	raw, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original information %s %v %s", mode, e, stderr.String())
-	}
-	var out Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if json.Unmarshal(line, &out) == nil && out != nil {
-			return out
-		}
-	}
-	t.Fatal("fixture result")
-	return nil
-}
 
 type fixture struct {
 	Endpoint                                                                string
@@ -52,27 +23,8 @@ type fixture struct {
 	Watches                                                                 []struct{ Command, Result Object }
 }
 
-func setup(t *testing.T) (*pgxpool.Pool, *pgxpool.Pool, string, string, fixture) {
-	t.Helper()
-	owner, dsn := testsupport.PostgreSQL(t)
-	path := filepath.Join(t.TempDir(), "information-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
-	var f fixture
-	if e := json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
-	}
-	config := owner.Config()
-	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
-	api, e := pgxpool.NewWithConfig(context.Background(), config)
-	if e != nil {
-		t.Fatal(e)
-	}
-	t.Cleanup(api.Close)
-	return owner, api, dsn, path, f
-}
 func TestAcceptedWatchOpaqueAuthorityReadOnlyAndRevocation(t *testing.T) {
-	owner, api, dsn, path, f := setup(t)
+	owner, api, _, f := setup(t)
 	ctx := context.Background()
 	now := func() time.Time { return time.Unix(f.Clock, 0) }
 	devices := &deviceauth.Service{Pool: api, Endpoint: f.Endpoint, Now: now}
@@ -162,13 +114,20 @@ func TestAcceptedWatchOpaqueAuthorityReadOnlyAndRevocation(t *testing.T) {
 	for _, probe := range []struct {
 		field string
 		value any
-	}{{"controlEpoch", 1}, {"controlEpoch", 0.5}, {"controlEpoch", "0"}, {"deviceId", "00000000-0000-4000-8000-000000000001"}, {"keyId", "changed-key"}, {"keyId", 0}} {
+	}{{"controlEpoch", 0}, {"controlEpoch", 0.5}, {"controlEpoch", "0"}, {"deviceId", "00000000-0000-4000-8000-000000000001"}, {"keyId", "changed-key"}, {"keyId", 0}} {
 		if _, e = owner.Exec(ctx, `UPDATE information_watches_v2 SET background_authority=jsonb_set($2::jsonb,ARRAY[$3]::text[],$4::jsonb) WHERE id=$1`, f.Watches[1].Command["watchId"], originalAuthority, probe.field, string(encode(probe.value))); e != nil {
 			t.Fatal(e)
 		}
-		expected := node(t, dsn, "authority", path, Object{"watchId": f.Watches[1].Command["watchId"], "scope": "notifications"})["authorized"] == true
-		if got := authorize(b, "notifications") == nil; got != expected {
-			t.Fatalf("original authority %s=%v Go=%v JS=%v", probe.field, probe.value, got, expected)
+		err := authorize(b, "notifications")
+		// The existing JavaScript contract treats numeric zero as a falsy optional key ID.
+		if probe.field == "keyId" && probe.value == 0 {
+			if err != nil {
+				t.Fatalf("falsy key ID contract: %v", err)
+			}
+			continue
+		}
+		if fault.Code(err) != "information_watch_authorization_required" {
+			t.Fatalf("changed authority %s=%v accepted: %v", probe.field, probe.value, err)
 		}
 	}
 	if _, e = owner.Exec(ctx, `UPDATE information_watches_v2 SET background_authority=$2::jsonb WHERE id=$1`, f.Watches[1].Command["watchId"], originalAuthority); e != nil {

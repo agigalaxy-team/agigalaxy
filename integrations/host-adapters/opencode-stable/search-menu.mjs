@@ -1,4 +1,4 @@
-import { searchQuerySchema,searchScope,searchSourceTypes } from '../../../packages/galaxy-official/src/shared/search-schema.mjs';
+import { searchQuerySchema,searchScope,searchSourceTypes } from '../../../packages/galaxy-contracts/src/search-schema.mjs';
 import { createSearchFeedbackForm,createSearchFeedbackMenu } from './search-feedback-menu.mjs';
 import { createProjectDiscoveryMenu } from './project-discovery-menu.mjs';
 import {createCapsuleMenu} from './capsule-menu.mjs';

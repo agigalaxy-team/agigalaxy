@@ -1,7 +1,7 @@
 import type {z} from 'zod/v4';
 import type {createWebRuntime} from "../../runtime.mjs";
 import type {createChoiceSyncClient} from './choice-sync-client.mjs';
-import type {choiceContentSchema,choicePutSchema,choicePreferenceSchema} from "../../../../galaxy-official/src/shared/choice-snapshot-schema-v2.mjs";
+import type {choiceContentSchema,choicePutSchema,choicePreferenceSchema} from "../../../../galaxy-contracts/src/choice-snapshot-schema-v2.mjs";
 import type {ChoiceVersion} from "../help-search/help-contact-view-types";
 
 export type ChoiceContent=z.infer<typeof choiceContentSchema>;

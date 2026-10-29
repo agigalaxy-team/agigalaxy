@@ -17,13 +17,15 @@ Go 候选中的 `setup`、`service-config`、`host-configs` 子命令分别承�
 
 服务版公开配置仍为 `version:2`、精确 HTTPS `endpoint/website`、本机绝对 `dataDirectory`、`trustedKeys`（kid→publicKeyPem/notBefore/notAfter/revoked）；通过 `--config` 或 `GALAXY_NATIVE_CONFIG` 选择，不放 token、私钥或恢复码。配置准备不创建身份/绑定、不跟重定向或覆盖原信任；宿主生成只写选定输出，不自行修改用户配置。
 
-Go 候选宿主配置的 MCP command 指向包内平台二进制，args 为 `native`，env 含公开配置路径。正常宿主源码和包内 `opencode.js` 默认使用 Go，不通过缺包或缺配置回退到旧 JS 内核；旧协议夹具需显式导入 reference 模块。OpenCode 的 JS 仅承担宿主 UI／SDK 桥接；有服务配置时启动 Go MCP 子进程，录制和整理经独立 `galaxy host` 私有 JSONL 子进程保存原资料。私有通道不是模型工具或网络服务。宿主事件取材及模型 SDK 调用留在宿主，不把观察方法开放给模型，也不偷偷改用服务器模型。旧同名 MCP 只启一套，切版本保留数据目录并关旧进程。卸载配置/Skill 不删除本机身份、摘要或任务；设备撤销和数据删除另行办理。
+Go 候选宿主配置的 MCP command 指向包内平台二进制，args 为 `native`，env 含公开配置路径。正常宿主源码和包内 `opencode.js` 默认使用 Go，不通过缺包或缺配置回退到旧 JS 内核；旧协议固定字节期望保留在当前回归夹具中，不调用已替代内核。OpenCode 的 JS 仅承担宿主 UI／SDK 桥接；有服务配置时启动 Go MCP 子进程，录制和整理经独立 `galaxy host` 私有 JSONL 子进程保存原资料。私有通道不是模型工具或网络服务。宿主事件取材及模型 SDK 调用留在宿主，不把观察方法开放给模型，也不偷偷改用服务器模型。旧同名 MCP 只启一套，切版本保留数据目录并关旧进程。卸载配置/Skill 不删除本机身份、摘要或任务；设备撤销和数据删除另行办理。
 
 无服务配置的 OpenCode 保留原本机菜单、本人选择与材料／模型选择，持久处理使用 `galaxy integration-host --data-dir <目录>` 私有 JSONL 入口；它按与本机 CLI 相同的目录次序取值，不读取服务配置、不创建服务 Runtime，也不发会话完成上传通知。本机状态、初始化／延后、记录整理和原件管理复用现有本机方法；重置仍由原可信菜单确认，只重置原身份／集成文件，保留独立工作资料。服务配置存在时使用 `host`；两者都不把宿主观察和保存端口加入模型 MCP 清单。
 
-旧签名发行种类 `galaxy-native-client-release` 以 JWS/Ed25519 绑定包和报告准确字节，签名最长30天；其维护、验签和启动说明仍用于对应旧包，不表示 Go 候选沿用旧内核。源码中的旧 JS 实现可保留作协议对照、迁移差分与旧包维护参考；宿主 TUI、SDK 桥接和 UI 也仍有 JS，不应表述为全部 JS 已删除。信任不能从包内自行推导。`protocolAcceptance=local-stdio-http-fixtures`、`actualHostAcceptance=false` 的报告只覆盖该范围；验签不等于安装、发布或真实宿主验收。构建及 NOTICE 见[源码与许可](source-and-licensing.md)。
+旧签名发行种类 `galaxy-native-client-release` 以 JWS/Ed25519 绑定包和报告准确字节，签名最长30天；其维护、验签和启动说明仍用于对应旧包，不表示 Go 候选沿用旧内核。被替代内核从现行源码退出，历史签名包及必要原始证据留在项目外；宿主 TUI、SDK 桥接和 UI 继续使用各自平台代码。信任不能从包内自行推导。`protocolAcceptance=local-stdio-http-fixtures`、`actualHostAcceptance=false` 的报告只覆盖该范围；验签不等于安装、发布或真实宿主验收。构建及 NOTICE 见[源码与许可](source-and-licensing.md)。
 
-`scripts/build-native-v2.mjs`在新候选目录构建平台 Go 二进制、薄宿主 JS、compact UI 与现有宿主资源，并记录实际文件摘要；不要求源码预存 UI dist。宿主依赖在构建／搬移运行包时闭合，不在安装中联网补包。候选清单的目标平台与构建成功不表示真实宿主、系统提醒或对应操作系统已经验收，更不表示正式上线或用户已安装。宿主验收 launcher 在准备前传入并核对独立 profile；CLI 发现、真实隔离 TUI 与物理桌面仍分开记录。
+`scripts/build-native-v2.mjs`在新候选目录构建平台 Go 二进制、薄宿主 JS、compact UI 与现有宿主资源，并记录实际文件摘要；不要求源码预存 UI dist。宿主依赖在构建／搬移运行包时闭合，不在安装中联网补包。候选准备核对包完整性和临时宿主配置；实际 CLI 发现、隔离 TUI 与物理桌面分别记录。目标平台、构建成功或包完整性均不表示真实宿主和系统提醒已经验收，也不表示上线或用户已安装。
+
+身份恢复的本机页面模板属于 Go 源码并编入 `galaxy`；候选构建按 `./cmd/galaxy` 的实际 Go 依赖收集源码及嵌入资源摘要，不需要额外复制恢复页面。该接线不代表新候选已经构建或完成宿主、平台验收。
 
 ## 宿主配置与能力
 
@@ -45,6 +47,8 @@ OpenCode 的事件适配保存本地事实、有限片段和环境，自有模�
 Claude `watchHost` 只接受 `kind:claude-code` 与真实绝对 command/cwd，不接受附加参数、认证变量或已验证布尔值。`galaxy_watch_host_capabilities` 只查询版本/help，不建模型会话。缺有效配置证据时 `readerProfileDocumented` 可为真，`readerConfigurationConfirmed/effectiveManagedPolicyConfirmed/backgroundReaderSupported` 仍为假；activate 返回 foreground-fallback（如 `host_reader_configuration_unconfirmed`），不启动模型。原因是 managed settings 优先级及动态来源不能仅靠旗标/缺本机文件排除。前台 `galaxy_watch_check`/`ack` 更新 Agent 游标；reconcile 的 unknown 不等于原模型已停止。
 
 既有证据包括隔离 OpenCode 的实际 TUI 操作及 Codex/Claude CLI 工具发现；它们使用合成数据或有限发现范围，且须保留其记录的版本／运行内核，不能自动归于当前 Go 候选，也不能扩成所有宿主、桌面 UI、真实模型与后台循环都已验收。
+
+根管理的服务信任是显式选择：`service-config prepare` 的 `--root-pins-file` 与 `--trust-directory` 须成对提供绝对路径，`--network-type` 可选 `official` 或 `hub`。根 pin 文件为 `kid → {publicKeyPem,notBefore,notAfter,revoked}` 的公开 JSON，根信任不会从服务响应自行建立。先在服务信息中明确读取，Go 验证 Manifest 和 keyring、持久化公开信任序列后才采用；回滚、冲突、撤销复活及过期均拒绝。更新采用后使旧内存连接失效，沿原身份重新连接；根 keyring 过期不能继续使用旧会话。静态 `trustedKeys` 配置继续沿原方式工作。
 
 ## 本机数据、同步与接续
 
@@ -73,6 +77,8 @@ Claude `watchHost` 只接受 `kind:claude-code` 与真实绝对 command/cwd，�
 
 设备工具 `galaxy_identity_device_native_read` 的 current/list/pending/reconcile 只核对，prepare_revoke 登记未签挑战并给进程内 previewId，confirm 再经真实选择。控制版本/期限/连接变化重核；撤销只作用所选服务、拒绝目标旧连接，不删除数据或声称全网撤销。最后管理设备须已登记恢复依据才可自撤，登记不证明本人仍持有码。stop_retry 只停止本机继续提交，已签未知操作保留，不等于服务取消。
 
+Native 身份恢复码的当前源码入口是 `galaxy_identity_recovery`：`set` 为当前身份准备新码，`recover` 打开原码输入页，`resume` 以原 `operationId` 接续未完成操作。工具只返回临时本机页面定位，恢复码仅由本人在该页输入或查看，不放入工具参数、工具结果或公开配置。恢复在所选服务的同一 GUID 上执行控制操作，会撤销该服务原设备与绑定、选择新设备并轮换下一代恢复码；本人须在本机保存并确认新码，重新连接另行选择。它不自动恢复历史私有内容或本机资料。页面十分钟有效，关闭或过期不代表服务操作取消；结果未知先查询原回执，只有服务仍记录为待提交时，才可由本人确认重试原签名字节。此流程本机定向联测已通过，不能据源码接线声称最终候选或真实宿主与平台验收通过。
+
 关注需当前房间 Agent grant、用途和结束时间，宿主按 nextCheckAt 调度 check/ack/stop；绑定变更停止旧关注，不复制权限。本机锁/租约只存定位、每次重读来源，人类已读与 Agent 游标分开。无事件不调用模型，当前实现不安装常驻服务；停用 grant 不等于宿主原模型进程已停止。
 
 ## A2A 与已选 Worker Pack
@@ -81,7 +87,7 @@ Claude `watchHost` 只接受 `kind:claude-code` 与真实绝对 command/cwd，�
 
 authentication 默认 none，或 `bearer-environment` 指定 `GALAXY_A2A_PEER_<名称>_TOKEN`；只给该子进程注入，实际调用才读，缺失不降匿名、不借 Official token。不支持 OAuth、任意 headers 和自动凭据发现。prepare/execute 走真实选择，对端状态保 peer-reported。互通说明见 [A2A组件](../../packages/galaxy-a2a/README.md)。
 
-`workerPacks.workers` 固定已有 peer 与真实 pack（builderId/manifestId/manifestHash、sourceHash/version），id 为1—80字母数字/下划线/连字符，最多32项。不接受 shell、下载地址或模型程序路径，不安装启动任意程序。`galaxy_worker_host_read/prepare/execute/abort_local` 需准确可读 Attempt/Configuration/用途，执行经原预览/本人选择；面板自动轮询进度及回执。对端Task、participant-reported Result与PackUse保留独立关联和记录，abort_local只结束本地等待，远端CancelTask另行确认。现有Node/PGlite检查中的租约和选择存储是合同夹具。
+`workerPacks.workers` 固定已有 peer 与真实 pack（builderId/manifestId/manifestHash、sourceHash/version），id 为1—80字母数字/下划线/连字符，最多32项。不接受 shell、下载地址或模型程序路径，不安装启动任意程序。`galaxy_worker_host_read/prepare/execute/abort_local` 需准确可读 Attempt/Configuration/用途，执行经原预览/本人选择；面板自动轮询进度及回执。对端Task、participant-reported Result与PackUse保留独立关联和记录，abort_local只结束本地等待，远端CancelTask另行确认。当前回归分别核对 Go 执行与宿主协议；受控协议端不等于外部 Worker 或真实宿主平台验收。
 
 ## 系统提醒与平台范围
 

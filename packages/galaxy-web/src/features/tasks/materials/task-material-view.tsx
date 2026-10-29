@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useSyncExternalStore} from "react";
 import {withholdTaskMaterialProjection,withholdTaskMaterialTree,taskMaterialProjectionNodes,taskMaterialProjectionId,taskMaterialProjectionKey} from "./task-material-client.mjs";
 import type {WorkRuntime} from "../work-task-types";
 import type {z} from "zod/v4";
-import type {contributionProjectionReadSchema} from "../../../../../galaxy-official/src/shared/contribution-sharing-v2-schema.mjs";
+import type {contributionProjectionReadSchema} from "../../../../../galaxy-contracts/src/contribution-sharing-v2-schema.mjs";
 import {object} from "../../projects/contracts";
 
 type Runtime={api:Pick<WorkRuntime['api'],'call'|'snapshot'>}&Partial<Pick<WorkRuntime,'taskDraftScope'>>;

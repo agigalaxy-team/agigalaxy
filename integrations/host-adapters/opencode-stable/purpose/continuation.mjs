@@ -1,5 +1,5 @@
-import { workContinuationLinkFromText } from '../../../../packages/galaxy-edge-mcp/src/native-v2/work/continuation-link.mjs';
-import { continuationResultText } from '../../../../packages/galaxy-edge-mcp/src/native-v2/work/continuation.mjs';
+import { workContinuationLinkFromText } from '../../../../packages/galaxy-contracts/src/work-continuation-link.mjs';
+import { continuationResultText } from '../../../native-v2/presentation/work-continuation.mjs';
 
 export function createPurposeContinuation(session) {
   async function openObject(object, back = session.onBack) {

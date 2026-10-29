@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestSnapshotSchemaMatchesOriginalJSBoundaries(t *testing.T) {
+func TestSnapshotSchemaMatchesCurrentSharedContract(t *testing.T) {
 	_, _, snapshot, _, configPath := fixtureFiles(t)
 	raw, _ := json.Marshal(snapshot)
 	clone := func() Object { var v Object; json.Unmarshal(raw, &v); return v }
@@ -53,14 +53,14 @@ func TestSnapshotSchemaMatchesOriginalJSBoundaries(t *testing.T) {
 		t.Fatal(e)
 	}
 	var original []bool
-	if e := json.Unmarshal(node(t, "", "validate", path), &original); e != nil {
+	if e := json.Unmarshal(siteContract(t, "validate", path), &original); e != nil {
 		t.Fatal(e)
 	}
 	for i, value := range values {
 		b, _ := json.Marshal(value)
 		_, e := ParseSnapshot(b)
 		if (e == nil) != original[i] {
-			t.Fatalf("snapshot boundary %d differs from current original JS: Go=%v JS=%v", i, e, original[i])
+			t.Fatalf("snapshot boundary %d differs from current shared contract: Go=%v JS=%v", i, e, original[i])
 		}
 	}
 }

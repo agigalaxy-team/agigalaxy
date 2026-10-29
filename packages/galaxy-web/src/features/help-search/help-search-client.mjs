@@ -1,5 +1,5 @@
-import { sha256Hex } from "../../../../galaxy-official/src/shared/web-primitives.mjs";
-import { searchV2Scope } from "../../../../galaxy-official/src/shared/search-v2-schema.mjs";
+import { sha256Hex } from "../../../../galaxy-contracts/src/web-primitives.mjs";
+import { searchV2Scope } from "../../../../galaxy-contracts/src/search-v2-schema.mjs";
 
 const copy = value => structuredClone(value);
 const key = (type, ref) => `${type}:${ref.id}:${ref.version}`;

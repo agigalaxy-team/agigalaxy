@@ -6,11 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +15,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/attachments"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/feedbackfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -74,53 +71,12 @@ func ownerRolePool(t *testing.T, dsn, role string) *pgxpool.Pool {
 	t.Cleanup(pool.Close)
 	return pool
 }
-func ownerNodeProjection(t *testing.T, dsn, account, operation string, now time.Time) Object {
-	t.Helper()
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
-	if e != nil {
-		t.Fatal(e)
-	}
-	script := `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import {AccountFeedbackDataService} from './packages/galaxy-official/src/operations/feedback/owner-data.mjs';import {FeedbackAttachmentsV1Service} from './packages/galaxy-official/src/community/feedback-attachments-v1.mjs';const url=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(url.hostname!=='127.0.0.1'||!url.pathname.startsWith('/galaxy_go_test_'))throw Error('isolated db required');const db=new pg.Pool({connectionString:url.href});const endpoint='https://go-feedback.example.invalid',accountId=process.argv[1],operation=process.argv[2],now=()=>Number(process.argv[3]);const accounts={runAuthorized:(_a,_p,fn)=>fn(db,null,{accountId}),resolveWithin:async()=>({id:accountId})};const files=new FeedbackAttachmentsV1Service({db,endpoint,accounts,store:{},scanner:{},now});const service=new AccountFeedbackDataService({db,endpoint,accounts,feedbackAttachments:files,now});const actor={kind:'official-account',endpoint,accountId};try{console.log(JSON.stringify({operation:await service.operation(actor,operation),page:await service.exportPage(actor,operation,{limit:1})}))}finally{await db.end()}`
-	cmd := exec.Command("node", "--input-type=module", "-e", script, account, operation, strconvUnix(now))
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original owner projection %v %s", e, out)
-	}
-	var result Object
-	if e = json.Unmarshal(out, &result); e != nil {
-		t.Fatal(e)
-	}
-	return result
-}
-func strconvUnix(now time.Time) string { return strconv.FormatInt(now.Unix(), 10) }
-
 func TestOwnerFeedbackDataOriginalRolesAndRecovery(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	var fixture struct {
-		Accounts []string
-		Endpoint string
-	}
-	if e := json.Unmarshal(nodeFixture(t, dsn, "setup"), &fixture); e != nil {
-		t.Fatal(e)
-	}
-	// Execute the unchanged official role scripts in this disposable cluster.
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
-	if e != nil {
-		t.Fatal(e)
-	}
-	for _, name := range []string{"api-role.sql", "worker-role.sql"} {
-		sql, e := os.ReadFile(filepath.Join(root, "packages", "galaxy-official", "src", "infrastructure", name))
-		if e != nil {
-			t.Fatal(e)
-		}
-		if _, e = pool.Exec(ctx, string(sql)); e != nil {
-			t.Fatalf("original role %s: %v", name, e)
-		}
-	}
+	fixture := feedbackfixture.Create(t, pool, "api", "worker")
+	var e error
 	api := ownerRolePool(t, dsn, "galaxy_api")
 	worker := ownerRolePool(t, dsn, "galaxy_evidence_worker")
 	now := time.Unix(2000000000, 0)
@@ -176,9 +132,9 @@ func TestOwnerFeedbackDataOriginalRolesAndRecovery(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	original := ownerNodeProjection(t, dsn, owner, export, now)
-	if !reflect.DeepEqual(normalized(t, Object{"operation": operation, "page": page}), original) {
-		t.Fatalf("Node owner projection differs\nGo=%s\nNode=%s", encoded(t, Object{"operation": operation, "page": page}), encoded(t, original))
+	expected := capturedProjection(t, "owner", map[string]string{"EXPORT": export, "ACCOUNT_A": owner, "ATTACHMENT": attachment, "FEEDBACK_A": firstID})
+	if !reflect.DeepEqual(normalized(t, Object{"operation": operation, "page": page}), expected) {
+		t.Fatalf("owner projection differs from captured contract: %s", encoded(t, Object{"operation": operation, "page": page}))
 	}
 	serialized := string(encoded(t, page))
 	for _, hidden := range []string{"PRIVATE_OPERATOR_NOTE", "FOREIGN_FEEDBACK_TEXT", "processing", "storage_key", "encryption_key_id"} {

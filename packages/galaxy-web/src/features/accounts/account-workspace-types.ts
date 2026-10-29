@@ -1,6 +1,6 @@
 import type {createWebRuntime} from "../../runtime.mjs";
 import type {z} from 'zod/v4';
-import type {selfDeclaredProfileSchema,profileStatementSchema} from "../../../../galaxy-official/src/shared/profile-schema.mjs";
+import type {selfDeclaredProfileSchema,profileStatementSchema} from "../../../../galaxy-contracts/src/profile-schema.mjs";
 
 export type AccountRuntime=Awaited<ReturnType<typeof createWebRuntime>>;
 // Fields consumed from profile-client's current overview and both Honor projections.

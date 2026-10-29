@@ -13,7 +13,7 @@ import (
 
 func TestOriginalTemporaryCursorProtocol(t *testing.T) {
 	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts", "go", "chat-interop.mjs"), "recruitment-codec")
+	cmd := exec.Command("node", filepath.Join(root, "scripts", "go", "protocol-codec-fixture.mjs"), "recruitment-codec")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL=postgres://127.0.0.1/galaxy_go_test_opportunity_codec")
 	raw, e := cmd.Output()

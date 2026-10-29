@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -16,7 +14,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 )
 
-func TestOriginalMeiliGorseRequestsAndProtectedRedirect(t *testing.T) {
+func TestMeiliGorseWireRequestsAndProtectedRedirect(t *testing.T) {
 	type request struct {
 		Method, Path, Authorization, APIKey string
 		Query                               map[string][]string
@@ -86,18 +84,10 @@ func TestOriginalMeiliGorseRequestsAndProtectedRedirect(t *testing.T) {
 	goRequests := append([]request{}, requests...)
 	requests = nil
 	mu.Unlock()
-	root, _ := filepath.Abs("../../..")
-	script := `import{MeilisearchClient,GorseClient}from './packages/galaxy-official/src/discovery-runtime/native-clients.mjs';let [url,key,d]=process.argv.slice(1);d=JSON.parse(d);const m=new MeilisearchClient({url,apiKey:key,index:'test'}),g=new GorseClient({url,apiKey:key});await m.configure();await m.upsert({id:d.id,kind:d.kind,sourceId:d.sourceId,version:d.indexVersion,title:d.title,body:d.body,topic:d.topic,tags:d.tags,publishedAt:d.publishedAt});await m.search({query:'<Go>',after:2,limit:9,topic:'technology',itemKeys:[d.id],rankingMode:'newest'});await m.remove(d.id);await g.upsert(d);await g.remove(d.id);await g.recommend({mode:'latest',limit:3,topic:'technology',profileId:'visitor:test',offset:4})`
-	cmd := exec.Command("node", "--input-type=module", "-e", script, server.URL, key, jsonString(d))
-	cmd.Dir = root
-	if raw, e := cmd.CombinedOutput(); e != nil {
-		t.Fatalf("original clients %v %s", e, raw)
-	}
-	mu.Lock()
-	jsRequests := append([]request{}, requests...)
-	mu.Unlock()
-	if !reflect.DeepEqual(goRequests, jsRequests) {
-		t.Fatalf("native contract differs Go %s JS %s", jsonString(goRequests), jsonString(jsRequests))
+	var expected []request
+	loadWireFixture(t, "native-requests", &expected)
+	if !reflect.DeepEqual(goRequests, expected) {
+		t.Fatalf("native wire contract differs actual %s expected %s", jsonString(goRequests), jsonString(expected))
 	}
 	var received atomic.Int32
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { received.Add(1); _, _ = w.Write([]byte(`{}`)) }))

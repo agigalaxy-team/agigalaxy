@@ -1,6 +1,6 @@
 import {z} from 'zod';
-import {identityProviderSchema, identityIntentSchema, identityPageSchema} from "../../../../galaxy-official/src/shared/identity-link-schema.mjs";
-import {sha256Hex} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {identityProviderSchema, identityIntentSchema, identityPageSchema} from "../../../../galaxy-contracts/src/identity-link-schema.mjs";
+import {sha256Hex} from "../../../../galaxy-contracts/src/web-primitives.mjs";
 
 const uuid = z.uuid();
 const terminal = new Set(['linked', 'revoked', 'binding-inactive', 'provider-unavailable', 'canceled']);

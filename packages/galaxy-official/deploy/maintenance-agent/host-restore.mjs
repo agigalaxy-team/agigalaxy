@@ -20,6 +20,6 @@ export function createOperationsStackPreparation({config,run}){
 export function createHostRestoreAdapters({config,run,controlDirectory,productionEnabled=false,fetchImpl=fetch,prosodyProbe=null}){
  if(productionEnabled)return createProductionRestoreAdapters({config,run,controlDirectory,fetchImpl,prosodyProbe});
  return{version:'operations-stack-isolated-preparation-v1',moduleIds:[],openingConditions:[],prepare:createOperationsStackPreparation({config,run}),
-  'capture-current-facts':async context=>({complete:false,deletion:await captureDeletionRecoveryContribution({config,controlDirectory,operationId:context.intent.operationId,endpoint:context.authority?.endpoint,run}),
+  'capture-current-facts':async context=>({complete:false,deletion:await captureDeletionRecoveryContribution({config,controlDirectory,operationId:context.intent.operationId,endpoint:context.authority?.endpoint,context,run}),
    blockers:['maintenance_current_source_lifecycle_not_connected','maintenance_outbound_delivery_reconciliation_not_connected','maintenance_current_authority_preservation_not_connected']})};
 }

@@ -3,7 +3,7 @@ import React,{useEffect,useEffectEvent,useLayoutEffect,useMemo,useRef,useState} 
 import {BookOpen,Check,Cloud,Smartphone,X} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {createChoiceSyncClient} from './choice-sync-client.mjs';
-import {stableJson} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {stableJson} from "../../../../galaxy-contracts/src/web-primitives.mjs";
 import {ChoiceRetainedOperations,useChoiceViewLease,type ChoiceViewLease} from "../../shared/operations/choice-retained-operations";
 import type {ChoiceContent,CloudChoiceContent,CloudChoice,CloudChoiceVersion,ChoicePreference,ChoiceLocalState,ChoiceSyncProps,ChoiceSyncPreview,ChoiceSyncViewClient} from './choice-sync-view-types';
 import {recordErrorField} from "../work-records/record-workspace-types";

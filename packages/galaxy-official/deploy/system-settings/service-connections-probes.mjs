@@ -1,7 +1,7 @@
-import {MeilisearchClient,GorseClient,OpenPanelClient} from '../../src/discovery-runtime/native-clients.mjs';
-import {OperationsAgentOsClient} from "../../src/operations/agentos/client.mjs";
-import {AttachmentClamAV} from '../../src/infrastructure/attachment-clamav.mjs';
-import {serviceConnectionSchema,serviceCredentialSchemas,serviceConnectionTestSchema} from '../../src/operations/system-settings/service-connections-schema.mjs';
+import {MeilisearchClient,GorseClient,OpenPanelClient} from '../support/native-clients.mjs';
+import {OperationsAgentOsClient} from "../support/agentos-probe.mjs";
+import {AttachmentClamAV} from '../support/attachment-clamav.mjs';
+import {serviceConnectionSchema,serviceCredentialSchemas,serviceConnectionTestSchema} from '../../../galaxy-contracts/src/operations-service-connections-schema.mjs';
 
 const result=(configuration,now)=>({id:configuration.id,kind:configuration.kind,state:'available',checkedAt:now(),checks:[],code:null});
 export async function testServiceConnection(value,{credential=null,fetchImpl=fetch,scannerFactory=x=>new AttachmentClamAV(x),scannerPolicy=null,now=()=>Math.floor(Date.now()/1000)}={}){

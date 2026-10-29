@@ -16,7 +16,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestOriginalProofPurposeEnvelopeAndCurrentPins(t *testing.T) {
+func TestProofPurposeEnvelopeAndCurrentPins(t *testing.T) {
 	public, private, e := ed25519.GenerateKey(rand.Reader)
 	if e != nil {
 		t.Fatal(e)
@@ -35,12 +35,12 @@ func TestOriginalProofPurposeEnvelopeAndCurrentPins(t *testing.T) {
 	privatePEM := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: pkcs8}))
 	input, _ := json.Marshal(map[string]any{"endpoint": keyring.Endpoint, "kid": keyring.KID, "data": data, "id": id, "at": at, "age": 3600, "publicKeyPem": publicPEM, "privateKeyPem": privatePEM, "token": token})
 	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/proof-envelope-interop.mjs"))
+	cmd := exec.Command("node", filepath.Join(root, "scripts/go/domain-envelope-contract.mjs"))
 	cmd.Dir = root
 	cmd.Stdin = strings.NewReader(string(input))
 	out, e := cmd.CombinedOutput()
 	if e != nil {
-		t.Fatalf("source proof envelope interop failed: %v", e)
+		t.Fatalf("current proof envelope contract failed: %v", e)
 	}
 	var oracle struct {
 		SameBytes bool
@@ -48,7 +48,7 @@ func TestOriginalProofPurposeEnvelopeAndCurrentPins(t *testing.T) {
 		ExpiresAt int64
 	}
 	if json.Unmarshal(out, &oracle) != nil || !oracle.SameBytes {
-		t.Fatal("source proof signature bytes differ")
+		t.Fatal("independent proof signature bytes differ")
 	}
 	raw, expires, e := keyring.VerifyProof(context.Background(), token, at)
 	if e != nil || expires != at+3600 {

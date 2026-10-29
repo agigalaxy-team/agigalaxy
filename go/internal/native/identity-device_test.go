@@ -2,10 +2,10 @@ package native
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"io"
 	"net/http"
@@ -13,8 +13,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -24,7 +22,7 @@ import (
 func TestNativeDeviceManagementOriginalJournalAndGoControl(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	store, meta, transport := workUploadServiceFixtureDatabase(t, dsn, true)
+	store, meta, transport := nativeGoUploadFixtureDatabasePeer(t, dsn)
 	now := func() time.Time { return time.Unix(meta.Now, 0) }
 	service := &deviceauth.Service{Pool: pool, Endpoint: meta.Configuration.Endpoint, Now: now, AllowedScopes: connectionBrowserScopes}
 	original, _ := url.Parse(meta.Origin)
@@ -140,23 +138,24 @@ func TestNativeDeviceManagementOriginalJournalAndGoControl(t *testing.T) {
 	}); e != nil {
 		t.Fatal(e)
 	}
-	// The unchanged original Native reads Go's durable journal, and the original
-	// verifier checks the actual Go-produced public control chain.
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	script := `import {readFile} from 'node:fs/promises';import {createNativeRuntime} from './packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';import {verifyIdentityControlChain} from './packages/galaxy-official/src/verification/identity-control.mjs';const dir=process.argv[1],origin=process.argv[2],f=JSON.parse(await readFile(dir+'/work-upload-fixture.json','utf8')),c=f.configuration;const native=await createNativeRuntime({...c,trustedKeys:new Map(Object.entries(c.trustedKeys)),fetch:(url,options)=>fetch(origin+new URL(url).pathname,options),now:()=>f.now,autoResumePrivateSync:false});const pending=await native.deviceManagement.pending(),state=await fetch(origin+'/v2/identity/'+pending.history[0].subjectId+'/control').then(x=>x.json());await verifyIdentityControlChain(state);console.log(JSON.stringify({pending,verified:true}));await native.close();`
-	command := exec.Command("node", "--input-type=module", "-e", script, store.Directory, server.URL)
-	command.Dir = root
-	var originalDiagnostics strings.Builder
-	command.Stderr = &originalDiagnostics
-	out, e := command.Output()
+	pending, e := d.Read(ctx, "pending", "")
+	if e != nil || uploadObject(pending)["active"] != nil || len(uploadRows(uploadObject(pending)["history"])) != 2 {
+		t.Fatal("device journal recovery changed", pending, e)
+	}
+	controlState, e := service.ControlPublicState(ctx, scope.Owner)
 	if e != nil {
-		t.Fatalf("original journal reader: %v %s", e, originalDiagnostics.String())
+		t.Fatal(e)
 	}
-	var checked struct {
-		Pending  map[string]any `json:"pending"`
-		Verified bool           `json:"verified"`
+	raw, e := protocol.Encode(controlState)
+	if e != nil {
+		t.Fatal(e)
 	}
-	if e = json.Unmarshal(out, &checked); e != nil || !checked.Verified || checked.Pending["active"] != nil || len(uploadRows(checked.Pending["history"])) != 2 {
-		t.Fatalf("original journal incompatible: %v", e)
+	var wireState map[string]any
+	if e = protocol.Decode(raw, &wireState); e != nil {
+		t.Fatal(e)
 	}
+	if _, e = verifyConnectionControl(wireState); e != nil {
+		t.Fatal("control chain failed signature verification", e)
+	}
+
 }

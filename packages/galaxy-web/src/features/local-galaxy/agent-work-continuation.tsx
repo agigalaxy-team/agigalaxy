@@ -2,7 +2,7 @@ import React,{useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} fr
 import {Sparkles} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import type {z} from 'zod/v4';
-import {createWorkContinuationLink,workContinuationPrompt,workContinuationObjectSchema} from "../../../../galaxy-edge-mcp/src/native-v2/work/continuation-link.mjs";
+import {createWorkContinuationLink,workContinuationPrompt,workContinuationObjectSchema} from "../../../../galaxy-contracts/src/work-continuation-link.mjs";
 import './agent-work-continuation.css';
 import {hasLocalGalaxyWindow,returnToLocalGalaxyWindow,subscribeLocalGalaxyWindow} from './local-galaxy-window.mjs';
 

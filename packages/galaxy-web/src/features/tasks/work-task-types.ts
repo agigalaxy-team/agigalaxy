@@ -1,5 +1,5 @@
 import type {z} from 'zod/v4';
-import type {taskRequestV2Schema,taskEventV2Schema,participationProposalV2Schema} from "../../../../galaxy-official/src/shared/task-schema-v2.mjs";
+import type {taskRequestV2Schema,taskEventV2Schema,participationProposalV2Schema} from "../../../../galaxy-contracts/src/task-schema-v2.mjs";
 import type {createWebRuntime} from "../../runtime.mjs";
 import type {FeedbackParticipant} from "./operations/task-operation-state";
 import type {FactReference} from "../work-records/presentation-types";

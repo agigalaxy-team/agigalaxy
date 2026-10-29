@@ -3,7 +3,7 @@ import React,{useCallback,useEffect,useEffectEvent,useId,useLayoutEffect,useMemo
 import {Button} from '@/components/ui/button';
 import {MemberAvatar,memberName,useMemberNames} from "../../shared/people/conversation-ui";
 import {useGovernanceDraft} from "../governance/governance-presentation";
-import {hubCharterSchema} from "../../../../galaxy-official/src/shared/hubs-v2-schema.mjs";
+import {hubCharterSchema} from "../../../../galaxy-contracts/src/hubs-v2-schema.mjs";
 import {HubCharterView,HubClauseEditor,hubFields,hubGroups,hubScopeNames,hubStatuses,hubError} from './hub-details';
 import type {HubAcknowledged,HubCharter,HubClient,HubDeclaration,HubIntake,HubManagement,HubMember,HubReport,HubResult,HubRuntime,HubSelection,HubView} from './hub-workspace-types';
 

@@ -1,6 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import {MemberLink,memberName,useMemberNames,type MemberAvatarProfile} from "../../shared/people/conversation-ui";
-import {accountAvatarKey} from "../../../../galaxy-official/src/shared/account-profile-presentation.mjs";
+import {accountAvatarKey} from "../../../../galaxy-contracts/src/account-profile-presentation.mjs";
 import type {ChatRuntime} from './chat-workspace-types';
 
 export function chatMemberName(ref?:string,ownId?:string,name?:string){

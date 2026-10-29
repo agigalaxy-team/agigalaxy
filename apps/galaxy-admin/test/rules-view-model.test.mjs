@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {rulesClone,rulesHref,rulesIsControls,rulesLocation,rulesMerge,rulesNewDraft,rulesNewRule,rulesPath,rulesQuery,rulesSampleFacts,rulesSetNumeric,rulesTraceLabel,rulesValidation} from "../src/lib/rules/rules-view-model.ts";
-import {p14RulesCatalog} from '../../../packages/galaxy-official/src/operations/rules/catalog.mjs';
+import {readFileSync} from 'node:fs';
+const {p14RulesCatalog}=JSON.parse(readFileSync(new URL('./original-ui-contract.json',import.meta.url),'utf8'));
 
 const ruleId='84309cc7-b49a-4233-83b6-079edfd6c804',listId='899fd0f4-c1f1-412b-b64a-39a56050d292',otherId='da7d64fa-ac81-4e49-9dc8-032b71106aa0';
 const policy=()=>({schema:'business-controls/1',features:{forumPost:true,forumReply:true,chatSend:true,attachmentUpload:true},lists:[{id:listId,name:'推广词',kind:'keyword',enabled:true,entries:['推广']}],rules:[{...rulesNewRule(ruleId),name:'新账户外链限制',targets:['forum-post'],conditions:{combinator:'and',rules:[{field:'accountTier',operator:'eq',value:'new'},{field:'keywordList',operator:'matches',value:listId}]}}]});

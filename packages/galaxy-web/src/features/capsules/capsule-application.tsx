@@ -7,7 +7,7 @@ import {useChoiceViewLease,type ChoiceViewLease} from "../../shared/operations/c
 import {useGovernanceDraft} from "../governance/governance-presentation";
 import {capsuleInputDraftKey} from './capsule-authoring-state';
 import {useRegisteredCapsuleDraft} from './capsule-authoring-shared';
-import {capsuleUseV2Schema} from "../../../../galaxy-official/src/shared/capsule-v2-schema.mjs";
+import {capsuleUseV2Schema} from "../../../../galaxy-contracts/src/capsule-v2-schema.mjs";
 import type {CapsuleAuthorClient,CapsuleAuthorRuntime,CapsuleCaseHistory,CapsuleConfigurationView,CapsuleDetail,CapsuleLocator,CapsuleOriginLocator,CapsuleOriginWork,CapsulePropose,CapsuleRead,CapsuleRegisterDraft,CapsuleRun,CapsuleUse,CapsuleUses,CapsuleUseView,CapsuleVerificationView} from './capsule-authoring-types';
 
 type ExactRef={id:string;version:number};

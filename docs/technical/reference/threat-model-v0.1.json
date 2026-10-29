@@ -67,7 +67,7 @@
       "gap": "新增来源须明确注册和验证；未提供任意远程代码适配器",
       "tasks": "C00-04",
       "source": "packages/galaxy-official/src/infrastructure/public-fetch.mjs",
-      "test": "packages/galaxy-official/test/public-transport.test.mjs",
+      "test": "packages/galaxy-client/test/public-transport.test.mjs",
       "documentation": "docs/technical/interfaces.md",
       "review_scope": "current source and dated delivery evidence; no claim of full production defense"
     },

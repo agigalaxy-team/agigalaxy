@@ -20,6 +20,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/webevents"
 	"github.com/google/uuid"
 )
@@ -33,7 +34,7 @@ func TestRealPublicPortalAndControlledDeviceSubscriptions(t *testing.T) {
 	origin := ""
 	node := func(mode string) []byte {
 		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/device-auth-interop.mjs"), mode)
+		cmd := exec.Command("node", filepath.Join(root, "scripts/go/device-client-fixture.mjs"), mode)
 		cmd.Dir = root
 		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN="+origin)
 		out, e := cmd.CombinedOutput()
@@ -42,7 +43,7 @@ func TestRealPublicPortalAndControlledDeviceSubscriptions(t *testing.T) {
 		}
 		return out
 	}
-	node("setup")
+	deviceauthfixture.Prepare(t, pool, dir, []string{"binding", "history"})
 	api, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_api")
 	if e != nil {
 		t.Fatal(e)

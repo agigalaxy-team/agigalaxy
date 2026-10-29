@@ -87,11 +87,23 @@ func TestDurableSpoolCapacityConflictRecoveryAndClosure(t *testing.T) {
 		t.Fatal("close replayed or lost state")
 	}
 	var delivered []Event
+	recoveryEntered, recoveryRelease := make(chan struct{}), make(chan struct{})
 	s = mustSpool(t, SpoolOptions{Path: path, Endpoint: "https://fixture.invalid", Interval: time.Minute, BatchSize: 1, Write: func(_ context.Context, e Event) (Result, error) {
 		delivered = append(delivered, e)
+		if len(delivered) == 1 {
+			close(recoveryEntered)
+			<-recoveryRelease
+		}
 		return Result{State: "recorded"}, nil
 	}})
-	flush(t, s)
+	// NewSpool starts one recovery batch itself; observe that batch rather
+	// than racing an explicit second Flush against its completion.
+	<-recoveryEntered
+	s.mu.Lock()
+	recovered := s.active
+	s.mu.Unlock()
+	close(recoveryRelease)
+	<-recovered
 	if pending(s) != 1 {
 		t.Fatal("batch limit", pending(s))
 	}

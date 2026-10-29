@@ -1,4 +1,4 @@
-import { selfDeclaredProfileSchema } from '../../../packages/galaxy-official/src/shared/profile-schema.mjs';
+import { selfDeclaredProfileSchema } from '../../../packages/galaxy-contracts/src/profile-schema.mjs';
 import { createProjectDescriptionMenu } from './project-description-menu.mjs';
 import {showExactChoice} from './exact-choice.mjs';
 

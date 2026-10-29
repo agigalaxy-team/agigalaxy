@@ -111,7 +111,7 @@ originals/     原始资料与关键讨论
 ```sh
 git clone https://github.com/agigalaxy-team/agigalaxy.git
 cd agigalaxy
-npm ci --ignore-scripts --no-audit --no-fund
+npm run setup
 npm run build:site
 npm run dev
 ```

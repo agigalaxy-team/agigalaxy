@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -23,18 +21,9 @@ import (
 )
 
 func TestCredentialHTTPOriginalOwnerIntakeAndTransactionRevocation(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "credential-fixture.json")
-	setup := fixtureNode(t, dsn, "setup", path, 2000000000)
-	raw, e := os.ReadFile(path)
-	if e != nil {
-		t.Fatal(e)
-	}
-	var f signedFixture
-	if json.Unmarshal(raw, &f) != nil {
-		t.Fatal("fixture")
-	}
+	f, setup := setupCredentials(t, owner, "setup-http")
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -121,10 +110,8 @@ func TestCredentialHTTPOriginalOwnerIntakeAndTransactionRevocation(t *testing.T)
 	}
 	call(request("POST", credentialBase+"/"+id+"/recheck", Object{}), 200)
 	listed := call(request("GET", credentialBase, nil), 200)
-	original := fixtureNode(t, dsn, "owner-read", path, 2000000000)
-	if !reflect.DeepEqual(normalized(listed), original["list"]) {
-		t.Fatal("Go HTTP→original JS credential list differs")
-	}
+	original := credentialGolden(t, "owner-read")
+	compareCredentialProjection(t, listed, original["list"].(map[string]any), f.OwnedID, false)
 	call(request("GET", credentialBase+"?after="+id, nil), 200)
 	for _, query := range []string{"?limit=1", "?after=" + id + "&after=" + id} {
 		out := call(request("GET", credentialBase+query, nil), 400)

@@ -1,0 +1,122 @@
+{
+  "queries": [
+    {
+      "actor": "viewer",
+      "input": {
+        "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "type": "evidence",
+        "version": 1
+      },
+      "kind": "record"
+    },
+    {
+      "actor": "owner",
+      "input": {
+        "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "type": "evidence",
+        "version": 1
+      },
+      "kind": "record"
+    },
+    {
+      "actor": "owner",
+      "input": {
+        "id": "86309116-2676-43ca-852e-edd7969885fe",
+        "type": "verification"
+      },
+      "kind": "record"
+    }
+  ],
+  "results": [
+    {
+      "value": {
+        "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "type": "evidence",
+        "version": 1,
+        "currentVersion": 3,
+        "referenceStatus": "revoked",
+        "record": null,
+        "capabilityVerified": false,
+        "taskOutcomeVerified": false
+      },
+      "wire": "{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"type\":\"evidence\",\"version\":1,\"currentVersion\":3,\"referenceStatus\":\"revoked\",\"record\":null,\"capabilityVerified\":false,\"taskOutcomeVerified\":false}"
+    },
+    {
+      "value": {
+        "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "type": "evidence",
+        "version": 1,
+        "operationId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+        "state": "recorded",
+        "currentVersion": 3,
+        "currentState": "revoked",
+        "sourceStrength": "submitter-reported-reference",
+        "independentExecutionVerified": false,
+        "capabilityVerified": false,
+        "taskOutcomeVerified": false,
+        "synthetic": false,
+        "record": {
+          "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+          "kind": "evidence",
+          "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+          "source": {
+            "issuer": "Author-reported source",
+            "originalAt": "2033-05-18T03:32:20.000Z",
+            "originSystem": "controlled-test",
+            "contentVersion": "version-1",
+            "externalStableId": "original-source"
+          },
+          "summary": "  Exact retained raw summary  ",
+          "expiresAt": null,
+          "synthetic": false,
+          "observedAt": "2033-05-18T03:33:20.000Z",
+          "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "operationId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+          "evidenceType": "test-result",
+          "expectedVersion": 0,
+          "reportedSourceState": "available"
+        },
+        "provenance": {
+          "sourceKey": "declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31",
+          "synthetic": false,
+          "importedAt": "2033-05-18T03:33:20.000Z",
+          "recordedAt": "2033-05-18T03:33:20.000Z",
+          "claimAuthority": "authenticated-subject-report",
+          "sourceStrength": "submitter-reported-reference",
+          "capabilityVerified": false,
+          "currentSourceState": "not-checked",
+          "externalRevocation": "unknown",
+          "sourceIdentityVerified": false,
+          "independentExecutionVerified": false
+        },
+        "integrity": "payload-hash-matches-storage",
+        "authorization": "current",
+        "externalOwnershipVerified": false,
+        "availability": {
+          "record": "available",
+          "upstream": "not-checked",
+          "upstreamRevocation": "unknown"
+        },
+        "revocation": "revoked",
+        "current": false,
+        "referenceStatus": "revoked"
+      },
+      "wire": "{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"type\":\"evidence\",\"version\":1,\"operationId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"state\":\"recorded\",\"currentVersion\":3,\"currentState\":\"revoked\",\"sourceStrength\":\"submitter-reported-reference\",\"independentExecutionVerified\":false,\"capabilityVerified\":false,\"taskOutcomeVerified\":false,\"synthetic\":false,\"record\":{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"kind\":\"evidence\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"source\":{\"issuer\":\"Author-reported source\",\"originalAt\":\"2033-05-18T03:32:20.000Z\",\"originSystem\":\"controlled-test\",\"contentVersion\":\"version-1\",\"externalStableId\":\"original-source\"},\"summary\":\"  Exact retained raw summary  \",\"expiresAt\":null,\"synthetic\":false,\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"operationId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"evidenceType\":\"test-result\",\"expectedVersion\":0,\"reportedSourceState\":\"available\"},\"provenance\":{\"sourceKey\":\"declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31\",\"synthetic\":false,\"importedAt\":\"2033-05-18T03:33:20.000Z\",\"recordedAt\":\"2033-05-18T03:33:20.000Z\",\"claimAuthority\":\"authenticated-subject-report\",\"sourceStrength\":\"submitter-reported-reference\",\"capabilityVerified\":false,\"currentSourceState\":\"not-checked\",\"externalRevocation\":\"unknown\",\"sourceIdentityVerified\":false,\"independentExecutionVerified\":false},\"integrity\":\"payload-hash-matches-storage\",\"authorization\":\"current\",\"externalOwnershipVerified\":false,\"availability\":{\"record\":\"available\",\"upstream\":\"not-checked\",\"upstreamRevocation\":\"unknown\"},\"revocation\":\"revoked\",\"current\":false,\"referenceStatus\":\"revoked\"}"
+    },
+    {
+      "value": {
+        "id": "86309116-2676-43ca-852e-edd7969885fe",
+        "type": "verification",
+        "version": 2,
+        "currentVersion": 2,
+        "referenceStatus": "dependency-unavailable",
+        "reason": "evidence_revoked",
+        "observedAt": "2033-05-18T03:33:20.000Z",
+        "capabilityVerified": false,
+        "taskOutcomeVerified": false,
+        "record": null
+      },
+      "wire": "{\"id\":\"86309116-2676-43ca-852e-edd7969885fe\",\"type\":\"verification\",\"version\":2,\"currentVersion\":2,\"referenceStatus\":\"dependency-unavailable\",\"reason\":\"evidence_revoked\",\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"capabilityVerified\":false,\"taskOutcomeVerified\":false,\"record\":null}"
+    }
+  ]
+}

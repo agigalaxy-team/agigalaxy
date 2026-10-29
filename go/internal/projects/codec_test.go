@@ -12,7 +12,7 @@ import (
 
 func TestOriginalProjectDocumentLengthAndFunctionOrder(t *testing.T) {
 	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts", "go", "chat-interop.mjs"), "project-codec")
+	cmd := exec.Command("node", filepath.Join(root, "scripts", "go", "protocol-codec-fixture.mjs"), "project-codec")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL=postgres://127.0.0.1/galaxy_go_test_project_codec")
 	raw, e := cmd.Output()

@@ -12,7 +12,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -193,30 +192,23 @@ func TestSinkFailureStatusSlogAndSafeCauses(t *testing.T) {
 		t.Fatal("unsafe/lost diagnostic", output.String())
 	}
 }
-func TestOriginalEventProjectionParity(t *testing.T) {
-	inputs := []Event{{"event": "http_completed", "requestId": "11111111-1111-4111-8111-111111111111", "route": "GET /v1/account/public/11111111-1111-4111-8111-111111111111/posts", "status": 200, "stage": "http-dispatch", "durationMs": 12.3456, "body": "PRIVATE"}, {"event": "operations_job_failed", "code": "PRIVATE", "queue": "information-watch", "attempt": 2, "errorName": "DatabaseError", "errorCode": "23505", "stackFrames": []any{Event{"file": "/opt/private/packages/galaxy-official/src/infrastructure/database.mjs", "line": 17, "column": 9}, Event{"file": "https://private.invalid/PRIVATE?token=PRIVATE", "line": 1, "column": 2}}}, {"event": "PRIVATE", "code": "PRIVATE", "phase": "PRIVATE", "target": "PRIVATE", "state": "PRIVATE"}, {"status": 503, "auditStatus": "queued", "delivery": "retry-pending", "pending": 3}, {"event": "runtime_started", "signal": "SIGTERM", "exitCode": 0, "resourceId": "11111111-1111-4111-8111-111111111111", "durationMs": 1.00049}}
-	for name := range events {
-		inputs = append(inputs, Event{"event": name, "body": "PRIVATE"})
+func TestBoundedDiagnosticProjectionAndCurrentSourceFrames(t *testing.T) {
+	input := Event{"event": "operations_job_failed", "route": "GET /v1/account/public/11111111-1111-4111-8111-111111111111/posts", "durationMs": 12.3456, "code": "PRIVATE", "body": "PRIVATE", "errorName": "DatabaseError", "errorCode": "23505", "stackFrames": []any{Event{"file": "/opt/galaxy/go/internal/postgres/tx.go", "line": 17, "column": 9}, Event{"file": "https://private.invalid/PRIVATE?token=PRIVATE", "line": 1, "column": 2}}}
+	projected := Project(input)
+	raw, err := json.Marshal(projected)
+	if err != nil {
+		t.Fatal(err)
 	}
-	raw, _ := json.Marshal(inputs)
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", "--input-type=module", "-e", `import {runtimeLogEvent} from './packages/galaxy-official/src/operations/runtime-log.mjs';console.log(JSON.stringify(JSON.parse(process.argv[1]).map(runtimeLogEvent)));`, string(raw))
-	cmd.Dir = root
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatal(e, string(out))
+	if strings.Contains(string(raw), "PRIVATE") || projected["route"] != "GET /v1/account/public/:id/posts" || projected["durationMs"] != 12.346 || projected["code"] != "other_error" {
+		t.Fatal("unsafe or lost diagnostic", string(raw))
 	}
-	var expected []Event
-	if e = json.Unmarshal(out, &expected); e != nil {
-		t.Fatal(e)
+	expected := []any{Event{"file": "go/internal/postgres/tx.go", "line": 17, "column": 9}}
+	if !reflect.DeepEqual(projected["stackFrames"], expected) {
+		t.Fatal("source frames", projected)
 	}
-	for i, input := range inputs {
-		raw, _ := json.Marshal(Project(input))
-		var actual Event
-		json.Unmarshal(raw, &actual)
-		if !reflect.DeepEqual(actual, expected[i]) {
-			t.Fatalf("projection %d: %s != %v", i, raw, expected[i])
-		}
+	rejected := Project(Event{"event": "PRIVATE", "state": "PRIVATE", "target": "PRIVATE", "body": "PRIVATE"})
+	if !reflect.DeepEqual(rejected, Event{"event": "runtime_event_rejected"}) {
+		t.Fatal("unknown diagnostic retained", rejected)
 	}
 }
 
@@ -261,5 +253,23 @@ func TestDailyRotationOnActualAcceptedWrite(t *testing.T) {
 	current, _ := os.ReadFile(filepath.Join(dir, "api-primary", "runtime.jsonl"))
 	if !strings.Contains(string(old), "runtime_started") || !strings.Contains(string(current), "runtime_stopped") {
 		t.Fatal("daily boundary changed")
+	}
+}
+
+func TestRelocatedSDKAndPlatformDiagnosticLocations(t *testing.T) {
+	for _, name := range []string{
+		"packages/galaxy-client/src/node/connection.mjs",
+		"packages/galaxy-contracts/src/verification.mjs",
+		"packages/galaxy-official/deploy/maintenance-agent/runtime.mjs",
+		"go/internal/native/identity-recovery.go",
+	} {
+		if got := safeFile("/private/host/" + name); got != name {
+			t.Fatalf("current source lost: %s -> %s", name, got)
+		}
+	}
+	for _, name := range []string{"/private/config.json", "packages/galaxy-client/src/../../private.mjs", "https://private.invalid/secret?token=PRIVATE"} {
+		if got := safeFile(name); got != "" {
+			t.Fatalf("private location retained: %s", got)
+		}
 	}
 }

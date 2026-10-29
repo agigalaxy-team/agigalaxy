@@ -1,5 +1,5 @@
 import * as z from "zod/v4";
-import {discoveryQueryV2Schema,discoveryDetailV2Schema,sameOpportunityRef} from "../../../../../galaxy-official/src/shared/discovery-schema-v2.mjs";
+import {discoveryQueryV2Schema,discoveryDetailV2Schema,sameOpportunityRef} from "../../../../../galaxy-contracts/src/discovery-schema-v2.mjs";
 import {getProjectContactClient} from "./operations.mjs";
 
 const sessions=new WeakMap();

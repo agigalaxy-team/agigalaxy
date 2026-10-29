@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { defaultResourceBudgetPolicy, resourceBudgetPolicySchema } from '../src/infrastructure/resource-budgets.mjs';
-import { defaultRequestQuotaPolicy, requestQuotaPolicySchema } from '../src/adapters/http/request-quotas.mjs';
-import { governanceConfigSchema } from "../src/governance/governance-config.mjs";
-import { parseNetworkProfile } from "../src/network/network-profile.mjs";
-import { identityConfigurationSchema } from "../src/identity/config.mjs";
+import { defaultResourceBudgetPolicy, resourceBudgetPolicySchema } from '../../galaxy-contracts/src/policies/resource-budget.mjs';
+import { defaultRequestQuotaPolicy, requestQuotaPolicySchema } from '../../galaxy-contracts/src/request-quota-policy.mjs';
+import { governanceConfigSchema } from "../../galaxy-contracts/src/governance-config-schema.mjs";
+import { parseNetworkProfile } from "../../galaxy-contracts/src/network-profile-schema.mjs";
+import { identityConfigurationSchema } from "../../galaxy-contracts/src/identity-configuration-schema.mjs";
 
 const text = max => z.string().trim().min(1).max(max).refine(value => !/[\p{Cc}\uFEFF]/u.test(value));
 const stageSettings = z.strictObject({

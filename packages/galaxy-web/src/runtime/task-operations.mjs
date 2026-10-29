@@ -1,11 +1,11 @@
 import { createParticipationCompose } from './task-operations/participation-compose.mjs';
 import { createPublicationMaterials } from './task-operations/publication-materials.mjs';
 import { createTaskOperationJournal } from './task-operations/operation-journal.mjs';
-import {taskRequestV2Schema,taskEnvelopeV2Schema,participationProposalV2Schema,participationEventV2Schema} from "../../../galaxy-official/src/shared/task-schema-v2.mjs";
-import {equalJson,sha256Hex} from "../../../galaxy-official/src/shared/web-primitives.mjs";
+import {taskRequestV2Schema,taskEnvelopeV2Schema,participationProposalV2Schema,participationEventV2Schema} from "../../../galaxy-contracts/src/task-schema-v2.mjs";
+import {equalJson,sha256Hex} from "../../../galaxy-contracts/src/web-primitives.mjs";
 import {normalizeForumOrigin} from "../features/community-forum/community-forum-origin.mjs";
 import {taskLocalDraftView} from "../features/tasks/publish/task-local-draft-client.mjs";
-import {taskMaterialBodySchema,hasTaskMaterials} from "../../../galaxy-official/src/shared/task-material-v1-schema.mjs";
+import {taskMaterialBodySchema,hasTaskMaterials} from "../../../galaxy-contracts/src/task-material-v1-schema.mjs";
 
 // Per-runtime task journals and once-only flows. The identity getters remain live
 // across every await; neither a copied identity nor a new authority is created.

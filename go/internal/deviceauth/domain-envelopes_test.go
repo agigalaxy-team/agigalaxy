@@ -16,7 +16,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestDomainEnvelopesOriginalBytesAndAgreementPins(t *testing.T) {
+func TestDomainEnvelopeBytesAndAgreementPins(t *testing.T) {
 	ctx := context.Background()
 	public, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -45,7 +45,7 @@ func TestDomainEnvelopesOriginalBytesAndAgreementPins(t *testing.T) {
 				t.Fatal(err)
 			}
 			input, _ := json.Marshal(map[string]any{"endpoint": k.Endpoint, "kid": k.KID, "data": data, "id": id, "at": at, "age": 300, "publicKeyPem": publicPEM, "privateKeyPem": privatePEM, "token": token, "kind": kind})
-			cmd := exec.Command("node", filepath.Join(root, "scripts/go/proof-envelope-interop.mjs"))
+			cmd := exec.Command("node", filepath.Join(root, "scripts/go/domain-envelope-contract.mjs"))
 			cmd.Dir, cmd.Stdin = root, strings.NewReader(string(input))
 			out, err := cmd.Output()
 			var result struct {
@@ -53,7 +53,7 @@ func TestDomainEnvelopesOriginalBytesAndAgreementPins(t *testing.T) {
 				ExpiresAt int64
 			}
 			if err != nil || json.Unmarshal(out, &result) != nil || !result.SameBytes || result.ExpiresAt != at+300 {
-				t.Fatal("original domain envelope differs", err)
+				t.Fatal("independent domain envelope differs", err)
 			}
 			if _, err = k.Verify(ctx, token, at); err == nil {
 				t.Fatal("domain signature accepted as session")

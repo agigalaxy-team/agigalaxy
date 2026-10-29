@@ -1,4 +1,4 @@
-import { assistanceDraftApproaches } from "../../../../packages/galaxy-official/src/clients/local/assistance-store.mjs";
+import { assistanceDraftApproaches } from "../../../../packages/galaxy-contracts/src/assistance-schema.mjs";
 
 export function createAssistanceDraftsRequestFields(session) {
   function valuesText(content) {

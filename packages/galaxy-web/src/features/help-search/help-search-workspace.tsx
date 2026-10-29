@@ -13,8 +13,8 @@ import {useCurrentTaskMaterialTree,TaskCurrentSourceItem,TaskMaterialNotice} fro
 import {useGovernanceDraft} from "../governance/governance-presentation";
 import {useChoiceViewLease} from "../../shared/operations/choice-retained-operations";
 import {carryHelpOrigin,helpOriginLocator} from "./help-origin-client.mjs";
-import {searchV2Scope} from "../../../../galaxy-official/src/shared/search-v2-schema.mjs";
-import {discoveryQueryV2Schema} from "../../../../galaxy-official/src/shared/discovery-schema-v2.mjs";
+import {searchV2Scope} from "../../../../galaxy-contracts/src/search-v2-schema.mjs";
+import {discoveryQueryV2Schema} from "../../../../galaxy-contracts/src/discovery-schema-v2.mjs";
 import type {ProjectRuntime} from "../projects/contracts";
 import {contactDraftRuntime} from "./help-contact-view-types";
 import {projectErrorText} from "../projects/contracts";

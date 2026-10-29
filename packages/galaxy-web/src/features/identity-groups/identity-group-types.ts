@@ -1,6 +1,6 @@
 import type {RefObject} from 'react';
 import type {z} from 'zod/v4';
-import type {identityGroupIntentSchema,identityGroupSourceSchema,identityGroupSourceSelectionSchema} from "../../../../galaxy-official/src/shared/identity-group-v2-schema.mjs";
+import type {identityGroupIntentSchema,identityGroupSourceSchema,identityGroupSourceSelectionSchema} from "../../../../galaxy-contracts/src/identity-group-v2-schema.mjs";
 import type {ChoiceViewLease} from "../../shared/operations/choice-retained-operations";
 import type {createWebRuntime} from "../../runtime.mjs";
 

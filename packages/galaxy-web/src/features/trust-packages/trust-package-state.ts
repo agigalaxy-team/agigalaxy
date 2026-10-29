@@ -1,7 +1,7 @@
 import * as z from 'zod/v4';
-import {trustAudienceSchema,trustClaimSchema,trustSourceRefSchema,trustSourceSnapshotSchema,trustContainerSchema,trustPermissionSchema} from "../../../../galaxy-official/src/shared/trust-package-schema.mjs";
+import {trustAudienceSchema,trustClaimSchema,trustSourceRefSchema,trustSourceSnapshotSchema,trustContainerSchema,trustPermissionSchema} from "../../../../galaxy-contracts/src/trust-package-schema.mjs";
 import type {createTrustPackageWorkspaceClient} from './trust-package-workspace-client.mjs';
-import type {verifyTrustPackage} from "../../../../galaxy-official/src/verification/trust-package.mjs";
+import type {verifyTrustPackage} from "../../../../galaxy-contracts/src/verification/trust-package.mjs";
 
 export type TrustRef=z.infer<typeof trustSourceRefSchema>;
 export type TrustAudience=z.infer<typeof trustAudienceSchema>;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { forumBodyBlocks, forumBodyParagraphs, forumLinkLabel } from "./community-forum-browse.mjs";
-import { forumTopics } from "../../../../galaxy-official/src/shared/community-forum-topics-v1.mjs";
+import { forumTopics } from "../../../../galaxy-contracts/src/community-forum-topics-v1.mjs";
 import { ForumAudienceSummary } from "./forum-audience";
 import { forumPreviewProjection, type ForumKind, type ForumPayload, type ForumPreviewPayload, type ForumPermission } from "./community-forum-view-types";
 

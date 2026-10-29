@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 )
 
 func TestOriginalPolicyLosslessVersionAndStrictLimits(t *testing.T) {
-	root, _ := filepath.Abs("../../..")
 	dir := t.TempDir()
 	cases := []string{}
 	base := DefaultPolicy()
@@ -25,14 +23,9 @@ func TestOriginalPolicyLosslessVersionAndStrictLimits(t *testing.T) {
 		cases = append(cases, string(raw))
 	}
 	cases = append(cases, `{"version":"\ud800","new":{"task":2,"comment":20,"invitation":5},"normal":{"task":10,"comment":100,"invitation":20},"promotionDays":7,"invitationCooldownDays":7}`)
-	file := filepath.Join(dir, "cases.json")
-	raw, _ = json.Marshal(cases)
-	_ = os.WriteFile(file, raw, 0600)
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/task-materials-interop.mjs"), "policies", file)
-	cmd.Dir = root
-	output, e := cmd.CombinedOutput()
+	output, e := os.ReadFile("testdata/policy-original.json")
 	if e != nil {
-		t.Fatalf("original policy: %v %s", e, output)
+		t.Fatal(e)
 	}
 	var expected []struct {
 		Accepted bool

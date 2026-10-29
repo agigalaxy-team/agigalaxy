@@ -1,4 +1,4 @@
-import {chatParticipantRefSchema} from "../../../../galaxy-official/src/shared/chat-schema.mjs";
+import {chatParticipantRefSchema} from "../../../../galaxy-contracts/src/chat-schema.mjs";
 import {ReadingDetails,ReadingSummary} from "../../shared/reading/reading-details";
 import React,{useCallback,useEffect,useId,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import type {createWebRuntime} from "../../runtime.mjs";

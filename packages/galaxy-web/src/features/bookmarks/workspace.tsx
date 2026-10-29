@@ -2,7 +2,7 @@ import {AccountSessionScope,useAccountSessionModel} from '../accounts/account-se
 import React,{useContext,useEffect,useEffectEvent,useLayoutEffect,useRef,useState} from "react";
 import {Bookmark,MessageCircle,FileText} from "lucide-react";
 import type {z} from "zod/v4";
-import {readingBookmarksPageSchema,readingBookmarkKey,readingBookmarkPath} from "../../../../galaxy-official/src/shared/reading-bookmarks-v1-schema.mjs";
+import {readingBookmarksPageSchema,readingBookmarkKey,readingBookmarkPath} from "../../../../galaxy-contracts/src/reading-bookmarks-v1-schema.mjs";
 import {directoryReadingState,rememberDirectoryReading,restoreDirectoryReading} from "../../shared/reading/directory-reading-state.mjs";
 import {OfficialAccountStatus} from "../accounts/official-account-panel";
 import {useQueryReads} from "../../application/query-reads";

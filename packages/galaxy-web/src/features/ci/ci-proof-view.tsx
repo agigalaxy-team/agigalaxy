@@ -2,7 +2,7 @@ import {ReadingDetails,ReadingSummary} from "../../shared/reading/reading-detail
 import React from 'react';
 import {decodeJwt} from 'jose';
 import type * as z from 'zod/v4';
-import {ciProofV2Schema} from "../../../../galaxy-official/src/shared/ci-observation-v2-schema.mjs";
+import {ciProofV2Schema} from "../../../../galaxy-contracts/src/ci-observation-v2-schema.mjs";
 import "../../shared/styles/peering-ci.css";
 
 export const ciConclusion:Record<string,string>={success:'CI 通过',failure:'CI 未通过',neutral:'CI 结果为中性',cancelled:'运行已取消',skipped:'运行已跳过',timed_out:'运行超时',action_required:'运行需要处理',stale:'运行结果已过期',startup_failure:'运行未能启动'};

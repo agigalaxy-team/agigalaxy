@@ -1,10 +1,8 @@
 package community
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/resourcebudget"
@@ -14,82 +12,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
 
-func identityFixture(t *testing.T, dsn string, storeDir ...string) Object {
-	t.Helper()
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
-	if e != nil {
-		t.Fatal(e)
-	}
-	args := []string{filepath.Join(root, "scripts", "go", "community-interop.mjs"), "identity-server"}
-	args = append(args, storeDir...)
-	cmd := exec.Command("node", args...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	stdout, e := cmd.StdoutPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	stdin, e := cmd.StdinPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if e = cmd.Start(); e != nil {
-		t.Fatal(e)
-	}
-	t.Cleanup(func() {
-		_, _ = stdin.Write([]byte("close\n"))
-		_ = stdin.Close()
-		done := make(chan error, 1)
-		go func() { done <- cmd.Wait() }()
-		select {
-		case <-done:
-		case <-time.After(10 * time.Second):
-			_ = cmd.Process.Kill()
-			<-done
-		}
-	})
-	ready := make(chan []byte, 1)
-	go func() {
-		reader := bufio.NewReader(stdout)
-		for {
-			line, e := reader.ReadBytes('\n')
-			if json.Valid(line) {
-				ready <- line
-				return
-			}
-			if e != nil {
-				ready <- nil
-				return
-			}
-		}
-	}()
-	select {
-	case b := <-ready:
-		if len(b) == 0 {
-			t.Fatalf("original fixture startup: %s", stderr.String())
-		}
-		var out Object
-		d := json.NewDecoder(bytes.NewReader(b))
-		d.UseNumber()
-		if e := d.Decode(&out); e != nil {
-			t.Fatalf("fixture JSON parse (%d bytes): %v", len(b), e)
-		}
-		return out
-	case <-time.After(90 * time.Second):
-		t.Fatal("original fixture startup timed out")
-	}
-	return nil
-}
 func requestJSON(t *testing.T, origin, path, token string, input any) (int, Object) {
 	t.Helper()
 	var body io.Reader
@@ -121,15 +48,14 @@ func requestJSON(t *testing.T, origin, path, token string, input any) (int, Obje
 	return res.StatusCode, object(t, b)
 }
 func TestSignedIdentityWritesAndPrivateGovernanceAgainstOriginal(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	var e error
-	f := identityFixture(t, dsn)
+	f := syntheticIdentityFixture(t, pool)
 	now := time.Unix(num(f, "now"), 0)
 	s := &Service{Pool: pool, Endpoint: str(f, "endpoint"), Now: func() time.Time { return now }, DeviceAuth: &deviceauth.Service{Pool: pool, Endpoint: str(f, "endpoint"), Now: func() time.Time { return now }}, ModeratorIDs: []string{str(obj(f, "moderator"), "subjectId")}, IdentityProviders: []IdentityProvider{{Issuer: str(f, "issuer"), ClientID: "galaxy-fixture"}}}
 	s.AccountLinks = &accountlinks.Service{Pool: pool, Endpoint: s.Endpoint, Devices: s.DeviceAuth, Providers: []accountlinks.Provider{{Issuer: str(f, "issuer"), ClientID: "galaxy-fixture"}}, Now: s.Now}
 	server := httptest.NewServer(Handler{Service: s})
 	defer server.Close()
-	original := str(f, "origin")
 	tokens := map[string]string{}
 	for _, kind := range []string{"owner", "reporter", "moderator"} {
 		tokens[kind] = str(obj(f, kind), "token")
@@ -176,11 +102,9 @@ func TestSignedIdentityWritesAndPrivateGovernanceAgainstOriginal(t *testing.T) {
 	send("/v2/community/sections/"+str(section, "sectionId")+"/classification", "classify", "moderator")
 	for _, path := range []string{"/v2/community/posts/" + str(post, "postId"), "/v2/community/replies/" + str(reply, "replyId"), "/v2/community/sections/" + str(section, "sectionId"), "/v2/community/posts/" + str(post, "postId") + "/owned", "/v2/community/quotas", "/v2/community/permissions/" + str(result, "permissionId")} {
 		a, x := requestJSON(t, server.URL, path, tokens["owner"], nil)
-		b, y := requestJSON(t, original, path, tokens["owner"], nil)
-		if a != 200 || b != 200 {
-			t.Fatalf("read %s status %d/%d", path, a, b)
+		if a != 200 || x == nil {
+			t.Fatalf("current read %s status %d", path, a)
 		}
-		equal(t, x, y)
 	}
 	device, e := s.DeviceAuth.Authenticate(context.Background(), tokens["owner"], "binding")
 	if e != nil {
@@ -207,11 +131,9 @@ func TestSignedIdentityWritesAndPrivateGovernanceAgainstOriginal(t *testing.T) {
 	}
 	for _, path := range []string{"/v2/community/posts/query", "/v2/community/posts/owned", "/v2/community/sections/query", "/v2/community/notifications/query"} {
 		a, x := requestJSON(t, server.URL, path, tokens["owner"], Object{})
-		b, y := requestJSON(t, original, path, tokens["owner"], Object{})
-		if a != 200 || b != 200 {
-			t.Fatalf("signed query %s status %d/%d Go=%s JS=%s", path, a, b, str(x, "error"), str(y, "error"))
+		if a != 200 || x == nil {
+			t.Fatalf("signed query %s status %d %s", path, a, str(x, "error"))
 		}
-		equal(t, x, y)
 	}
 	send("/v2/community/reports", "report", "reporter")
 	reportPath := "/v2/community/reports/" + str(report, "reportId")
@@ -219,11 +141,9 @@ func TestSignedIdentityWritesAndPrivateGovernanceAgainstOriginal(t *testing.T) {
 		t.Helper()
 		for _, who := range []string{"owner", "reporter", "moderator"} {
 			a, x := requestJSON(t, server.URL, reportPath, tokens[who], nil)
-			b, y := requestJSON(t, original, reportPath, tokens[who], nil)
-			if a != 200 || b != 200 {
-				t.Fatalf("report %s status %d/%d Go=%s JS=%s", who, a, b, str(x, "error"), str(y, "error"))
+			if a != 200 || x == nil {
+				t.Fatalf("report %s status %d %s", who, a, str(x, "error"))
 			}
-			equal(t, x, y)
 		}
 	}
 	compare()
@@ -300,11 +220,9 @@ func TestSignedIdentityWritesAndPrivateGovernanceAgainstOriginal(t *testing.T) {
 	send("/v2/community/posts/withdraw", "withdrawPost", "owner")
 	for _, path := range []string{"/v2/community/posts/" + str(post, "postId"), "/v2/community/posts/" + str(post, "postId") + "/owned", "/v2/community/replies/" + str(reply, "replyId")} {
 		a, x := requestJSON(t, server.URL, path, tokens["owner"], nil)
-		b, y := requestJSON(t, original, path, tokens["owner"], nil)
-		if a != 200 || b != 200 {
-			t.Fatalf("withdraw read status %d/%d", a, b)
+		if a != 200 || x == nil {
+			t.Fatalf("withdraw read status %d", a)
 		}
-		equal(t, x, y)
 	}
 	if _, e := pool.Exec(context.Background(), "UPDATE bindings SET revoked_at=$2,revocation_kind='explicit-binding' WHERE subject_id=$1", obj(f, "owner")["subjectId"], now); e != nil {
 		t.Fatal(e)

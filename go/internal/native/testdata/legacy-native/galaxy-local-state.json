@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "integration": null,
+  "uploadPrivacy": {
+    "version": 1,
+    "revision": 0,
+    "level": "history-overview",
+    "includeFullConversations": false,
+    "sessionIds": []
+  },
+  "cases": [],
+  "disclosurePlans": [],
+  "consentGrants": [],
+  "localProofDrafts": [],
+  "auditEvents": [
+    {
+      "id": "audit_5e3f9f29dcf24cb1bdbfda70c6c0ac9b",
+      "action": "galaxy_id.initialized",
+      "subjectId": "GUID1001M61XETSN4W8JAYZ0C0H1RDMQ",
+      "occurredAt": "2026-10-28T18:48:15.421Z",
+      "details": {
+        "localOnly": true
+      }
+    }
+  ]
+}

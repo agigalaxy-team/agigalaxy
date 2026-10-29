@@ -22,6 +22,16 @@ var ledgerColumns = map[string][]string{
 	"deletion_executions": {"id", "request_id", "subject_id", "command_hash", "result", "created_at"},
 }
 
+// DeletionLedgerColumns exposes the capture contract to the isolated
+// maintenance adapter without a second table/column definition.
+func DeletionLedgerColumns() map[string][]string {
+	out := make(map[string][]string, len(ledgerColumns))
+	for name, columns := range ledgerColumns {
+		out[name] = append([]string(nil), columns...)
+	}
+	return out
+}
+
 type DeletionLedger struct {
 	Version    int                 `json:"version"`
 	Schema     int                 `json:"schema"`

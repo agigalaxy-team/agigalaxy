@@ -28,12 +28,12 @@ func TestTransportConfigurationOriginalHashAndFileBoundaries(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	command := exec.CommandContext(ctx, "node", "--input-type=module", "-e", `import {loadChatTransport} from './packages/galaxy-official/src/chat/chat-config.mjs';const x=await loadChatTransport(process.argv[1]);console.log(JSON.stringify({hash:x.configurationHash}));`, path)
+	command := exec.CommandContext(ctx, "node", "--input-type=module", "-e", `import {readFile} from 'node:fs/promises';import {createHash} from 'node:crypto';const x=JSON.parse(await readFile(process.argv[1],'utf8'));console.log(JSON.stringify({hash:createHash('sha256').update(JSON.stringify(x)).digest('hex')}));`, path)
 	command.Dir = root
 	out, e := command.Output()
 	if e != nil {
 		if ee, ok := e.(*exec.ExitError); ok {
-			t.Fatalf("original config: %v %s", e, ee.Stderr)
+			t.Fatalf("independent JSON bytes: %v %s", e, ee.Stderr)
 		}
 		t.Fatal(e)
 	}
@@ -42,7 +42,7 @@ func TestTransportConfigurationOriginalHashAndFileBoundaries(t *testing.T) {
 		t.Fatal(e)
 	}
 	if *hash != str(oracle, "hash") {
-		t.Fatalf("original configuration hash differs: %s %s", *hash, oracle["hash"])
+		t.Fatalf("configuration hash differs from JSON.stringify: %s %s", *hash, oracle["hash"])
 	}
 	for _, service := range []string{"https://127.0.0.1:5347", "xmpp://remote.example.invalid:5347", "xmpp://user@localhost:5347", "xmpp://localhost:5347/path", "xmpp://localhost:5347?query=yes"} {
 		config.Service = service

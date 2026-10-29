@@ -6,10 +6,8 @@ import (
 	"errors"
 	"net/netip"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -37,29 +35,6 @@ type signedFixture struct {
 	}
 }
 
-func fixtureNode(t *testing.T, dsn, mode, path string, at int64) Object {
-	t.Helper()
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
-	if e != nil {
-		t.Fatal(e)
-	}
-	cmd := exec.Command("node", filepath.Join(root, "go", "internal", "credentials", "testdata", "interop.mjs"), mode, path, strconv.FormatInt(at, 10))
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e := cmd.Output()
-	if e != nil {
-		detail := ""
-		if exit, ok := e.(*exec.ExitError); ok {
-			detail = string(exit.Stderr)
-		}
-		t.Fatalf("original credential fixture failed: %v %s", e, detail)
-	}
-	var result Object
-	if json.Unmarshal(out, &result) != nil {
-		t.Fatal("invalid original credential fixture output")
-	}
-	return result
-}
 func encoded(t *testing.T, v any) []byte {
 	t.Helper()
 	b, e := json.Marshal(v)
@@ -78,16 +53,7 @@ func TestOriginalSignedCredentialVerificationAndPGViews(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
-	path := filepath.Join(t.TempDir(), "credential-fixture.json")
-	setup := fixtureNode(t, dsn, "setup", path, 2000000000)
-	raw, e := os.ReadFile(path)
-	if e != nil {
-		t.Fatal(e)
-	}
-	var f signedFixture
-	if json.Unmarshal(raw, &f) != nil {
-		t.Fatal("invalid signed fixture")
-	}
+	f, setup := setupCredentials(t, owner, "setup")
 	now := time.Unix(2000000000, 0)
 	var mu sync.Mutex
 	fetches := 0
@@ -191,14 +157,13 @@ func TestOriginalSignedCredentialVerificationAndPGViews(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	reference := fixtureNode(t, dsn, "read", path, now.Unix())
-	if !reflect.DeepEqual(normalized(page), reference["public"]) {
-		t.Fatalf("Go→JS public credential metadata differs")
-	}
+	reference := credentialGolden(t, "read-current")
+	compareCredentialProjection(t, page, reference["public"].(map[string]any), f.OwnedID, true)
 	listed, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return service.ListWithin(ctx, tx, account, []byte(`{}`)) })
-	if e != nil || !reflect.DeepEqual(normalized(listed), reference["list"]) {
-		t.Fatalf("Go→JS owner list differs %v", e)
+	if e != nil {
+		t.Fatal(e)
 	}
+	compareCredentialProjection(t, listed, reference["list"].(map[string]any), f.OwnedID, false)
 	items := page["items"].([]Object)
 	if len(items) != 4 {
 		t.Fatalf("foreign holder material became public: %d items", len(items))
@@ -255,7 +220,7 @@ func TestOriginalSignedCredentialVerificationAndPGViews(t *testing.T) {
 	if e != nil || rechecked["revocation"].(Object)["state"] != "revoked" {
 		t.Fatalf("signed revocation not applied %v", e)
 	}
-	reference = fixtureNode(t, dsn, "read", path, now.Unix())
+	reference = credentialGolden(t, "read-revoked")
 	get, e = postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return service.GetWithin(ctx, tx, account, f.OwnedID) })
 	if e != nil || !reflect.DeepEqual(normalized(get), reference["owned"]) {
 		t.Fatalf("Go signed recheck→JS differs %v", e)
@@ -317,28 +282,13 @@ func TestCredentialConfigAndNetworkBoundary(t *testing.T) {
 }
 
 func TestOriginalDateAndPublicAddressClassification(t *testing.T) {
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
-	if e != nil {
-		t.Fatal(e)
-	}
 	dates := []string{"2023-02-29T00:00:00Z", "2023-02-31T00:00:00Z", "2023-04-31T24:00:00Z", "2023-01-00T00:00:00Z", "9999-12-31T24:00:00Z", "0000-01-01T00:00:00+01:00"}
 	addresses := []string{"8.8.8.8", "127.0.0.1", "10.1.2.3", "192.175.48.1", "192.31.196.1", "192.52.193.1", "192.88.99.1", "2606:4700:4700::1111", "::2", "::ffff:8.8.8.8", "64:ff9b::808:808", "2001:3::1", "2620:4f:8000::1", "3fff::1", "5f00::1"}
-	input := encoded(t, Object{"dates": dates, "addresses": addresses})
-	script := `import {isPublicAddress} from './packages/galaxy-official/src/infrastructure/public-fetch.mjs';let raw='';for await(const b of process.stdin)raw+=b;const x=JSON.parse(raw);console.log(JSON.stringify({dates:x.dates.map(s=>{const t=Date.parse(s);return Number.isFinite(t)?new Date(Math.floor(t/1000)*1000).toISOString():null}),addresses:x.addresses.map(isPublicAddress)}))`
-	cmd := exec.Command("node", "--input-type=module", "-e", script)
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(string(input))
-	out, e := cmd.Output()
-	if e != nil {
-		t.Fatal("original scalar classification failed", e)
-	}
 	var expected struct {
 		Dates     []*string
 		Addresses []bool
 	}
-	if json.Unmarshal(out, &expected) != nil {
-		t.Fatal("invalid original scalar output")
-	}
+	captureJSON(t, "scalar", &expected)
 	for index, value := range dates {
 		seconds, e := dateField(Object{"value": value}, "value")
 		if expected.Dates[index] == nil {

@@ -1,10 +1,9 @@
+import {copyLegacyNativeFixture} from './legacy-native-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
 import {generateKeyPairSync,randomUUID} from 'node:crypto';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createNativeRuntimeBridge} from '../native-runtime-bridge.mjs';
@@ -17,7 +16,7 @@ const data=result=>JSON.parse(result.content[0].text);
 async function fixture(t){
  const directory=await mkdtemp(join(tmpdir(),'galaxy-go-host-')),store=join(directory,'data'),configPath=join(directory,'native.json'),closers=[];
  t.after(async()=>{for(const close of closers.reverse())await close();const exact=resolve(directory);assert.ok(exact.startsWith(resolve(tmpdir())+sep));await rm(exact,{recursive:true,force:true});});
- await promisify(execFile)(process.execPath,['scripts/go/native-fixture.mjs',store]);
+ await copyLegacyNativeFixture(store);
  const {identity}=JSON.parse(await readFile(join(store,'expected.json'),'utf8'));
  const now=Math.floor(Date.now()/1000),key=generateKeyPairSync('ed25519').publicKey.export({type:'spki',format:'pem'});
  await writeFile(configPath,JSON.stringify({version:2,website:'https://selected.invalid',endpoint:'https://galaxy.invalid',dataDirectory:store,trustedKeys:{synthetic:{publicKeyPem:key,notBefore:now-1,notAfter:now+3600,revoked:false}}}));

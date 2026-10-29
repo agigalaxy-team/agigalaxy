@@ -22,6 +22,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// catalog.json is the maintained personal MCP wire contract. It has no runtime
+// dependency on the retired Node registration handler or its one-time exporter.
 //go:embed catalog.json
 var catalogJSON []byte
 

@@ -19,8 +19,8 @@ import type { createReadTaskController } from '../../../shared/read-task.mjs';
 export interface GalaxyMenuSession {
   readonly api: StableHostApi;
   readonly closed: boolean;
-  readonly store: Pick<typeof import('../../../../packages/galaxy-core/src/local-store.mjs'), 'getLocalSnapshot' | 'getGalaxyIntegrationStatus' | 'resetGalaxyIntegration'>;
-  readonly connection: Pick<typeof import('../../../../packages/galaxy-core/src/connection-profile.mjs'), 'getGalaxyConnectionStatus'>;
+  readonly store: ReturnType<typeof import('../bridge/host-local-client.mjs').createHostLocalClient>['store'];
+  readonly connection: ReturnType<typeof import('../bridge/host-local-client.mjs').createHostLocalClient>['connection'];
   readonly createDeletionRecords: ReturnType<typeof import('../bridge/host-local-client.mjs').createHostLocalClient>['deletionRecords'];
   readonly dataDirectory: string | undefined;
   connectionController: ConnectionController | null;

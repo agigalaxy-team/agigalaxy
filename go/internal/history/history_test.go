@@ -5,9 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -22,29 +19,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/history/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original history %s %v %s", mode, e, stderr.String())
-	}
-	lines := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
-	for i := len(lines) - 1; i >= 0; i-- {
-		var o Object
-		if json.Unmarshal(lines[i], &o) == nil && o != nil {
-			return o
-		}
-	}
-	t.Fatal("invalid history fixture result")
-	return nil
-}
 func normal(v any) any { var out any; _ = json.Unmarshal(encode(v), &out); return out }
 func same(t *testing.T, a, b any) {
 	t.Helper()
@@ -53,20 +27,20 @@ func same(t *testing.T, a, b any) {
 	}
 }
 func TestOriginalHistoryProjectionHashesPermissionsAndHTTP(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "history-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
 	var f struct {
 		Endpoint, PublicCase, Hidden, Shared, Later string
 		Now                                         int64
 		Owner, Viewer                               struct{ Subject, Token string }
 		FailedGrant                                 Object
 	}
-	if json.Unmarshal(raw, &f) != nil {
-		t.Fatal("fixture")
+	setupHistory(t, owner, &f)
+	var expectedQueries []struct {
+		Input   []Object `json:"input"`
+		Results []Object `json:"results"`
 	}
+	fixtureJSON(t, "query", &expectedQueries)
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -87,7 +61,8 @@ func TestOriginalHistoryProjectionHashesPermissionsAndHTTP(t *testing.T) {
 		t.Fatal(e)
 	}
 	queries := []Object{{"actor": nil, "input": Object{"subjectId": f.Owner.Subject}}, {"actor": "owner", "input": Object{"subjectId": f.Owner.Subject}}, {"actor": "viewer", "input": Object{"subjectId": f.Owner.Subject}}, {"actor": "owner", "input": Object{"subjectId": f.Owner.Subject, "environment": "node", "sourceKind": "local", "createdFrom": "2000-01-01T00:00:00Z", "createdBefore": "2100-01-01T00:00:00Z"}}, {"actor": nil, "input": Object{"subjectId": f.Owner.Subject, "query": "compiler", "limit": 1}}, {"actor": nil, "input": Object{"subjectId": f.Owner.Subject, "after": f.PublicCase, "limit": 1}}, {"actor": nil, "input": Object{"subjectId": f.Owner.Subject, "verificationStrength": "reported-only"}}, {"actor": nil, "input": Object{"subjectId": f.Owner.Subject, "capabilityId": "compiler"}}}
-	expected := node(t, dsn, "query", path, queries)["results"].([]any)
+	same(t, queries, expectedQueries[0].Input)
+	expected := expectedQueries[0].Results
 	for i, q := range queries {
 		var actor *deviceauth.Actor
 		switch q["actor"] {
@@ -100,7 +75,7 @@ func TestOriginalHistoryProjectionHashesPermissionsAndHTTP(t *testing.T) {
 		if e != nil {
 			t.Fatalf("query %d: %v", i, e)
 		}
-		same(t, got, expected[i].(Object)["value"])
+		same(t, got, expected[i]["value"])
 	}
 	public, e := s.Query(ctx, nil, encode(Object{"subjectId": f.Owner.Subject}))
 	if e != nil {
@@ -146,7 +121,8 @@ func TestOriginalHistoryProjectionHashesPermissionsAndHTTP(t *testing.T) {
 			t.Fatal("revoked event remained in rebuilt case")
 		}
 	}
-	expectedAfter := node(t, dsn, "query", path, []Object{{"actor": nil, "input": Object{"subjectId": f.Owner.Subject}}})["results"].([]any)[0].(Object)["value"]
+	same(t, []Object{{"actor": nil, "input": Object{"subjectId": f.Owner.Subject}}}, expectedQueries[1].Input)
+	expectedAfter := expectedQueries[1].Results[0]["value"]
 	same(t, after, expectedAfter)
 	// Source count/version corruption cannot be accepted as a rebuilt history.
 	_, e = owner.Exec(ctx, `UPDATE cases SET version=version+1 WHERE id=$1`, f.Later)

@@ -1,20 +1,14 @@
 package hubs
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"crypto/ed25519"
-	"crypto/rand"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/builders"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/cases"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/civ2"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/contributions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/verificationrecords"
@@ -25,104 +19,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
 
-type originalPeer struct {
-	mu     sync.Mutex
-	input  io.WriteCloser
-	output *bufio.Reader
-	meta   Object
-	key    ed25519.PrivateKey
-	stderr bytes.Buffer
-}
-
-func originalPeerFixture(t *testing.T, dsn, endpoint string, proof bool) *originalPeer {
-	t.Helper()
-	pub, key, e := ed25519.GenerateKey(rand.Reader)
-	if e != nil {
-		t.Fatal(e)
-	}
-	public, e := identity.PublicPEM(pub)
-	if e != nil {
-		t.Fatal(e)
-	}
-	private, e := x509.MarshalPKCS8PrivateKey(key)
-	if e != nil {
-		t.Fatal(e)
-	}
-	file := filepath.Join(t.TempDir(), "peering-fixture.json")
-	raw := encode(Object{"endpoint": endpoint, "privateKeyPem": string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: private})), "publicKeyPem": public, "includeProof": proof})
-	if e = os.WriteFile(file, raw, 0600); e != nil {
-		t.Fatal(e)
-	}
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/hubs/testdata/peering.mjs"), file)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	p := &originalPeer{key: key}
-	input, e := cmd.StdinPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	output, e := cmd.StdoutPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	p.input = input
-	p.output = bufio.NewReader(output)
-	cmd.Stderr = &p.stderr
-	if e = cmd.Start(); e != nil {
-		t.Fatal(e)
-	}
-	t.Cleanup(func() {
-		_ = input.Close()
-		done := make(chan error, 1)
-		go func() { done <- cmd.Wait() }()
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			_ = cmd.Process.Kill()
-			<-done
-		}
-	})
-	line, e := p.output.ReadBytes('\n')
-	if e != nil {
-		t.Fatal(e, p.stderr.String())
-	}
-	if protocol.Decode(line, &p.meta) != nil || p.meta["ready"] != true {
-		t.Fatal("original peer startup")
-	}
-	return p
-}
-func (p *originalPeer) call(t *testing.T, q Object) Object {
-	t.Helper()
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if _, e := p.input.Write(append(encode(q), '\n')); e != nil {
-		t.Fatal(e)
-	}
-	raw, e := p.output.ReadBytes('\n')
-	if e != nil {
-		t.Fatal(e, p.stderr.String())
-	}
-	var result Object
-	if protocol.Decode(raw, &result) != nil {
-		t.Fatal("original peer reply")
-	}
-	if result["error"] != nil {
-		t.Fatal(result["error"], result["message"])
-	}
-	return obj(result["value"])
-}
-
-func TestPeeringTwoGoDatabasesOriginalJSProofAndUnknownScope(t *testing.T) {
+func TestPeeringTwoGoDatabasesCurrentSDKProofAndUnknownScope(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
 	name := "galaxy_go_test_peer_" + strings.ReplaceAll(uuid.NewString(), "-", "")
@@ -135,19 +37,24 @@ func TestPeeringTwoGoDatabasesOriginalJSProofAndUnknownScope(t *testing.T) {
 	}
 	second.Path = "/" + name
 	secondDSN := second.String()
-	left := originalPeerFixture(t, dsn, "https://a.example.invalid", false)
-	right := originalPeerFixture(t, secondDSN, "https://b.example.invalid", true)
+	rightOwner, err := pgxpool.New(ctx, secondDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(rightOwner.Close)
+	left := newGoPeerFixture(t, owner, "https://a.example.invalid", false)
+	right := newGoPeerFixture(t, rightOwner, "https://b.example.invalid", true)
 	clock := int64(2000000000)
 	now := func() time.Time { return time.Unix(clock, 0) }
 	type endpoint struct {
-		original *originalPeer
+		original *goPeerFixture
 		pool     *pgxpool.Pool
 		service  *Service
 		peer     *Peering
 		actor    deviceauth.Actor
 		server   *httptest.Server
 	}
-	build := func(dsn string, f *originalPeer) *endpoint {
+	build := func(dsn string, f *goPeerFixture) *endpoint {
 		t.Helper()
 		cfg, e := pgxpool.ParseConfig(dsn)
 		if e != nil {
@@ -219,13 +126,14 @@ func TestPeeringTwoGoDatabasesOriginalJSProofAndUnknownScope(t *testing.T) {
 	agreement := Object{"profile": "galaxy-direct-proof/1", "id": uuid.NewString(), "version": 1, "parties": []any{Object{"endpoint": left.meta["endpoint"], "hubId": left.meta["hubId"], "operatorId": left.meta["subject"], "keys": []any{Object{"kid": "go-fixture", "publicKeyPem": obj(left.meta["pin"])["publicKeyPem"], "notBefore": clock - 1, "notAfter": clock + 200000}}}, Object{"endpoint": right.meta["endpoint"], "hubId": right.meta["hubId"], "operatorId": right.meta["subject"], "keys": []any{Object{"kid": "go-fixture", "publicKeyPem": obj(right.meta["pin"])["publicKeyPem"], "notBefore": clock - 1, "notAfter": clock + 200000}}}}, "sourceKinds": []any{"contribution-summary", "ci-proof-v2"}, "purpose": "help-discovery", "ratePerMinute": 60, "pageSize": 1, "expiresAt": clock + 1800, "responseMaxAgeSeconds": 120, "cache": "no-response-body-retention", "route": "direct", "officialProtocolFee": 0, "localEvaluationAuthority": "no-automatic-capability-upgrade", "rawTaskContext": "excluded", "intake": "each-party-hub-private-intake"}
 	authorize := func(target *endpoint, payload Object) Object {
 		t.Helper()
-		return target.original.call(t, Object{"action": "authorize", "payload": payload})
+		return target.original.authorizePeering(t, payload)
 	}
 	approve := func(target *endpoint) {
 		ev := Object{"schemaVersion": 2, "id": uuid.NewString(), "hubId": target.original.meta["hubId"], "kind": "peer-approve", "expectedVersion": 0, "agreement": agreement}
 		ok(target, "/v2/hubs/peering/events", authorize(target, ev))
 	}
 	sends := 0
+	outerSigned := ""
 	drop := false
 	var afterResponse func()
 	a.peer.Send = func(ctx context.Context, address string, body []byte, timeout time.Duration, max int) ([]byte, error) {
@@ -242,6 +150,10 @@ func TestPeeringTwoGoDatabasesOriginalJSProofAndUnknownScope(t *testing.T) {
 		}
 		defer response.Body.Close()
 		raw, e := io.ReadAll(response.Body)
+		var envelope Object
+		if protocol.Decode(raw, &envelope) == nil {
+			outerSigned = txt(envelope, "signed")
+		}
 		if response.StatusCode != 200 {
 			return nil, io.ErrUnexpectedEOF
 		}
@@ -286,8 +198,32 @@ func TestPeeringTwoGoDatabasesOriginalJSProofAndUnknownScope(t *testing.T) {
 		in     Object
 	}{{"read", Object{"hubId": right.meta["hubId"], "agreementId": agreement["id"]}}, {"connections", Object{"hubId": right.meta["hubId"]}}, {"list", Object{"hubId": right.meta["hubId"], "kind": "grants"}}, {"preview", Object{"hubId": right.meta["hubId"], "agreementId": agreement["id"], "source": right.meta["source"]}}, {"sources", Object{"hubId": right.meta["hubId"], "kind": "case-event", "parentId": right.meta["caseId"]}}} {
 		got := ok(b, "/v2/hubs/peering/"+q.method, q.in)
-		want := right.call(t, Object{"action": "read", "method": q.method, "input": q.in})
-		same(t, got, want)
+		switch q.method {
+		case "read":
+			if got["agreementId"] != agreement["id"] || got["state"] != "local-approved" || got["remoteApproval"] != "not-established-by-local-record" {
+				t.Fatalf("agreement read: %v", got)
+			}
+			same(t, got["agreement"], agreement)
+		case "connections":
+			items := arr(got["items"])
+			if len(items) != 1 || obj(items[0])["agreementId"] != agreement["id"] || obj(items[0])["peer"] != left.meta["endpoint"] || obj(items[0])["remoteApproval"] != "requires-current-query" {
+				t.Fatalf("connections: %v", got)
+			}
+		case "list":
+			items := arr(got["items"])
+			if len(items) != 1 || obj(items[0])["id"] != sourceGrant["id"] || obj(items[0])["state"] != "granted" || obj(items[0])["currentSourceStatus"] != "requires-current-query" {
+				t.Fatalf("source grants: %v", got)
+			}
+		case "preview":
+			if got["published"] != false || got["peer"] != left.meta["endpoint"] {
+				t.Fatalf("source preview: %v", got)
+			}
+			same(t, got["source"], right.meta["source"])
+		case "sources":
+			if got["sourceTextIncluded"] != false || len(arr(got["items"])) < 1 || strings.Contains(string(encode(got)), "PRIVATE_SYNTHETIC") {
+				t.Fatalf("source disclosure: %v", got)
+			}
+		}
 	}
 	proof := obj(right.meta["proof"])
 	proofGrant := clone(sourceGrant)
@@ -298,12 +234,9 @@ func TestPeeringTwoGoDatabasesOriginalJSProofAndUnknownScope(t *testing.T) {
 	if len(arr(proofPage["items"])) != 1 || obj(arr(proofPage["items"])[0])["signed"] != obj(proof["published"])["signed"] || num(obj(arr(proofPage["sourceGroups"])[0]), "independentEvidenceAdded") != 0 {
 		t.Fatal("proof bytes or provenance changed", proofPage)
 	}
-	// The original JS caller verifies both the Go outer signature and original CI token.
-	left.call(t, Object{"action": "transport", "origin": b.server.URL, "peer": right.meta["endpoint"]})
-	jsPage := left.call(t, Object{"action": "read", "method": "query", "input": Object{"hubId": left.meta["hubId"], "agreementId": agreement["id"], "queryId": uuid.NewString(), "after": page["nextCursor"]}})
-	if obj(arr(jsPage["items"])[0])["signed"] != obj(proof["published"])["signed"] {
-		t.Fatal("original JS rejected Go proof page")
-	}
+	// Verify both envelopes through the current JavaScript client, independently
+	// of the Go peer verifier, while preserving the issuer proof bytes.
+	verifyCurrentSDK(t, outerSigned, txt(obj(proof["published"]), "signed"), right.meta)
 	before := sends
 	drop = true
 	unknownID := uuid.NewString()
@@ -349,7 +282,9 @@ func TestPeeringTwoGoDatabasesOriginalJSProofAndUnknownScope(t *testing.T) {
 		t.Fatal("peer signature widened response", status, invalid)
 	}
 	b.peer.Sign = originalSign
-	right.call(t, Object{"action": "revoke", "id": obj(proof["evidenceAuth"])["consentId"]})
+	if _, err := right.auth.Service.RevokeConsent(ctx, right.auth.Actor, txt(obj(proof["evidenceAuth"]), "consentId"), nil); err != nil {
+		t.Fatal(err)
+	}
 	gone := query(Object{"after": proofPage["nextCursor"], "recheck": []any{proofGrant["id"]}})
 	found := false
 	for _, v := range arr(gone["items"]) {

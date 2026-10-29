@@ -9,7 +9,6 @@ package.json 的实际导出为：
 | 导出 | 文件 |
 |---|---|
 | 主桥接 | [src/protocol/bridge.mjs](src/protocol/bridge.mjs) |
-| host | [src/hosts/host-flow.mjs](src/hosts/host-flow.mjs) |
 | host-v2 | [src/hosts/host-flow-v2.mjs](src/hosts/host-flow-v2.mjs) |
 | facts-v2 | [src/facts/facts-v2.mjs](src/facts/facts-v2.mjs) |
 | discovery | [src/protocol/card-discovery.mjs](src/protocol/card-discovery.mjs) |
@@ -24,5 +23,9 @@ package.json 的实际导出为：
 ## 开发和集成
 
 根 setup 安装本目录锁定依赖。相关检查可使用根 npm run test:a2a 或对应 node --test 文件，前置与边界见[开发检查](../../docs/technical/development.md)。
+
+参与任务及工作事实集成用例通过当前 Go Cases／Task HTTP 服务执行，测试自行创建隔离 PostgreSQL 并清理，不读取已有业务数据库。运行这些用例前，将 `GALAXY_GO_TEST_PG_BIN` 指向包含 `initdb`、`pg_ctl` 的 PostgreSQL 二进制目录；Go 在 PATH 中，或由 `GALAXY_BUILD_GO` 指定。Node 测试会按 `galaxy_a2a_fixture` 编译标记启动受限 Go 测试服务，无需手动常驻服务。
+
+Python 对端用例另需 Python 3.12 隔离环境，按 `test/python/requirements.lock` 安装，并通过 `GALAXY_A2A_PYTHON` 指定解释器。不要与 Agno／AgentOS 的运行依赖环境混装。该对端使用固定的官方 HelloWorld 源和独立生命周期执行器；它证明协议、当前权限和原操作恢复边界，不调用模型，也不代表外部运营者或生产任务验收。
 
 Native 配置、预览及使用方式见[客户端说明](../../docs/technical/native-client.md)。[架构](../../docs/technical/architecture.md)说明与 Hub、Core、HTTP 和 MCP 的关系；[项目状态](../../WORK_STATUS.md)区分源码、发行与实际运行范围。

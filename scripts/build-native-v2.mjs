@@ -7,23 +7,24 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {componentRelease,INITIAL_VERSION} from './release-identifiers.mjs';
 import {buildCompactApp} from '../integrations/native-v2/compact-app/build.mjs';
+import {collectGoNativeLicenses} from './go-native-licenses.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),sha=x=>createHash('sha256').update(x).digest('hex');
 const packageName=path=>path.startsWith('@')?path.split('/').slice(0,2).join('/'):path.split('/')[0];
 // Native bundles have one dependency namespace. Reconcile these two observed
 // local patch versions to the current Official/A2A lock; candidate HTTP/stdio
 // checks validate the selected runtime. Future unreviewed differences fail.
 const nativeReconciliation={jose:{selected:'6.2.12',inputs:['6.2.10','6.2.12']}};
-async function dependencyVersion(name,inputs){
+async function dependencyVersion(name,inputs,sourceDirectory){
  const importers=Object.entries(inputs).filter(([,value])=>value.imports.some(i=>i.external&&packageName(i.path)===name)).map(([source])=>source);
  /** @type {Set<string>} */
  const versions=new Set();
  for(const source of importers.length?importers:['package.json']){
-  let directory=dirname(resolve(root,source)),found=false;
-  while(directory===resolve(root)||directory.startsWith(resolve(root)+sep)){
+  let directory=dirname(resolve(sourceDirectory,source)),found=false;
+  while(directory===resolve(sourceDirectory)||directory.startsWith(resolve(sourceDirectory)+sep)){
    try{const pkg=JSON.parse(await readFile(join(directory,'node_modules',name,'package.json'),'utf8'));
     if(pkg.name!==name)throw new Error('External native dependency identity differs');versions.add(pkg.version);found=true;break;
    }catch(error){if(error.code!=='ENOENT')throw error;}
-   if(directory===resolve(root))break;directory=dirname(directory);
+   if(directory===resolve(sourceDirectory))break;directory=dirname(directory);
   }
   if(!found)throw new Error('Unresolved native dependency '+name+' imported by '+source);
  }
@@ -42,21 +43,18 @@ export async function buildGoNativeCandidate({destination,sourceDirectory=root,v
  await mkdir(destination);
  const run=promisify(execFile);
  const {stdout:compiler}=await run(goExecutable,['version'],{cwd:join(sourceDirectory,'go'),windowsHide:true});
+ const goLicenses=await collectGoNativeLicenses({sourceDirectory,destination,goExecutable,goos,goarch});
  await run(goExecutable,['build','-mod=readonly','-trimpath','-buildvcs=false','-o',join(destination,binary),'./cmd/galaxy'],{cwd:join(sourceDirectory,'go'),windowsHide:true,env:{...process.env,GOOS:goos,GOARCH:goarch,CGO_ENABLED:'0',GOTOOLCHAIN:'local',GOFLAGS:'-mod=readonly'}});
  const entry=`import {fileURLToPath} from 'node:url';import {createNativeGalaxyPlugin as createPlugin} from './integrations/host-adapters/opencode-stable/native-galaxy.tui.ts';const executable=fileURLToPath(new URL('./${binary}',import.meta.url));export function createNativeGalaxyPlugin(options={}){return createPlugin({...options,backend:'go',executable:options.executable??executable});}export default createNativeGalaxyPlugin();`;
- const result=await build({absWorkingDir:sourceDirectory,stdin:{contents:entry,resolveDir:sourceDirectory,sourcefile:'go-opencode-candidate.mjs',loader:'js'},outfile:join(destination,'opencode.js'),bundle:true,splitting:false,platform:'node',format:'esm',target:'node22',packages:'external',external:['bun:sqlite'],metafile:true,write:false,sourcemap:false,
-  plugins:[{name:'exclude-legacy-native-process',setup(builder){builder.onResolve({filter:/legacy-runtime\.mjs$/},()=>({path:join(sourceDirectory,'integrations/host-adapters/opencode-stable/bridge/legacy-unavailable.mjs')}));builder.onResolve({filter:/legacy-local\.mjs$/},()=>({path:join(sourceDirectory,'integrations/host-adapters/opencode-stable/bridge/legacy-local-unavailable.mjs')}));}}]});
- const artifacts={[binary]:sha(await readFile(join(destination,binary)))},sources={},dependencies={},dependencyResolution={};
+ const result=await build({absWorkingDir:sourceDirectory,stdin:{contents:entry,resolveDir:sourceDirectory,sourcefile:'go-opencode-candidate.mjs',loader:'js'},outfile:join(destination,'opencode.js'),bundle:true,splitting:false,platform:'node',format:'esm',target:'node22',packages:'external',external:['bun:sqlite'],metafile:true,write:false,sourcemap:false});
+ const artifacts={[binary]:sha(await readFile(join(destination,binary)))},sources={...goLicenses.sourceHashes},dependencies={},dependencyResolution={};
  for(const output of result.outputFiles){const name=relative(destination,output.path).replaceAll('\\','/');await writeFile(output.path,output.contents,{flag:'wx'});artifacts[name]=sha(output.contents);}
  for(const source of Object.keys(result.metafile.inputs)){
   if(source==='go-opencode-candidate.mjs')continue;
   if(source.replaceAll('\\','/').includes('/node_modules/')||source.startsWith('node_modules/'))throw Error('Unexpected bundled dependency source');
   sources[source]=sha(await readFile(resolve(sourceDirectory,source)));
  }
- for(const output of Object.values(result.metafile.outputs))for(const item of output.imports){if(!item.external||item.path.startsWith('node:')||item.path==='bun:sqlite')continue;const name=packageName(item.path);if(dependencies[name])continue;const selected=await dependencyVersion(name,result.metafile.inputs);dependencies[name]=selected.selected;dependencyResolution[name]=selected;}
- for(const file of await readdir(join(sourceDirectory,'go'),{recursive:true})){
-  if(file.endsWith('.go')||file==='go.mod'||file==='go.sum')sources['go/'+file.replaceAll('\\','/')]=sha(await readFile(join(sourceDirectory,'go',file)));
- }
+ for(const output of Object.values(result.metafile.outputs))for(const item of output.imports){if(!item.external||item.path.startsWith('node:')||item.path==='bun:sqlite')continue;const name=packageName(item.path);if(dependencies[name])continue;const selected=await dependencyVersion(name,result.metafile.inputs,sourceDirectory);dependencies[name]=selected.selected;dependencyResolution[name]=selected;}
  const compact=await buildCompactApp({destination:join(destination,'dist')});
  for(const file of compact.inputs){const source=relative(sourceDirectory,resolve(file)).replaceAll('\\','/');if(!source.startsWith('../')&&!source.includes('/node_modules/')&&!source.startsWith('node_modules/'))sources[source]=sha(await readFile(resolve(file)));}
  for(const file of await readdir(join(destination,'dist')))artifacts['dist/'+file]=sha(await readFile(join(destination,'dist',file)));
@@ -75,13 +73,15 @@ export async function buildGoNativeCandidate({destination,sourceDirectory=root,v
  // including when the Native candidate is nested inside a Go core candidate.
  // Copy here once so both callers hash and carry the same original bytes.
  const windowsNotificationHelper='notifications/windows-notify-icon.ps1';
- await candidateAsset('packages/galaxy-edge-mcp/src/native-v2/notifications/windows-notify-icon.ps1',windowsNotificationHelper);
+ await candidateAsset('integrations/native-v2/notifications/windows-notify-icon.ps1',windowsNotificationHelper);
  for(const[name,contents]of Object.entries({
-  'README.md':'# Galaxy Go Native candidate\n\nThis is an incomplete local migration candidate. Start MCP with the included galaxy binary and the native subcommand, using an explicitly selected GALAXY_NATIVE_CONFIG. OpenCode retains opencode.js as its host UI adapter. No Node business core is bundled.\n\nKeep notifications/windows-notify-icon.ps1 beside the executable in its notifications subdirectory. It is the unchanged original Windows helper; the runtime uses the explicitly configured absolute PowerShell command. Linux retains its original Python helper embedded in Go and requires the selected Python executable (default /usr/bin/python3); no Node notification module is required. macOS requires an explicitly configured signed GalaxyNotifications.app executable; this candidate does not build, sign, install or automatically select an App. These resources do not enable notifications or establish platform acceptance.\n\nThe included skills and host formats retain their original tool references; use the runtime tool list to identify supported actions. Existing host-capabilities.json observations belong to their recorded runtime/version, not this Go candidate. Installation, platform acceptance and migration completion remain pending.\n',
+  'README.md':'# Galaxy Go Native candidate\n\nThis local Go Native candidate includes setup, service-config and host-configs commands. Start MCP with the included galaxy binary and the native subcommand, using an explicitly selected GALAXY_NATIVE_CONFIG. OpenCode retains opencode.js as its host UI adapter. No Node business core is bundled.\n\nKeep notifications/windows-notify-icon.ps1 beside the executable in its notifications subdirectory. It is the unchanged original Windows helper; the runtime uses the explicitly configured absolute PowerShell command. Linux retains its original Python helper embedded in Go and requires the selected Python executable (default /usr/bin/python3); no Node notification module is required. macOS requires an explicitly configured signed GalaxyNotifications.app executable; this candidate does not build, sign, install or automatically select an App. These resources do not enable notifications or establish platform acceptance.\n\nThe included skills and host formats retain their original tool references; use the runtime tool list to identify supported actions. Existing host-capabilities.json observations belong to their recorded runtime/version, not this Go candidate. Real host and platform acceptance and migration completion remain pending; building this candidate does not change an installed host.\n',
   'HOSTS.md':'# Host configuration\n\nService Native uses the included platform binary, args ["native"], and the explicit GALAXY_NATIVE_CONFIG path. Local-only Integration uses args ["integration-mcp", "--data-dir", "ABSOLUTE_PATH"] without a service configuration; it does not expose service tools or start uploads. OpenCode uses a thin host adapter and a private Go host channel for local persistence; model calls remain with the selected host SDK. The Go installer generates only the chosen host configuration. Static skills and host templates are included; historical host observations do not establish current Go acceptance.\n'
  })){await writeFile(join(destination,name),contents,{flag:'wx'});artifacts[name]=sha(contents);}
  for(const name of ['LICENSE','NOTICE'])await candidateAsset('integrations/native-v2/legal/'+name,name);
+ for(const [name,digest] of Object.entries(goLicenses.files))artifacts[name]=digest;
  sources['scripts/build-native-v2.mjs']=sha(await readFile(join(sourceDirectory,'scripts/build-native-v2.mjs')));
+ sources['scripts/go-native-licenses.mjs']=sha(await readFile(join(sourceDirectory,'scripts/go-native-licenses.mjs')));
  const platformResources={windows:{helper:windowsNotificationHelper,command:'explicit-absolute-PowerShell'},linux:{helper:'embedded-original-Python',command:'configured-Python-or-/usr/bin/python3'},darwin:{helper:'externally-configured-signed-GalaxyNotifications.app',bundled:false},platformAcceptance:'pending'};
  const manifest={version:2,kind:'galaxy-native-go-local-candidate',component:'client',releaseId:version,backend:'go',target:{goos,goarch},compiler:compiler.trim(),builder:'esbuild '+esbuildVersion,mcp:{command:binary,args:['native']},hostPersistence:{command:binary,args:['host'],transport:'private-jsonl'},artifacts,dependencyResolution,sourceFiles:Object.keys(sources).length,platformResources,publicRelease:false,defaultInstallationChanged:false,migrationComplete:false,hostAcceptance:'pending',modelProvider:'user-host',containsPrivateKeys:false,containsConfiguredAuthority:false};
  const pkg={name:'@galaxy/native-go-candidate',version,private:true,type:'module',license:'Apache-2.0',engines:{node:'>=22.13.0'},exports:{'./opencode':'./opencode.js'},dependencies};

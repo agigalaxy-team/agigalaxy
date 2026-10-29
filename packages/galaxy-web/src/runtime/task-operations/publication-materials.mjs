@@ -1,5 +1,5 @@
 import { createTaskMaterialClient } from "../../features/tasks/materials/task-material-client.mjs";
-import { hasTaskMaterials } from '../../../../galaxy-official/src/shared/task-material-v1-schema.mjs';
+import { hasTaskMaterials } from '../../../../galaxy-contracts/src/task-material-v1-schema.mjs';
 
 // Material verification preserves the original publication slot and erased IDs.
 export function createPublicationMaterials({ api, prefix, store, taskDraftScope, receiptStatus, now, taskAwait, checkOperationLease, sameTaskOperation, captureTaskDraftLease }) {

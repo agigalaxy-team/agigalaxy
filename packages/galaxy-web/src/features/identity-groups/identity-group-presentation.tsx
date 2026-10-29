@@ -4,7 +4,7 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {MemberAvatar,memberName,useMemberNames} from "../../shared/people/conversation-ui";
 import {HistoryFields} from "../work-records/history";
-import {identityGroupIntentSchema} from "../../../../galaxy-official/src/shared/identity-group-v2-schema.mjs";
+import {identityGroupIntentSchema} from "../../../../galaxy-contracts/src/identity-group-v2-schema.mjs";
 import type {IdentityGroupCandidateRef,IdentityGroupClient,IdentityGroupIntent as GroupIntent,IdentityGroupLease,IdentityGroupProposal,IdentityGroupRecord,IdentityGroupRuntime,IdentityGroupSourceView} from "./identity-group-types";
 
 export const identityGroupStates:Record<string,string>={pending:'等待其他身份同意',committed:'这次变更已生效',active:'共同展示中',revoked:'分组已撤销',declined:'这次邀请已拒绝',cancelled:'这次邀请已取消',expired:'这次邀请已到期',conflict:'原分组已经变化',absent:'暂未查到这次变更','source-deletion-pending':'相关身份正在申请删除，展示已暂停','source-deleted':'相关来源已删除','control-evidence-unavailable':'身份控制证明当前不可用'};

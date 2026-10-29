@@ -14,9 +14,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -75,24 +72,7 @@ func (p portal) Revoke(ctx context.Context, i, s string, id *string) (object, er
 func TestRegisteredUsersCurrentHTTPAndOriginalDurableCommands(t *testing.T) {
 	admin, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string, input object) object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/registered-users-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		cmd.Stdin = strings.NewReader(encode(input))
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o object
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid original result")
-		}
-		return o
-	}
-	base := node("setup", object{})
+	base := registeredFixture(t, admin)
 	issuer, management, endpoint := value(base["issuer"]), value(base["management"]), value(base["endpoint"])
 	var mu sync.Mutex
 	admitted := true
@@ -253,11 +233,48 @@ func TestRegisteredUsersCurrentHTTPAndOriginalDurableCommands(t *testing.T) {
 		json.Unmarshal([]byte(encode(goValue)), &a)
 		json.Unmarshal([]byte(encode(jsValue)), &b)
 		if !reflect.DeepEqual(a, b) {
-			t.Fatalf("%s\nGo%s\nJS%s", label, encode(goValue), encode(jsValue))
+			t.Fatalf("%s\nGo%s\nReference%s", label, encode(goValue), encode(jsValue))
 		}
 	}
+	reference := &r.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, Directory: native, Portal: portal{gateway}, Now: now}
+	referenceActor := func() (r.Actor, error) {
+		req := httptest.NewRequest("POST", "https://admin.example.invalid/v1/operations/registered-users", nil)
+		req.Header.Set("Origin", "https://admin.example.invalid")
+		req.Header.Set("X-Galaxy-Operator-CSRF", strings.Repeat("C", 43))
+		req.AddCookie(&http.Cookie{Name: "__Host-galaxy-operator", Value: strings.Repeat("R", 43)})
+		return gateway.AuthorizeOperations(req, true, "")
+	}
+	read := func(value object, err error) object {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
 	original := func(mode, id string, input object) object {
-		return node(mode, object{"origin": provider.URL, "id": id, "input": input})
+		t.Helper()
+		actor, err := referenceActor()
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch mode {
+		case "list":
+			if input == nil {
+				input = object{}
+			}
+			return read(reference.List(ctx, actor, input))
+		case "source":
+			return read(index.Source(ctx, nil))
+		case "detail":
+			return read(reference.Detail(ctx, actor, id))
+		case "command":
+			return read(reference.Command(ctx, actor, id, input, referenceActor))
+		case "operation":
+			return read(reference.Operation(ctx, actor, id))
+		default:
+			t.Fatal("unexpected current registration view " + mode)
+		}
+		return nil
 	}
 	status, o := request("GET", "", nil, false)
 	if status != 401 {

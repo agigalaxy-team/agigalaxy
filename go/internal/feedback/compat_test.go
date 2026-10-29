@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -17,6 +15,7 @@ import (
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/feedbackfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -48,24 +47,25 @@ func (f *fixtureAuthority) Operator(_ context.Context, _ pgx.Tx, _, id, permissi
 	}
 	return Operator{ID: id, Role: role, CanManage: id == "go-admin"}, nil
 }
-func nodeFixture(t *testing.T, dsn string, args ...string) []byte {
+func capturedProjection(t *testing.T, name string, replacements map[string]string) Object {
 	t.Helper()
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
+	raw, e := os.ReadFile("testdata/original-projections.json")
 	if e != nil {
 		t.Fatal(e)
 	}
-	cmd := exec.Command("node", append([]string{filepath.Join(root, "scripts", "go", "feedback-fixture.mjs")}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e := cmd.Output()
-	if e != nil {
-		var detail string
-		if x, ok := e.(*exec.ExitError); ok {
-			detail = string(x.Stderr)
-		}
-		t.Fatalf("original Node fixture: %v %s", e, detail)
+	var all map[string]json.RawMessage
+	if e = json.Unmarshal(raw, &all); e != nil {
+		t.Fatal(e)
 	}
-	return out
+	value := string(all[name])
+	for key, replacement := range replacements {
+		value = strings.ReplaceAll(value, "$"+key, replacement)
+	}
+	var result Object
+	if e = json.Unmarshal([]byte(value), &result); e != nil {
+		t.Fatal(e)
+	}
+	return result
 }
 func normalized(t *testing.T, v any) any {
 	t.Helper()
@@ -94,19 +94,11 @@ func code(t *testing.T, e error, want string) {
 	}
 }
 
-func TestFeedbackAgainstCurrentPostgresSchemaAndNodeProjection(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+func TestFeedbackAgainstCurrentPostgresSchemaAndCapturedProjection(t *testing.T) {
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	var fixture struct {
-		Accounts    []string
-		Endpoint    string
-		Submission  Object
-		Fingerprint string
-	}
-	if e := json.Unmarshal(nodeFixture(t, dsn, "setup"), &fixture); e != nil {
-		t.Fatal(e)
-	}
+	fixture := feedbackfixture.Create(t, pool)
 	auth := &fixtureAuthority{}
 	now := time.Unix(2000000000, 0)
 	s := &Service{Pool: pool, Endpoint: fixture.Endpoint, Authority: auth, Now: func() time.Time { return now }}
@@ -165,7 +157,8 @@ func TestFeedbackAgainstCurrentPostgresSchemaAndNodeProjection(t *testing.T) {
 		t.Fatalf("foreign receipt: %v %v", foreign, e)
 	}
 	other := Object{"operationId": uuid.NewString(), "body": "私聊中的附件过期提示不明确。", "module": "chat"}
-	if _, e = s.Submit(ctx, fixture.Accounts[1], encoded(t, other)); e != nil {
+	otherResult, e := s.Submit(ctx, fixture.Accounts[1], encoded(t, other))
+	if e != nil {
 		t.Fatal(e)
 	}
 	list, e := s.List(ctx, "go-admin", Query{Days: "all", Limit: 1})
@@ -211,14 +204,22 @@ func TestFeedbackAgainstCurrentPostgresSchemaAndNodeProjection(t *testing.T) {
 	if strings.Contains(notes, "PRIVATE_NOTE") || strings.Contains(notes, "搜索结果") {
 		t.Fatal("private content in general audit")
 	}
-	// The unchanged JS read model must display Go-written records identically.
-	var original struct {
-		List   Object
-		Detail Object
-	}
-	if e = json.Unmarshal(nodeFixture(t, dsn, "read", id), &original); e != nil {
+	// Frozen projection captured once from the original implementation. IDs and
+	// UIDs are the only values supplied by this isolated database.
+	var uidA, uidB, submittedEvent, updatedEvent string
+	if e = pool.QueryRow(ctx, "SELECT uid FROM community_accounts WHERE id=$1", fixture.Accounts[0]).Scan(&uidA); e != nil {
 		t.Fatal(e)
 	}
+	if e = pool.QueryRow(ctx, "SELECT uid FROM community_accounts WHERE id=$1", fixture.Accounts[1]).Scan(&uidB); e != nil {
+		t.Fatal(e)
+	}
+	if e = pool.QueryRow(ctx, "SELECT id::text FROM operations_feedback_events_v1 WHERE feedback_id=$1 AND kind='submitted'", id).Scan(&submittedEvent); e != nil {
+		t.Fatal(e)
+	}
+	if e = pool.QueryRow(ctx, "SELECT id::text FROM operations_feedback_events_v1 WHERE feedback_id=$1 AND kind='updated'", id).Scan(&updatedEvent); e != nil {
+		t.Fatal(e)
+	}
+	replacements := map[string]string{"ACCOUNT_A": fixture.Accounts[0], "ACCOUNT_B": fixture.Accounts[1], "UID_A": uidA, "UID_B": uidB, "FEEDBACK_A": id, "FEEDBACK_B": otherResult["feedbackId"].(string), "EVENT_UPDATED": updatedEvent, "EVENT_SUBMITTED": submittedEvent}
 	list, e = s.List(ctx, "go-admin", Query{Days: "all", Limit: 1})
 	if e != nil {
 		t.Fatal(e)
@@ -227,11 +228,11 @@ func TestFeedbackAgainstCurrentPostgresSchemaAndNodeProjection(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if !reflect.DeepEqual(normalized(t, list), normalized(t, original.List)) {
-		t.Fatal("Go list differs from original Node projection")
+	if !reflect.DeepEqual(normalized(t, list), capturedProjection(t, "list", replacements)) {
+		t.Fatalf("list differs from captured contract: %s", encoded(t, list))
 	}
-	if !reflect.DeepEqual(normalized(t, detail), normalized(t, original.Detail)) {
-		t.Fatalf("Go detail differs\nGo: %s\nNode: %s", encoded(t, detail), encoded(t, original.Detail))
+	if !reflect.DeepEqual(normalized(t, detail), capturedProjection(t, "detail", replacements)) {
+		t.Fatalf("detail differs from captured contract: %s", encoded(t, detail))
 	}
 	auth.revoked = true
 	_, e = s.Get(ctx, "go-admin", id, "")

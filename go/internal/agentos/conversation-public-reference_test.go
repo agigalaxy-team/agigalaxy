@@ -1,10 +1,6 @@
 package agentos
 
 import (
-	"bytes"
-	"encoding/json"
-	"os/exec"
-	"path/filepath"
 	"testing"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
@@ -21,20 +17,16 @@ func TestConversationPublicReferenceOriginalContract(t *testing.T) {
 		{"reference": Object{"kind": "post", "id": id, "url": "https://example.invalid"}, "args": Object{}, "current": Object{}},
 		{"reference": nil, "args": Object{}, "current": Object{}},
 	}
-	raw, _ := json.Marshal(cases)
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", "--input-type=module", "-e", `import{readFileSync}from'node:fs';import{createHash}from'node:crypto';import canonicalize from'./packages/galaxy-official/node_modules/canonicalize/lib/canonicalize.js';import{conversationPublicReferenceSchema as schema,checkConversationPublicReference as check}from'./packages/galaxy-official/src/operations/agentos/public-reference.mjs';console.log(JSON.stringify(JSON.parse(readFileSync(0,'utf8')).map(x=>{const parsed=schema.safeParse(x.reference);if(!parsed.success)return{parsed:false};let code='';try{check(parsed.data,x.args.kind,x.args.id,x.current)}catch(e){code=e.code}return{parsed:true,code,digest:createHash('sha256').update(canonicalize({arguments:x.args,publicReference:parsed.data})).digest('hex')}})));`)
-	cmd.Dir, cmd.Stdin = root, bytes.NewReader(raw)
-	output, err := cmd.Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var original []struct {
+	// Exact acceptance, error and canonical digest values captured from the original contract.
+	original := []struct {
 		Parsed       bool
 		Code, Digest string
-	}
-	if err = json.Unmarshal(output, &original); err != nil {
-		t.Fatal(err)
+	}{
+		{true, "", "3723fa1a0214a490e8e158191f819a56d354fd037c14d041d6872ad8682d5d24"},
+		{true, "", "d36225815277d141f249aac1c6d2374c8a35d7cee7c58fdfbf00888423c81158"},
+		{true, "operations_agentos_source_changed", "d36225815277d141f249aac1c6d2374c8a35d7cee7c58fdfbf00888423c81158"},
+		{true, "invalid_operations_agentos_request", "d6e36d06dd42e508011fddb633b842b2e41bdea2b36fdb71f442ba9c65fea7d0"},
+		{false, "", ""}, {false, "", ""}, {false, "", ""},
 	}
 	for i, input := range cases {
 		ref, err := parseConversationPublicReference(input["reference"])

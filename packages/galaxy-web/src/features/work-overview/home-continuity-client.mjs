@@ -1,4 +1,4 @@
-import {createNotificationInboxClient} from "../../../../galaxy-official/src/clients/personal-summary.mjs";
+import {createNotificationInboxClient} from "../../../../galaxy-client/src/clients/personal-summary.mjs";
 
 // Read-only home projection. Listing never claims presentation or marks read.
 export function createHomeContinuityClient(runtime) {

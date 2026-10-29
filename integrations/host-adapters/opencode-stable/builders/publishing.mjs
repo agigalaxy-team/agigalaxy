@@ -1,4 +1,4 @@
-import { githubBridgeMapping } from '../../../../packages/galaxy-official/src/shared/ci-provenance.mjs';
+import { githubBridgeMapping } from '../../../../packages/galaxy-contracts/src/ci-provenance.mjs';
 
 export function createBuildersPublishing(session) {
   function disclosure(input, back) {

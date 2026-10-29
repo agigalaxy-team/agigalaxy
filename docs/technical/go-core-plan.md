@@ -1,6 +1,6 @@
 # 银河服务器与本机 Go 核心重构实施计划
 
-状态：起始基线 `597cafa26c30540fedccb1b63a53e7232ecf1879`，本地实施后已完成本次授权的 GitHub 同步、必要技术迁移和 Go 服务器切换；本机源码和产物已交付，真实宿主／平台安装范围另见当前状态。当前运行结果与剩余事项集中记录于 [WORK_STATUS](../../WORK_STATUS.md)，不由方案正文推定完成情况。
+状态：起始基线 `597cafa26c30540fedccb1b63a53e7232ecf1879`。此前已完成一轮服务器切换；当前仍在落实源码退出、发行与实际消费者收束，不能由旧部署结果推定整轮完成。当前运行结果与剩余事项集中记录于 [WORK_STATUS](../../WORK_STATUS.md)，不由方案正文推定完成情况。
 
 ## 1 目标与实施边界
 
@@ -8,24 +8,15 @@
 
 承接现有数据库和本机文件格式，只做队列、安装与版本衔接所需的技术变更。全套业务数据重新设计不与语言迁移捆绑。迁移当前有效功能，不将旧实验代码、助手自行推导或未确认业务规则固化为新需求。
 
-## 2 改造前基线与保留的职责边界
+## 2 原语义与当前职责边界
 
-本节记录实施起点的源码事实，旧入口用于定位原语义；当前接线与剩余工作只维护在[WORK_STATUS](../../WORK_STATUS.md)，不据下表推断旧主链仍在使用。
+起始提交用于 Git 历史追溯，不要求现行源码保留已替代 Node 服务。当前有效入口见[架构](architecture.md)，实际进展见[WORK_STATUS](../../WORK_STATUS.md)。迁移保留以下原有语义：
 
-| 部分 | 已核对的源码入口与实际情况 | 对方案的影响 |
-|---|---|---|
-| Hub 服务族 | [API](../../packages/galaxy-official/src/server.mjs)、[Worker](../../packages/galaxy-official/src/worker.mjs)、[发布器](../../packages/galaxy-official/src/content-publisher.mjs)、`src/migrate.mjs` | 同源但分进程、分数据库角色；迁 Go 后保留职责隔离 |
-| Native 主入口 | [native-v2-entry.mjs](../../packages/galaxy-edge-mcp/src/native-v2-entry.mjs) → [stdio.mjs](../../packages/galaxy-edge-mcp/src/native-v2/stdio.mjs) → runtime/server | 现行本机运行主线，不把旧 `src/index.mjs` 当成完整客户端 |
-| CLI | [cli.mjs](../../packages/galaxy-node/src/cli.mjs) | 目前是本机 ID 的内部 init/status/export 回退工具，不是完整桌面客户端 |
-| 本机 Integration MCP | [index.mjs](../../packages/galaxy-edge-mcp/src/index.mjs) | 无服务配置也能使用本机工具；Go承接时单独提供local-only入口，不能直接改成要求服务配置的Native入口 |
-| OpenCode 桥接 | [native-runtime-bridge.mjs](../../integrations/host-adapters/opencode-stable/native-runtime-bridge.mjs) | 直接导入 `startNativeStdio` 并用进程内 MCP Transport；只替换安装命令不能退出旧核心 |
-| 宿主采集与整理 | [work-recorder.mjs](../../integrations/host-adapters/opencode-stable/work-recorder.mjs)、[work-summarizer.mjs](../../integrations/host-adapters/opencode-stable/work-summarizer.mjs) | 插件直接写本机历史／原件，并通过宿主 SDK 调用用户模型；必须拆开宿主取材与持久处理 |
-| 本机资料 | [files.mjs](../../packages/galaxy-core/src/storage/files.mjs)、[Native Store](../../packages/galaxy-edge-mcp/src/native-v2/store.mjs)、Core `work-history/`、`conversation-archive/` | 身份及连接JSON、密钥PEM，工作履历 `work-history/history.sqlite`、会话原件 `conversation-archive/private.sqlite` 分别按原身份管理；各自已有的 `sync.sqlite` 只承接原上传选择和队列，不新增同步功能；协调锁数据库另行保留 |
-| 跨进程写入 | [write-lock.mjs](../../packages/galaxy-core/src/storage/write-lock.mjs) | `.galaxy-coordination.sqlite` 只提供协调锁；不能在仍有使用者时删除，也不因此迁全部资料进 SQLite |
-| 浏览器 | [runtime.mjs](../../packages/galaxy-web/src/runtime.mjs)、`application/galaxy-session.tsx` | 浏览器设备钥、IndexedDB、草稿与 Query 状态仍在浏览器；不能搬到服务器或要求安装 Go 才能访问网站 |
-| 发行 | [build-native-v2.mjs](../../scripts/build-native-v2.mjs)、[组件清单](../../repository-components.json) | `galaxy.js` 是构建输出，不是源目录中的独立入口；现有打包导出 runtime/server/opencode 并依赖 Node |
-
-上述是关键运行链路的源码核对，不等同于全部业务和全部宿主运行验收。现行功能与权限边界仍以产品正文和用户确认记录为准，入口定位见[架构](architecture.md)。
+- API、普通 Worker、Information Worker、迁移、发布和维护分别运行、使用相应数据库角色。
+- 本机身份和连接使用 JSON／PEM；履历在 `work-history/history.sqlite`，会话原件在 `conversation-archive/private.sqlite`，原有 `sync.sqlite` 只承接已存在的上传选择和队列；`.galaxy-coordination.sqlite` 仍是跨进程协调锁，不是全部用户资料库。
+- 无远端服务配置的本机工具仍可使用。OpenCode 的菜单、录制取材及用户选定的宿主模型保留，持久化交 Go；不再通过进程内旧 MCP 或旧 CLI 回退。
+- 浏览器设备钥、IndexedDB、草稿及查询状态仍属于浏览器。浏览网站不要求安装 Go。
+- 当前 Native 发行包括 Go 二进制及必要宿主 JS；历史签名包保持原字节，未做的平台与宿主验收不能由交叉编译代替。
 
 ## 3 目标运行结构
 

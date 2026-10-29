@@ -127,9 +127,14 @@ function PermissionsContent({operatorId,location:requestedLocation,csrfToken,aut
   if('role' in result){setRoleDrafts(previous=>{const next={...previous};delete next[done?.key??result.role.id];return next;});setEditing(previous=>({...previous,['role:'+(done?.key??result.role.id)]:false}));if(location.tab==='roles'&&done?.key==='new')router.replace(permissionsHref(location,{id:result.role.id,after:'',trail:[]}),{scroll:false});}
   else if('automation' in result){setAutomationCopyNote(previous=>({...previous,[done?.key??result.automation.id]:''}));setAutomationDrafts(previous=>{const next={...previous};delete next[done?.key??result.automation.id];return next;});setEditing(previous=>({...previous,['automation:'+(done?.key??result.automation.id)]:false}));if(location.tab==='automatic'&&(done?.key==='new'||done?.key.startsWith('new:')))router.replace(permissionsHref(location,{id:result.automation.id,after:'',trail:[]}),{scroll:false});}
   else if(done)setAssignmentChoice(previous=>({...previous,[done.key]:''}));
-  await refreshAll();router.refresh();
- },[refreshAll,router,location]);
- const conflict=useCallback(()=>{void refreshAll();router.refresh();},[refreshAll,router]);
+  const currentPerson=people?.items.find(person=>person.operatorId===operatorId);
+  const affectsOperator='assignment' in result?result.assignment.operatorId===operatorId:'role' in result&&done?.key!=='new'&&(!currentPerson||currentPerson.assignments.some(assignment=>assignment.enabled&&assignment.roleId===result.role.id));
+  const reads='automation' in result?[automationRead.read(),historyRead.read()]:'assignment' in result?[peopleRead.read(),historyRead.read()]:[rolesRead.read(),peopleRead.read(),historyRead.read()];
+  await Promise.all(reads);
+  // The server owns the current operator's authorization projection.
+  if(affectsOperator)router.refresh();
+ },[operatorId,people,automationRead.read,historyRead.read,peopleRead.read,rolesRead.read,router,location]);
+ const conflict=useCallback(()=>{void refreshAll();},[refreshAll]);
  const currentCommand=useOperationCommand<PermissionSave>({csrfToken,canWrite:!!catalog&&!resumed,onCommitted:committed,onConflict:conflict,errorMessages:errors,recover});
  const resumedRead=useOperationsRead<PermissionOperationRead>({path:resumed&&canRead&&catalog?permissionReceiptPath(resumed):null,failureMessage:'保存结果暂时无法读取。',clearOnOffline:true});
  const command={...currentCommand,locked:currentCommand.locked||!!resumed||navigating,pending:currentCommand.pending??resumed,error:resumed?resumedRead.error||recoveryNotice:currentCommand.error,message:resumeMessage||currentCommand.message,submit:(path:string,body:Record<string,unknown>,label:string)=>{setResumeMessage('');return currentCommand.submit(path,body,label);}};

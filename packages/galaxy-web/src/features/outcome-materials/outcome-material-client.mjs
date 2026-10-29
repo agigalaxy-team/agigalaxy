@@ -1,5 +1,5 @@
-import {outcomeMaterialEventSchema} from "../../../../galaxy-official/src/shared/outcome-material-v2-schema.mjs";
-import {sha256Hex,equalJson} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {outcomeMaterialEventSchema} from "../../../../galaxy-contracts/src/outcome-material-v2-schema.mjs";
+import {sha256Hex,equalJson} from "../../../../galaxy-contracts/src/web-primitives.mjs";
 
 const instances=new WeakMap();
 export function createOutcomeMaterialClient(runtime,{subjectId}){

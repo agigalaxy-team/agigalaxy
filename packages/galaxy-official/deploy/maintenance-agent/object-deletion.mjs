@@ -1,10 +1,11 @@
 import {createHash} from 'node:crypto';
 import {readFile,lstat,mkdir,writeFile} from 'node:fs/promises';
 import {ListObjectsV2Command} from '@aws-sdk/client-s3';
-import {validateDeletionLedger} from '../../src/operations/deletion-ledger.mjs';
+import {recoveryExecutable,recoveryCall} from './go-recovery.mjs';
 import {noSymlinkPath,postgresSqlArguments,runCommand} from '../operations-stack/host.mjs';
 
 const fail=code=>Object.assign(Error(code),{code});
+const recoveryCallExecutable=async(context,ledger,run)=>recoveryCall(await recoveryExecutable(context),{mode:'ledger-validate',ledger},run);
 const uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const guid=/^GUID[A-Z0-9]{28}$/,digest=/^[a-f0-9]{64}$/;
 const maximum=100000,maximumBytes=20*1024*1024;
@@ -22,8 +23,8 @@ export function objectReceiptArguments(cluster){const args=postgresSqlArguments(
 
 // Neither purge_pending nor age is authorization. Only an actually executed
 // request in the original complete signed/approved ledger supplies the owners.
-export async function executedObjectDeletionSubjects(ledger,endpoint){
- try{await validateDeletionLedger(ledger);}catch{throw fail('maintenance_object_deletion_ledger_invalid');}
+export async function executedObjectDeletionSubjects(ledger,endpoint,{validate}={}){
+ try{if(typeof validate!=='function')throw Error();await validate(ledger);}catch{throw fail('maintenance_object_deletion_ledger_invalid');}
  if(ledger.endpoint!==endpoint)throw fail('maintenance_object_deletion_endpoint_changed');
  return ledger.tables.deletion_requests.filter(x=>x.execution_result).map(row=>({subjectId:row.subject_id,requestId:row.id}));
 }
@@ -99,7 +100,7 @@ export async function currentAttachmentStore({config={tools:{systemctl:'/usr/bin
  const info=await lstat(path);if(!info.isFile()||info.uid!==0||(info.mode&0o077)||info.size>16384)throw fail('maintenance_attachment_configuration_unknown');
  const raw=await readFile(path,'utf8');let x;try{x=JSON.parse(raw);}catch{throw fail('maintenance_attachment_configuration_unknown');}
  if(!/^http:\/\/127[.]0[.]0[.]1:[0-9]{1,5}$/.test(x.store?.endpoint??''))throw fail('maintenance_attachment_native_binding_required');
- const {loadAttachmentConfiguration}=await import('../../src/infrastructure/attachment-configuration.mjs');
+ const {loadAttachmentConfiguration}=await import('../support/attachment-configuration.mjs');
  const loaded=await loadAttachmentConfiguration({GALAXY_ATTACHMENTS_CONFIG_FILE:path});if(!loaded?.store)throw fail('maintenance_attachment_configuration_unknown');
  return{store:loaded.store,binding:hash(raw)};
 }
@@ -112,7 +113,7 @@ export class MaintenanceObjectDeletion{
  async read(context,ref,suffix){const path=this.controlDirectory+'/recovery-facts/'+context.intent.operationId+'-'+suffix+'.json';if(ref?.operationId!==context.intent.operationId||ref.artifactPath!==path)throw fail('maintenance_object_plan_invalid');const raw=await privateJson(path);if(hash(raw)!==ref.sha256)throw fail('maintenance_object_plan_changed');return JSON.parse(raw);}
  async inspect(){const {store}=await this.storeFactory();try{return{nativeKeys:(await nativeAttachmentInventory(store)).size,bodyReturned:false};}finally{store.close();}}
  async capture(context){const {store,binding}=await this.storeFactory();try{return await this.save(context,'objects-current',{version:1,binding,rows:await this.readLive()});}finally{store.close();}}
- async ledger(context){const c=context.currentFacts.deletion;const ledger=await this.read(context,c,'deletion');if(c.signatureValidated!==true)throw fail('maintenance_object_deletion_ledger_invalid');return{deletedSubjects:await executedObjectDeletionSubjects(ledger,context.authority.endpoint),ledgerSha256:c.sha256};}
+ async ledger(context){const c=context.currentFacts.deletion;const ledger=await this.read(context,c,'deletion');if(c.signatureValidated!==true)throw fail('maintenance_object_deletion_ledger_invalid');return{deletedSubjects:await executedObjectDeletionSubjects(ledger,context.authority.endpoint,{validate:value=>recoveryCallExecutable(context,value,this.run)}),ledgerSha256:c.sha256};}
  async point(database,context){const state=(await database.query('SELECT recovery_id,status FROM recovery_state WHERE singleton=true')).rows[0];if(state?.recovery_id!==context.intent.operationId||state.status!=='quarantined')throw fail('maintenance_exact_quarantine_required');return attachmentPointersWithin(database);}
  async prepare(database,context,point){const current=await this.read(context,context.currentFacts.objects,'objects-current'),{deletedSubjects,ledgerSha256}=await this.ledger(context),canonical=await this.point(database,context);
   const plan=buildObjectDeletionPlan({current:current.rows,point,canonical,deletedSubjects,now:this.now()});return this.save(context,'objects-plan',{version:1,binding:current.binding,ledgerSha256,...plan});}

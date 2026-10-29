@@ -1,5 +1,5 @@
-import {assertModelSettingsApplicable,modelSettingsDomains} from '../../src/shared/operations-model-settings-schema.mjs';
-import {modelProtocolBase} from '../../src/shared/model-endpoint.mjs';
+import {assertModelSettingsApplicable,modelSettingsDomains} from '../../../galaxy-contracts/src/operations-model-settings-schema.mjs';
+import {modelProtocolBase} from '../../../galaxy-contracts/src/model-endpoint.mjs';
 
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const fail=()=>Object.assign(new Error('model_settings_configuration_invalid'),{code:'model_settings_configuration_invalid'});

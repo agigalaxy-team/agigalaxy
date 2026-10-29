@@ -33,7 +33,7 @@ for area in roots:
         private = (name.startswith('.env') and not name.endswith('.example')) or path.suffix in {'.key','.pem','.pyc','.log','.tsbuildinfo'}
         named = name.startswith(('LICENSE','NOTICE','COPYING')) or name.startswith('Dockerfile') or name.endswith('.env.example') or name in {'.gitignore','.dockerignore','.gitattributes'}
         configuration = path.suffix in {'.json','.yaml','.yml'}
-        source_config = path.relative_to(root).parts[0]=='originals' or any(part in {'src','test','tests','theme','.github'} for part in path.relative_to(root).parts) or any(mark in name for mark in ('.example','.empty')) or name in {'SOURCE.json','package.json','package-lock.json','tsconfig.json','client-contract.json'}
+        source_config = path.relative_to(root).parts[0] in {'originals','go'} or any(part in {'src','test','tests','testdata','theme','.github'} for part in path.relative_to(root).parts) or any(mark in name for mark in ('.example','.empty')) or name in {'SOURCE.json','package.json','package-lock.json','tsconfig.json','client-contract.json'}
         if not private and (path.suffix in extensions or named) and (not configuration or source_config):
             if not any(part in excluded for part in path.relative_to(root).parts):
                 files.add(path)
@@ -41,13 +41,14 @@ for name in components['sourceFiles']:
     path = root / name
     if filesystem_path(path).is_file() and not filesystem_path(path).is_symlink():
         files.add(path)
-# Share the runtime package's explicit resource list and add source-only inputs.
-# Arbitrary local JSON/configuration is still excluded.
-catalog = json.loads((root / 'packages/galaxy-official/release-resources.json').read_text(encoding='utf-8'))
+# Current source/resource ownership is the component catalog. A source archive
+# never loads the retired Node runtime or requires a previously built binary.
 closure=subprocess.run([os.environ.get('GALAXY_BUILD_NODE','node'),str(root/'scripts/components.mjs'),'resources','--component','hub'],cwd=root,capture_output=True,text=True,encoding='utf8')
 if closure.returncode:
     raise ValueError('Hub runtime import closure is incomplete; source archive refused. See component resources command.')
-required_resources = catalog['service'] + catalog['source'] + components['requiredSourceResources'] + json.loads(closure.stdout)
+required_resources = components['requiredSourceResources'] + json.loads(closure.stdout)
+for component in components['components']:
+    required_resources += component.get('sourceEntries', []) + component.get('configurationInputs', [])
 for name in required_resources:
     path = root / name
     physical=filesystem_path(path)

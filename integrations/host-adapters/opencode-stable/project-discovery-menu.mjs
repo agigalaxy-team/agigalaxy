@@ -1,4 +1,4 @@
-import { discoveryPreferencesSchema, functionTagsSchema } from '../../../packages/galaxy-official/src/shared/discovery-schema.mjs';
+import { discoveryPreferencesSchema, functionTagsSchema } from '../../../packages/galaxy-contracts/src/discovery-schema.mjs';
 import { createProfileMenu } from './profile-menu.mjs';
 import {createNativeProjectDiscoveryMenu} from './project-contact-menu.mjs';
 

@@ -1,11 +1,18 @@
-import { open } from 'node:fs/promises';
+import { open, rename, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
-import { createHash } from 'node:crypto';
-import { withLocalRead, withLocalWrite } from '../../../galaxy-core/src/storage/write-lock.mjs';
-import { writeJson } from '../../../galaxy-core/src/storage/files.mjs';
+import { createHash, randomUUID } from 'node:crypto';
+import { withJournalRead, withJournalWrite } from './coordination.mjs';
 
 export const hash = value => createHash('sha256').update(value).digest('hex');
 const LIMIT = 8 * 1024 * 1024;
+
+async function writeJson(filePath, value) {
+  const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+    await rename(temporaryPath, filePath);
+  } finally { await rm(temporaryPath, { force: true }); }
+}
 
 // One private journal per local actor, Official, peer, tenant and peer principal.
 // A dispatch reservation survives restart: an unknown send is never replayed.
@@ -31,14 +38,14 @@ export function createJournal(directory, scope) {
       throw error;
     } finally { await file?.close(); }
   }
-  const read = () => withLocalRead(directory, load);
+  const read = () => withJournalRead(directory, load);
   async function get(id) {
     const link = (await read()).links.find(item => item.id === id);
     if (!link) throw new Error('A2A association not found in this scope.');
     return link;
   }
   async function change(id, revision, update) {
-    return withLocalWrite(directory, async root => {
+    return withJournalWrite(directory, async root => {
       const data = await load(root);
       const index = data.links.findIndex(item => item.id === id);
       const previous = index < 0 ? null : data.links[index];

@@ -1,0 +1,50 @@
+{
+  "input": {
+    "clock": 2000000040,
+    "queries": [
+      {
+        "id": "ecca05a6-4f59-4f48-b083-e428ada659ba",
+        "kind": "request"
+      },
+      {
+        "id": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+        "kind": "proof"
+      },
+      {
+        "input": {
+          "id": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+          "type": "proof"
+        },
+        "kind": "receipt"
+      }
+    ]
+  },
+  "results": [
+    {
+      "value": {
+        "requestId": "ecca05a6-4f59-4f48-b083-e428ada659ba",
+        "state": "source-unavailable",
+        "taskOutcomeVerified": false,
+        "capabilityVerified": false,
+        "independentExecutionVerified": false
+      }
+    },
+    {
+      "error": "evidence_revoked",
+      "status": 409
+    },
+    {
+      "value": {
+        "id": "f793dcd4-77aa-4324-b6c5-3804ea253bca",
+        "type": "proof",
+        "state": "recorded",
+        "payloadHash": "dee151b8c5415266d8d7344f129fb8258b805db6f415c90183778761f62e68ee",
+        "consentId": "bdc2931e-9958-48fe-a5e4-42fd1f85c27d",
+        "objectState": "recorded-not-current-verified",
+        "taskOutcomeVerified": false,
+        "capabilityVerified": false,
+        "independentExecutionVerified": false
+      }
+    }
+  ]
+}

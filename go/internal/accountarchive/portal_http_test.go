@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -21,15 +19,9 @@ import (
 )
 
 func TestPortalArchiveHTTPOriginalRoutesAndCurrentSession(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "archive-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
-	var f struct{ Endpoint, Issuer, AccountID string }
-	if json.Unmarshal(raw, &f) != nil {
-		t.Fatal("fixture")
-	}
+	f := setupArchive(t, owner)
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -82,7 +74,7 @@ func TestPortalArchiveHTTPOriginalRoutesAndCurrentSession(t *testing.T) {
 		return out
 	}
 	list := call(request("GET", "/v1/account/archives?limit=0x1", nil), 200)
-	same(t, list, node(t, dsn, "portal-read", path, nil)["archives"])
+	same(t, list, archiveGolden(t, "archive-read-1")["archives"])
 	create := Object{"id": uuid.NewString(), "title": "  Portal selected copy  ", "selection": Object{"workspaceId": nil, "sessionIds": []string{"portal-selected"}, "scopeId": uuid.NewString()}, "uploadLevel": "conversation-archive", "includeFullConversation": true}
 	id := create["id"].(string)
 	call(request("POST", "/v1/account/archives/create", create), 200)

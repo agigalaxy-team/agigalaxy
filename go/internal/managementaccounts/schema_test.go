@@ -1,15 +1,14 @@
 package managementaccounts
 
 import (
-	"github.com/google/uuid"
 	"strings"
 	"testing"
 )
 
 func TestOriginalManagementSchemasAndTargetVersions(t *testing.T) {
-	create := Object{"operationId": uuid.NewString(), "username": " new.user ", "temporaryPassword": strings.Repeat("😀", 4096), "firstName": strings.Repeat("😀", 100)}
-	command := Object{"operationId": uuid.NewString(), "expectedVersion": strings.Repeat("a", 64), "kind": "profile-update", "firstName": " changed ", "reason": " original "}
-	assignment := Object{"operationId": uuid.NewString(), "expectedVersion": 0, "roleId": uuid.NewString(), "enabled": true}
+	create := Object{"operationId": "954b628d-a8aa-4db1-91db-55294210fc2a", "username": " new.user ", "temporaryPassword": strings.Repeat("😀", 4096), "firstName": strings.Repeat("😀", 100)}
+	command := Object{"operationId": "52cb4fdf-a62f-4f43-b294-34a5f222f2b1", "expectedVersion": strings.Repeat("a", 64), "kind": "profile-update", "firstName": " changed ", "reason": " original "}
+	assignment := Object{"operationId": "c87ae0e4-f5d4-46e0-a0c9-ffbcd95b6792", "expectedVersion": 0, "roleId": "ded3f132-66ea-47a1-b559-ab234421060d", "enabled": true}
 	lists := []any{Object{}, Object{"page": 1000000, "pageSize": 100, "query": strings.Repeat("😀", 200), "enabled": "true", "aiDomain": "overview"}, Object{"page": "1"}, Object{"pageSize": 30}, Object{"enabled": true}, Object{"sort": "created-desc"}, Object{"unexpected": true}}
 	histories := []any{Object{}, Object{"after": "9223372036854775807", "limit": 100}, Object{"after": "9223372036854775808"}, Object{"after": "01"}, Object{"limit": 0}}
 	creates := []any{create}
@@ -38,7 +37,13 @@ func TestOriginalManagementSchemasAndTargetVersions(t *testing.T) {
 	assignments = append(assignments, o)
 	user := &User{Issuer: "https://management.example.invalid/realms/management", ExternalSubject: "id", Username: "original", FirstName: "😀", LastName: "", RequiredActions: []string{}, Admission: "reader", Enabled: true}
 	versions := []any{Object{"user": user, "meta": Object{}}, Object{"user": nil, "meta": Object{"version": 7, "login_blocked": true, "deleted_at": "2025-01-02T03:04:05.123456Z"}}}
-	original := oracle(t, "", "schema", Object{"create": creates, "command": commands, "list": lists, "history": histories, "assignment": assignments, "versions": versions})
+	var fixture struct {
+		Input Object `json:"input"`
+		Value Object `json:"value"`
+	}
+	fixtureJSON(t, "schema", &fixture)
+	eq(t, "schema input", Object{"create": creates, "command": commands, "list": lists, "history": histories, "assignment": assignments, "versions": versions}, fixture.Input)
+	original := fixture.Value
 	for _, pair := range []struct {
 		kind  string
 		items []any

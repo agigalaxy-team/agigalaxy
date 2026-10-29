@@ -1,13 +1,13 @@
 import {statfs,lstat,readFile} from 'node:fs/promises';
-import {randomUUID} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import 'node:path';
 import {runCommand,resticEnvironment,withJobLock} from '../operations-stack/host.mjs';
 import {createProductBackup} from '../operations-stack/backup.mjs';
-import {readBackupStatus} from '../../src/operations/backup-status.mjs';
+import {readBackupStatus} from '../support/backup-status.mjs';
 import {normalizeOperationalRecord} from '../operations-stack/log-record.mjs';
-import {maintenanceModules} from "../../src/operations/maintenance/catalog.mjs";
-import {maintenanceNativeCommandSchema} from '../../src/shared/operations-maintenance-schema.mjs';
-import {maintenanceRequestSignature} from "../../src/operations/maintenance/native.mjs";
+import {maintenanceModules} from "../../../galaxy-contracts/src/operations/maintenance/catalog.mjs";
+import {maintenanceNativeCommandSchema} from '../../../galaxy-contracts/src/operations-maintenance-schema.mjs';
+import {maintenanceRequestSignature} from "../support/maintenance-signature.mjs";
 import {resolveMaintenanceFootprint,maintenanceCaptureConfiguration,maintenanceCaptureContext} from './footprint.mjs';
 import {MaintenanceControlJournal} from './journal.mjs';
 import {MaintenanceRestoreExecutor} from './restore-executor.mjs';
@@ -25,8 +25,8 @@ const periodSeconds={'15m':900,'1h':3600,'24h':86400};
 const commandView=operation=>{if(!operation)return null;const{intent:_intent,intentDigest:_intentDigest,approval:_approval,backupDiagnostic:_backupDiagnostic,...safe}=operation;return safe;};
 
 export class MaintenanceNativeRuntime{
- constructor({configuration,run=runCommand,now=()=>new Date(),journal=null,restoreAdapters=null,fetchImpl=fetch,footprint=resolveMaintenanceFootprint,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
-  Object.assign(this,{configuration,config:configuration.operations,run,now,fetchImpl,resolveFootprint:footprint,pause});
+ constructor({configuration,run=runCommand,now=()=>new Date(),journal=null,restoreAdapters=null,fetchImpl=fetch,footprint=resolveMaintenanceFootprint,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),releaseFiles={lstat,readFile}}){
+  Object.assign(this,{configuration,config:configuration.operations,run,now,fetchImpl,resolveFootprint:footprint,pause,releaseFiles});
   this.journal=journal??new MaintenanceControlJournal({directory:configuration.controlDirectory,now});
   this.restoreExecutor=new MaintenanceRestoreExecutor({journal:this.journal,adapters:restoreAdapters??createHostRestoreAdapters({config:this.config,run,controlDirectory:configuration.controlDirectory,productionEnabled:configuration.production?.enabled===true,fetchImpl,prosodyProbe:configuration.production?.enabled===true?createMaintenanceProsodyProbe({configuration,fetchImpl}):null}),now});this.tasks=new Map();
  }
@@ -135,11 +135,16 @@ export class MaintenanceNativeRuntime{
   if(api.length!==1||api[0].state!=='available'||api[0].releasePaths.length!==1)throw fail('maintenance_api_binding_invalid');
   const directory=api[0].releasePaths[0];
   if(typeof directory!=='string'||!/^\/opt\/galaxy\/releases\/[A-Za-z0-9._-]+$/.test(directory))throw fail('maintenance_api_binding_invalid');
-  const file=directory+'/service-release.json',info=await lstat(file);
+  // Match the API loader's format precedence: an existing old manifest must
+  // not fall through to a different Go artifact when invalid.
+  let file=directory+'/service-release.json',info;
+  try{info=await this.releaseFiles.lstat(file);}catch(error){if(error?.code!=='ENOENT')throw error;file=directory+'/go-core-artifact.json';info=await this.releaseFiles.lstat(file);}
   if(!info.isFile()||info.isSymbolicLink()||info.size>1048576)throw fail('maintenance_api_binding_invalid');
-  const release=JSON.parse(await readFile(file,'utf8'));
-  if(release.kind!=='galaxy-official-service-release'||release.version!==1||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(release.releaseId??'')||release.entries?.api!=='packages/galaxy-official/src/server.mjs')throw fail('maintenance_api_binding_invalid');
-  return{authorizationUrl,url:new URL(authorizationUrl).origin+'/readyz',releaseId:release.releaseId};
+  const bytes=await this.releaseFiles.readFile(file),release=JSON.parse(bytes.toString('utf8'));
+  const old=file.endsWith('/service-release.json')&&release.kind==='galaxy-official-service-release'&&release.entries?.api==='packages/galaxy-official/src/server.mjs';
+  const go=file.endsWith('/go-core-artifact.json')&&((release.kind==='galaxy-go-core-release'&&release.mode==='release')||(release.kind==='galaxy-go-core-local-candidate'&&['candidate',undefined].includes(release.mode)))&&release.component==='hub'&&release.backend==='go'&&release.target?.goos==='linux'&&['amd64','arm64'].includes(release.target?.goarch)&&release.target?.cgo===false&&release.entries?.['galaxy-api']==='galaxy-api'&&release.files?.['galaxy-api']!=null;
+  if((!old&&!go)||release.version!==1||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(release.releaseId??''))throw fail('maintenance_api_binding_invalid');
+  return{authorizationUrl,url:new URL(authorizationUrl).origin+'/readyz',releaseId:release.releaseId,file,manifestSha256:createHash('sha256').update(bytes).digest('hex')};
  }
  async authorizeAfterApiReady(intent,binding,onPhase=null){
   // systemctl start acknowledges a process, not an API listener. All writers
@@ -162,6 +167,8 @@ export class MaintenanceNativeRuntime{
     let value;try{value=JSON.parse(text);}catch{throw fail('maintenance_api_readiness_failed');}
     if(response.status===200&&value?.status==='ready'){
      if(this.configuration.authorizationUrl!==binding.authorizationUrl)throw fail('maintenance_api_binding_changed');
+     const info=await this.releaseFiles.lstat(binding.file);
+     if(!info.isFile()||info.isSymbolicLink()||info.size>1048576||createHash('sha256').update(await this.releaseFiles.readFile(binding.file)).digest('hex')!==binding.manifestSha256)throw fail('maintenance_api_binding_changed');
      // No retry of this authority decision or of the original backup command.
      if(onPhase)await onPhase('current-authorization');
      return this.authorize(intent);

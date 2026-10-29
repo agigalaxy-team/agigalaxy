@@ -6,13 +6,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/portal"
@@ -33,16 +31,12 @@ func (d *webEventDirectory) RolesFresh(ctx context.Context, issuer, subject stri
 	return d.Roles(ctx, issuer, subject)
 }
 func TestAdminWebEventAuthorityCurrentPermissionsAndPassiveActivity(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/web-events-interop.mjs"), "setup")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	if out, e := cmd.CombinedOutput(); e != nil {
-		t.Fatalf("original schema: %v %s", e, out)
-	}
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	if _, e := databaseschema.Migrate(ctx, pool, nil); e != nil {
+		t.Fatal(e)
+	}
 	now := time.Unix(2000000000, 0)
 	endpoint, issuer := "https://events.invalid", "https://operator.invalid/realms/admin"
 	subject := "event-reader"

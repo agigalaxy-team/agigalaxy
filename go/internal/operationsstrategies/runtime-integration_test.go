@@ -11,14 +11,14 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
 	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/publicationfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -31,28 +31,11 @@ func (publicationQualificationFixture) Account(context.Context, pgx.Tx, string, 
 	return nil
 }
 func TestStrategyRealPreparedEffectOriginalTraceAndReceipt(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	node := func(file, mode string, input Object) Object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, file), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		raw, _ := json.Marshal(input)
-		cmd.Stdin = strings.NewReader(string(raw))
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o Object
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("source fixture reply")
-		}
-		return o
-	}
-	base := node("scripts/go/operations-permissions-interop.mjs", "setup", nil)
-	node("scripts/go/operations-permissions-interop.mjs", "automation-setup", Object{})
+	currentFixture := operationsfixture.New(t, owner)
+	base := currentFixture.Data
+	currentFixture.Automation(t)
 	endpoint, issuer, rootID := str(base["endpoint"]), str(base["issuer"]), str(obj(base["ids"])["root"])
 	cfg := owner.Config()
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
@@ -70,7 +53,7 @@ func TestStrategyRealPreparedEffectOriginalTraceAndReceipt(t *testing.T) {
 	now := func() time.Time { return time.Unix(2000000000, 0) }
 	g.Now = now
 	permissions := &p.Service{Pool: pool, Endpoint: endpoint, Authority: g, StoredAuthority: g.StoredOperators(), Now: now, AIWork: &operationsai.Service{Endpoint: endpoint}}
-	publication := node("go/internal/operationsqueries/testdata/interop.mjs", "seed-public", Object{"endpoint": endpoint, "rootId": rootID})
+	publication := publicationfixture.Prepare(t, owner, endpoint, now)
 	forum := &community.Service{Pool: pool, Endpoint: endpoint, Authority: publicationQualificationFixture{}, Now: now, OperationsHandling: true}
 	payload := obj(publication["payload"])
 	body, _ := json.Marshal(payload)
@@ -78,7 +61,7 @@ func TestStrategyRealPreparedEffectOriginalTraceAndReceipt(t *testing.T) {
 		t.Fatal(e)
 	}
 	target := str(payload["postId"])
-	executionFixture := node("go/internal/agentos/testdata/execution.mjs", "seed", Object{"endpoint": endpoint, "rootId": rootID, "targetId": target})
+	executionFixture := seedStrategyExecution(t, currentFixture, target)
 	executionID := str(obj(executionFixture["original"])["executionId"])
 	executions := &agentos.Executions{Pool: pool, Endpoint: endpoint, Permissions: permissions, Now: now}
 	business := &p.BusinessAuthority{Human: g, Execution: executions}
@@ -112,11 +95,20 @@ func TestStrategyRealPreparedEffectOriginalTraceAndReceipt(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	original := node("scripts/go/strategies-interop.mjs", "effects", Object{"endpoint": endpoint, "rootId": rootID, "executionId": executionID, "conditions": []Object{selected}})
+	rawFacts, e := os.ReadFile("testdata/strategies-effects.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	var original Object
+	if e = json.Unmarshal(rawFacts, &original); e != nil {
+		t.Fatal(e)
+	}
+	original["executionId"], original["ownerId"], original["grantId"] = executionID, rootID, obj(executionFixture["grant"])["id"]
+	obj(original["target"])["id"] = target
 	if !same(facts, original) {
 		a, _ := json.Marshal(facts)
 		b, _ := json.Marshal(original)
-		t.Fatalf("real condition/source facts differ\nGo%s\nJS%s", a, b)
+		t.Fatalf("real condition/source facts differ\nGo%s\nReference%s", a, b)
 	}
 	request := httptest.NewRequest("POST", "https://admin.example.invalid/v1/operations/strategies/draft", nil)
 	request.Header.Set("Origin", "https://admin.example.invalid")
@@ -242,11 +234,17 @@ func TestStrategyRealPreparedEffectOriginalTraceAndReceipt(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	original = node("scripts/go/strategies-interop.mjs", "runDetail", Object{"endpoint": endpoint, "rootId": rootID, "id": runID, "native": metadata})
-	if !same(view, original) {
-		a, _ := json.Marshal(view)
-		b, _ := json.Marshal(original)
-		t.Fatalf("original completed run projection differs\nGo%s\nJS%s", a, b)
+	publicRead := httptest.NewRequest("GET", "https://admin.example.invalid/v1/operations/strategies/runs/"+runID, nil)
+	publicRead.Header.Set("Origin", "https://admin.example.invalid")
+	publicRead.AddCookie(&http.Cookie{Name: "__Host-galaxy-operator", Value: strings.Repeat("R", 43)})
+	publicResponse := httptest.NewRecorder()
+	handler.ServeHTTP(publicResponse, publicRead)
+	var publicView Object
+	if e = json.Unmarshal(publicResponse.Body.Bytes(), &publicView); e != nil {
+		t.Fatal(e)
+	}
+	if publicResponse.Code != 200 || !same(view, publicView) {
+		t.Fatalf("completed run HTTP projection differs status%d\nDomain%s\nHTTP%s", publicResponse.Code, str(view["state"]), publicResponse.Body.String())
 	}
 	step["phase"], step["failure"] = "failed", "workflow-failed"
 	code, stopped := private("step", step)
@@ -258,13 +256,13 @@ func TestStrategyRealPreparedEffectOriginalTraceAndReceipt(t *testing.T) {
 		t.Fatal("automatic stop changed completed effect")
 	}
 
-	publication2 := node("go/internal/operationsqueries/testdata/interop.mjs", "seed-public", Object{"endpoint": endpoint, "rootId": rootID})
+	publication2 := publicationfixture.Prepare(t, owner, endpoint, now)
 	payload2 := obj(publication2["payload"])
 	raw2, _ := json.Marshal(payload2)
 	if _, e = forum.Publish(ctx, publication2["accounts"].([]any)[0].(string), string(raw2)); e != nil {
 		t.Fatal(e)
 	}
-	secondFixture := node("go/internal/agentos/testdata/execution.mjs", "seed", Object{"endpoint": endpoint, "rootId": rootID, "targetId": payload2["postId"]})
+	secondFixture := seedStrategyExecution(t, currentFixture, str(payload2["postId"]))
 	executionID = str(obj(secondFixture["original"])["executionId"])
 	humanConfig := deepClone(parsed)
 	humanStrategy := obj(list(humanConfig["strategies"])[0])

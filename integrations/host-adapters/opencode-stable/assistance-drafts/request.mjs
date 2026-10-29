@@ -1,5 +1,5 @@
 import { showExactChoice } from '../exact-choice.mjs';
-import { assistanceDraftApproaches } from "../../../../packages/galaxy-official/src/clients/local/assistance-store.mjs";
+import { assistanceDraftApproaches } from "../../../../packages/galaxy-contracts/src/assistance-schema.mjs";
 
 export function createAssistanceDraftsRequest(session) {
   function requestSettings(row) {

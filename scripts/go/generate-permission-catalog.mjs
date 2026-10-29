@@ -1,9 +1,9 @@
-import {operationsAiActionRegistry,aiWorkPreparationRegistry,aiQueryPermissions,aiAutonomousPermissions} from '../../packages/galaxy-official/src/shared/operations-ai-action-registry.mjs';
+import {operationsAiActionRegistry,aiWorkPreparationRegistry,aiQueryPermissions,aiAutonomousPermissions} from '../../packages/galaxy-contracts/src/operations-ai-action-registry.mjs';
 import {writeFile} from 'node:fs/promises';
-import {operationsPermissionCodes,operationsPermissionCatalog} from '../../packages/galaxy-official/src/operations-permission-catalog.mjs';
-import {managementMaintainerPermissionCodes} from '../../packages/galaxy-official/src/shared/operations-management-maintainer-actions.mjs';
-import {agentOsQueryViews} from '../../packages/galaxy-official/src/shared/operations-agentos-query-schema.mjs';
-import {agentOsQueryReadAction} from '../../packages/galaxy-official/src/shared/operations-agentos-query-access.mjs';
+import {operationsPermissionCodes,operationsPermissionCatalog} from '../../packages/galaxy-contracts/src/operations-permission-catalog.mjs';
+import {managementMaintainerPermissionCodes} from '../../packages/galaxy-contracts/src/operations-management-maintainer-actions.mjs';
+import {agentOsQueryViews} from '../../packages/galaxy-contracts/src/operations-agentos-query-schema.mjs';
+import {agentOsQueryReadAction} from '../../packages/galaxy-contracts/src/operations-agentos-query-access.mjs';
 const codes=[...operationsPermissionCodes];
 if(new Set(codes).size!==codes.length||codes.some(code=>typeof code!=='string'||!/^[a-z][a-z0-9.-]{0,99}$/.test(code)))throw Error('invalid source permission catalog');
 const list=values=>values.map(value=>'\t'+JSON.stringify(value)+',').join('\n');

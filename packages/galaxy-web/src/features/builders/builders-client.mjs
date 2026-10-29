@@ -1,6 +1,6 @@
-import {builderEventSchema} from "../../../../galaxy-official/src/shared/builders-schema.mjs";
-import {builderExtensionEventSchema} from "../../../../galaxy-official/src/shared/builder-support-v2-schema.mjs";
-import {equalJson,sha256Hex} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {builderEventSchema} from "../../../../galaxy-contracts/src/builders-schema.mjs";
+import {builderExtensionEventSchema} from "../../../../galaxy-contracts/src/builder-support-v2-schema.mjs";
+import {equalJson,sha256Hex} from "../../../../galaxy-contracts/src/web-primitives.mjs";
 const extensions=new Set(['support-profile','pack-manifest','scope-report']),copy=value=>structuredClone(value);
 const error=(code,message)=>Object.assign(new Error(message),{code});
 export function createBuildersWebClient(runtime,{subjectId=/** @type {string|null} */(null),now=()=>Math.floor(Date.now()/1000),locks=globalThis.navigator?.locks}={}){

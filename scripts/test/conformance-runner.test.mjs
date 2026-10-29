@@ -16,12 +16,11 @@ test('runner does not turn absent, skipped, failed or changed-source checks into
   assert.equal(deriveChecks(mapping,{first:good,second:good},false)[0].status,'not-tested');
 });
 
-test('conformance source identity includes runtime JSON, proxy routes and both native TypeScript entrypoints', async () => {
+test('conformance source identity includes current Go, SQL and shared contracts without retired Node source', async () => {
   const current = await fingerprint();
-  const expected = ['packages/galaxy-official/public-docs.json', 'packages/galaxy-official/api-reference.mjs',
-    'packages/galaxy-official/deploy/caddy-routes.mjs', 'docs/technical/reference/version-contract.json',
-    'integrations/host-adapters/opencode-stable/configured-galaxy.tui.ts',
-    'integrations/host-adapters/opencode-stable/galaxy.tui.ts'];
+  const expected = ['go/go.mod', 'go/internal/databaseschema/sql/133.sql',
+    'go/internal/identity/control-chain.go', 'docs/technical/reference/version-contract.json',
+    'packages/galaxy-contracts/src/consents-schema.mjs'];
   for (const name of expected) assert.match(current.files[name], /^[0-9a-f]{64}$/, name);
   const directory = await mkdtemp(join(tmpdir(), 'galaxy-source-fingerprint-'));
   try {
@@ -30,7 +29,7 @@ test('conformance source identity includes runtime JSON, proxy routes and both n
       await mkdir(dirname(path), { recursive: true }); await writeFile(path, 'fixture');
     }
     const before = await fingerprint(directory);
-    await writeFile(join(directory, 'packages/galaxy-official/public-docs.json'), '{"changed":true}');
+    await writeFile(join(directory, 'go/internal/databaseschema/sql/133.sql'), '-- changed migration');
     const after = await fingerprint(directory);
     assert.notEqual(after.sha256, before.sha256);
     assert.deepEqual(Object.keys(after.files), Object.keys(before.files));

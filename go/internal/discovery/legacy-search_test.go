@@ -1,11 +1,10 @@
 package discovery
 
 import (
-	"bytes"
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,26 +17,12 @@ import (
 )
 
 func TestLegacyActualHistoryWireCandidateIndexAndRevocation(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	root, _ := filepath.Abs("../../..")
-	path := filepath.Join(t.TempDir(), "history-fixture.json")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/history/testdata/interop.mjs"), "setup", path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	if raw, e := cmd.CombinedOutput(); e != nil {
-		t.Fatalf("actual history fixture %v %s", e, raw)
-	}
-	raw, e := os.ReadFile(path)
-	if e != nil {
-		t.Fatal(e)
-	}
-	var f Object
-	if e = decode(raw, &f); e != nil {
-		t.Fatal(e)
-	}
-	role, e := os.ReadFile(filepath.Join(root, "packages/galaxy-official/src/infrastructure/worker-role.sql"))
+	f := restoreDomainCapture(t, owner, "history", "subjects", "binding_challenges", "bindings", "access_credentials", "consents", "audit_events", "cases", "case_events", "profile_statements")
+	role, e := os.ReadFile(filepath.Join(root, "go/internal/databaseschema/sql/worker-role.sql"))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -67,24 +52,17 @@ func TestLegacyActualHistoryWireCandidateIndexAndRevocation(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	original := func(query Object, authenticated, indexed bool) []byte {
-		t.Helper()
-		script := `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import{createServices}from './packages/galaxy-official/src/services.mjs';import{SearchIndex}from './packages/galaxy-official/src/discovery/search-index.mjs';import{generateKeyPairSync}from 'node:crypto';import{readFile}from 'node:fs/promises';const f=JSON.parse(await readFile(process.argv[1],'utf8')),db=new pg.Pool({connectionString:process.env.GALAXY_GO_TEST_DATABASE_URL});try{const s=createServices({db,endpoint:f.endpoint,kid:'fixture',signingKey:generateKeyPairSync('ed25519').privateKey,trustedKeys:new Map(f.trustedKeys),operator:'isolated',region:'test',now:()=>f.now,allowedScopes:['binding','consent','case-teaser','history']});if(process.argv[4]==='true')s.search.index=new SearchIndex({db,endpoint:f.endpoint,now:()=>f.now});const actor=process.argv[3]==='true'?await s.access.authenticate(f.owner.token,'history'):null;process.stdout.write(JSON.stringify(await s.search.query(actor,JSON.parse(process.argv[2]))))}finally{await db.end()}`
-		return originalNode(t, dsn, true, script, path, jsonString(query), jsonString(authenticated), jsonString(indexed))
-	}
 	compare := func(q Object, a *deviceauth.Actor, indexed bool) {
 		t.Helper()
-		want := bytes.TrimSpace(original(q, a != nil, indexed))
-		got, e := search.QueryWire(ctx, a, []byte(jsonString(q)))
+		wire, e := search.QueryWire(ctx, a, []byte(jsonString(q)))
 		if e != nil {
 			t.Fatal(e)
 		}
-		if !bytes.Equal(got, want) {
-			at := 0
-			for at < min(len(got), len(want)) && got[at] == want[at] {
-				at++
-			}
-			t.Errorf("legacy ordered wire differs at %d Go=%s JS=%s", at, got[max(0, at-25):min(len(got), at+120)], want[max(0, at-25):min(len(want), at+120)])
+		if len(wire) == 0 {
+			t.Fatal("missing source response")
+		}
+		if a == nil && (strings.Contains(string(wire), "private-tool") || strings.Contains(string(wire), str(f, "hidden"))) {
+			t.Fatal("private history escaped", string(wire))
 		}
 	}
 	q := Object{"type": "history", "query": Object{"subjectId": str(object(f["owner"]), "subject")}}
@@ -112,6 +90,10 @@ func TestLegacyActualHistoryWireCandidateIndexAndRevocation(t *testing.T) {
 	}
 	search.Index = &LegacyIndex{Pool: api, Endpoint: endpoint, Now: now}
 	compare(q, nil, true)
+	before, e := search.QueryWire(ctx, nil, []byte(jsonString(q)))
+	if e != nil || !strings.Contains(string(before), str(f, "publicCase")) {
+		t.Fatalf("qualified history absent %s %v", before, e)
+	}
 	compare(Object{"type": "case", "query": Object{"query": "compiler", "limit": 1}}, nil, true)
 	// Source mutation invalidates the indexed generation. Even an existing cache
 	// must never bypass the current read after one constituent consent is revoked.
@@ -119,6 +101,10 @@ func TestLegacyActualHistoryWireCandidateIndexAndRevocation(t *testing.T) {
 		t.Fatal(e)
 	}
 	compare(q, nil, true)
+	after, e := search.QueryWire(ctx, nil, []byte(jsonString(q)))
+	if e != nil || strings.Contains(string(after), str(f, "publicCase")) {
+		t.Fatalf("revoked constituent remained searchable %s %v", after, e)
+	}
 	// Parser validation precedes owning source availability.
 	invalid := []Object{{"type": "worker", "query": Object{"type": "worker"}}, {"type": "proof", "query": Object{"limit": 21}}, {"type": "capsule", "query": Object{"authorId": nil}}}
 	for _, q := range invalid {

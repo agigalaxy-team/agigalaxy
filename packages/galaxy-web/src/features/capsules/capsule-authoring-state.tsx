@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {useChoiceViewLease} from "../../shared/operations/choice-retained-operations";
-import {sha256Hex} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {sha256Hex} from "../../../../galaxy-contracts/src/web-primitives.mjs";
 import type {CapsuleAuthorClient,CapsuleAuthorLease,CapsuleAuthorRuntime,CapsuleInputGateProps,CapsuleLocator,CapsuleReceipt} from './capsule-authoring-types';
 
 export const capsuleAuthoringDraftKey=(endpoint:string,subjectId:string,mode:string,capsuleId?:string)=>'capsule-authoring:'+endpoint+':'+subjectId+':'+(mode==='revision'?capsuleId:'new');

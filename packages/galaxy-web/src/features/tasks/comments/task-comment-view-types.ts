@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import {taskCommentV2Schema,commentReportV2Schema,commentModerationV2Schema} from "../../../../../galaxy-official/src/shared/task-comment-v2-schema.mjs";
+import {taskCommentV2Schema,commentReportV2Schema,commentModerationV2Schema} from "../../../../../galaxy-contracts/src/task-comment-v2-schema.mjs";
 import type {WorkRuntime} from "../work-task-types";
 export type CommentKind='create'|'edit'|'correct'|'retract'|'report'|'supplement'|'appeal'|'withdraw-report'|'pause'|'resolve'|'resume';
 export type CommentType='comment'|'report'|'governance';

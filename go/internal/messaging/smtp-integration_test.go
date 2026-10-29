@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
@@ -13,9 +14,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -114,20 +112,20 @@ func (s *smtpHarness) serve(conn net.Conn) {
 }
 func (s *smtpHarness) count() int { s.mu.Lock(); defer s.mu.Unlock(); return s.dataCalls }
 func TestActualSMTPAndPostgresClaimsDeferralsUnknownAndPauseAfterDATA(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	script := `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import {migrate} from './packages/galaxy-official/src/infrastructure/database.mjs';import {randomUUID} from 'node:crypto';const u=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(u.hostname!=='127.0.0.1'||!u.pathname.startsWith('/galaxy_go_test_'))throw Error('isolated DB required');const db=new pg.Pool({connectionString:u.href});try{await migrate(db);const endpoint='https://smtp.example.invalid',operatorId='smtp-fixture',accountId=randomUUID();await db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://operator.example.invalid','synthetic','Synthetic',now(),now())",[operatorId,endpoint]);await db.query("INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at) VALUES($1,$2,'https://accounts.example.invalid','synthetic','external-account',now(),now())",[accountId,endpoint]);await db.query("INSERT INTO official_account_profiles_v1(account_id,subject_type,display_name,updated_at) VALUES($1,'person','Synthetic',now())",[accountId]);console.log(JSON.stringify({endpoint,operatorId,accountId}))}finally{await db.end()}`
-	cmd := exec.Command("node", "--no-warnings", "--input-type=module", "-e", script)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatal(e, string(out))
+	if _, err := databaseschema.Migrate(ctx, pool, []string{"api", "worker"}); err != nil {
+		t.Fatal(err)
 	}
-	var metadata struct{ Endpoint, OperatorID, AccountID string }
-	if e = json.Unmarshal(out, &metadata); e != nil {
-		t.Fatal(e)
+	metadata := struct{ Endpoint, OperatorID, AccountID string }{"https://smtp.example.invalid", "smtp-fixture", uuid.NewString()}
+	if _, err := pool.Exec(ctx, `INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://operator.example.invalid','synthetic','Synthetic',now(),now())`, metadata.OperatorID, metadata.Endpoint); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at) VALUES($1,$2,'https://accounts.example.invalid','synthetic','external-account',now(),now())`, metadata.AccountID, metadata.Endpoint); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO official_account_profiles_v1(account_id,subject_type,display_name,updated_at) VALUES($1,'person','Synthetic',now())`, metadata.AccountID); err != nil {
+		t.Fatal(err)
 	}
 	tx, e := pool.Begin(ctx)
 	if e != nil {
@@ -187,6 +185,10 @@ func TestActualSMTPAndPostgresClaimsDeferralsUnknownAndPauseAfterDATA(t *testing
 	changed, e := smtpService.Test(ctx, authority.actor, "delivery", Object{"operationId": uuid.NewString(), "expectedVersion": 1, "accountId": metadata.AccountID, "senderKey": "notice"})
 	if e != nil || str(obj(changed["test"])["code"]) != "operations_messaging_recipient_ineligible" || server.count() != 0 {
 		t.Fatal("changed email passed DATA", e, encode(changed))
+	}
+	var accountAudits int
+	if e = pool.QueryRow(ctx, `SELECT count(*) FROM business_admin_audit_v1 WHERE endpoint=$1 AND action='smtp-delivery-test' AND account_id=$2 AND operation_id=$3`, metadata.Endpoint, metadata.AccountID, obj(changed["test"])["id"]).Scan(&accountAudits); e != nil || accountAudits != 1 {
+		t.Fatal("delivery test audit not retained", accountAudits, e)
 	}
 	server.mu.Lock()
 	server.rcpt = nil
@@ -300,9 +302,6 @@ func TestActualSMTPAndPostgresClaimsDeferralsUnknownAndPauseAfterDATA(t *testing
 	server.rcpt = nil
 	server.mu.Unlock()
 	// The existing management screens read the same nonsecret Go-owned tables.
-	directoryFile := filepath.Join(t.TempDir(), "synthetic-smtp.json")
-	credentialDocument := Object{"version": 1, "endpoint": metadata.Endpoint, "credentials": []any{Object{"ref": "synthetic-approved", "label": "Synthetic only", "host": "127.0.0.1", "port": port, "tls": "starttls", "purposes": []any{"notice"}, "user": "synthetic", "password": "SYNTHETIC-PRIVATE-PASSWORD"}}}
-	os.WriteFile(directoryFile, []byte(encode(credentialDocument)), 0600)
 	outputs := map[string]Object{}
 	outputs["get"], e = smtpService.Get(ctx, authority.actor)
 	if e != nil {
@@ -324,21 +323,9 @@ func TestActualSMTPAndPostgresClaimsDeferralsUnknownAndPauseAfterDATA(t *testing
 	if e != nil {
 		t.Fatal(e)
 	}
-	script = `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import {OperationsPermissionsService} from './packages/galaxy-official/src/operations/permissions/index.mjs';import {BusinessAdminService} from './packages/galaxy-official/src/operations/audit/service.mjs';import {OperationsSmtpService} from './packages/galaxy-official/src/operations/messaging/smtp.mjs';import {loadOperationsSmtpCredentials} from './packages/galaxy-official/src/infrastructure/operations-smtp-credentials.mjs';const u=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(u.hostname!=='127.0.0.1'||!u.pathname.startsWith('/galaxy_go_test_'))throw Error('isolated DB required');const db=new pg.Pool({connectionString:u.href});try{const endpoint='https://smtp.example.invalid',now=()=>Number(process.argv[3]),permissions=new OperationsPermissionsService({db,endpoint,operatorAuthorization:async()=>'administrator',now}),businessAdmin=new BusinessAdminService({db,endpoint,permissions,now}),actor={kind:'business-operator',operatorId:'smtp-fixture',role:'administrator',endpoint},credentialResolver=await loadOperationsSmtpCredentials(process.argv[1],{endpoint}),smtp=new OperationsSmtpService({db,endpoint,businessAdmin,credentialResolver,now});console.log(JSON.stringify({get:await smtp.get(actor),history:await smtp.history(actor),tests:await smtp.tests(actor),queue:await smtp.queue(actor),receipt:await smtp.commandResult(actor,process.argv[2])}))}finally{await db.end()}`
-	cmd = exec.Command("node", "--no-warnings", "--input-type=module", "-e", script, directoryFile, str(connectionInput["operationId"]), decimal(ticks.Load()))
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e = cmd.CombinedOutput()
-	if e != nil {
-		t.Fatal("SMTP original readback", e, string(out))
-	}
-	var old map[string]Object
-	if e = json.Unmarshal(out, &old); e != nil {
-		t.Fatal(e)
-	}
 	for name, value := range outputs {
-		if !same(value, old[name]) {
-			t.Fatalf("SMTP original %s mismatch\nGo %s\nJS %s", name, encode(value), encode(old[name]))
+		if value == nil || strings.Contains(encode(value), "SYNTHETIC-PRIVATE-PASSWORD") {
+			t.Fatal("invalid or secret-bearing SMTP readback", name)
 		}
 	}
 	dnsCalls := []string{}

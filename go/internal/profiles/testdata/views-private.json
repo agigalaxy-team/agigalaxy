@@ -1,0 +1,39 @@
+{
+  "public": {
+    "selfDeclared": {}
+  },
+  "selected": {
+    "selfDeclared": {
+      "displayName": "Selected private ID",
+      "about": "Only the selected ID may read this"
+    },
+    "selfDeclaredReadExpiresAt": 2000000060,
+    "selfDeclaredSource": {
+      "id": "1aa400f7-b1d3-45f1-89b9-9ee27a51bbfb",
+      "classification": "self-declared",
+      "capabilityVerified": false
+    }
+  },
+  "durable": {
+    "selfDeclared": {
+      "displayName": "Retained signed device statement"
+    },
+    "selfDeclaredReadExpiresAt": 2000000060,
+    "selfDeclaredSource": {
+      "id": "109223ec-9586-4329-946e-cd3caa86f885",
+      "classification": "self-declared",
+      "capabilityVerified": false
+    }
+  },
+  "legacy": {
+    "selfDeclared": {
+      "displayName": "Legacy finite consent statement"
+    },
+    "selfDeclaredReadExpiresAt": 2000000060,
+    "selfDeclaredSource": {
+      "id": "a7b1d8a8-2aa4-4bfb-9762-e500af6f9836",
+      "classification": "self-declared",
+      "capabilityVerified": false
+    }
+  }
+}

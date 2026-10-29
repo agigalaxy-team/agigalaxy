@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
-	"github.com/google/uuid"
-	"os/exec"
+	"os"
 	"strings"
 	"testing"
 )
 
 func TestOriginalContentSchemasAndUTF16Excerpt(t *testing.T) {
-	id := uuid.NewString()
+	id := "11111111-1111-4111-8111-111111111111"
 	cases := []Object{}
 	add := func(k string, x Object) { cases = append(cases, Object{"kind": k, "input": x}) }
 	for _, x := range []Object{{}, {"query": strings.Repeat("🚀", 160)}, {"query": strings.Repeat("🚀", 161)}, {"after": "POST:" + id}, {"after": nil}, {"pinned": false}, {"days": 28}, {"days": "all"}, {"days": "7"}, {"limit": 101}} {
@@ -50,9 +49,7 @@ func TestOriginalContentSchemasAndUTF16Excerpt(t *testing.T) {
 			add(k, x)
 		}
 	}
-	cmd := exec.Command("node", "testdata/schema.mjs")
-	cmd.Stdin = bytes.NewReader(encode(cases))
-	b, e := cmd.Output()
+	b, e := os.ReadFile("testdata/original-content-schema.json")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -88,9 +85,8 @@ func TestOriginalContentSchemasAndUTF16Excerpt(t *testing.T) {
 	}
 	source := strings.Repeat("a", 179) + "🚀tail"
 	raw := encode(jsSlice(source, 180))
-	cmd = exec.Command("node", "-e", "process.stdout.write(JSON.stringify(process.argv[1].slice(0,180)))", source)
-	expected, e := cmd.Output()
-	if e != nil || !bytes.Equal(raw, expected) {
-		t.Fatalf("original UTF16 excerpt %s != %s %v", raw, expected, e)
+	expected := []byte("\"" + strings.Repeat("a", 179) + `\ud83d"`)
+	if !bytes.Equal(raw, expected) {
+		t.Fatalf("UTF16 excerpt %s != %s", raw, expected)
 	}
 }

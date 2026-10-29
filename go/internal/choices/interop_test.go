@@ -1,164 +1,132 @@
 package choices
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/cases"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/historyv2"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/searchv2"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/taskmaterials"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
-	"io"
-	"net/http"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
-func TestOriginalOwnerChoiceSourcesAndReceipt(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
-	defer cancel()
-	root, _ := filepath.Abs("../../..")
-	dir := t.TempDir()
-	cmd := exec.CommandContext(ctx, "node", filepath.Join(root, "scripts/go/qualification-interop.mjs"), "choices")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_QUALIFICATION_DIR="+dir)
-	stdout, e := cmd.StdoutPipe()
-	if e != nil {
-		t.Fatal(e)
+func TestOwnerChoiceSourcesAndReceipt(t *testing.T) {
+	owner, _ := testsupport.PostgreSQL(t)
+	ctx := context.Background()
+	if _, err := databaseschema.Migrate(ctx, owner, []string{"api", "worker"}); err != nil {
+		t.Fatal(err)
 	}
-	stdin, e := cmd.StdinPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if e = cmd.Start(); e != nil {
-		t.Fatal(e)
-	}
-	defer func() {
-		_, _ = io.WriteString(stdin, "stop\n")
-		_ = stdin.Close()
-		if e := cmd.Wait(); e != nil && ctx.Err() == nil {
-			t.Errorf("original fixture %v: %s", e, stderr.String())
-		}
-	}()
-	scanner := bufio.NewScanner(stdout)
-	ready := false
-	for scanner.Scan() {
-		if scanner.Text() == "ready" {
-			ready = true
-			break
-		}
-	}
-	if !ready {
-		t.Fatalf("original fixture %s", stderr.String())
-	}
-	var f struct {
-		Endpoint, Token, Bridge string
-		Now                     int64
-	}
-	raw, _ := os.ReadFile(filepath.Join(dir, "fixture.json"))
-	if e = json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
-	}
-	pool, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_api")
+	endpoint := "https://choice.example.invalid"
+	identity := deviceauthfixture.NewEndpoint(t, owner, t.TempDir(), []string{"binding", "consent", "assistance", "history"}, endpoint)
+	cfg := owner.Config()
+	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
+	pool, e := pgxpool.NewWithConfig(ctx, cfg)
 	if e != nil {
 		t.Fatal(e)
 	}
 	defer pool.Close()
-	now := func() time.Time { return time.Unix(f.Now, 0) }
-	devices := &deviceauth.Service{Pool: pool, Endpoint: f.Endpoint, Now: now}
-	cs := &cases.Service{Pool: pool, Endpoint: f.Endpoint, Devices: devices, Now: now}
-	tasks := &taskmaterials.Service{Pool: pool, Endpoint: f.Endpoint, Devices: devices, Now: now, CaseOwnerSource: cs.RequireOwnerSourceWithin}
-	history := &historyv2.Service{Pool: pool, Endpoint: f.Endpoint, Devices: devices, Tasks: tasks.ReadHistoryWireWithin, Now: now}
+	now := func() time.Time { return time.Unix(2000000000, 0) }
+	devices := &deviceauth.Service{Pool: pool, Endpoint: endpoint, Now: now}
+	cs := &cases.Service{Pool: pool, Endpoint: endpoint, Devices: devices, Now: now}
+	tasks := &taskmaterials.Service{Pool: pool, Endpoint: endpoint, Devices: devices, Now: now, CaseOwnerSource: cs.RequireOwnerSourceWithin}
+	history := &historyv2.Service{Pool: pool, Endpoint: endpoint, Devices: devices, Tasks: tasks.ReadHistoryWireWithin, Now: now}
+	task := Object{"operationId": uuid.NewString(), "taskId": uuid.NewString(), "caseId": nil, "intent": "collaboration", "title": "Current task eligibility", "summary": "Explicit selected work", "workContext": Object{"goal": "Original goal", "currentSituation": "Original current situation", "attemptRefs": []any{}}, "visibility": "Private", "collaboration": "open-assistance", "capabilityId": "code", "enrollmentExpiresAt": now().Unix() + 3600}
+	grant := identity.Grant(t, task, "assistance.publish", task["operationId"].(string), "Private", nil)
+	if _, e = tasks.CreateTask(ctx, taskmaterials.Actor{Actor: identity.Actor}, taskmaterials.TaskSubmission{ConsentID: grant["consentId"].(string), PayloadJSON: grant["payloadJson"].(string)}); e != nil {
+		t.Fatal("current task creation", e)
+	}
 	reader := &Reader{Tasks: tasks, History: history}
-	s := &Service{Pool: pool, Endpoint: f.Endpoint, Devices: devices, Sources: reader, Now: now}
-	h := Handler{Service: s}
-	actor, e := devices.Authenticate(ctx, f.Token, "binding")
-	if e != nil {
-		t.Fatal(e)
-	}
-	original := func(action string, input Object) Object {
+	svc := &Service{Pool: pool, Endpoint: endpoint, Devices: devices, Sources: reader, Now: now}
+	handler := Handler{Service: svc}
+	search := &searchv2.Service{Pool: pool, Devices: devices, History: history, Now: now, Tasks: func(ctx context.Context, a *deviceauth.Actor, raw []byte) (json.RawMessage, error) {
+		if a == nil {
+			return tasks.QueryTasksWire(ctx, nil, "requested", "", "", 20)
+		}
+		actor := taskmaterials.Actor{Actor: *a}
+		return tasks.QueryTasksWire(ctx, &actor, "requested", "", "", 20)
+	}}
+	ref := func(kind string, query Object) Object {
 		t.Helper()
-		raw, _ := json.Marshal(Object{"action": action, "query": input})
-		r, _ := http.NewRequestWithContext(ctx, "POST", f.Bridge, bytes.NewReader(raw))
-		r.Header.Set("Content-Type", "application/json")
-		res, e := http.DefaultClient.Do(r)
+		input, _ := json.Marshal(Object{"type": kind, "query": query})
+		page, e := search.Query(ctx, &identity.Actor, input)
 		if e != nil {
+			t.Fatal("current source search", kind, e)
+		}
+		b, _ := json.Marshal(page)
+		var out Object
+		if e = json.Unmarshal(b, &out); e != nil {
 			t.Fatal(e)
 		}
-		defer res.Body.Close()
-		var v Object
-		if e = json.NewDecoder(res.Body).Decode(&v); e != nil {
-			t.Fatal(e)
+		for _, v := range array(out["items"]) {
+			item := object(v)
+			if item["id"] == task["taskId"] {
+				return object(item["ref"])
+			}
 		}
-		if res.StatusCode != 200 {
-			t.Fatalf("original %s %d %v", action, res.StatusCode, v)
-		}
-		return v
+		t.Fatalf("selected task absent from %s search", kind)
+		return nil
 	}
+	taskQuery := Object{"view": "requested"}
+	historyQuery := Object{"subjectId": identity.Actor.SubjectID}
+	taskRef := ref("task", taskQuery)
+	historyRef := ref("history", historyQuery)
+	snapshot := uuid.NewString()
+	candidate := []any{Object{"type": "task", "id": taskRef["id"], "version": taskRef["version"]}, Object{"type": "history", "id": historyRef["id"], "version": historyRef["version"]}}
+	witnesses := []any{Object{"search": Object{"type": "task", "query": taskQuery}, "ref": taskRef}, Object{"search": Object{"type": "history", "query": historyQuery}, "ref": historyRef}}
+	base := Object{"snapshotId": snapshot, "versionId": uuid.NewString(), "baseRevision": 0, "preferenceRevision": 1, "content": Object{"localVersion": 1, "localTaskRef": "local-explicit-choice", "visibleRationale": "Owner retained selected-source rationale", "rationaleAuthor": "user", "candidateRefs": candidate, "selectedRefs": []any{candidate[0]}, "resultRefs": []any{}}, "witnesses": witnesses}
+	conflict := Object{}
+	for k, v := range base {
+		conflict[k] = v
+	}
+	conflict["versionId"] = uuid.NewString()
+	content := Object{}
+	for k, v := range object(base["content"]) {
+		content[k] = v
+	}
+	content["localVersion"], content["visibleRationale"] = 2, "Alternative retained by another device"
+	conflict["content"] = content
+	resolve := Object{}
+	for k, v := range base {
+		resolve[k] = v
+	}
+	resolve["versionId"], resolve["baseRevision"], resolve["resolveVersionIds"] = uuid.NewString(), 1, []any{conflict["versionId"]}
+	resolvedContent := Object{}
+	for k, v := range object(base["content"]) {
+		resolvedContent[k] = v
+	}
+	resolvedContent["localVersion"] = 3
+	resolve["content"] = resolvedContent
 	request := func(action string, input Object, status int) Object {
 		t.Helper()
 		raw, _ := json.Marshal(input)
 		r := httptest.NewRequest("POST", "/v2/choice-snapshots/"+action, bytes.NewReader(raw))
 		r.Header.Set("Content-Type", "application/json")
-		r.Header.Set("Authorization", "Bearer "+f.Token)
+		r.Header.Set("Authorization", "Bearer "+identity.Credential)
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, r)
+		handler.ServeHTTP(w, r)
 		if w.Code != status {
-			t.Fatalf("Go %s %d %s", action, w.Code, w.Body.String())
+			t.Fatalf("%s HTTP%d %s", action, w.Code, w.Body.String())
 		}
-		var v Object
-		if e = json.Unmarshal(w.Body.Bytes(), &v); e != nil {
+		var out Object
+		if e := json.Unmarshal(w.Body.Bytes(), &out); e != nil {
 			t.Fatal(e)
 		}
-		return v
+		return out
 	}
-	equal := func(actual, expected Object) {
-		t.Helper()
-		a, _ := json.Marshal(actual)
-		var normal Object
-		_ = json.Unmarshal(a, &normal)
-		a, _ = json.Marshal(normal)
-		b, _ := json.Marshal(expected)
-		if string(a) != string(b) {
-			t.Fatalf("Choice differs Go=%s original=%s", a, b)
-		}
-	}
-	fixture := original("choice-fixture", nil)
-	pref := object(fixture["preference"])
-	puts := array(fixture["puts"])
-	receipts := array(fixture["receipts"])
-	get := Object{"snapshotId": pref["snapshotIds"].([]any)[0]}
-	equal(request("preferences/read", Object{}, 200), original("choice-preferences", nil))
-	equal(request("preferences/save", pref, 200), original("choice-preferences", nil))
-	first := object(puts[0])
-	parsedFirst, e := Parse("put", first)
-	if e != nil {
-		t.Fatal(e)
-	}
-	for _, v := range array(parsedFirst["witnesses"]) {
-		tx, e := pool.Begin(ctx)
-		if e != nil {
-			t.Fatal(e)
-		}
-		w, e := reader.WitnessWithin(ctx, tx, actor, object(v))
-		_ = tx.Rollback(ctx)
-		if e != nil {
-			t.Fatal(e)
-		}
-		equal(w, original("choice-witness", object(v)))
-	}
-	for i, v := range puts {
-		put := object(v)
+	request("preferences/read", Object{}, 200)
+	request("preferences/save", Object{"endpoint": endpoint, "expectedRevision": 0, "enabled": true, "snapshotIds": []any{snapshot}}, 200)
+	receipts := []Object{}
+	for i, put := range []Object{base, conflict, resolve} {
 		parsed, e := Parse("put", put)
 		if e != nil {
 			t.Fatal(e)
@@ -167,29 +135,34 @@ func TestOriginalOwnerChoiceSourcesAndReceipt(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		if hash != object(receipts[i])["requestHash"] {
-			t.Fatalf("original intent hash %s %v", hash, receipts[i])
+		receipt := Object{"snapshotId": snapshot, "versionId": put["versionId"], "requestHash": hash}
+		receipts = append(receipts, receipt)
+		first := request("put", put, 200)
+		if first["syncState"] != []string{"synced", "conflict", "synced"}[i] {
+			t.Fatal("unexpected conflict or resolution", first)
 		}
-		out := request("put", put, 200)
-		delete(out, "operationVersionId")
-		delete(out, "syncState")
-		equal(out, original("choice-get", get))
-		equal(request("receipt", object(receipts[i]), 200), original("choice-receipt", object(receipts[i])))
-		equal(request("put", put, 200), original("choice-put", put))
+		replay := request("put", put, 200)
+		if replay["replayed"] != true || replay["operationVersionId"] != put["versionId"] {
+			t.Fatal("missing exact operation replay", replay)
+		}
+		if got := request("receipt", receipt, 200); got["state"] != "acknowledged" {
+			t.Fatal("accepted receipt missing", got)
+		}
 	}
-	equal(request("list", Object{}, 200), original("choice-list", Object{}))
-	original("choice-revoke-root", nil)
-	current := request("get", get, 200)
-	equal(current, original("choice-get", get))
+	request("list", Object{}, 200)
+	if _, e = identity.Service.RevokeConsent(ctx, identity.Actor, grant["consentId"].(string), nil); e != nil {
+		t.Fatal(e)
+	}
+	current := request("get", Object{"snapshotId": snapshot}, 200)
 	if object(object(current["current"])["content"])["visibleRationale"] != nil || object(object(current["current"])["content"])["rationaleUnavailable"] != true {
-		t.Fatal("revoked source retained current rationale")
+		t.Fatal("revoked source retained rationale", current)
 	}
-	receipt := object(receipts[0])
-	equal(request("receipt", receipt, 200), original("choice-receipt", receipt))
-	request("delete", Object{"snapshotId": get["snapshotId"], "expectedRevision": 2}, 200)
-	equal(request("get", get, 200), original("choice-get", get))
-	equal(request("receipt", receipt, 200), original("choice-receipt", receipt))
-	wrong := Object{"snapshotId": receipt["snapshotId"], "versionId": receipt["versionId"], "requestHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	receipt := receipts[0]
+	request("receipt", receipt, 200)
+	request("delete", Object{"snapshotId": snapshot, "expectedRevision": 2}, 200)
+	request("get", Object{"snapshotId": snapshot}, 200)
+	request("receipt", receipt, 200)
+	wrong := Object{"snapshotId": snapshot, "versionId": receipt["versionId"], "requestHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
 	if request("receipt", wrong, 200)["state"] != "conflict" {
 		t.Fatal("mismatched accepted intent")
 	}

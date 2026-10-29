@@ -3,7 +3,6 @@ package feedback
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/attachments"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/feedbackfixture"
 	"github.com/google/uuid"
 )
 
@@ -54,16 +54,10 @@ func (f *fixtureScanner) Scan(context.Context, []byte) (map[string]any, error) {
 }
 
 func TestFeedbackAttachmentOriginalLedgerLifecycle(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	var fixture struct {
-		Accounts []string
-		Endpoint string
-	}
-	if e := json.Unmarshal(nodeFixture(t, dsn, "setup"), &fixture); e != nil {
-		t.Fatal(e)
-	}
+	fixture := feedbackfixture.Create(t, pool)
 	now := time.Unix(2000000000, 0)
 	store := &memoryAttachmentStore{bytes: map[string][]byte{}}
 	scanner := &fixtureScanner{}

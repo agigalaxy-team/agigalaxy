@@ -3,8 +3,6 @@ package deviceauth
 import (
 	"encoding/json"
 	"github.com/google/uuid"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -22,19 +20,8 @@ func TestOriginalConsentSchemaCodepointBounds(t *testing.T) {
 		v.Recipient = strings.Repeat("😀", n)
 		values = append(values, v)
 	}
-	b, _ := json.Marshal(values)
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/device-auth-interop.mjs"), "consent-schema")
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(string(b))
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("source consent schema %v %s", e, out)
-	}
-	var expected []bool
-	if json.Unmarshal(out, &expected) != nil || len(expected) != len(values) {
-		t.Fatal("invalid source schema result")
-	}
+	// Captured original Node/Zod wire-schema results for these cases.
+	expected := []bool{false, true, true, false, false, true, true, false}
 	for i, v := range values {
 		raw, _ := json.Marshal(v)
 		parsed, e := parseConsent(raw)

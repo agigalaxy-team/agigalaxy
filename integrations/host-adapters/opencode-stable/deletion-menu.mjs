@@ -1,4 +1,4 @@
-export function createDeletionMenu({ controller, select, prompt, info, language, isCurrent, onBack, onReturnWork=onBack, canSubmit = true, records = /** @type {ReturnType<import('../local-deletion-records.mjs').createLocalDeletionRecords>|null} */ (null) }) {
+export function createDeletionMenu({ controller, select, prompt, info, language, isCurrent, onBack, onReturnWork=onBack, canSubmit = true, records = /** @type {ReturnType<ReturnType<typeof import('./bridge/host-local-client.mjs').createHostLocalClient>['deletionRecords']>|null} */ (null) }) {
   const zh = language !== 'en-US', label = (a,b) => zh ? a : b;
   const plain = value => String(value ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ').slice(0,1000);
   const names = { requested: ['已申请','Requested'], 'review-needed': ['待补充信息','Information needed'], approved: ['已审核，尚未执行','Approved; not executed'], rejected: ['未获通过','Declined'], cancelled: ['已取消','Cancelled'] };

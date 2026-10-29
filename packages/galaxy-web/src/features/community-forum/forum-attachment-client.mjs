@@ -1,5 +1,5 @@
 import * as z from 'zod/v4';
-import {forumAttachmentPrepareSchema,forumAttachmentSourceSchema} from "../../../../galaxy-official/src/shared/forum-attachments-v1-schema.mjs";
+import {forumAttachmentPrepareSchema,forumAttachmentSourceSchema} from "../../../../galaxy-contracts/src/forum-attachments-v1-schema.mjs";
 
 const states=['preparing','prepared','uploading','unconfirmed','failed','scan-pending','scanning','available','blocked','erased','revoked','expired','unavailable'];
 export const forumDraftAttachmentSchema=forumAttachmentPrepareSchema.omit({attachmentId:true}).partial({name:true,mediaType:true,size:true}).extend({id:z.uuid(),state:z.enum(states),existing:z.boolean().default(false),uploadRetryAt:z.string().nullable().optional(),uploadRetryable:z.boolean().optional()}).refine(value=>value.existing||!!value.name&&!!value.mediaType&&!!value.size);

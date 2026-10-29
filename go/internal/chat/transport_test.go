@@ -10,7 +10,7 @@ import (
 
 func TestComponentReconnectKeepsUnknownOperationAndStops(t *testing.T) {
 	f := fakeArchive(t)
-	transport, e := NewComponentTransport("xmpp://"+f.listener.Addr().String(), "gateway.example.invalid", "rooms.example.invalid", testSecret, 2*time.Second)
+	transport, e := NewComponentTransport("xmpp://"+f.Listener.Addr().String(), "gateway.example.invalid", "rooms.example.invalid", testSecret, 2*time.Second)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -23,19 +23,19 @@ func TestComponentReconnectKeepsUnknownOperationAndStops(t *testing.T) {
 	if e != nil || !truth(probe, "authenticatedGateway") || truth(probe, "bodyReturned") {
 		t.Fatalf("probe: %v %v", probe, e)
 	}
-	f.mu.Lock()
-	f.probeBody = `<query xmlns='http://jabber.org/protocol/disco#info'><identity category='conference' type='text'/><feature var='http://jabber.org/protocol/muc'/><item jid='room-private'/></query>`
-	f.mu.Unlock()
+	f.Mu.Lock()
+	f.ProbeBody = `<query xmlns='http://jabber.org/protocol/disco#info'><identity category='conference' type='text'/><feature var='http://jabber.org/protocol/muc'/><item jid='room-private'/></query>`
+	f.Mu.Unlock()
 	if _, e = transport.Probe(ctx); fault.Code(e) != "chat_transport_invalid_reply" {
 		t.Fatalf("probe accepted room item: %v", e)
 	}
-	f.mu.Lock()
-	f.probeBody = ""
-	f.mu.Unlock()
+	f.Mu.Lock()
+	f.ProbeBody = ""
+	f.Mu.Unlock()
 	id := uuid.NewString()
-	f.mu.Lock()
-	f.loseNext = true
-	f.mu.Unlock()
+	f.Mu.Lock()
+	f.LoseNext = true
+	f.Mu.Unlock()
 	result := make(chan error, 1)
 	go func() {
 		_, e := transport.Command(ctx, "send", Object{"messageId": id, "text": "原操作"})
@@ -50,12 +50,12 @@ func TestComponentReconnectKeepsUnknownOperationAndStops(t *testing.T) {
 		case <-deadline:
 			t.Fatal("send not received")
 		case <-ticker.C:
-			f.mu.Lock()
-			sent = len(f.sendIDs) == 1
+			f.Mu.Lock()
+			sent = len(f.SendIDs) == 1
 			if sent {
-				f.connections[0].Close()
+				f.Connections[0].Close()
 			}
-			f.mu.Unlock()
+			f.Mu.Unlock()
 		}
 	}
 	select {
@@ -72,10 +72,10 @@ func TestComponentReconnectKeepsUnknownOperationAndStops(t *testing.T) {
 		case <-deadline:
 			t.Fatal("component did not reconnect")
 		case <-ticker.C:
-			f.mu.Lock()
-			connected = len(f.connections) >= 2
-			commands := len(f.sendIDs)
-			f.mu.Unlock()
+			f.Mu.Lock()
+			connected = len(f.Connections) >= 2
+			commands := len(f.SendIDs)
+			f.Mu.Unlock()
 			connected = connected && transport.Available()
 			if commands != 1 {
 				t.Fatal("reconnect replayed a command")
@@ -86,19 +86,19 @@ func TestComponentReconnectKeepsUnknownOperationAndStops(t *testing.T) {
 	if e != nil || str(ack, "archiveId") != id {
 		t.Fatalf("reconcile: %v %v", ack, e)
 	}
-	f.mu.Lock()
-	if len(f.bodies) != 1 {
+	f.Mu.Lock()
+	if len(f.Bodies) != 1 {
 		t.Fatal("reconcile created duplicate archive")
 	}
-	count := len(f.connections)
-	f.mu.Unlock()
+	count := len(f.Connections)
+	f.Mu.Unlock()
 	transport.Stop()
 	timer := time.NewTimer(1200 * time.Millisecond)
 	defer timer.Stop()
 	<-timer.C
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if len(f.connections) != count || transport.Available() {
+	f.Mu.Lock()
+	defer f.Mu.Unlock()
+	if len(f.Connections) != count || transport.Available() {
 		t.Fatal("Stop did not cancel reconnect")
 	}
 }

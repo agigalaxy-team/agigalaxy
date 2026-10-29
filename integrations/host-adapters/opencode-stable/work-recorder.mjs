@@ -1,6 +1,6 @@
 import {createHostLocalClient} from './bridge/host-local-client.mjs';
 import {createOpenCodeWorkSummarizer} from './work-summarizer.mjs';
-import {nativeDiagnostics} from '../../../packages/galaxy-edge-mcp/src/native-v2/diagnostics.mjs';
+import {nativeDiagnostics} from './bridge/native-diagnostics.mjs';
 
 const asTime = value => Number.isFinite(value) && value >= 0 ? new Date(value).toISOString() : undefined;
 const modelName = model => model && typeof model.providerID === 'string' && typeof (model.modelID ?? model.id) === 'string'
@@ -10,15 +10,15 @@ const short = (value, length = 1200) => typeof value === 'string' ? value.slice(
 const content = text => ({excerpt: short(text), originalLength: typeof text === 'string' ? text.length : 0,
   retained: text ? 'excerpt' : 'none', availableFromHost: true});
 
-/** @typedef {string | {id?: string, subjectId?: string, createdAt?: string} | null | undefined} WorkRecorderIdentity */
+/** @typedef {ReturnType<typeof createHostLocalClient>} HostPersistence */
 
 /** Uses the public TuiPluginApi event bus and state. It observes the current
  * foreground session only, never enumerates other host sessions or creates a
  * background reader/model. State reconciliation also covers reconnect/restart.
  * @param {*} api
- * @param {{dataDirectory?: string, getIdentity?: (directory: string) => WorkRecorderIdentity | Promise<WorkRecorderIdentity>, history?: Pick<ReturnType<typeof import('../../../packages/galaxy-core/src/work-history/index.mjs').createLocalWorkHistory>, 'identity'|'beginCapture'|'observeEnvironment'|'observe'|'list'|'get'|'pending'|'setSummaryState'|'submitSummary'>, archive?: Pick<ReturnType<typeof import('../../../packages/galaxy-core/src/conversation-archive/index.mjs').createLocalConversationArchive>, 'settings'|'captureMessage'|'configure'>, onSessionComplete?: (input: {galaxyId: string, host: string, sessionId: string}) => unknown | Promise<unknown>, pollMs?: number}} [options]
+ * @param {{dataDirectory?: string, history?: HostPersistence['history'], archive?: HostPersistence['archive'], onSessionComplete?: (input: {galaxyId: string, host: string, sessionId: string}) => unknown | Promise<unknown>, pollMs?: number}} [options]
  */
-export function createOpenCodeWorkRecorder(api, {dataDirectory, getIdentity, history, archive, onSessionComplete, pollMs = 2000} = {}) {
+export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive, onSessionComplete, pollMs = 2000} = {}) {
   const persistence=history?null:createHostLocalClient({localOnly:true,dataDirectory});
   history??=persistence.history;archive??=persistence?.archive;
   const diagnostics=nativeDiagnostics('host-client');

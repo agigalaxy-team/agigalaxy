@@ -22,12 +22,10 @@ func TestAutonomyTaskTransportUsesOriginalScopeAndNeverReplaysLostPOST(t *testin
 		if r.Header.Get("X-Galaxy-Service-Key") != serviceKey {
 			t.Error("missing original service authentication")
 		}
-		var signed Object
-		original(t, Object{"kind": "token", "key": key, "token": strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")}, &signed)
-		claims := object(signed["claims"])
+		claims, valid := verifyFixtureToken(key, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 		issued, _ := index(claims["iat"])
 		expires, _ := index(claims["exp"])
-		if signed["valid"] != true || claims["sub"] != "autonomy:"+taskID || claims["scope"] != "task" || claims["taskId"] != taskID || claims["planId"] != planID || claims["accountId"] != accountID || claims["delegationVersion"] != nil || expires-issued != 60 {
+		if !valid || claims["sub"] != "autonomy:"+taskID || claims["scope"] != "task" || claims["taskId"] != taskID || claims["planId"] != planID || claims["accountId"] != accountID || claims["delegationVersion"] != nil || expires-issued != 60 {
 			t.Error("original task token scope differs")
 		}
 		if r.Method == "POST" {

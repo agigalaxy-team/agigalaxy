@@ -3,6 +3,7 @@ package workerconfig
 import (
 	"context"
 	"encoding/json"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
@@ -13,24 +14,24 @@ import (
 	"time"
 )
 
-// One combined handoff fixture. The original complete JS migration creates the
-// pg-boss schema; original PgBoss sends both selected jobs and actually forwards
+// One combined handoff fixture. Current Go migrations create the pg-boss
+// schema; the real PgBoss sends both selected jobs and actually forwards
 // the recurring minute. No application worker, model, SMTP or publisher runs.
 func TestLegacyPendingAdoptionAndRecurringSlotHandoff(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
+	if _, e := databaseschema.Migrate(ctx, pool, nil); e != nil {
+		t.Fatal(e)
+	}
 	root, _ := filepath.Abs("../../..")
-	script := `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';
-import {PgBoss} from './packages/galaxy-official/node_modules/pg-boss/dist/index.js';
-import {migrate} from './packages/galaxy-official/src/infrastructure/database.mjs';
-import {operationsDatabase,createOperationsJobs} from './packages/galaxy-official/src/operations/jobs/service.mjs';
+	script := `import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),pg=require('pg'),{PgBoss}=require('pg-boss');
 import {randomUUID} from 'node:crypto';
 const url=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(url.hostname!=='127.0.0.1'||!/^\/galaxy_go_test_[a-z0-9_]+$/.test(url.pathname))throw Error('isolated database required');
 const db=new pg.Pool({connectionString:url.href,max:4}),endpoint='https://adoption.example.invalid',runId=randomUUID(),planId=randomUUID(),operator='isolated-adoption';
 let boss;const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 try{
- await migrate(db);
  await db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://issuer.invalid',$1,'Isolated handoff metadata',now(),now())",[operator,endpoint]);
  await db.query("INSERT INTO operations_retention_runs_v1(id,endpoint,target,state,requested_by,request_actor,created_at,updated_at) VALUES($1,$2,'data-exports','queued',$3,$4,now(),now())",[runId,endpoint,operator,{kind:'business-operator',endpoint,operatorId:operator,role:'administrator'}]);
  const config={channels:['inapp'],content:{purpose:'service-update',title:'Isolated handoff',body:'No delivery consumer is started',expiresAt:new Date(Date.now()+3600000).toISOString()},audience:{kind:'attributes',subjectTypes:['person']},schedule:{kind:'recurring',cron:'* * * * * *',timezone:'UTC'}};
@@ -38,21 +39,21 @@ try{
  await db.query("INSERT INTO operations_messaging_versions_v1(plan_id,version,config,created_by,created_at) VALUES($1,1,$2,$3,now())",[planId,config,operator]);
  // Avoid crossing a minute while the small Go transaction assertions run.
  const remaining=60000-Date.now()%60000;if(remaining<20000)await delay(remaining+100);
- boss=new PgBoss({db:operationsDatabase(db),schema:'galaxy_jobs',migrate:false,createSchema:false,schedule:true,supervise:false,cronMonitorIntervalSeconds:1,registerInstance:false,persistQueueStats:false,persistWarnings:false});
+ boss=new PgBoss({db:{executeSql:(text,values)=>db.query(text,values)},schema:'galaxy_jobs',migrate:false,createSchema:false,schedule:true,supervise:false,cronMonitorIntervalSeconds:1,registerInstance:false,persistQueueStats:false,persistWarnings:false});
  await boss.start();
  const selectedId=await boss.send('retention-cleanup',{runId},{singletonKey:'retention:'+runId});
  await db.query('UPDATE operations_retention_runs_v1 SET job_id=$2 WHERE id=$1',[runId,selectedId]);
  const activeId=await boss.send('retention-cleanup',{runId},{singletonKey:'controlled-active:'+runId});
  await db.query("UPDATE galaxy_jobs.job SET state='active',started_on=now() WHERE id=$1",[activeId]);
- const key=planId,businessKey='messaging:'+planId,original=createOperationsJobs({db,boss});
+ const key=planId,businessKey='messaging:'+planId;
  // Preserve the real legacy defect: its business-derived colon key is passed
  // unchanged and is rejected. The next definition is a controlled, valid-key
- // legacy record through the same real wrapper, not a successful old plan flow.
+ // legacy record through the same real scheduler, not a successful old plan flow.
  let legacyColonRejected=false;
- try{await original.schedule('messaging-run','* * * * * *',{planId,planVersion:1},{key:businessKey,timezone:'UTC',missed:'skip'});}
+ try{await boss.schedule('messaging-run','* * * * * *',{planId,planVersion:1},{key:businessKey,tz:'UTC',missed:'skip'});}
  catch(error){if(error.code!=='ERR_ASSERTION')throw error;legacyColonRejected=true;}
  if(!legacyColonRejected)throw Error('expected legacy colon key rejection was not observed');
- await original.schedule('messaging-run','* * * * * *',{planId,planVersion:1},{key,timezone:'UTC',missed:'skip'});
+ await boss.schedule('messaging-run','* * * * * *',{planId,planVersion:1},{key,tz:'UTC',missed:'skip'});
  let fired;const deadline=Date.now()+15000;
  while(Date.now()<deadline){
   fired=(await db.query("SELECT j.id AS job_id,to_char(f.singleton_on,'YYYY-MM-DD HH24:MI:SS') AS slot FROM galaxy_jobs.schedule s JOIN galaxy_jobs.job j ON j.id=s.last_job_id JOIN galaxy_jobs.job f ON f.name='__pgboss__send-it' AND f.data->>'name'=s.name AND f.data->>'key'=s.key AND f.state='completed' WHERE s.name='messaging-run' AND s.key=$1 ORDER BY f.singleton_on DESC LIMIT 1",[key])).rows[0];

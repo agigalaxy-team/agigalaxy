@@ -12,36 +12,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 )
 
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/cases/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	raw, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original Case %s %v %s", mode, e, stderr.String())
-	}
-	var out Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if json.Unmarshal(line, &out) == nil && out != nil {
-			return out
-		}
-	}
-	t.Fatal("fixture output")
-	return nil
-}
 func same(t *testing.T, a, b any) {
 	t.Helper()
 	var x, y any
@@ -52,23 +27,9 @@ func same(t *testing.T, a, b any) {
 	}
 }
 func TestOriginalCaseLedgerHTTPTransactionsAndFacts(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "case-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
-	var f struct {
-		Endpoint                                                                    string
-		Clock                                                                       int64
-		Owner                                                                       struct{ Subject, Token string }
-		Root, Seed, Attempt, Result, Review, Rollback, Uncreated, NewRoot, NewGrant Object
-		Requests                                                                    []Object
-		V2root                                                                      Object
-		V2events, V2requests                                                        []Object
-	}
-	if e := json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
-	}
+	f := setupCases(t, owner)
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -147,7 +108,7 @@ func TestOriginalCaseLedgerHTTPTransactionsAndFacts(t *testing.T) {
 	if fault.Code(e) != "source_access_unavailable" {
 		t.Fatal(e)
 	}
-	original := node(t, dsn, "read", path, nil)
+	original := fixtureValue(t, "read")
 	got, e := svc.Get(ctx, a, text(f.Root, "id"))
 	if e != nil {
 		t.Fatal(e)
@@ -169,6 +130,13 @@ func TestOriginalCaseLedgerHTTPTransactionsAndFacts(t *testing.T) {
 		if e != nil {
 			return nil, e
 		}
+		// The new attempt's implicit startedAt is the persisted database
+		// creation instant; all other original facts remain fixed.
+		var created time.Time
+		if e := owner.QueryRow(ctx, `SELECT created_at FROM case_events WHERE id=$1`, f.Attempt["id"]).Scan(&created); e != nil {
+			t.Fatal(e)
+		}
+		object(list(object(original["facts"])["attempts"])[0])["startedAt"] = created.UTC().Format("2006-01-02T15:04:05.000Z")
 		same(t, c["facts"], original["facts"])
 		return c, nil
 	})
@@ -179,7 +147,7 @@ func TestOriginalCaseLedgerHTTPTransactionsAndFacts(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	expected := node(t, dsn, "v2", path, nil)
+	expected := fixtureValue(t, "v2")
 	got, e = svc.GetV2(ctx, a, text(f.V2root, "caseId"), []byte(`{}`))
 	if e != nil {
 		t.Fatal(e)

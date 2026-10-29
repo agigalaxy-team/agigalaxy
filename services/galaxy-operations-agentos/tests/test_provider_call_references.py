@@ -1,4 +1,4 @@
-"""Real Agno/OpenAI SSE, Node bind/PGlite and native SQLite; no provider."""
+"""Real Agno/OpenAI SSE, current contract transport and native SQLite; no provider."""
 import base64
 import copy
 from dataclasses import dataclass
@@ -109,7 +109,7 @@ class ProviderReferenceTest(unittest.TestCase):
         self.assertEqual(parsed[0]['id'],raw)
         self.assertEqual(len(parsed[0]['id']),11)
         self.assertEqual(parsed[0]['function']['arguments'],'{}')
-    def test_real_sdk_two_http_requests_echo_complete_signature_node_stores_short_ref_and_reload_is_idempotent(self):
+    def test_real_sdk_two_http_requests_echo_complete_signature_gateway_sends_short_ref_and_reload_is_idempotent(self):
         for length in (1139,4423):
             with self.subTest(length=length):
                 raw,signature=signature_id(length);requests=[]
@@ -153,9 +153,13 @@ class ProviderReferenceTest(unittest.TestCase):
                 self.assertEqual(again['run_data']['tools'][0]['tool_call_id'],ref)
                 projected=conversation_storage_fields(original['run_data'],reference_ids=True)
                 self.assertIsNone(projected['tools'][0]['tool_call_id'])
-                # Retrying this exact local tracking request never creates a new ledger key.
+                # Retrying sends the same bounded reference. The current Go conversation
+                # tests own durable bind/ledger replay; this fixture records transport only.
                 self.gateway.conversation_summary('conversation:'+conversation,run_id=run,call_id=raw,session_id=session,turn_id=operation)
-                after=self.inspect_node();self.assertEqual(sum(item['native_run_id']==run for item in after['rows']),1)
+                after=self.inspect_node();retried=[item for item in after['rows'] if item['native_run_id']==run]
+                self.assertEqual(len(retried),2)
+                self.assertEqual([item['call_id'] for item in retried],[ref,ref])
+                self.assertEqual(after['boundary'],'current-shared-call-id-schema; durable-ledger-owned-by-Go')
                 self.assertLessEqual(after['maxLength'],200)
                 self.previous_runs={item['native_run_id']for item in after['rows']}
     def test_duty_private_sdk_pause_and_continuation_keep_original_coordinate_public_views_do_not(self):

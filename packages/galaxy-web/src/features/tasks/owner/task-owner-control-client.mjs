@@ -1,6 +1,6 @@
-import {sha256Hex} from "../../../../../galaxy-official/src/shared/web-primitives.mjs";
-import {taskOwnerControlEnvelopeV2Schema,taskOwnerControlPreviewV2Schema,taskOwnerControlResultV2Schema} from "../../../../../galaxy-official/src/shared/task-owner-control-v2-schema.mjs";
-import {taskEnvelopeV2Schema,participationProposalV2Schema,participationEventV2Schema} from "../../../../../galaxy-official/src/shared/task-schema-v2.mjs";
+import {sha256Hex} from "../../../../../galaxy-contracts/src/web-primitives.mjs";
+import {taskOwnerControlEnvelopeV2Schema,taskOwnerControlPreviewV2Schema,taskOwnerControlResultV2Schema} from "../../../../../galaxy-contracts/src/task-owner-control-v2-schema.mjs";
+import {taskEnvelopeV2Schema,participationProposalV2Schema,participationEventV2Schema} from "../../../../../galaxy-contracts/src/task-schema-v2.mjs";
 
 const clients=new WeakMap(),copy=value=>structuredClone(value),equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code});};

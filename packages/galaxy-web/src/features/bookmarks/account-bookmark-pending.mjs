@@ -1,4 +1,4 @@
-import {readingBookmarkReferenceSchema,readingBookmarkKey} from "../../../../galaxy-official/src/shared/reading-bookmarks-v1-schema.mjs";
+import {readingBookmarkReferenceSchema,readingBookmarkKey} from "../../../../galaxy-contracts/src/reading-bookmarks-v1-schema.mjs";
 
 let storage;
 function journal(){

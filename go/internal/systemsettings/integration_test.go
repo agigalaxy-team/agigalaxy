@@ -57,24 +57,7 @@ func (d currentRoles) RolesFresh(ctx context.Context, i, sub string) ([]string, 
 func TestSettingsDurableNativeMailBridgeAndGeneralPublicationTransaction(t *testing.T) {
 	admin, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string, input object) object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/system-settings-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		cmd.Stdin = strings.NewReader(encode(input))
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o object
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid source result")
-		}
-		return o
-	}
-	base := node("setup", object{})
+	base := settingsFixture(t, admin)
 	endpoint, issuer := str(base["endpoint"]), str(base["issuer"])
 	now := func() time.Time { return time.Unix(2000000000, 0) }
 	key := strings.Repeat("K", 40)
@@ -311,11 +294,53 @@ func TestSettingsDurableNativeMailBridgeAndGeneralPublicationTransaction(t *test
 		json.Unmarshal([]byte(encode(a)), &left)
 		json.Unmarshal([]byte(encode(b)), &right)
 		if !reflect.DeepEqual(left, right) {
-			t.Fatalf("%s\nGo%s\nJS%s", label, encode(a), encode(b))
+			t.Fatalf("%s\nGo%s\nReference%s", label, encode(a), encode(b))
 		}
 	}
+	reference := &s.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, StoredAuthority: gateway.StoredOperators(), Native: native, Now: now}
+	referenceGeneral := &s.General{Settings: reference, WebsiteOrigin: "https://website.example.invalid", Client: &http.Client{Transport: routed{origin}}}
+	referenceActor := func() (s.Actor, error) {
+		r := httptest.NewRequest("POST", "https://admin.example.invalid/v1/operations/system-settings/mail/versions", nil)
+		r.Header.Set("Origin", "https://admin.example.invalid")
+		r.Header.Set("X-Galaxy-Operator-CSRF", strings.Repeat("C", 43))
+		r.AddCookie(&http.Cookie{Name: "__Host-galaxy-operator", Value: strings.Repeat("E", 43)})
+		return gateway.AuthorizeOperations(r, true, "")
+	}
+	read := func(value object, err error) object {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
 	original := func(mode, section, id string, input object) object {
-		return node(mode, object{"origin": host.URL, "section": section, "id": id, "input": input})
+		t.Helper()
+		actor, err := referenceActor()
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch mode {
+		case "read":
+			return read(reference.Read(ctx, actor, section))
+		case "overview":
+			return read(reference.Overview(ctx, actor))
+		case "advanced":
+			return read(reference.Advanced(ctx, actor))
+		case "history":
+			if input == nil {
+				input = object{}
+			}
+			return read(reference.History(ctx, actor, section, input))
+		case "operation":
+			return read(reference.Operation(ctx, actor, id))
+		case "general-source":
+			return read(referenceGeneral.Source(ctx, actor))
+		case "general-operation":
+			return read(referenceGeneral.Operation(ctx, actor, id))
+		default:
+			t.Fatal("unexpected current settings view " + mode)
+		}
+		return nil
 	}
 	status, out := request("GET", "/mail", nil)
 	check(status, out)
@@ -326,7 +351,11 @@ func TestSettingsDurableNativeMailBridgeAndGeneralPublicationTransaction(t *test
 	status, out = request("POST", "/mail/versions", save)
 	check(status, out)
 	version := obj(out["version"])
-	sourceSaved := node("command", object{"origin": host.URL, "section": "mail", "kind": "save", "input": save})
+	referenceEditor, err := referenceActor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceSaved := read(reference.Command(ctx, referenceEditor, "mail", "save", save, referenceActor))
 	sourceSaved["replayed"] = out["replayed"]
 	equal("original saved operation", out, sourceSaved)
 	incomplete := object{"operationId": uuid.NewString(), "expectedRevision": 1, "versionId": version["id"]}
@@ -450,7 +479,18 @@ func TestSettingsDurableNativeMailBridgeAndGeneralPublicationTransaction(t *test
 	if adopted["state"] != "recorded" {
 		t.Fatalf("same SMTP actual adoption %s", encode(adopted))
 	}
-	sourceAdoption := node("mail-adoption", object{"origin": host.URL, "metadataFile": metadataFile, "credentialFile": credentialFile})
+	adoptionBytes, err := os.ReadFile("testdata/settings-mail-adoption.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sourceAdoption object
+	if err = json.Unmarshal(adoptionBytes, &sourceAdoption); err != nil {
+		t.Fatal(err)
+	}
+	obj(sourceAdoption["result"])["versionId"] = version["id"]
+	receiptFixture := obj(sourceAdoption["receipt"])
+	receiptFixture["versionId"], receiptFixture["credentialFile"] = version["id"], credentialFile
+	obj(receiptFixture["configuration"])["credentialRef"] = "system-key-" + credentialID
 	equal("original actual mail adoption", object{"result": adopted, "receipt": adoptedReceipt}, sourceAdoption)
 	if strings.Contains(encode(adoptedReceipt), "isolated-password") {
 		t.Fatal("SMTP credential leaked to receipt")
@@ -477,10 +517,19 @@ func TestSettingsDurableNativeMailBridgeAndGeneralPublicationTransaction(t *test
 	mu.Lock()
 	requests := append([]any(nil), wire...)
 	mu.Unlock()
-	verified := node("wire", object{"key": key, "requests": requests})
+	wireVerifier := exec.Command("node", "testdata/verify-maintenance-wire.mjs")
+	wireVerifier.Stdin = strings.NewReader(encode(object{"key": key, "requests": requests}))
+	wireResult, err := wireVerifier.CombinedOutput()
+	if err != nil {
+		t.Fatalf("independent HMAC bytes %v %s", err, wireResult)
+	}
+	var verified object
+	if err = json.Unmarshal(wireResult, &verified); err != nil {
+		t.Fatal(err)
+	}
 	for _, v := range verified["results"].([]any) {
 		if v != true {
-			t.Fatal("original Node HMAC verifier rejected exact Go bytes")
+			t.Fatal("independent Node HMAC verifier rejected exact Go bytes")
 		}
 	}
 }

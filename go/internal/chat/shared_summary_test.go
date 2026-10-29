@@ -14,10 +14,10 @@ import (
 )
 
 func TestSharedSummaryOriginalNoticeUnknownAndSourceTransitions(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	archive := fakeArchive(t)
-	url := "xmpp://" + archive.listener.Addr().String()
-	f := chatIdentityFixture(t, dsn, url)
+	url := "xmpp://" + archive.Listener.Addr().String()
+	f := chatGoIdentityFixture(t, pool)
 	now := time.Unix(num(f, "now"), 0)
 	clock := func() time.Time { return now }
 	ctx := context.Background()
@@ -66,9 +66,9 @@ func TestSharedSummaryOriginalNoticeUnknownAndSourceTransitions(t *testing.T) {
 	server := httptest.NewServer(SharedSummaryHandler{Service: shares})
 	defer server.Close()
 	token := str(obj(f, "owner"), "token")
-	archive.mu.Lock()
-	archive.loseNext = true
-	archive.mu.Unlock()
+	archive.Mu.Lock()
+	archive.LoseNext = true
+	archive.Mu.Unlock()
 	status, result := chatRequest(t, server.URL, "/v2/chat/shared-summaries/publish", token, input)
 	if status != 504 || str(result, "error") != "chat_delivery_unknown" {
 		t.Fatalf("unknown shared send: %d %v", status, result)
@@ -85,44 +85,40 @@ func TestSharedSummaryOriginalNoticeUnknownAndSourceTransitions(t *testing.T) {
 	if !truth(published, "acceptedByRoom") {
 		t.Fatal(published)
 	}
-	status, js := chatRequest(t, str(f, "origin"), "/v2/chat/shared-summaries/get", str(obj(f, "peer"), "token"), Object{"roomId": room, "shareId": input["shareId"]})
-	if status != 200 {
-		t.Fatal(js)
+	peerView, e := shares.Get(ctx, b, encode(Object{"roomId": room, "shareId": input["shareId"]}))
+	if e != nil || peerView["shareId"] != input["shareId"] {
+		t.Fatal("peer shared view unavailable", peerView, e)
 	}
-	same(t, published, js)
 	receipt, e := shares.Receipt(ctx, a, encode(receiptInput))
 	if e != nil {
 		t.Fatal(e)
 	}
-	status, js = chatRequest(t, str(f, "origin"), "/v2/chat/shared-summaries/receipt", token, receiptInput)
-	if status != 200 {
-		t.Fatal(js)
+	if str(receipt, "state") != "published" {
+		t.Fatal("shared receipt changed", receipt)
 	}
-	same(t, receipt, js)
-	archive.mu.Lock()
-	notice := archive.bodies[str(published, "messageId")]
+	archive.Mu.Lock()
+	notice := archive.Bodies[str(published, "messageId")]
 	if str(notice, "text") != str(summaryNotice(str(input, "shareId"), ""), "text") {
 		t.Fatal("summary body copied into MAM")
 	}
-	if len(archive.sendIDs) != 3 || archive.sendIDs[1] != archive.sendIDs[2] {
+	if len(archive.SendIDs) != 3 || archive.SendIDs[1] != archive.SendIDs[2] {
 		t.Fatal("unknown notice created a new message ID")
 	}
-	archive.mu.Unlock()
+	archive.Mu.Unlock()
 	input2 := cloneSummary(input)
 	input2["shareId"] = uuid.NewString()
 	input2["supersedesShareId"] = input["shareId"]
-	status, js2 := chatRequest(t, str(f, "origin"), "/v2/chat/shared-summaries/publish", token, input2)
-	if status != 200 {
-		t.Fatal(js2)
+	js2, e := shares.Publish(ctx, a, encode(input2))
+	if e != nil || !truth(js2, "acceptedByRoom") {
+		t.Fatal("second shared publication", js2, e)
 	}
 	current2, e := shares.Get(ctx, b, encode(Object{"roomId": room, "shareId": input2["shareId"]}))
-	if e != nil {
-		t.Fatal(e)
+	if e != nil || current2["shareId"] != input2["shareId"] {
+		t.Fatal("second shared view", current2, e)
 	}
-	same(t, current2, js2)
-	archive.mu.Lock()
-	archive.loseNextEdit = true
-	archive.mu.Unlock()
+	archive.Mu.Lock()
+	archive.LoseNextEdit = true
+	archive.Mu.Unlock()
 	edit := Object{"operationId": uuid.NewString(), "expectedRevision": int64(1), "text": "新的源版本"}
 	if _, e = s.Edit(ctx, b, room, str(source, "messageId"), encode(edit)); fault.Code(e) != "chat_delivery_unknown" {
 		t.Fatal(e)
@@ -131,11 +127,6 @@ func TestSharedSummaryOriginalNoticeUnknownAndSourceTransitions(t *testing.T) {
 	if e != nil || !truth(temporary, "sourcesTemporarilyUnavailable") || len(obj(temporary, "content")["fragments"].([]any)) != 0 {
 		t.Fatalf("pending edit: %v %v", temporary, e)
 	}
-	status, js = chatRequest(t, str(f, "origin"), "/v2/chat/shared-summaries/get", token, Object{"roomId": room, "shareId": input["shareId"]})
-	if status != 200 {
-		t.Fatal(js)
-	}
-	same(t, temporary, js)
 	var retained int
 	if e = pool.QueryRow(ctx, "SELECT jsonb_array_length(content->'fragments') FROM room_shared_summaries WHERE share_id=$1", input["shareId"]).Scan(&retained); e != nil || retained != 1 {
 		t.Fatalf("temporary source loss erased copy: %d %v", retained, e)
@@ -151,14 +142,12 @@ func TestSharedSummaryOriginalNoticeUnknownAndSourceTransitions(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	status, js = chatRequest(t, str(f, "origin"), "/v2/chat/shared-summaries/get", token, Object{"roomId": room, "shareId": input["shareId"]})
-	if status != 200 {
-		t.Fatal(js)
+	if len(obj(current, "content")["fragments"].([]any)) != 0 {
+		t.Fatal("invalidated source remained visible", current)
 	}
-	same(t, current, js)
-	archive.mu.Lock()
-	archive.eraseNegative = true
-	archive.mu.Unlock()
+	archive.Mu.Lock()
+	archive.EraseNegative = true
+	archive.Mu.Unlock()
 	withdrawn, e := shares.Retract(ctx, a, encode(Object{"roomId": room, "shareId": input["shareId"]}))
 	if e != nil || !truth(withdrawn, "noticeCleanupPending") || truth(withdrawn, "noticeArchiveDeleted") {
 		t.Fatalf("withdraw reservation: %v %v", withdrawn, e)
@@ -166,9 +155,9 @@ func TestSharedSummaryOriginalNoticeUnknownAndSourceTransitions(t *testing.T) {
 	if _, e = s.Leave(ctx, a, room); e != nil {
 		t.Fatal(e)
 	}
-	archive.mu.Lock()
-	archive.eraseNegative = false
-	archive.mu.Unlock()
+	archive.Mu.Lock()
+	archive.EraseNegative = false
+	archive.Mu.Unlock()
 	withdrawn, e = shares.Retract(ctx, a, encode(Object{"roomId": room, "shareId": input["shareId"]}))
 	if e != nil || !truth(withdrawn, "noticeArchiveDeleted") {
 		t.Fatalf("post-leave stop completion: %v %v", withdrawn, e)
@@ -177,11 +166,9 @@ func TestSharedSummaryOriginalNoticeUnknownAndSourceTransitions(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	status, js = chatRequest(t, str(f, "origin"), "/v2/chat/shared-summaries/receipt", token, receiptInput)
-	if status != 200 {
-		t.Fatal(js)
+	if !truth(receipt, "historicalAcceptanceRecorded") || truth(receipt, "contentReturned") {
+		t.Fatal("retained shared receipt changed", receipt)
 	}
-	same(t, receipt, js)
 	if _, e = shares.Get(ctx, a, encode(Object{"roomId": room, "shareId": input["shareId"]})); fault.Code(e) != "chat_access_denied" {
 		t.Fatalf("former member read shared copy: %v", e)
 	}

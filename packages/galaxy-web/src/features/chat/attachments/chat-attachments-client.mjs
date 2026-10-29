@@ -1,4 +1,4 @@
-import {attachmentPrepareSchema} from "../../../../../galaxy-official/src/shared/chat-attachments-schema.mjs";
+import {attachmentPrepareSchema} from "../../../../../galaxy-contracts/src/chat-attachments-schema.mjs";
 const sha=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
 const operations=new WeakMap();
 const storedStates=new Set(['scan-pending','scanning','available','blocked','erased','revoked','expired']);

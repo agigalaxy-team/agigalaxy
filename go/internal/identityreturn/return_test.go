@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -39,10 +40,15 @@ func node(t *testing.T, script string, args ...string) map[string]json.RawMessag
 	return result
 }
 func TestOriginalHTMLBytesCSPAndAcceptNegotiation(t *testing.T) {
-	script := `import {readFile} from 'node:fs/promises';import {runInNewContext} from 'node:vm';import {createHash,randomUUID} from 'node:crypto';const source=await readFile('packages/galaxy-official/src/adapters/http/identity-callback-page.mjs','utf8');const {page,acceptsIdentityCallbackHtml,styleHash,scriptHash}=runInNewContext(source.replace(/^import .+;\r?$/gm,'').replace(/^export /gm,'')+';({page,acceptsIdentityCallbackHtml,styleHash,scriptHash})',{createHash,randomUUID,ServiceError:class extends Error{}});const variants=[[true,200,true,false],[false,409,true,false],[false,500,true,false],[false,404,true,true],[false,400,false,false],[false,503,false,false]];const accept=JSON.parse(process.argv[1]);console.log(JSON.stringify({pages:variants.map(([success,status,association,expiredReturn])=>page(success,status,association,{expiredReturn})),styleHash,scriptHash,negotiation:accept.map(headers=>acceptsIdentityCallbackHtml({headers}))}));`
 	vectors := []map[string]string{{}, {"accept": "application/json"}, {"accept": "text/html"}, {"accept": "text/html;q=0,application/json"}, {"accept": "text/html;q=.5,application/json;q=1"}, {"accept": "text/html;q=.5,application/json;q=.4"}, {"accept": "text/html;q=1,application/json;q=1"}, {"accept": "text/html,application/xhtml+xml;q=.9,*/*;q=.8"}, {"accept": "text/html", "sec-fetch-mode": "cors"}, {"accept": "text/html", "sec-fetch-mode": "navigate"}, {"accept": "text/html;q=Infinity"}, {"accept": "text/html;q=2"}, {"accept": "text/html;q=0x1,application/json;q=0"}, {"accept": "text/html;q=1,text/html;q=0"}, {"accept": "text/html ;q=1"}, {"accept": "text/html;q="}, {"accept": "text/html;q=.5;q=0"}}
-	raw, _ := json.Marshal(vectors)
-	original := node(t, script, string(raw))
+	raw, e := os.ReadFile("testdata/original-page.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	var original map[string]json.RawMessage
+	if e = json.Unmarshal(raw, &original); e != nil {
+		t.Fatal(e)
+	}
 	var pages []string
 	_ = json.Unmarshal(original["pages"], &pages)
 	variants := []struct {

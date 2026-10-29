@@ -2,7 +2,7 @@ import {ReadingDetails,ReadingSummary} from "../../shared/reading/reading-detail
 import React,{useId} from 'react';
 import type {z} from 'zod/v4';
 import {Button} from '@/components/ui/button';
-import {peeringAgreementSchema,peeringPartySchema} from "../../../../galaxy-official/src/shared/hub-peering-v2-schema.mjs";
+import {peeringAgreementSchema,peeringPartySchema} from "../../../../galaxy-contracts/src/hub-peering-v2-schema.mjs";
 
 type PeeringAgreement=z.infer<typeof peeringAgreementSchema>;
 type PeeringParty=z.infer<typeof peeringPartySchema>;

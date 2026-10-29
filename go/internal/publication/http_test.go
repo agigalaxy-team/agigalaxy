@@ -6,13 +6,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/access"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
@@ -28,25 +27,19 @@ func (commandDirectory) Roles(context.Context, string, string) ([]string, error)
 func (commandDirectory) RolesFresh(context.Context, string, string) ([]string, error) {
 	return []string{"galaxy-reader"}, nil
 }
-func TestOriginalPublicationHTTPWithRestrictedAPIRiverCommands(t *testing.T) {
+func TestPublicationHTTPWithRestrictedAPIRiverCommands(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
-	node(t, dsn, "setup")
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	config, _, snapshot, _, _ := fixtureFiles(t)
-	root, _ := filepath.Abs("../../..")
 	execute := func(sql string, args ...any) {
 		t.Helper()
 		if _, e := pool.Exec(ctx, sql, args...); e != nil {
 			t.Fatal(e)
 		}
 	}
-	for _, name := range []string{"api-role.sql", "worker-role.sql"} {
-		b, e := os.ReadFile(filepath.Join(root, "packages/galaxy-official/src/infrastructure", name))
-		if e != nil {
-			t.Fatal(e)
-		}
-		execute(string(b))
+	if _, err := databaseschema.Migrate(ctx, pool, []string{"api", "worker"}); err != nil {
+		t.Fatal(err)
 	}
 	tx, e := pool.Begin(ctx)
 	if e != nil {

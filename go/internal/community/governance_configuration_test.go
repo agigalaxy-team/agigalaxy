@@ -9,7 +9,10 @@ import (
 )
 
 func TestGovernanceOriginalAstralSchemaAndHash(t *testing.T) {
-	raw := node(t, "postgres://127.0.0.1/galaxy_go_test_governance", "governance-astral-fixture")
+	raw, e := os.ReadFile("testdata/governance-astral-fixture.json")
+	if e != nil {
+		t.Fatal(e)
+	}
 	value, e := governanceJSON(raw)
 	if e != nil {
 		t.Fatal(e)
@@ -42,7 +45,10 @@ func TestGovernanceOriginalAstralSchemaAndHash(t *testing.T) {
 }
 
 func TestReviewedGovernanceMatchesOriginalConfigurationAndSignatures(t *testing.T) {
-	raw := node(t, "postgres://127.0.0.1/galaxy_go_test_governance", "governance-fixture")
+	raw, e := os.ReadFile("testdata/governance-fixture.json")
+	if e != nil {
+		t.Fatal(e)
+	}
 	value, e := governanceJSON(raw)
 	if e != nil {
 		t.Fatal(e)

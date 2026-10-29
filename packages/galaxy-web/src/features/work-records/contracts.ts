@@ -1,8 +1,8 @@
 import * as z from 'zod/v4';
-import type {caseEventV2Schema} from "../../../../galaxy-official/src/shared/cases-schema.mjs";
-import type {evidenceReferenceRecordSchema,verificationRecordSchema} from "../../../../galaxy-official/src/shared/verification-record-schema.mjs";
-import {capsuleSourceV2Schema} from "../../../../galaxy-official/src/shared/capsule-v2-schema.mjs";
-import {participationEventV2Schema} from "../../../../galaxy-official/src/shared/task-schema-v2.mjs";
+import type {caseEventV2Schema} from "../../../../galaxy-contracts/src/cases-schema.mjs";
+import type {evidenceReferenceRecordSchema,verificationRecordSchema} from "../../../../galaxy-contracts/src/verification-record-schema.mjs";
+import {capsuleSourceV2Schema} from "../../../../galaxy-contracts/src/capsule-v2-schema.mjs";
+import {participationEventV2Schema} from "../../../../galaxy-contracts/src/task-schema-v2.mjs";
 import type {CapsuleConfigurationView,CapsuleSourceItem} from "../capsules/capsule-authoring-types";
 import type {FactReference,InterventionOpinionsView,ResolutionDecision} from "./presentation-types";
 import type {WorkTask,WorkParticipation} from "../tasks/work-task-types";

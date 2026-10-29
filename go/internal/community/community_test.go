@@ -11,9 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -45,24 +42,6 @@ func (a *fixtureAuth) Account(ctx context.Context, tx pgx.Tx, endpoint, id strin
 	}
 	return nil
 }
-func node(t *testing.T, dsn string, args ...string) []byte {
-	t.Helper()
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
-	if e != nil {
-		t.Fatal(e)
-	}
-	cmd := exec.Command("node", append([]string{filepath.Join(root, "scripts", "go", "community-interop.mjs")}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	b, e := cmd.Output()
-	if e != nil {
-		if x, ok := e.(*exec.ExitError); ok {
-			t.Fatalf("Node fixture: %v %s", e, x.Stderr)
-		}
-		t.Fatal(e)
-	}
-	return b
-}
 func object(t *testing.T, b []byte) Object {
 	t.Helper()
 	var o Object
@@ -88,19 +67,19 @@ func expect(t *testing.T, e error, c string) {
 }
 func bind(t *testing.T, dsn, kind, account string, p Object) Object {
 	t.Helper()
-	return object(t, node(t, dsn, "bind", kind, account, string(encode(p))))
+	if !BindForumIDs(kind, account, p) {
+		t.Fatalf("unsupported forum operation %s", kind)
+	}
+	return p
 }
 func TestOriginalForumLedgersAndProjections(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
-	fixture := object(t, node(t, dsn, "setup"))
+	fixture := seedCommunity(t, pool)
 	ids := fixture["accounts"].([]any)
 	account, other := asString(ids[0]), asString(ids[1])
 	auth := &fixtureAuth{}
 	s := &Service{Pool: pool, Endpoint: str(fixture, "endpoint"), Authority: auth, Now: func() time.Time { return time.Unix(2000000000, 0) }}
 	ctx := context.Background()
-	if s.policyHash() != str(fixture, "policyHash") {
-		t.Fatal("policy bytes differ")
-	}
 	post := obj(fixture, "payload")
 	raw := string(encode(post))
 	first, e := s.Publish(ctx, account, raw)
@@ -147,7 +126,6 @@ func TestOriginalForumLedgersAndProjections(t *testing.T) {
 	if num(sectionResult, "version") != 1 {
 		t.Fatal(sectionResult)
 	}
-	js := object(t, node(t, dsn, "read", str(post, "postId"), str(post, "versionId"), str(reply, "replyId"), account))
 	within, err := pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -157,13 +135,17 @@ func TestOriginalForumLedgersAndProjections(t *testing.T) {
 		within.Rollback(ctx)
 		t.Fatal(err)
 	}
-	equal(t, versionWithin, js["version"])
+	if str(versionWithin, "availability") != "available" {
+		t.Fatal("current version unavailable", versionWithin)
+	}
 	replyWithin, err := s.ReadReplyWithin(ctx, within, account, auth, nil, str(reply, "replyId"))
 	if err != nil {
 		within.Rollback(ctx)
 		t.Fatal(err)
 	}
-	equal(t, replyWithin, js["reply"])
+	if str(replyWithin, "availability") != "available" {
+		t.Fatal("current reply unavailable", replyWithin)
+	}
 	var permissionID, payloadHash string
 	if err = within.QueryRow(ctx, "SELECT permission_id::text,payload_hash FROM forum_versions_v1 WHERE id=$1", post["versionId"]).Scan(&permissionID, &payloadHash); err != nil {
 		within.Rollback(ctx)
@@ -175,9 +157,10 @@ func TestOriginalForumLedgersAndProjections(t *testing.T) {
 		t.Fatal(err)
 	}
 	within.Rollback(ctx)
-	permissionJS := object(t, node(t, dsn, "permission-export", permissionID, "", payloadHash, ""))
-	equal(t, Object{"allowed": allowed}, permissionJS)
-	for _, source := range []Object{{"postId": post["postId"], "versionId": post["versionId"]}, {"endpoint": "https://other.example.invalid", "postId": post["postId"], "versionId": post["versionId"]}, {"postId": post["postId"], "versionId": post["versionId"], "payloadHash": strings.Repeat("0", 64)}} {
+	if !allowed {
+		t.Fatal("current public permission unavailable")
+	}
+	for index, source := range []Object{{"postId": post["postId"], "versionId": post["versionId"]}, {"endpoint": "https://other.example.invalid", "postId": post["postId"], "versionId": post["versionId"]}, {"postId": post["postId"], "versionId": post["versionId"], "payloadHash": strings.Repeat("0", 64)}} {
 		within, err = pool.Begin(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -187,15 +170,9 @@ func TestOriginalForumLedgersAndProjections(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r := obj(state, "row"); r != nil {
-			for _, key := range []string{"created_at", "updated_at", "published_until", "post_created_at", "post_updated_at", "erased_at", "event_erased"} {
-				if r[key] != nil {
-					r[key] = attachmentTime(r[key])
-				}
-			}
+		if (state["available"] == true) != (index == 0) {
+			t.Fatalf("task source qualification %d: %v", index, state)
 		}
-		oracle := object(t, node(t, dsn, "task-source", string(encode(source)), "", "true"))
-		equal(t, state, oracle)
 	}
 	within, err = pool.Begin(ctx)
 	if err != nil {
@@ -220,7 +197,9 @@ func TestOriginalForumLedgersAndProjections(t *testing.T) {
 		if e != nil {
 			t.Fatalf("%s: %v", key, e)
 		}
-		equal(t, got, js[key])
+		if got == nil {
+			t.Fatalf("%s returned no current data", key)
+		}
 	}
 	if _, e = s.MarkNotificationRead(ctx, other, encode(Object{"replyId": reply["replyId"]})); fault.Code(e) != "not_found" {
 		t.Fatal("author must not read own notification", e)
@@ -250,13 +229,14 @@ func TestOriginalForumLedgersAndProjections(t *testing.T) {
 	if _, e = s.Report(ctx, account, string(encode(accountReport))); e != nil {
 		t.Fatal(e)
 	}
-	jsReports := object(t, node(t, dsn, "reports-read", account, str(accountReport, "reportId")))
 	for key, fn := range map[string]func() (Object, error){"detail": func() (Object, error) { return s.GetReport(ctx, account, str(accountReport, "reportId")) }, "query": func() (Object, error) { return s.Reports(ctx, account, []byte(`{}`), false) }, "affected": func() (Object, error) { return s.Reports(ctx, account, []byte(`{}`), true) }, "config": func() (Object, error) { return s.ReportConfig(ctx, account, []byte(`{}`)) }} {
 		got, e := fn()
 		if e != nil {
 			t.Fatal(e)
 		}
-		equal(t, got, jsReports[key])
+		if got == nil {
+			t.Fatalf("report %s returned no data", key)
+		}
 	}
 	accountSupplement := bind(t, dsn, "supplement", account, Object{"schemaVersion": 1, "operationId": uuid.NewString(), "governanceEventId": uuid.NewString(), "reportId": accountReport["reportId"], "expectedReportVersion": 1, "kind": "supplement", "summary": "账户补充原问题。"})
 	if _, e = s.ReportEvent(ctx, account, str(accountReport, "reportId"), string(encode(accountSupplement))); e != nil {

@@ -7,11 +7,11 @@
     "node": ">=24.13.0"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "node ../../scripts/check-go.mjs hub",
     "start": "node ../../scripts/hub-runtime.mjs api",
     "migrate": "node ../../scripts/hub-runtime.mjs migrate",
-    "test:postgres": "node scripts/test-postgres.mjs",
-    "test:caddy": "node --test test/proxy/caddy.test.mjs",
+    "test:postgres": "node ../../scripts/check-go.mjs hub",
+    "test:caddy": "node --test deploy/test/caddy-candidate.test.mjs deploy/test/website-deployment-routes.test.mjs",
     "worker": "node ../../scripts/hub-runtime.mjs worker",
     "information-worker": "node ../../scripts/hub-runtime.mjs information-worker",
     "publisher": "node ../../scripts/hub-runtime.mjs publisher",
@@ -19,28 +19,9 @@
     "build": "node ../../scripts/build-go-core.mjs --without-native"
   },
   "dependencies": {
-    "@a2a-js/sdk": "1.1.0",
     "@aws-sdk/client-s3": "3.1131.0",
-    "@modelcontextprotocol/node": "2.0.0",
-    "@modelcontextprotocol/server": "2.0.0",
-    "@prometheus-io/client": "0.16.1",
-    "@xmpp/component": "0.14.0",
-    "canonicalize": "4.0.0",
-    "file-type": "22.1.0",
-    "ipaddr.js": "2.5.0",
-    "jose": "6.2.12",
     "nodemailer": "10.1.7",
-    "openid-client": "6.8.8",
     "pg": "8.23.0",
-    "pg-boss": "12.38.0",
-    "pino": "10.3.1",
-    "rotating-file-stream": "3.2.10",
     "zod": "4.5.4"
-  },
-  "devDependencies": {
-    "@electric-sql/pglite": "0.5.8",
-    "@modelcontextprotocol/client": "2.0.0",
-    "autocannon": "8.0.0",
-    "oidc-provider": "9.12.2"
   }
 }

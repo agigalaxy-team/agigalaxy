@@ -2,7 +2,6 @@ package native
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
@@ -13,9 +12,6 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,7 +20,7 @@ import (
 func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	store, meta, transport := workUploadServiceFixtureDatabase(t, dsn)
+	store, meta, transport := nativeGoUploadFixtureDatabase(t, dsn)
 	now := func() time.Time { return time.Unix(meta.Now, 0) }
 	devices := &deviceauth.Service{Pool: pool, Endpoint: meta.Configuration.Endpoint, Now: now}
 	owner, e := store.Owner(ctx)
@@ -147,18 +143,8 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 		t.Fatalf("terminal account journal pending: %v", e)
 	}
 	transport.setHook(nil)
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	script := `import {readFile} from 'node:fs/promises';import {createNativeRuntime} from './packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';const dir=process.argv[1],origin=process.argv[2],f=JSON.parse(await readFile(dir+'/work-upload-fixture.json','utf8')),c=f.configuration;const native=await createNativeRuntime({...c,trustedKeys:new Map(Object.entries(c.trustedKeys)),fetch:(url,options)=>fetch(origin+new URL(url).pathname,options),now:()=>f.now,autoResumePrivateSync:false});console.log(JSON.stringify(await native.identityAccounts.pending()));await native.close();`
-	command := exec.Command("node", "--input-type=module", "-e", script, store.Directory, server.URL)
-	command.Dir = root
-	var diagnostic strings.Builder
-	command.Stderr = &diagnostic
-	out, e := command.Output()
-	if e != nil {
-		t.Fatalf("original account journal reader: %v %s", e, diagnostic.String())
+	if uploadObject(pending)["originalOperationRetained"] != true {
+		t.Fatal("terminal original operation was not retained", pending)
 	}
-	var originalPending map[string]any
-	if e = json.Unmarshal(out, &originalPending); e != nil || len(uploadRows(originalPending["items"])) != 0 || originalPending["originalOperationRetained"] != true {
-		t.Fatalf("original account journal incompatible: %v", e)
-	}
+
 }

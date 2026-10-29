@@ -1,0 +1,556 @@
+{
+  "seed": {
+    "proofId": "83381bae-ece0-4653-a4c5-e7de29017bac",
+    "signed": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LXByb29mK2p3dCIsImtpZCI6ImZpeHR1cmUifQ.eyJkYXRhIjp7InZlcnNpb24iOjEsInR5cGUiOiJjaS1leGVjdXRpb24tb2JzZXJ2YXRpb24iLCJpZCI6IjgzMzgxYmFlLWVjZTAtNDY1My1hNGM1LWU3ZGUyOTAxN2JhYyIsInN1YmplY3QiOiJHVUlEMTUwMU02MVg3UTg2NU42MTVEUzUzSjBKNERRVCIsImlzc3VlciI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiZXZpZGVuY2VJZCI6IjQwNTk2MzhhLTdlY2MtNGEzOS04NTAxLTU4NjM4NDhmMDYwYiIsIm9ic2VydmF0aW9uSWQiOiIwZjkyMjBkMi05M2Y5LTRjOWMtOTczMC1jOGFkZTg4Mjg3Y2IiLCJzY29wZSI6InJlZmVyZW5jZWQtY2ktcnVuLW9ubHkiLCJzdHJlbmd0aCI6ImNpLWV4ZWN1dGlvbi1mYWN0IiwiaW5kZXBlbmRlbmNlIjoicmVwb3NpdG9yeS1jb250cm9sbGVkIiwiYXR0cmlidXRpb24iOiJzdWJtaXR0ZXItYXNzZXJ0ZWQiLCJzb3VyY2UiOnsib3duZXIiOiJGaXh0dXJlIiwicnVuSWQiOjExLCJjb21taXQiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiYXR0ZW1wdCI6MSwicHJvdmlkZXIiOiJnaXRodWItYWN0aW9ucyIsInJlcG9zaXRvcnkiOiJTeW50aGV0aWMiLCJyZXBvc2l0b3J5SWQiOjc3LCJzb3VyY2VVcGRhdGVkQXQiOiIyMDMzLTA1LTE4VDAzOjMzOjIwLjAwMFoifSwiY29uY2x1c2lvbiI6InN1Y2Nlc3MiLCJzb3VyY2VDb250cm9sIjp7InZlcnNpb24iOjEsIm9ic2VydmVkVmlhIjoiZ2l0aHViLXJlc3QtYXBpIiwicmVwb3NpdG9yeU93bmVyIjp7ImlkIjozLCJ0eXBlIjoiT3JnYW5pemF0aW9uIiwibG9naW4iOiJGaXh0dXJlIn0sInN1Ym1pdHRlckNvbnRyb2xWZXJpZmllZCI6ZmFsc2UsImluZGVwZW5kZW50RXhlY3V0aW9uVmVyaWZpZWQiOmZhbHNlfSwidGFza091dGNvbWVWZXJpZmljYXRpb24iOiJub3QtaW5kZXBlbmRlbnRseS12ZXJpZmllZCIsImNhcGFiaWxpdHlWZXJpZmllZCI6ZmFsc2UsInByZXBhcmVkQXQiOjIwMDAwMDAwMDAsIm9ic2VydmVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMCwibGltaXRhdGlvbnMiOlsiUmVwb3NpdG9yeSB3b3JrZmxvd3MgbWF5IGJlIGNvbnRyb2xsZWQgYnkgdGhlIHN1Ym1pdHRlci4iLCJBIENJIGNvbmNsdXNpb24gZG9lcyBub3QgcHJvdmUgdGFzayBxdWFsaXR5IG9yIGluZGl2aWR1YWwgY29udHJpYnV0aW9uLiJdLCJzdGF0dXNQYXRoIjoiL3YxL3Byb29mcy84MzM4MWJhZS1lY2UwLTQ2NTMtYTRjNS1lN2RlMjkwMTdiYWMvc3RhdHVzIn0sImlzcyI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiYXVkIjoiaHR0cHM6Ly9ldmlkZW5jZS5leGFtcGxlLmludmFsaWQiLCJpYXQiOjIwMDAwMDAwMDAsIm5iZiI6MjAwMDAwMDAwMCwiZXhwIjoyMDAwMDAzNjAwLCJqdGkiOiI4MzM4MWJhZS1lY2UwLTQ2NTMtYTRjNS1lN2RlMjkwMTdiYWMifQ.R7uguOk9Huo64bOvcpWkFLOO05FAVFMjl-7H67hmTl_bO_VKQ5QMOH1qzRzeBN-jyoONKPLx6Vn_Gpn7nObJDg",
+    "status": "active",
+    "caseContext": {
+      "caseId": "01103f42-27ed-4c2b-b517-54b22f914a67",
+      "sourceVersion": 4,
+      "checkedAt": 2000000000,
+      "status": "has-corrections",
+      "scope": "visible-case-context-only",
+      "authority": "case-owner-reported",
+      "independentDecision": false,
+      "affectsSignedCiFact": false,
+      "reviews": [],
+      "corrections": [
+        {
+          "eventId": "6dab9f04-7616-4df1-89ce-6fa9d927e6ed",
+          "targetEventId": "f83238e9-d67f-424e-a727-b3fd50de1d85",
+          "reason": "Limit original interpretation",
+          "summary": "Reported correction"
+        }
+      ]
+    },
+    "provenance": {
+      "version": 1,
+      "profile": "github-actions-provenance/1",
+      "sourceKey": "github-actions:repository:77:run:11:attempt:1",
+      "issuer": "https://evidence.example.invalid",
+      "proofId": "83381bae-ece0-4653-a4c5-e7de29017bac",
+      "source": {
+        "provider": "github-actions",
+        "owner": "Fixture",
+        "repository": "Synthetic",
+        "runId": 11,
+        "attempt": 1,
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "repositoryId": 77,
+        "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+      },
+      "conclusion": "success",
+      "sourceControl": {
+        "version": 1,
+        "observedVia": "github-rest-api",
+        "repositoryOwner": {
+          "id": 3,
+          "login": "Fixture",
+          "type": "Organization"
+        },
+        "submitterControlVerified": false,
+        "independentExecutionVerified": false
+      },
+      "authority": "issuer-attested-github-api-observation",
+      "submitterControlVerified": false,
+      "independentExecutionVerified": false
+    }
+  },
+  "next": {
+    "proofId": "9414f744-980c-4534-8062-d6945eb630f2",
+    "signed": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LXByb29mK2p3dCIsImtpZCI6ImdvLWZpeHR1cmUifQ.eyJkYXRhIjp7InZlcnNpb24iOjEsInR5cGUiOiJjaS1leGVjdXRpb24tb2JzZXJ2YXRpb24iLCJpZCI6Ijk0MTRmNzQ0LTk4MGMtNDUzNC04MDYyLWQ2OTQ1ZWI2MzBmMiIsInN1YmplY3QiOiJHVUlEMTUwMU02MVg3UTg2NU42MTVEUzUzSjBKNERRVCIsImlzc3VlciI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiZXZpZGVuY2VJZCI6IjQwNTk2MzhhLTdlY2MtNGEzOS04NTAxLTU4NjM4NDhmMDYwYiIsIm9ic2VydmF0aW9uSWQiOiIwZjkyMjBkMi05M2Y5LTRjOWMtOTczMC1jOGFkZTg4Mjg3Y2IiLCJzY29wZSI6InJlZmVyZW5jZWQtY2ktcnVuLW9ubHkiLCJzdHJlbmd0aCI6ImNpLWV4ZWN1dGlvbi1mYWN0IiwiaW5kZXBlbmRlbmNlIjoicmVwb3NpdG9yeS1jb250cm9sbGVkIiwiYXR0cmlidXRpb24iOiJzdWJtaXR0ZXItYXNzZXJ0ZWQiLCJzb3VyY2UiOnsib3duZXIiOiJGaXh0dXJlIiwicnVuSWQiOjExLCJjb21taXQiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiYXR0ZW1wdCI6MSwicHJvdmlkZXIiOiJnaXRodWItYWN0aW9ucyIsInJlcG9zaXRvcnkiOiJTeW50aGV0aWMiLCJyZXBvc2l0b3J5SWQiOjc3LCJzb3VyY2VVcGRhdGVkQXQiOiIyMDMzLTA1LTE4VDAzOjMzOjIwLjAwMFoifSwiY29uY2x1c2lvbiI6InN1Y2Nlc3MiLCJzb3VyY2VDb250cm9sIjp7InZlcnNpb24iOjEsIm9ic2VydmVkVmlhIjoiZ2l0aHViLXJlc3QtYXBpIiwicmVwb3NpdG9yeU93bmVyIjp7ImlkIjozLCJ0eXBlIjoiT3JnYW5pemF0aW9uIiwibG9naW4iOiJGaXh0dXJlIn0sInN1Ym1pdHRlckNvbnRyb2xWZXJpZmllZCI6ZmFsc2UsImluZGVwZW5kZW50RXhlY3V0aW9uVmVyaWZpZWQiOmZhbHNlfSwidGFza091dGNvbWVWZXJpZmljYXRpb24iOiJub3QtaW5kZXBlbmRlbnRseS12ZXJpZmllZCIsImNhcGFiaWxpdHlWZXJpZmllZCI6ZmFsc2UsInByZXBhcmVkQXQiOjIwMDAwMDAwMDAsIm9ic2VydmVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMCwibGltaXRhdGlvbnMiOlsiUmVwb3NpdG9yeSB3b3JrZmxvd3MgbWF5IGJlIGNvbnRyb2xsZWQgYnkgdGhlIHN1Ym1pdHRlci4iLCJBIENJIGNvbmNsdXNpb24gZG9lcyBub3QgcHJvdmUgdGFzayBxdWFsaXR5IG9yIGluZGl2aWR1YWwgY29udHJpYnV0aW9uLiJdLCJzdGF0dXNQYXRoIjoiL3YxL3Byb29mcy85NDE0Zjc0NC05ODBjLTQ1MzQtODA2Mi1kNjk0NWViNjMwZjIvc3RhdHVzIn0sImlzcyI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiYXVkIjoiaHR0cHM6Ly9ldmlkZW5jZS5leGFtcGxlLmludmFsaWQiLCJpYXQiOjIwMDAwMDAwMDAsIm5iZiI6MjAwMDAwMDAwMCwiZXhwIjoyMDAwMDAzNjAwLCJqdGkiOiI5NDE0Zjc0NC05ODBjLTQ1MzQtODA2Mi1kNjk0NWViNjMwZjIifQ.R-500LowdEna0dlmrA9DO8bdxQOTZv2KpVWLv5OxcPy-K1oB0NCBftUVgV2MbyN_dTWxdvpe2YwbSzVNMiH2BA",
+    "status": "active",
+    "caseContext": {
+      "caseId": "01103f42-27ed-4c2b-b517-54b22f914a67",
+      "sourceVersion": 4,
+      "checkedAt": 2000000000,
+      "status": "has-corrections",
+      "scope": "visible-case-context-only",
+      "authority": "case-owner-reported",
+      "independentDecision": false,
+      "affectsSignedCiFact": false,
+      "reviews": [],
+      "corrections": [
+        {
+          "eventId": "6dab9f04-7616-4df1-89ce-6fa9d927e6ed",
+          "targetEventId": "f83238e9-d67f-424e-a727-b3fd50de1d85",
+          "reason": "Limit original interpretation",
+          "summary": "Reported correction"
+        }
+      ]
+    },
+    "provenance": {
+      "version": 1,
+      "profile": "github-actions-provenance/1",
+      "sourceKey": "github-actions:repository:77:run:11:attempt:1",
+      "issuer": "https://evidence.example.invalid",
+      "proofId": "9414f744-980c-4534-8062-d6945eb630f2",
+      "source": {
+        "provider": "github-actions",
+        "owner": "Fixture",
+        "repository": "Synthetic",
+        "runId": 11,
+        "attempt": 1,
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "repositoryId": 77,
+        "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+      },
+      "conclusion": "success",
+      "sourceControl": {
+        "version": 1,
+        "observedVia": "github-rest-api",
+        "repositoryOwner": {
+          "id": 3,
+          "login": "Fixture",
+          "type": "Organization"
+        },
+        "submitterControlVerified": false,
+        "independentExecutionVerified": false
+      },
+      "authority": "issuer-attested-github-api-observation",
+      "submitterControlVerified": false,
+      "independentExecutionVerified": false
+    }
+  },
+  "seedWire": "{\"proofId\":\"83381bae-ece0-4653-a4c5-e7de29017bac\",\"signed\":\"eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LXByb29mK2p3dCIsImtpZCI6ImZpeHR1cmUifQ.eyJkYXRhIjp7InZlcnNpb24iOjEsInR5cGUiOiJjaS1leGVjdXRpb24tb2JzZXJ2YXRpb24iLCJpZCI6IjgzMzgxYmFlLWVjZTAtNDY1My1hNGM1LWU3ZGUyOTAxN2JhYyIsInN1YmplY3QiOiJHVUlEMTUwMU02MVg3UTg2NU42MTVEUzUzSjBKNERRVCIsImlzc3VlciI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiZXZpZGVuY2VJZCI6IjQwNTk2MzhhLTdlY2MtNGEzOS04NTAxLTU4NjM4NDhmMDYwYiIsIm9ic2VydmF0aW9uSWQiOiIwZjkyMjBkMi05M2Y5LTRjOWMtOTczMC1jOGFkZTg4Mjg3Y2IiLCJzY29wZSI6InJlZmVyZW5jZWQtY2ktcnVuLW9ubHkiLCJzdHJlbmd0aCI6ImNpLWV4ZWN1dGlvbi1mYWN0IiwiaW5kZXBlbmRlbmNlIjoicmVwb3NpdG9yeS1jb250cm9sbGVkIiwiYXR0cmlidXRpb24iOiJzdWJtaXR0ZXItYXNzZXJ0ZWQiLCJzb3VyY2UiOnsib3duZXIiOiJGaXh0dXJlIiwicnVuSWQiOjExLCJjb21taXQiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiYXR0ZW1wdCI6MSwicHJvdmlkZXIiOiJnaXRodWItYWN0aW9ucyIsInJlcG9zaXRvcnkiOiJTeW50aGV0aWMiLCJyZXBvc2l0b3J5SWQiOjc3LCJzb3VyY2VVcGRhdGVkQXQiOiIyMDMzLTA1LTE4VDAzOjMzOjIwLjAwMFoifSwiY29uY2x1c2lvbiI6InN1Y2Nlc3MiLCJzb3VyY2VDb250cm9sIjp7InZlcnNpb24iOjEsIm9ic2VydmVkVmlhIjoiZ2l0aHViLXJlc3QtYXBpIiwicmVwb3NpdG9yeU93bmVyIjp7ImlkIjozLCJ0eXBlIjoiT3JnYW5pemF0aW9uIiwibG9naW4iOiJGaXh0dXJlIn0sInN1Ym1pdHRlckNvbnRyb2xWZXJpZmllZCI6ZmFsc2UsImluZGVwZW5kZW50RXhlY3V0aW9uVmVyaWZpZWQiOmZhbHNlfSwidGFza091dGNvbWVWZXJpZmljYXRpb24iOiJub3QtaW5kZXBlbmRlbnRseS12ZXJpZmllZCIsImNhcGFiaWxpdHlWZXJpZmllZCI6ZmFsc2UsInByZXBhcmVkQXQiOjIwMDAwMDAwMDAsIm9ic2VydmVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMCwibGltaXRhdGlvbnMiOlsiUmVwb3NpdG9yeSB3b3JrZmxvd3MgbWF5IGJlIGNvbnRyb2xsZWQgYnkgdGhlIHN1Ym1pdHRlci4iLCJBIENJIGNvbmNsdXNpb24gZG9lcyBub3QgcHJvdmUgdGFzayBxdWFsaXR5IG9yIGluZGl2aWR1YWwgY29udHJpYnV0aW9uLiJdLCJzdGF0dXNQYXRoIjoiL3YxL3Byb29mcy84MzM4MWJhZS1lY2UwLTQ2NTMtYTRjNS1lN2RlMjkwMTdiYWMvc3RhdHVzIn0sImlzcyI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiYXVkIjoiaHR0cHM6Ly9ldmlkZW5jZS5leGFtcGxlLmludmFsaWQiLCJpYXQiOjIwMDAwMDAwMDAsIm5iZiI6MjAwMDAwMDAwMCwiZXhwIjoyMDAwMDAzNjAwLCJqdGkiOiI4MzM4MWJhZS1lY2UwLTQ2NTMtYTRjNS1lN2RlMjkwMTdiYWMifQ.R7uguOk9Huo64bOvcpWkFLOO05FAVFMjl-7H67hmTl_bO_VKQ5QMOH1qzRzeBN-jyoONKPLx6Vn_Gpn7nObJDg\",\"status\":\"active\",\"caseContext\":{\"caseId\":\"01103f42-27ed-4c2b-b517-54b22f914a67\",\"sourceVersion\":4,\"checkedAt\":2000000000,\"status\":\"has-corrections\",\"scope\":\"visible-case-context-only\",\"authority\":\"case-owner-reported\",\"independentDecision\":false,\"affectsSignedCiFact\":false,\"reviews\":[],\"corrections\":[{\"eventId\":\"6dab9f04-7616-4df1-89ce-6fa9d927e6ed\",\"targetEventId\":\"f83238e9-d67f-424e-a727-b3fd50de1d85\",\"reason\":\"Limit original interpretation\",\"summary\":\"Reported correction\"}]},\"provenance\":{\"version\":1,\"profile\":\"github-actions-provenance/1\",\"sourceKey\":\"github-actions:repository:77:run:11:attempt:1\",\"issuer\":\"https://evidence.example.invalid\",\"proofId\":\"83381bae-ece0-4653-a4c5-e7de29017bac\",\"source\":{\"provider\":\"github-actions\",\"owner\":\"Fixture\",\"repository\":\"Synthetic\",\"runId\":11,\"attempt\":1,\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"repositoryId\":77,\"sourceUpdatedAt\":\"2033-05-18T03:33:20.000Z\"},\"conclusion\":\"success\",\"sourceControl\":{\"version\":1,\"observedVia\":\"github-rest-api\",\"repositoryOwner\":{\"id\":3,\"login\":\"Fixture\",\"type\":\"Organization\"},\"submitterControlVerified\":false,\"independentExecutionVerified\":false},\"authority\":\"issuer-attested-github-api-observation\",\"submitterControlVerified\":false,\"independentExecutionVerified\":false}}",
+  "nextWire": "{\"proofId\":\"9414f744-980c-4534-8062-d6945eb630f2\",\"signed\":\"eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LXByb29mK2p3dCIsImtpZCI6ImdvLWZpeHR1cmUifQ.eyJkYXRhIjp7InZlcnNpb24iOjEsInR5cGUiOiJjaS1leGVjdXRpb24tb2JzZXJ2YXRpb24iLCJpZCI6Ijk0MTRmNzQ0LTk4MGMtNDUzNC04MDYyLWQ2OTQ1ZWI2MzBmMiIsInN1YmplY3QiOiJHVUlEMTUwMU02MVg3UTg2NU42MTVEUzUzSjBKNERRVCIsImlzc3VlciI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiZXZpZGVuY2VJZCI6IjQwNTk2MzhhLTdlY2MtNGEzOS04NTAxLTU4NjM4NDhmMDYwYiIsIm9ic2VydmF0aW9uSWQiOiIwZjkyMjBkMi05M2Y5LTRjOWMtOTczMC1jOGFkZTg4Mjg3Y2IiLCJzY29wZSI6InJlZmVyZW5jZWQtY2ktcnVuLW9ubHkiLCJzdHJlbmd0aCI6ImNpLWV4ZWN1dGlvbi1mYWN0IiwiaW5kZXBlbmRlbmNlIjoicmVwb3NpdG9yeS1jb250cm9sbGVkIiwiYXR0cmlidXRpb24iOiJzdWJtaXR0ZXItYXNzZXJ0ZWQiLCJzb3VyY2UiOnsib3duZXIiOiJGaXh0dXJlIiwicnVuSWQiOjExLCJjb21taXQiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiYXR0ZW1wdCI6MSwicHJvdmlkZXIiOiJnaXRodWItYWN0aW9ucyIsInJlcG9zaXRvcnkiOiJTeW50aGV0aWMiLCJyZXBvc2l0b3J5SWQiOjc3LCJzb3VyY2VVcGRhdGVkQXQiOiIyMDMzLTA1LTE4VDAzOjMzOjIwLjAwMFoifSwiY29uY2x1c2lvbiI6InN1Y2Nlc3MiLCJzb3VyY2VDb250cm9sIjp7InZlcnNpb24iOjEsIm9ic2VydmVkVmlhIjoiZ2l0aHViLXJlc3QtYXBpIiwicmVwb3NpdG9yeU93bmVyIjp7ImlkIjozLCJ0eXBlIjoiT3JnYW5pemF0aW9uIiwibG9naW4iOiJGaXh0dXJlIn0sInN1Ym1pdHRlckNvbnRyb2xWZXJpZmllZCI6ZmFsc2UsImluZGVwZW5kZW50RXhlY3V0aW9uVmVyaWZpZWQiOmZhbHNlfSwidGFza091dGNvbWVWZXJpZmljYXRpb24iOiJub3QtaW5kZXBlbmRlbnRseS12ZXJpZmllZCIsImNhcGFiaWxpdHlWZXJpZmllZCI6ZmFsc2UsInByZXBhcmVkQXQiOjIwMDAwMDAwMDAsIm9ic2VydmVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMCwibGltaXRhdGlvbnMiOlsiUmVwb3NpdG9yeSB3b3JrZmxvd3MgbWF5IGJlIGNvbnRyb2xsZWQgYnkgdGhlIHN1Ym1pdHRlci4iLCJBIENJIGNvbmNsdXNpb24gZG9lcyBub3QgcHJvdmUgdGFzayBxdWFsaXR5IG9yIGluZGl2aWR1YWwgY29udHJpYnV0aW9uLiJdLCJzdGF0dXNQYXRoIjoiL3YxL3Byb29mcy85NDE0Zjc0NC05ODBjLTQ1MzQtODA2Mi1kNjk0NWViNjMwZjIvc3RhdHVzIn0sImlzcyI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiYXVkIjoiaHR0cHM6Ly9ldmlkZW5jZS5leGFtcGxlLmludmFsaWQiLCJpYXQiOjIwMDAwMDAwMDAsIm5iZiI6MjAwMDAwMDAwMCwiZXhwIjoyMDAwMDAzNjAwLCJqdGkiOiI5NDE0Zjc0NC05ODBjLTQ1MzQtODA2Mi1kNjk0NWViNjMwZjIifQ.R-500LowdEna0dlmrA9DO8bdxQOTZv2KpVWLv5OxcPy-K1oB0NCBftUVgV2MbyN_dTWxdvpe2YwbSzVNMiH2BA\",\"status\":\"active\",\"caseContext\":{\"caseId\":\"01103f42-27ed-4c2b-b517-54b22f914a67\",\"sourceVersion\":4,\"checkedAt\":2000000000,\"status\":\"has-corrections\",\"scope\":\"visible-case-context-only\",\"authority\":\"case-owner-reported\",\"independentDecision\":false,\"affectsSignedCiFact\":false,\"reviews\":[],\"corrections\":[{\"eventId\":\"6dab9f04-7616-4df1-89ce-6fa9d927e6ed\",\"targetEventId\":\"f83238e9-d67f-424e-a727-b3fd50de1d85\",\"reason\":\"Limit original interpretation\",\"summary\":\"Reported correction\"}]},\"provenance\":{\"version\":1,\"profile\":\"github-actions-provenance/1\",\"sourceKey\":\"github-actions:repository:77:run:11:attempt:1\",\"issuer\":\"https://evidence.example.invalid\",\"proofId\":\"9414f744-980c-4534-8062-d6945eb630f2\",\"source\":{\"provider\":\"github-actions\",\"owner\":\"Fixture\",\"repository\":\"Synthetic\",\"runId\":11,\"attempt\":1,\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"repositoryId\":77,\"sourceUpdatedAt\":\"2033-05-18T03:33:20.000Z\"},\"conclusion\":\"success\",\"sourceControl\":{\"version\":1,\"observedVia\":\"github-rest-api\",\"repositoryOwner\":{\"id\":3,\"login\":\"Fixture\",\"type\":\"Organization\"},\"submitterControlVerified\":false,\"independentExecutionVerified\":false},\"authority\":\"issuer-attested-github-api-observation\",\"submitterControlVerified\":false,\"independentExecutionVerified\":false}}",
+  "second": {
+    "evidenceId": "6d85d830-dc4f-457f-bba1-e3aa05070c55",
+    "state": "observed",
+    "verificationGeneration": 0,
+    "observations": [
+      {
+        "source": {
+          "owner": "Fixture",
+          "runId": 12,
+          "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "attempt": 1,
+          "provider": "github-actions",
+          "repository": "Synthetic",
+          "repositoryId": 77,
+          "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+        },
+        "status": "observed",
+        "strength": "ci-execution-fact",
+        "verifier": "github-actions-api/0.1",
+        "completed": true,
+        "conclusion": "success",
+        "validUntil": 2000003600,
+        "attribution": "submitter-asserted",
+        "collectedAt": 2000000000,
+        "limitations": [
+          "Repository workflows may be controlled by the submitter.",
+          "A CI conclusion does not prove task quality or individual contribution."
+        ],
+        "independence": "repository-controlled",
+        "responseHash": "ebc36d19dd8d7d6330e2491a2a93a143fdbbe592a6abedb8b3fdab812cf61e02",
+        "sourceControl": {
+          "version": 1,
+          "observedVia": "github-rest-api",
+          "repositoryOwner": {
+            "id": 3,
+            "type": "Organization",
+            "login": "Fixture"
+          },
+          "submitterControlVerified": false,
+          "independentExecutionVerified": false
+        },
+        "capabilitiesVerified": false
+      }
+    ],
+    "capabilityVerified": false
+  },
+  "third": {
+    "evidenceId": "de6094f0-0c0e-4964-9c8b-f1d21cb164ca",
+    "state": "observed",
+    "verificationGeneration": 0,
+    "observations": [
+      {
+        "source": {
+          "owner": "Fixture",
+          "runId": 13,
+          "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "attempt": 1,
+          "provider": "github-actions",
+          "repository": "Synthetic",
+          "repositoryId": 77,
+          "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+        },
+        "status": "observed",
+        "strength": "ci-execution-fact",
+        "verifier": "github-actions-api/0.1",
+        "completed": true,
+        "conclusion": "success",
+        "validUntil": 2000003620,
+        "attribution": "submitter-asserted",
+        "collectedAt": 2000000020,
+        "limitations": [
+          "Repository workflows may be controlled by the submitter.",
+          "A CI conclusion does not prove task quality or individual contribution."
+        ],
+        "independence": "repository-controlled",
+        "responseHash": "1fcc3ccb50b344c7ff0b66f90dc8201d1569eab4637fedd2ee3ac6159b733003",
+        "sourceControl": {
+          "version": 1,
+          "observedVia": "github-rest-api",
+          "repositoryOwner": {
+            "id": 3,
+            "type": "Organization",
+            "login": "Fixture"
+          },
+          "submitterControlVerified": false,
+          "independentExecutionVerified": false
+        },
+        "capabilitiesVerified": false
+      },
+      {
+        "reason": "source_unavailable_or_invalid",
+        "status": "unavailable",
+        "collectedAt": 2000000000,
+        "capabilitiesVerified": false
+      }
+    ],
+    "capabilityVerified": false
+  },
+  "preview": {
+    "payloadJson": "{\"version\":1,\"type\":\"ci-execution-observation\",\"id\":\"9414f744-980c-4534-8062-d6945eb630f2\",\"subject\":\"GUID1501M61X7Q865N615DS53J0J4DQT\",\"issuer\":\"https://evidence.example.invalid\",\"evidenceId\":\"4059638a-7ecc-4a39-8501-5863848f060b\",\"observationId\":\"0f9220d2-93f9-4c9c-9730-c8ade88287cb\",\"scope\":\"referenced-ci-run-only\",\"strength\":\"ci-execution-fact\",\"independence\":\"repository-controlled\",\"attribution\":\"submitter-asserted\",\"source\":{\"owner\":\"Fixture\",\"runId\":11,\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"attempt\":1,\"provider\":\"github-actions\",\"repository\":\"Synthetic\",\"repositoryId\":77,\"sourceUpdatedAt\":\"2033-05-18T03:33:20.000Z\"},\"conclusion\":\"success\",\"sourceControl\":{\"version\":1,\"observedVia\":\"github-rest-api\",\"repositoryOwner\":{\"id\":3,\"type\":\"Organization\",\"login\":\"Fixture\"},\"submitterControlVerified\":false,\"independentExecutionVerified\":false},\"taskOutcomeVerification\":\"not-independently-verified\",\"capabilityVerified\":false,\"preparedAt\":2000000000,\"observedAt\":2000000000,\"expiresAt\":2000003600,\"limitations\":[\"Repository workflows may be controlled by the submitter.\",\"A CI conclusion does not prove task quality or individual contribution.\"],\"statusPath\":\"/v1/proofs/9414f744-980c-4534-8062-d6945eb630f2/status\"}",
+    "payloadHash": "09726f701eda3aeec0e3d28a3a22e9475b157d0eb979301fd35da929ad6889b2",
+    "published": false
+  },
+  "history": {
+    "projectionVersion": 1,
+    "subjectId": "GUID1501M61X7Q865N615DS53J0J4DQT",
+    "selfDeclared": {},
+    "derived": true,
+    "view": "public",
+    "items": [
+      {
+        "caseId": "01103f42-27ed-4c2b-b517-54b22f914a67",
+        "sourceVersion": 4,
+        "title": "CI source fixture",
+        "summary": "An author report only",
+        "state": "open",
+        "attempts": [
+          {
+            "id": "5f303d12-193a-44ea-8995-5f620af19cf4",
+            "sequence": 1
+          }
+        ],
+        "results": [
+          {
+            "id": "f83238e9-d67f-424e-a727-b3fd50de1d85",
+            "attemptId": "5f303d12-193a-44ea-8995-5f620af19cf4",
+            "outcome": "partial",
+            "summary": "Reported result",
+            "failureReason": "",
+            "limitations": [
+              "Not a verified capability"
+            ],
+            "corrected": true
+          }
+        ],
+        "corrections": [
+          {
+            "id": "6dab9f04-7616-4df1-89ce-6fa9d927e6ed",
+            "correctsEventId": "f83238e9-d67f-424e-a727-b3fd50de1d85",
+            "reason": "Limit original interpretation",
+            "summary": "Reported correction"
+          }
+        ],
+        "reviews": [],
+        "proofs": [
+          {
+            "proofId": "83381bae-ece0-4653-a4c5-e7de29017bac",
+            "signed": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LXByb29mK2p3dCIsImtpZCI6ImZpeHR1cmUifQ.eyJkYXRhIjp7InZlcnNpb24iOjEsInR5cGUiOiJjaS1leGVjdXRpb24tb2JzZXJ2YXRpb24iLCJpZCI6IjgzMzgxYmFlLWVjZTAtNDY1My1hNGM1LWU3ZGUyOTAxN2JhYyIsInN1YmplY3QiOiJHVUlEMTUwMU02MVg3UTg2NU42MTVEUzUzSjBKNERRVCIsImlzc3VlciI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiZXZpZGVuY2VJZCI6IjQwNTk2MzhhLTdlY2MtNGEzOS04NTAxLTU4NjM4NDhmMDYwYiIsIm9ic2VydmF0aW9uSWQiOiIwZjkyMjBkMi05M2Y5LTRjOWMtOTczMC1jOGFkZTg4Mjg3Y2IiLCJzY29wZSI6InJlZmVyZW5jZWQtY2ktcnVuLW9ubHkiLCJzdHJlbmd0aCI6ImNpLWV4ZWN1dGlvbi1mYWN0IiwiaW5kZXBlbmRlbmNlIjoicmVwb3NpdG9yeS1jb250cm9sbGVkIiwiYXR0cmlidXRpb24iOiJzdWJtaXR0ZXItYXNzZXJ0ZWQiLCJzb3VyY2UiOnsib3duZXIiOiJGaXh0dXJlIiwicnVuSWQiOjExLCJjb21taXQiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiYXR0ZW1wdCI6MSwicHJvdmlkZXIiOiJnaXRodWItYWN0aW9ucyIsInJlcG9zaXRvcnkiOiJTeW50aGV0aWMiLCJyZXBvc2l0b3J5SWQiOjc3LCJzb3VyY2VVcGRhdGVkQXQiOiIyMDMzLTA1LTE4VDAzOjMzOjIwLjAwMFoifSwiY29uY2x1c2lvbiI6InN1Y2Nlc3MiLCJzb3VyY2VDb250cm9sIjp7InZlcnNpb24iOjEsIm9ic2VydmVkVmlhIjoiZ2l0aHViLXJlc3QtYXBpIiwicmVwb3NpdG9yeU93bmVyIjp7ImlkIjozLCJ0eXBlIjoiT3JnYW5pemF0aW9uIiwibG9naW4iOiJGaXh0dXJlIn0sInN1Ym1pdHRlckNvbnRyb2xWZXJpZmllZCI6ZmFsc2UsImluZGVwZW5kZW50RXhlY3V0aW9uVmVyaWZpZWQiOmZhbHNlfSwidGFza091dGNvbWVWZXJpZmljYXRpb24iOiJub3QtaW5kZXBlbmRlbnRseS12ZXJpZmllZCIsImNhcGFiaWxpdHlWZXJpZmllZCI6ZmFsc2UsInByZXBhcmVkQXQiOjIwMDAwMDAwMDAsIm9ic2VydmVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMCwibGltaXRhdGlvbnMiOlsiUmVwb3NpdG9yeSB3b3JrZmxvd3MgbWF5IGJlIGNvbnRyb2xsZWQgYnkgdGhlIHN1Ym1pdHRlci4iLCJBIENJIGNvbmNsdXNpb24gZG9lcyBub3QgcHJvdmUgdGFzayBxdWFsaXR5IG9yIGluZGl2aWR1YWwgY29udHJpYnV0aW9uLiJdLCJzdGF0dXNQYXRoIjoiL3YxL3Byb29mcy84MzM4MWJhZS1lY2UwLTQ2NTMtYTRjNS1lN2RlMjkwMTdiYWMvc3RhdHVzIn0sImlzcyI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiYXVkIjoiaHR0cHM6Ly9ldmlkZW5jZS5leGFtcGxlLmludmFsaWQiLCJpYXQiOjIwMDAwMDAwMDAsIm5iZiI6MjAwMDAwMDAwMCwiZXhwIjoyMDAwMDAzNjAwLCJqdGkiOiI4MzM4MWJhZS1lY2UwLTQ2NTMtYTRjNS1lN2RlMjkwMTdiYWMifQ.R7uguOk9Huo64bOvcpWkFLOO05FAVFMjl-7H67hmTl_bO_VKQ5QMOH1qzRzeBN-jyoONKPLx6Vn_Gpn7nObJDg",
+            "status": "active",
+            "caseContext": {
+              "caseId": "01103f42-27ed-4c2b-b517-54b22f914a67",
+              "sourceVersion": 4,
+              "checkedAt": 2000000000,
+              "status": "has-corrections",
+              "scope": "visible-case-context-only",
+              "authority": "case-owner-reported",
+              "independentDecision": false,
+              "affectsSignedCiFact": false,
+              "reviews": [],
+              "corrections": [
+                {
+                  "eventId": "6dab9f04-7616-4df1-89ce-6fa9d927e6ed",
+                  "targetEventId": "f83238e9-d67f-424e-a727-b3fd50de1d85",
+                  "reason": "Limit original interpretation",
+                  "summary": "Reported correction"
+                }
+              ]
+            },
+            "provenance": {
+              "version": 1,
+              "profile": "github-actions-provenance/1",
+              "sourceKey": "github-actions:repository:77:run:11:attempt:1",
+              "issuer": "https://evidence.example.invalid",
+              "proofId": "83381bae-ece0-4653-a4c5-e7de29017bac",
+              "source": {
+                "provider": "github-actions",
+                "owner": "Fixture",
+                "repository": "Synthetic",
+                "runId": 11,
+                "attempt": 1,
+                "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "repositoryId": 77,
+                "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+              },
+              "conclusion": "success",
+              "sourceControl": {
+                "version": 1,
+                "observedVia": "github-rest-api",
+                "repositoryOwner": {
+                  "id": 3,
+                  "login": "Fixture",
+                  "type": "Organization"
+                },
+                "submitterControlVerified": false,
+                "independentExecutionVerified": false
+              },
+              "authority": "issuer-attested-github-api-observation",
+              "submitterControlVerified": false,
+              "independentExecutionVerified": false
+            }
+          },
+          {
+            "proofId": "9414f744-980c-4534-8062-d6945eb630f2",
+            "signed": "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiZ2FsYXh5LXByb29mK2p3dCIsImtpZCI6ImdvLWZpeHR1cmUifQ.eyJkYXRhIjp7InZlcnNpb24iOjEsInR5cGUiOiJjaS1leGVjdXRpb24tb2JzZXJ2YXRpb24iLCJpZCI6Ijk0MTRmNzQ0LTk4MGMtNDUzNC04MDYyLWQ2OTQ1ZWI2MzBmMiIsInN1YmplY3QiOiJHVUlEMTUwMU02MVg3UTg2NU42MTVEUzUzSjBKNERRVCIsImlzc3VlciI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiZXZpZGVuY2VJZCI6IjQwNTk2MzhhLTdlY2MtNGEzOS04NTAxLTU4NjM4NDhmMDYwYiIsIm9ic2VydmF0aW9uSWQiOiIwZjkyMjBkMi05M2Y5LTRjOWMtOTczMC1jOGFkZTg4Mjg3Y2IiLCJzY29wZSI6InJlZmVyZW5jZWQtY2ktcnVuLW9ubHkiLCJzdHJlbmd0aCI6ImNpLWV4ZWN1dGlvbi1mYWN0IiwiaW5kZXBlbmRlbmNlIjoicmVwb3NpdG9yeS1jb250cm9sbGVkIiwiYXR0cmlidXRpb24iOiJzdWJtaXR0ZXItYXNzZXJ0ZWQiLCJzb3VyY2UiOnsib3duZXIiOiJGaXh0dXJlIiwicnVuSWQiOjExLCJjb21taXQiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiYXR0ZW1wdCI6MSwicHJvdmlkZXIiOiJnaXRodWItYWN0aW9ucyIsInJlcG9zaXRvcnkiOiJTeW50aGV0aWMiLCJyZXBvc2l0b3J5SWQiOjc3LCJzb3VyY2VVcGRhdGVkQXQiOiIyMDMzLTA1LTE4VDAzOjMzOjIwLjAwMFoifSwiY29uY2x1c2lvbiI6InN1Y2Nlc3MiLCJzb3VyY2VDb250cm9sIjp7InZlcnNpb24iOjEsIm9ic2VydmVkVmlhIjoiZ2l0aHViLXJlc3QtYXBpIiwicmVwb3NpdG9yeU93bmVyIjp7ImlkIjozLCJ0eXBlIjoiT3JnYW5pemF0aW9uIiwibG9naW4iOiJGaXh0dXJlIn0sInN1Ym1pdHRlckNvbnRyb2xWZXJpZmllZCI6ZmFsc2UsImluZGVwZW5kZW50RXhlY3V0aW9uVmVyaWZpZWQiOmZhbHNlfSwidGFza091dGNvbWVWZXJpZmljYXRpb24iOiJub3QtaW5kZXBlbmRlbnRseS12ZXJpZmllZCIsImNhcGFiaWxpdHlWZXJpZmllZCI6ZmFsc2UsInByZXBhcmVkQXQiOjIwMDAwMDAwMDAsIm9ic2VydmVkQXQiOjIwMDAwMDAwMDAsImV4cGlyZXNBdCI6MjAwMDAwMzYwMCwibGltaXRhdGlvbnMiOlsiUmVwb3NpdG9yeSB3b3JrZmxvd3MgbWF5IGJlIGNvbnRyb2xsZWQgYnkgdGhlIHN1Ym1pdHRlci4iLCJBIENJIGNvbmNsdXNpb24gZG9lcyBub3QgcHJvdmUgdGFzayBxdWFsaXR5IG9yIGluZGl2aWR1YWwgY29udHJpYnV0aW9uLiJdLCJzdGF0dXNQYXRoIjoiL3YxL3Byb29mcy85NDE0Zjc0NC05ODBjLTQ1MzQtODA2Mi1kNjk0NWViNjMwZjIvc3RhdHVzIn0sImlzcyI6Imh0dHBzOi8vZXZpZGVuY2UuZXhhbXBsZS5pbnZhbGlkIiwiYXVkIjoiaHR0cHM6Ly9ldmlkZW5jZS5leGFtcGxlLmludmFsaWQiLCJpYXQiOjIwMDAwMDAwMDAsIm5iZiI6MjAwMDAwMDAwMCwiZXhwIjoyMDAwMDAzNjAwLCJqdGkiOiI5NDE0Zjc0NC05ODBjLTQ1MzQtODA2Mi1kNjk0NWViNjMwZjIifQ.R-500LowdEna0dlmrA9DO8bdxQOTZv2KpVWLv5OxcPy-K1oB0NCBftUVgV2MbyN_dTWxdvpe2YwbSzVNMiH2BA",
+            "status": "active",
+            "caseContext": {
+              "caseId": "01103f42-27ed-4c2b-b517-54b22f914a67",
+              "sourceVersion": 4,
+              "checkedAt": 2000000000,
+              "status": "has-corrections",
+              "scope": "visible-case-context-only",
+              "authority": "case-owner-reported",
+              "independentDecision": false,
+              "affectsSignedCiFact": false,
+              "reviews": [],
+              "corrections": [
+                {
+                  "eventId": "6dab9f04-7616-4df1-89ce-6fa9d927e6ed",
+                  "targetEventId": "f83238e9-d67f-424e-a727-b3fd50de1d85",
+                  "reason": "Limit original interpretation",
+                  "summary": "Reported correction"
+                }
+              ]
+            },
+            "provenance": {
+              "version": 1,
+              "profile": "github-actions-provenance/1",
+              "sourceKey": "github-actions:repository:77:run:11:attempt:1",
+              "issuer": "https://evidence.example.invalid",
+              "proofId": "9414f744-980c-4534-8062-d6945eb630f2",
+              "source": {
+                "provider": "github-actions",
+                "owner": "Fixture",
+                "repository": "Synthetic",
+                "runId": 11,
+                "attempt": 1,
+                "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "repositoryId": 77,
+                "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+              },
+              "conclusion": "success",
+              "sourceControl": {
+                "version": 1,
+                "observedVia": "github-rest-api",
+                "repositoryOwner": {
+                  "id": 3,
+                  "login": "Fixture",
+                  "type": "Organization"
+                },
+                "submitterControlVerified": false,
+                "independentExecutionVerified": false
+              },
+              "authority": "issuer-attested-github-api-observation",
+              "submitterControlVerified": false,
+              "independentExecutionVerified": false
+            }
+          }
+        ],
+        "capabilityVerified": false,
+        "verification": "reported-results; proofs retain their own limited scope",
+        "projectionHash": "5b0c7b86bd8ce6b7ea2c1009855f2c95c840b567fff29601afe82d8bea714c0b",
+        "collaborationContext": {
+          "version": 1,
+          "coverage": "up-to-20-visible-links-from-200-candidates",
+          "capabilityIds": [],
+          "items": [],
+          "capabilityVerified": false
+        },
+        "reportedProgress": {
+          "version": 1,
+          "authority": "case-owner-reported",
+          "latestResultId": "f83238e9-d67f-424e-a727-b3fd50de1d85",
+          "timeline": [
+            {
+              "resultId": "f83238e9-d67f-424e-a727-b3fd50de1d85",
+              "attemptId": "5f303d12-193a-44ea-8995-5f620af19cf4",
+              "outcome": "partial",
+              "sourceEventVersion": 3,
+              "corrected": true
+            }
+          ],
+          "subsequentReports": [],
+          "capabilityVerified": false,
+          "attemptCountIsCapability": false
+        },
+        "moderationContext": {
+          "version": 1,
+          "authority": "viewer-authorized-moderation",
+          "automaticallyVerified": false,
+          "items": [],
+          "coverage": "up-to-20-visible-reports; latest-10-visible-events-per-report"
+        },
+        "fieldPolicy": {
+          "id": "history-fields",
+          "version": 1,
+          "view": "public"
+        },
+        "rebuild": {
+          "rule": {
+            "id": "case-history",
+            "version": 4
+          },
+          "endpoint": "https://evidence.example.invalid",
+          "caseId": "01103f42-27ed-4c2b-b517-54b22f914a67",
+          "sourceVersion": 4,
+          "view": "public",
+          "contentHash": "8cd0faf600d93fe83ffebbb0efe84deda24efc6996ccefc86ab0024766f58651",
+          "sources": {
+            "events": [
+              {
+                "id": "01103f42-27ed-4c2b-b517-54b22f914a67",
+                "kind": "case",
+                "version": 1
+              },
+              {
+                "id": "5f303d12-193a-44ea-8995-5f620af19cf4",
+                "kind": "attempt",
+                "version": 2
+              },
+              {
+                "id": "f83238e9-d67f-424e-a727-b3fd50de1d85",
+                "kind": "result",
+                "version": 3
+              },
+              {
+                "id": "6dab9f04-7616-4df1-89ce-6fa9d927e6ed",
+                "kind": "revision",
+                "version": 4
+              }
+            ],
+            "proofIds": [
+              "83381bae-ece0-4653-a4c5-e7de29017bac",
+              "9414f744-980c-4534-8062-d6945eb630f2"
+            ],
+            "capsuleUseIds": [],
+            "assistanceIds": []
+          }
+        },
+        "searchExplanation": {
+          "rule": {
+            "id": "visible-history-rules",
+            "version": 1
+          },
+          "sourceType": "case-history",
+          "caseId": "01103f42-27ed-4c2b-b517-54b22f914a67",
+          "order": "case-id",
+          "scope": "current-authorized-view",
+          "checkedAt": 2000000000,
+          "textMatches": [],
+          "capabilityMatches": [],
+          "verification": {
+            "strength": "ci-execution-fact",
+            "proofIds": [
+              "83381bae-ece0-4653-a4c5-e7de29017bac",
+              "9414f744-980c-4534-8062-d6945eb630f2"
+            ],
+            "capabilityVerified": false,
+            "meaning": "At least one current visible limited CI execution Proof."
+          },
+          "sources": [
+            {
+              "kind": "case",
+              "id": "01103f42-27ed-4c2b-b517-54b22f914a67"
+            },
+            {
+              "kind": "history",
+              "id": "01103f42-27ed-4c2b-b517-54b22f914a67"
+            },
+            {
+              "kind": "proof",
+              "id": "83381bae-ece0-4653-a4c5-e7de29017bac"
+            },
+            {
+              "kind": "proof",
+              "id": "9414f744-980c-4534-8062-d6945eb630f2"
+            }
+          ],
+          "limitations": [
+            "Text terms match the disclosed Case title and summary.",
+            "Capability associations describe requested work, not verified proficiency.",
+            "UUID ordering is stable pagination, not a ranking of experts.",
+            "CI observations do not independently verify task outcome or individual capability."
+          ]
+        },
+        "matchReasons": [
+          "case ID order"
+        ]
+      }
+    ],
+    "nextCursor": null,
+    "search": {
+      "rule": "visible-history-rules@1",
+      "order": "case-id",
+      "windowLimited": false,
+      "scanLimit": 21,
+      "coverage": "current-page",
+      "globalCountProvided": false
+    },
+    "pageSummary": {
+      "cases": 1,
+      "results": 1,
+      "ciSources": {
+        "version": 1,
+        "scope": "provided-visible-ci-proofs-only",
+        "proofRecordCount": 2,
+        "sourceGroupCount": 1,
+        "duplicateProofRecordCount": 1,
+        "conflictingSourceGroupCount": 0,
+        "independentlyVerifiedSourceCount": 0,
+        "globalCountProvided": false,
+        "groups": [
+          {
+            "sourceKey": "github-actions:repository:77:run:11:attempt:1",
+            "repositoryId": 77,
+            "runId": 11,
+            "attempt": 1,
+            "records": [
+              {
+                "issuer": "https://evidence.example.invalid",
+                "proofId": "83381bae-ece0-4653-a4c5-e7de29017bac"
+              },
+              {
+                "issuer": "https://evidence.example.invalid",
+                "proofId": "9414f744-980c-4534-8062-d6945eb630f2"
+              }
+            ],
+            "conflicts": []
+          }
+        ]
+      }
+    },
+    "checkedAt": 2000000000,
+    "refresh": {
+      "mode": "on-demand",
+      "state": "rebuilt",
+      "backgroundQueue": false,
+      "checkedAt": 2000000000
+    },
+    "capabilityVerified": false
+  }
+}

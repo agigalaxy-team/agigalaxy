@@ -505,6 +505,16 @@ export interface SiteSetting {
         id?: string | null;
       }[]
     | null;
+  systemGeneralRevision?: number | null;
+  systemGeneralOperation?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   _status?: ('draft' | 'published') | null;
   updatedAt?: string | null;
   createdAt?: string | null;
@@ -523,6 +533,8 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         href?: T;
         id?: T;
       };
+  systemGeneralRevision?: T;
+  systemGeneralOperation?: T;
   _status?: T;
   updatedAt?: T;
   createdAt?: T;

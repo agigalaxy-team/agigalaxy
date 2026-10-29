@@ -1,7 +1,7 @@
 import {createFactSubmissions} from './fact-submissions.mjs';
-import {caseEventV2Schema,caseTaskLinkSchema} from "../../../../galaxy-official/src/shared/cases-schema.mjs";
-import {verificationEventSchema,verificationOperationReceiptResultSchema} from "../../../../galaxy-official/src/shared/verification-record-schema.mjs";
-import {equalJson,sha256Hex,stableJson} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {caseEventV2Schema,caseTaskLinkSchema} from "../../../../galaxy-contracts/src/cases-schema.mjs";
+import {verificationEventSchema,verificationOperationReceiptResultSchema} from "../../../../galaxy-contracts/src/verification-record-schema.mjs";
+import {equalJson,sha256Hex,stableJson} from "../../../../galaxy-contracts/src/web-primitives.mjs";
 
 const instances=new WeakMap(),copy=value=>structuredClone(value);
 const uuid=value=>/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value??'');

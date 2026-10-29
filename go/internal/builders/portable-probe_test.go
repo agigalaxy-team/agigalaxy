@@ -1,6 +1,7 @@
 package builders
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -11,25 +12,39 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
+// Exercise the current A2A SDK and portable signed contract without an old service.
+func portableContract(t *testing.T, mode string, input any) Object {
+	t.Helper()
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("node", filepath.Join(root, "go/internal/builders/testdata/portable-contract.mjs"), mode)
+	cmd.Dir = root
+	cmd.Stdin = bytes.NewReader(encode(input))
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	raw, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("portable SDK contract %s: %v %s", mode, err, stderr.String())
+	}
+	var result Object
+	if err = protocol.Decode(raw, &result); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
 func TestPortableCurrentSourcesOriginalVerifierAndProbeWorkerRole(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	file := filepath.Join(t.TempDir(), "builder-fixture.json")
-	node(t, dsn, "portable-setup", file, nil)
-	raw, e := os.ReadFile(file)
-	if e != nil {
-		t.Fatal(e)
-	}
-	var f Object
-	if protocol.Decode(raw, &f) != nil {
-		t.Fatal("fixture")
-	}
+	f := setupBuilders(t, owner, "portable-setup")
 	clock := num(f, "clock")
 	now := func() time.Time { return time.Unix(clock, 0) }
 	rolePool := func(role string) *pgxpool.Pool {
@@ -81,7 +96,7 @@ func TestPortableCurrentSourcesOriginalVerifierAndProbeWorkerRole(t *testing.T) 
 	}
 	same(t, captured["node-control"], f["nodeSnapshot"])
 	same(t, captured["conformance"], f["reportSnapshot"])
-	if node(t, dsn, "portable-verify", file, Object{"endpoint": s.Endpoint, "clock": clock, "builderId": f["builderId"], "controlId": f["controlId"], "reportId": f["reportId"], "publicKeyPem": pub, "node": n["signed"], "report": r["signed"]})["verified"] != true {
+	if portableContract(t, "portable-verify", Object{"endpoint": s.Endpoint, "clock": clock, "builderId": f["builderId"], "controlId": f["controlId"], "reportId": f["reportId"], "publicKeyPem": pub, "node": n["signed"], "report": r["signed"]})["verified"] != true {
 		t.Fatal("original verifier")
 	}
 	// Exports are reads of current authority, but every export has its own audit.
@@ -96,7 +111,7 @@ func TestPortableCurrentSourcesOriginalVerifierAndProbeWorkerRole(t *testing.T) 
 	ws := &Service{Pool: worker, Endpoint: s.Endpoint, Devices: &deviceauth.Service{Pool: worker, Endpoint: s.Endpoint, Now: now}, Now: now}
 	posts := 0
 	var afterPost func()
-	card := node(t, dsn, "probe-sdk", file, nil)["card"]
+	card := portableContract(t, "probe-sdk", nil)["card"]
 	w := &ProbeWorker{Service: ws, Transport: ProbeTransport{Get: func(context.Context, string, int, time.Duration) ([]byte, error) {
 		return encode(card), nil
 	}, Post: func(ctx context.Context, address string, body []byte, max int, timeout time.Duration) ([]byte, error) {
@@ -106,7 +121,7 @@ func TestPortableCurrentSourcesOriginalVerifierAndProbeWorkerRole(t *testing.T) 
 		if q["method"] != "GetTask" || num(obj(q["params"]), "historyLength") != 0 {
 			t.Fatal("probe performed work")
 		}
-		result := node(t, dsn, "probe-sdk", file, q)
+		result := portableContract(t, "probe-sdk", q)
 		requests := arr(result["requests"])
 		if len(requests) != 1 || obj(requests[0])["authorization"] != nil || obj(requests[0])["version"] != "1.0" {
 			t.Fatal("original SDK request scope", requests)

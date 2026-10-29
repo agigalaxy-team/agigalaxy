@@ -1,35 +1,49 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createServer} from 'node:http';
 import { createTaskOwnerReadClient } from "../src/features/tasks/owner/task-owner-read-client.mjs";
-import { sha256Hex } from '../../galaxy-official/src/shared/web-primitives.mjs';
+import { sha256Hex } from '../../galaxy-contracts/src/web-primitives.mjs';
 
 const now = 2000000000, taskId = crypto.randomUUID(), rootId = crypto.randomUUID();
 const guarantees = { projection: 'currently-authorized-authored-events', completeTaskSnapshot: false,
   contextAccessGranted: false, referenceAccessGranted: false, taskWriteGranted: false };
 function deferred() { let release; const promise = new Promise(resolve => { release = resolve; }); return { promise, release }; }
-async function fixture() {
+async function fixture(t) {
   let connection = { subjectId: 'GUID' + 'A'.repeat(28), bindingId: crypto.randomUUID(), generation: 1,
     control: { deviceId: crypto.randomUUID(), epoch: 2 } };
   const body = JSON.stringify({ taskId, title: '本人原始请求', summary: '只在明确授权后返回' }), bodyHash = await sha256Hex(body);
   const local = new Map(), calls = [], hooks = {};let time=now;
   const pause = async name => { if (hooks[name]) await hooks[name](); };
+  // Only response shapes and timing are simulated; server-side permission and
+  // signing behavior are outside this wire-level client regression.
+  const server=createServer(async(req,res)=>{
+    let raw='';for await(const chunk of req)raw+=chunk;
+    const input=JSON.parse(raw||'{}'),path=req.url;
+    calls.push({path,input});
+    let value;
+    if(path.endsWith('/prepare')){
+      const descriptor={version:1,operationId:input.operationId,taskId,taskVersion:1,
+        bindingId:connection.bindingId,deviceId:connection.control.deviceId,controlEpoch:connection.control.epoch,
+        eventRefs:[{eventId:rootId,version:1,payloadHash:bodyHash}],expiresAt:now+300};
+      const payloadJson=JSON.stringify(descriptor);
+      value={taskId,latestTaskVersion:1,...guarantees,payloadJson,payloadHash:await sha256Hex(payloadJson),
+        expiresAt:descriptor.expiresAt,events:[{eventId:rootId,version:1,kind:'request',payloadHash:bodyHash,
+          createdAt:new Date(now*1000).toISOString(),readExpiresAt:now+600}]};
+      await pause('metadata');
+    }else {
+      value={taskId,latestTaskVersion:1,...guarantees,events:[{eventId:rootId,version:1,kind:'request',payloadHash:bodyHash,payloadJson:body}]};
+      await pause('body');
+    }
+    res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(value));
+  });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});
+  const origin='http://127.0.0.1:'+server.address().port;
   const runtime = {
     api: { endpoint: 'https://official.example.org', snapshot: () => structuredClone(connection),
       async call(path, input) {
-        calls.push({ path, input: structuredClone(input) });
-        if (path.endsWith('/prepare')) {
-          const descriptor = { version: 1, operationId: input.operationId, taskId, taskVersion: 1,
-            bindingId: connection.bindingId, deviceId: connection.control.deviceId, controlEpoch: connection.control.epoch,
-            eventRefs: [{ eventId: rootId, version: 1, payloadHash: bodyHash }], expiresAt: now + 300 };
-          const payloadJson = JSON.stringify(descriptor);
-          const value = { taskId, latestTaskVersion: 1, ...guarantees, payloadJson, payloadHash: await sha256Hex(payloadJson),
-            expiresAt: descriptor.expiresAt, events: [{ eventId: rootId, version: 1, kind: 'request', payloadHash: bodyHash,
-              createdAt: new Date(now * 1000).toISOString(), readExpiresAt: now + 600 }] };
-          await pause('metadata'); return value;
-        }
-        const value = { taskId, latestTaskVersion: 1, ...guarantees,
-          events: [{ eventId: rootId, version: 1, kind: 'request', payloadHash: bodyHash, payloadJson: body }] };
-        await pause('body'); return value;
+        const response=await fetch(origin+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)});
+        if(!response.ok)throw Error('unexpected wire response');return response.json();
       },
       async prepareAuthorization(payloadJson, options) {
         calls.push({ sign: true });
@@ -52,38 +66,38 @@ async function fixture() {
     client: createTaskOwnerReadClient(runtime, taskId, { now: () => time }) };
 }
 
-test('metadata preparation and dismissal require no signature, Consent submission or event body', async () => {
-  const f = await fixture(), preview = await f.client.prepare();
+test('metadata preparation and dismissal require no signature, Consent submission or event body', async t => {
+  const f = await fixture(t), preview = await f.client.prepare();
   assert.equal(f.calls.length, 1); assert.equal(f.calls[0].path.endsWith('/prepare'), true);
   assert.equal(JSON.stringify(preview).includes('只在明确授权后返回'), false); f.client.close();
   assert.equal(f.local.size, 0);
 });
 
-test('same-subject rebind drops late metadata and cannot sign its prior descriptor', async () => {
-  const f = await fixture(), hit = deferred(), finish = deferred();
+test('same-subject rebind drops late metadata and cannot sign its prior descriptor', async t => {
+  const f = await fixture(t), hit = deferred(), finish = deferred();
   f.hooks.metadata = async () => { hit.release(); await finish.promise; };
   const operation = f.client.prepare(); await hit.promise; f.rebind(); finish.release();
   await assert.rejects(operation, /身份或连接已改变/); assert.equal(f.calls.some(call => call.sign || call.submit), false);
 });
 
-test('same-subject rebind while preparing a signature prevents Consent or body requests', async () => {
-  const f = await fixture(), preview = await f.client.prepare(), hit = deferred(), finish = deferred();
+test('same-subject rebind while preparing a signature prevents Consent or body requests', async t => {
+  const f = await fixture(t), preview = await f.client.prepare(), hit = deferred(), finish = deferred();
   f.hooks.sign = async () => { hit.release(); await finish.promise; };
   const operation = f.client.read(preview, { confirmed: true }); await hit.promise; f.rebind(); finish.release();
   await assert.rejects(operation, /身份或连接已改变/); assert.equal(f.calls.some(call => call.submit), false);
   assert.equal(f.calls.filter(call => call.path?.endsWith('/owner-read')).length, 0);
 });
 
-test('closing the consumer suppresses a late original body without persisting it', async () => {
-  const f = await fixture(), preview = await f.client.prepare(), hit = deferred(), finish = deferred();
+test('closing the consumer suppresses a late original body without persisting it', async t => {
+  const f = await fixture(t), preview = await f.client.prepare(), hit = deferred(), finish = deferred();
   f.hooks.body = async () => { hit.release(); await finish.promise; };
   const operation = f.client.read(preview, { confirmed: true }); await hit.promise; f.client.close(); finish.release();
   await assert.rejects(operation, /身份或连接已改变/);
   assert.equal(JSON.stringify([...f.local.values()]).includes('只在明确授权后返回'), false);
 });
 
-test('an altered preview cannot be signed; accepted finite result is not kept as a Task body', async () => {
-  const f = await fixture(), preview = await f.client.prepare();
+test('an altered preview cannot be signed; accepted finite result is not kept as a Task body', async t => {
+  const f = await fixture(t), preview = await f.client.prepare();
   await assert.rejects(f.client.read({ ...preview, events: [] }, { confirmed: true }), /范围或回执不一致/);
   await assert.rejects(f.client.read(preview), /明确授权/);
   assert.equal(f.calls.some(call => call.sign), false);
@@ -94,8 +108,8 @@ test('an altered preview cannot be signed; accepted finite result is not kept as
   assert.equal(JSON.stringify([...f.local.values()]).includes('只在明确授权后返回'),false);
 });
 
-test('a completed original read survives reopening on the same device/binding without a new signature or Consent; expiry stays visible without renewal',async()=>{
-  const f=await fixture(),preview=await f.client.prepare(),result=await f.client.read(preview,{confirmed:true});
+test('a completed original read survives reopening on the same device/binding without a new signature or Consent; expiry stays visible without renewal',async t=>{
+  const f=await fixture(t),preview=await f.client.prepare(),result=await f.client.read(preview,{confirmed:true});
   assert.equal(result.expiresAt,now+300);assert.equal(result.readExpiresAt,now+600);
   const before=f.calls.filter(call=>call.sign||call.submit).length;f.client.close();f.bumpGeneration();
   const reopened=f.reopen(),pending=await reopened.pending();assert.equal(pending.authorizationState,'authorized');
@@ -108,8 +122,8 @@ test('a completed original read survives reopening on the same device/binding wi
   assert.equal(f.calls.length,calls,'expired original scope is not re-signed or sent');
 });
 
-test('saved wrong-action Consent is rejected before a submit even if its preview matches', async () => {
-  const f = await fixture(), preview = await f.client.prepare();
+test('saved wrong-action Consent is rejected before a submit even if its preview matches', async t => {
+  const f = await fixture(t), preview = await f.client.prepare();
   f.hooks.submit = async () => { throw new Error('synthetic acknowledgement lost'); };
   await assert.rejects(f.client.read(preview, { confirmed: true }), /synthetic acknowledgement lost/);
   const saved = f.local.get(`task-owner-read:${taskId}`); saved.prepared.intent.action = 'assistance.publish';

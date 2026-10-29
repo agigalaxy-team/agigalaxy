@@ -1,11 +1,10 @@
 package operationsaudit
 
 import (
-	"bytes"
 	"encoding/json"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -85,7 +84,13 @@ func fixtureRow(action string) Object {
 }
 func TestAllOriginalClosedAuditActionProjectionsAndCustomRefinements(t *testing.T) {
 	rows := []Object{}
-	for action, entry := range catalog.Actions {
+	actions := make([]string, 0, len(catalog.Actions))
+	for action := range catalog.Actions {
+		actions = append(actions, action)
+	}
+	sort.Strings(actions)
+	for _, action := range actions {
+		entry := catalog.Actions[action]
 		row := fixtureRow(action)
 		for _, side := range []string{"selection", "result"} {
 			v := Object{"rawSecret": "synthetic unknown prose must not escape"}
@@ -119,18 +124,17 @@ func TestAllOriginalClosedAuditActionProjectionsAndCustomRefinements(t *testing.
 	unknown["selection"] = Object{"title": "synthetic private narrative"}
 	unknown["result"] = Object{"body": "synthetic body"}
 	rows = append(rows, unknown)
-	raw, _ := json.Marshal(rows)
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/operationsaudit/testdata/oracle.mjs"))
-	cmd.Dir = root
-	cmd.Stdin = bytes.NewReader(raw)
-	output, e := cmd.CombinedOutput()
+	// Fixed synthetic projections captured once from the retired verifier.
+	output, e := os.ReadFile("testdata/audit-projections.json")
 	if e != nil {
 		t.Fatalf("original audit projection %v %s", e, output)
 	}
 	var expected []Object
 	if json.Unmarshal(output, &expected) != nil {
 		t.Fatalf("invalid original projection %s", output)
+	}
+	if len(expected) != len(rows) {
+		t.Fatalf("audit fixture rows %d, current cases %d", len(expected), len(rows))
 	}
 	for i, row := range rows {
 		got := Metadata(row)

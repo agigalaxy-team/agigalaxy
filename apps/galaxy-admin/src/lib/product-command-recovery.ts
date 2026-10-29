@@ -1,5 +1,5 @@
-import {productOriginalIntent,productReceiptIntent} from '../../../../packages/galaxy-official/src/shared/operations-product-receipt-intent.mjs';
-import {canonicalReceiptInput} from '../../../../packages/galaxy-official/src/shared/operations-governance-receipt-intent.mjs';
+import {productOriginalIntent,productReceiptIntent} from '../../../../packages/galaxy-contracts/src/operations-product-receipt-intent.mjs';
+import {canonicalReceiptInput} from '../../../../packages/galaxy-contracts/src/operations-governance-receipt-intent.mjs';
 import {operationsRequest} from './operations-client';
 type Intent=Readonly<{path:string;body:Record<string,unknown>}>;
 export type ProductRecovered={recovered:true;operationId:string;action:string;recordedAt:string}&({family:'notice';noticeId:string;version:number;state:'draft'|'queued'|'withdrawn';submittedJobId:string|null}|{family:'retention';runId:string;target:string;state:'queued';jobId:string;createdAt:string});

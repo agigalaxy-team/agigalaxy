@@ -2,11 +2,7 @@ package operationspermissions_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +12,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	perms "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,28 +21,10 @@ import (
 func TestOriginalDelegationActionAndQueryConsumers(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string, input any) map[string]any {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		if input != nil {
-			cmd.Stdin = strings.NewReader(jsonText(input))
-		}
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o map[string]any
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid original result")
-		}
-		return o
-	}
-	base := node("setup", nil)
-	node("automation-setup", nil)
-	fixture := node("delegated-setup", nil)
+	currentFixture := operationsfixture.New(t, owner)
+	base := currentFixture.Data
+	currentFixture.Automation(t)
+	fixture := currentFixture.Delegated(t)
 	ids := object(base["ids"])
 	endpoint, issuer := text(base["endpoint"]), text(base["issuer"])
 	cfg, e := pgxpool.ParseConfig(dsn)
@@ -82,7 +61,7 @@ func TestOriginalDelegationActionAndQueryConsumers(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	source := node("consumer-prepare", map[string]any{"request": input, "operationId": op})
+	source := currentFixture.PrepareAction(t, map[string]any{"request": input, "operationId": op})
 	if !equal(proposal, source) {
 		t.Fatalf("prepare differs\nGo%s\nJS%s", jsonText(proposal), jsonText(source))
 	}
@@ -90,7 +69,7 @@ func TestOriginalDelegationActionAndQueryConsumers(t *testing.T) {
 	if e != nil || missing["state"] != "not-recorded" {
 		t.Fatalf("missing original %v", e)
 	}
-	originalMissing := node("consumer-recover", map[string]any{"proposal": proposal, "operationId": op})
+	originalMissing := currentFixture.RecoverAction(t, map[string]any{"proposal": proposal, "operationId": op})
 	if !equal(missing, originalMissing) {
 		t.Fatal("missing result differs")
 	}
@@ -98,7 +77,7 @@ func TestOriginalDelegationActionAndQueryConsumers(t *testing.T) {
 	if e != nil || result["state"] != "completed" {
 		t.Fatalf("Go original execute %v", e)
 	}
-	source = node("consumer-recover", map[string]any{"proposal": proposal, "operationId": op})
+	source = currentFixture.RecoverAction(t, map[string]any{"proposal": proposal, "operationId": op})
 	recovered, e := service.RecoverManagementAction(ctx, human, proposal, op)
 	if e != nil || !equal(source, recovered) {
 		t.Fatalf("Go effect→JS/Go recover %v", e)
@@ -110,7 +89,7 @@ func TestOriginalDelegationActionAndQueryConsumers(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	source = node("consumer-execute", map[string]any{"proposal": proposal2, "operationId": op2})
+	source = currentFixture.ExecuteAction(t, map[string]any{"proposal": proposal2, "operationId": op2})
 	recovered, e = service.RecoverManagementAction(ctx, human, proposal2, op2)
 	if e != nil || object(recovered["receipt"])["replayed"] != true || object(source["receipt"])["roleId"] != object(recovered["receipt"])["roleId"] {
 		t.Fatalf("JS execute→Go recovery %v", e)
@@ -152,14 +131,14 @@ func TestOriginalDelegationActionAndQueryConsumers(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	source = node("consumer-prepare", map[string]any{"request": promptInput, "operationId": promptOp})
+	source = currentFixture.PrepareAction(t, map[string]any{"request": promptInput, "operationId": promptOp})
 	if !equal(promptProposal, source) {
 		t.Fatal("prompt review card differs")
 	}
 	if _, e = service.ExecuteManagementAction(ctx, human, promptProposal, promptOp, authenticate); e != nil {
 		t.Fatal(e)
 	}
-	source = node("consumer-recover", map[string]any{"proposal": promptProposal, "operationId": promptOp})
+	source = currentFixture.RecoverAction(t, map[string]any{"proposal": promptProposal, "operationId": promptOp})
 	recovered, e = service.RecoverManagementAction(ctx, human, promptProposal, promptOp)
 	if e != nil || !equal(recovered, source) {
 		t.Fatalf("prompt consumer original receipt %v", e)
@@ -169,7 +148,7 @@ func TestOriginalDelegationActionAndQueryConsumers(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		want := node("consumer-read", map[string]any{"arguments": arguments})
+		want := currentFixture.ReadManagement(t, map[string]any{"arguments": arguments})
 		if !equal(got, want) {
 			t.Fatalf("read-ai-delegation projection differs\nGo%s\nJS%s", jsonText(got), jsonText(want))
 		}

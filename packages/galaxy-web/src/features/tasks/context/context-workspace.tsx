@@ -3,7 +3,7 @@ import React, { useEffect, useEffectEvent, useId, useMemo, useRef, useState } fr
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { createContextClientV2 } from "../../../../../galaxy-official/src/clients/context-v2.mjs";
+import { createContextClientV2 } from "../../../../../galaxy-client/src/clients/context-v2.mjs";
 import { MemberAvatar, memberName, readableTime, useMemberNames } from "../../../shared/people/conversation-ui";
 import {checkedContextDraft,recordErrorField} from "../../work-records/record-workspace-types";
 import {contextMaterialMatchesWork} from './task-context-reading.mjs';

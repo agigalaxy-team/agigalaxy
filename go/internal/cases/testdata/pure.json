@@ -1,0 +1,609 @@
+{
+  "input": {
+    "link": {
+      "case": {
+        "consentId": "0ac43324-754d-45b9-86de-912ef892b7be",
+        "payloadJson": "{}"
+      },
+      "expectedTaskVersion": 1,
+      "initialFact": {
+        "consentId": "e6756900-552e-46a9-9b41-857dea8e7514",
+        "payloadJson": "{\"x\":\" \\u2028\"}"
+      },
+      "operationId": "80437a62-4594-4be4-8d0e-dda384f9ced6",
+      "taskId": "a4aefe59-4b91-4008-879d-b5597d603e5b"
+    },
+    "parent": {
+      "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+      "version": 1
+    },
+    "rows": [],
+    "schemas": [
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "strategy": "﻿ approach  ",
+        "unknown": "reject"
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "configurationRef": null,
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "configurationRef": {
+          "id": "2c94e502-b1dd-4a02-9108-29bcb5cb1294",
+          "version": 1
+        },
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "environment": null,
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "environment": {
+          "extra": true,
+          "name": "x",
+          "version": "1"
+        },
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "scopeVersion": 1,
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 9007199254740992,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "startedAt": "2033-05-18T03:33Z",
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "startedAt": "2033-05-18T03:33:20+00:00",
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "startedAt": "2033-02-29T03:33:20Z",
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [],
+        "role": " author ",
+        "strategy": "﻿ approach  "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+        "expectedVersion": 1,
+        "inputScopeSummary": " input ",
+        "kind": "attempt-start",
+        "permissionScope": [
+          "read"
+        ],
+        "role": " author ",
+        "strategy": ""
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "06f31b87-f446-4089-8be0-1bd91eb49982",
+        "eventId": "5a83d8fb-3ea6-4b4b-8f23-61205b2896e7",
+        "expectedVersion": 0,
+        "kind": "case-created",
+        "localRef": "local:1",
+        "source": {
+          "kind": "active-task",
+          "reference": "task:1"
+        },
+        "summary": " summary ",
+        "synthetic": false,
+        "title": " title "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "attemptRef": {
+          "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+          "version": 1
+        },
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "4f9e1952-027f-49cf-bf29-fc0179ffbf7b",
+        "expectedVersion": 1,
+        "failureReason": " unknown ",
+        "kind": "attempt-end",
+        "status": "inconclusive",
+        "summary": " summary "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "attemptRef": {
+          "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+          "version": 1
+        },
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "aed4670a-b501-4883-aa96-37ebd859cf15",
+        "expectedVersion": 1,
+        "failureReason": " unknown ",
+        "kind": "attempt-correct",
+        "reason": " correction ",
+        "status": "inconclusive",
+        "summary": " summary "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "affectsAttemptIds": [],
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "description": " description ",
+        "eventId": "b93f071b-6ac3-4c4e-8e6c-f8b052979f23",
+        "expectedVersion": 1,
+        "kind": "intervention",
+        "observedEffect": " unknown ",
+        "sourceRefs": [],
+        "types": [
+          "advice"
+        ]
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "6a9e8739-32fd-445a-a21b-9200de1c6d3c",
+        "expectedVersion": 1,
+        "interventionRef": {
+          "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+          "version": 1
+        },
+        "kind": "intervention-response",
+        "state": "accepted",
+        "summary": " reply "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "deliverableRefs": [],
+        "eventId": "48894e8e-6e9c-4508-baf2-57243c0642d3",
+        "expectedVersion": 1,
+        "kind": "result-recorded",
+        "limitations": " limits ",
+        "origin": {
+          "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+          "kind": "attempt",
+          "version": 1
+        },
+        "reportedOutcome": "conflicting",
+        "scopeVersion": 1,
+        "summary": " result "
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "5011b040-c57e-4489-aefe-5785da8600d4",
+        "expectedVersion": 1,
+        "kind": "resolution-recorded",
+        "remainingGoals": [],
+        "resultRefs": [
+          {
+            "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+            "version": 1
+          }
+        ],
+        "satisfiedGoals": [
+          " goal "
+        ],
+        "status": "regressed",
+        "summary": " reported ",
+        "supersedesResolutionId": null,
+        "taskScopeVersion": 1,
+        "verificationRefs": []
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "c29e4787-ef1b-4383-9fe4-f88deca25716",
+        "expectedVersion": 1,
+        "kind": "case-scope-revised",
+        "reason": " reason ",
+        "summary": " changed ",
+        "taskScopeVersion": 2
+      },
+      {
+        "actorId": "GUID1234567890123456789012345678",
+        "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+        "eventId": "80f8e58f-afac-462f-a841-148e1f990e7c",
+        "expectedVersion": 1,
+        "kind": "case-withdrawn",
+        "reason": " owner choice "
+      }
+    ]
+  },
+  "result": {
+    "schemas": [
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "attempt-start",
+          "role": " author ",
+          "strategy": "approach ",
+          "inputScopeSummary": "input",
+          "permissionScope": [
+            "read"
+          ]
+        }
+      },
+      {
+        "accepted": false
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "attempt-start",
+          "role": " author ",
+          "strategy": "approach ",
+          "configurationRef": null,
+          "inputScopeSummary": "input",
+          "permissionScope": [
+            "read"
+          ]
+        }
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "attempt-start",
+          "role": " author ",
+          "strategy": "approach ",
+          "configurationRef": {
+            "id": "2c94e502-b1dd-4a02-9108-29bcb5cb1294",
+            "version": 1
+          },
+          "inputScopeSummary": "input",
+          "permissionScope": [
+            "read"
+          ]
+        }
+      },
+      {
+        "accepted": false
+      },
+      {
+        "accepted": false
+      },
+      {
+        "accepted": false
+      },
+      {
+        "accepted": false
+      },
+      {
+        "accepted": false
+      },
+      {
+        "accepted": false
+      },
+      {
+        "accepted": false
+      },
+      {
+        "accepted": false
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "attempt-start",
+          "role": " author ",
+          "strategy": "",
+          "inputScopeSummary": "input",
+          "permissionScope": [
+            "read"
+          ]
+        }
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "5a83d8fb-3ea6-4b4b-8f23-61205b2896e7",
+          "caseId": "06f31b87-f446-4089-8be0-1bd91eb49982",
+          "expectedVersion": 0,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "case-created",
+          "localRef": "local:1",
+          "title": "title",
+          "summary": "summary",
+          "source": {
+            "kind": "active-task",
+            "reference": "task:1"
+          },
+          "synthetic": false
+        }
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "4f9e1952-027f-49cf-bf29-fc0179ffbf7b",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "attempt-end",
+          "attemptRef": {
+            "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+            "version": 1
+          },
+          "status": "inconclusive",
+          "summary": "summary",
+          "failureReason": "unknown"
+        }
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "aed4670a-b501-4883-aa96-37ebd859cf15",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "attempt-correct",
+          "attemptRef": {
+            "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+            "version": 1
+          },
+          "status": "inconclusive",
+          "summary": "summary",
+          "failureReason": "unknown",
+          "reason": "correction"
+        }
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "b93f071b-6ac3-4c4e-8e6c-f8b052979f23",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "intervention",
+          "types": [
+            "advice"
+          ],
+          "affectsAttemptIds": [],
+          "description": "description",
+          "sourceRefs": [],
+          "observedEffect": "unknown"
+        }
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "6a9e8739-32fd-445a-a21b-9200de1c6d3c",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "intervention-response",
+          "interventionRef": {
+            "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+            "version": 1
+          },
+          "state": "accepted",
+          "summary": "reply"
+        }
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "48894e8e-6e9c-4508-baf2-57243c0642d3",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "result-recorded",
+          "origin": {
+            "kind": "attempt",
+            "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+            "version": 1
+          },
+          "scopeVersion": 1,
+          "deliverableRefs": [],
+          "reportedOutcome": "conflicting",
+          "summary": "result",
+          "limitations": "limits"
+        }
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "5011b040-c57e-4489-aefe-5785da8600d4",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "taskScopeVersion": 1,
+          "kind": "resolution-recorded",
+          "status": "regressed",
+          "summary": "reported",
+          "satisfiedGoals": [
+            "goal"
+          ],
+          "remainingGoals": [],
+          "resultRefs": [
+            {
+              "id": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+              "version": 1
+            }
+          ],
+          "verificationRefs": [],
+          "supersedesResolutionId": null
+        }
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "c29e4787-ef1b-4383-9fe4-f88deca25716",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "taskScopeVersion": 2,
+          "kind": "case-scope-revised",
+          "summary": "changed",
+          "reason": "reason"
+        }
+      },
+      {
+        "accepted": true,
+        "value": {
+          "eventId": "80f8e58f-afac-462f-a841-148e1f990e7c",
+          "caseId": "0797122b-a170-4913-bf69-f2134e017d2f",
+          "expectedVersion": 1,
+          "actorId": "GUID1234567890123456789012345678",
+          "kind": "case-withdrawn",
+          "reason": "owner choice"
+        }
+      }
+    ],
+    "facts": {
+      "attempts": [],
+      "interventions": [],
+      "results": [],
+      "resolutions": [],
+      "responses": [],
+      "scopes": [],
+      "synthetic": null,
+      "resolution": {
+        "status": "unrecorded"
+      },
+      "version": 1,
+      "caseId": "15c97406-8bf1-4873-ad77-f0062ee6e76f",
+      "scopeVersion": 1
+    },
+    "hashes": {
+      "current": "ab02d0a91c54da194d549a2a0df8658bd24d68b77190b83cd48865176cf2e5bf",
+      "legacy": "2fa35d302d99f51da3e88c584afa87491ab3ca80ebae858cb38ea1cdb5b584b8"
+    }
+  }
+}

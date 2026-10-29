@@ -3,12 +3,11 @@ package publication
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
@@ -53,19 +52,13 @@ func (p *publicationProxy) Activate(ctx context.Context, a Artifact) error {
 	}
 	return e
 }
-func TestOriginalPostgresStateAndActivationRecovery(t *testing.T) {
+func TestPostgresStateAndActivationRecovery(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
-	node(t, dsn, "setup")
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	config, files, snapshot, _, _ := fixtureFiles(t)
-	root, _ := filepath.Abs("../../..")
-	b, e := os.ReadFile(filepath.Join(root, "packages/galaxy-official/src/infrastructure/content-publisher-role.sql"))
-	if e != nil {
-		t.Fatal(e)
-	}
-	if _, e = pool.Exec(ctx, string(b)); e != nil {
-		t.Fatal(e)
+	if _, err := databaseschema.Migrate(ctx, pool, []string{"content-publisher"}); err != nil {
+		t.Fatal(err)
 	}
 	publisherPool, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_content_publisher")
 	if e != nil {
@@ -97,16 +90,9 @@ func TestOriginalPostgresStateAndActivationRecovery(t *testing.T) {
 	if e != nil || got["state"] != "published" || proxy.prepares != 1 || proxy.activations != 1 {
 		t.Fatalf("original publication not reconciled: %+v %v prepare=%d activate=%d", got, e, proxy.prepares, proxy.activations)
 	}
-	var original struct {
-		ID, State string
-		Result    Object
-		Error     any
-	}
-	if e = json.Unmarshal(node(t, dsn, "read", id), &original); e != nil {
-		t.Fatal(e)
-	}
-	if original.ID != id || original.State != "published" || original.Error != nil || original.Result["publicationId"] != id || original.Result["siteVersion"] != "original-software-1" || original.Result["publicUrl"] != config.PublicOrigin+"/" {
-		t.Fatalf("original JS cannot read Go publication: %+v", original)
+	view, err := publicationView(pool.QueryRow(ctx, "SELECT "+viewColumns+" FROM site_publications_v1 WHERE id=$1", id))
+	if err != nil || view["id"] != id || view["state"] != "published" || view["error"] != nil || view["result"].(Object)["publicationId"] != id || view["result"].(Object)["siteVersion"] != "original-software-1" || view["result"].(Object)["publicUrl"] != config.PublicOrigin+"/" {
+		t.Fatalf("recorded publication view %+v %v", view, err)
 	}
 	var events int
 	if e = pool.QueryRow(ctx, "SELECT count(*) FROM web_event_outbox_v1 WHERE module='site-content' AND source_ref->>'id'=$1", id).Scan(&events); e != nil || events != 1 {

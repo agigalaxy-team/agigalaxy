@@ -2,9 +2,9 @@ import { draftSchema, draftRefSchema } from "./draft-contract.mjs";
 export { newForumDraft, forumDraftPayload } from "./draft-contract.mjs";
 import * as z from 'zod/v4';
 import {readWithTransientRecovery} from "../../../../../integrations/shared/read-task.mjs";
-import { sha256Hex } from "../../../../galaxy-official/src/shared/web-primitives.mjs";
-import { forumWriteSpec } from "../../../../galaxy-official/src/shared/community-forum-v1-schema.mjs";
-import { bindForumIds } from "../../../../galaxy-official/src/shared/community-forum-ids-v1.mjs";
+import { sha256Hex } from "../../../../galaxy-contracts/src/web-primitives.mjs";
+import { forumWriteSpec } from "../../../../galaxy-contracts/src/community-forum-v1-schema.mjs";
+import { bindForumIds } from "../../../../galaxy-contracts/src/community-forum-ids-v1.mjs";
 import {createForumAttachmentsClient,forumAttachmentError} from './forum-attachment-client.mjs';
 
 const queues = new WeakMap();

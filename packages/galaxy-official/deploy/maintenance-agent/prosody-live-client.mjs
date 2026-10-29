@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {maintenanceRequestSignature} from "../../src/operations/maintenance/native.mjs";
+import {maintenanceRequestSignature} from "../support/maintenance-signature.mjs";
 
 const fail=()=>Object.assign(Error('maintenance_prosody_live_component_readiness_unconfirmed'),{code:'maintenance_prosody_live_component_readiness_unconfirmed'});
 // The same protected loopback service identity used for maintenance approval.

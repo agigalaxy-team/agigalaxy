@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "id": "GUID1001M61XETSN4W8JAYZ0C0H1RDMQ",
+  "genesisProof": {
+    "version": 1,
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAztnGS11rzLTM8J7XgoNHlQVZ07YtIIS4pijLyh+P48o=\n-----END PUBLIC KEY-----\n",
+    "nonce": "5dxptyF0D1C_VgbU9xAZthwy8TP-Gnjl48nu0W_WkYg"
+  },
+  "idFormat": "guid-32-v1",
+  "birthOrigin": "local",
+  "birthOriginCode": "0",
+  "subjectType": "person",
+  "clientKind": "normal",
+  "publicKeyFingerprint": "e3b1:c851:bfd2:eb30:970a:963f:9f15:c7a6:933f:b70a:2b14:565c:e930:ad73:b1ec:8b03",
+  "keyAlgorithm": "Ed25519",
+  "createdAt": "2026-10-28T18:48:15.413Z",
+  "localOnly": true,
+  "transport": "none",
+  "note": "This Galaxy ID was created locally. It has not been registered, verified, or uploaded."
+}

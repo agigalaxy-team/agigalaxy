@@ -2,34 +2,20 @@ package civ2
 
 import (
 	"context"
-	"crypto/ed25519"
-	"crypto/rand"
-	"encoding/json"
 	"errors"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
 // The role supply source, not a history migration, now names the original
 // request/case arguments by position. Exercise that exact scoped SQL directly.
 func TestOriginalCIWorkerRoleRequestScope(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	public, _, _ := ed25519.GenerateKey(rand.Reader)
-	pem, _ := identity.PublicPEM(public)
-	path := filepath.Join(t.TempDir(), "ci-fixture.json")
-	node(t, dsn, "setup", path, Object{"publicKey": pem})
-	raw, _ := os.ReadFile(path)
-	var f struct{ Root, OtherRoot, Evidence, OtherEvidence, First Object }
-	if e := json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
-	}
+	f := setupCI(t, owner)
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
 		_, e := c.Exec(ctx, "SET ROLE galaxy_evidence_worker")

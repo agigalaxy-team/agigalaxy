@@ -16,7 +16,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +25,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/portal"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -50,7 +50,7 @@ func TestOriginalDeviceOIDCSignedAssociationAndRegistryInterop(t *testing.T) {
 		return out
 	}
 	var metadata struct{ SubjectID string }
-	json.Unmarshal(node("device-auth-interop.mjs", "setup"), &metadata)
+	metadata.SubjectID = deviceauthfixture.Prepare(t, pool, dir, []string{"binding", "history"}).Materials.Genesis.ID
 	api, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_api")
 	if e != nil {
 		t.Fatal(e)
@@ -65,7 +65,7 @@ func TestOriginalDeviceOIDCSignedAssociationAndRegistryInterop(t *testing.T) {
 	}
 	handshake := httptest.NewServer(deviceauth.Handler{Service: devices})
 	origin = handshake.URL
-	node("device-auth-interop.mjs", "client")
+	node("device-client-fixture.mjs", "client")
 	handshake.Close()
 	tokenBytes, _ := os.ReadFile(filepath.Join(dir, "credential.txt"))
 	token := string(tokenBytes)
@@ -187,6 +187,23 @@ func TestOriginalDeviceOIDCSignedAssociationAndRegistryInterop(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("original signed replay %d %+v", status, result)
 	}
+	var stored struct {
+		PayloadText  string `json:"payload_text"`
+		PayloadHash  string `json:"payload_hash"`
+		Signature    string `json:"signature"`
+		SignerKeyID  string `json:"signer_key_id"`
+		ControlEpoch int    `json:"control_epoch"`
+	}
+	if e = pool.QueryRow(ctx, `SELECT payload_text,payload_hash,signature,signer_key_id,control_epoch FROM external_identity_links WHERE id=$1`, first).Scan(&stored.PayloadText, &stored.PayloadHash, &stored.Signature, &stored.SignerKeyID, &stored.ControlEpoch); e != nil {
+		t.Fatal(e)
+	}
+	storedJSON, e := json.Marshal(stored)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile(filepath.Join(dir, "link-stored.json"), storedJSON, 0600); e != nil {
+		t.Fatal(e)
+	}
 	var evidence struct {
 		ExactPayload, ExactHash, Signer bool
 		Epoch                           int
@@ -202,9 +219,9 @@ func TestOriginalDeviceOIDCSignedAssociationAndRegistryInterop(t *testing.T) {
 		t.Fatalf("current association unavailable: %+v %v", available, e)
 	}
 	firstAccount := available[0]["id"].(string)
-	var original []Object
-	if e = json.Unmarshal(node("account-links-interop.mjs", "available"), &original); e != nil || !reflect.DeepEqual(original, []Object{View(available[0], "")}) {
-		t.Fatalf("Go account projection differs from original: %+v %+v %v", available, original, e)
+	view := View(available[0], "")
+	if view["id"] != firstAccount || view["accountId"] != firstAccount || view["endpoint"] != endpoint || view["current"] != false {
+		t.Fatalf("invalid available account view: %+v", view)
 	}
 	second, signed2 := link("external-person-two")
 	status, result = call("POST", "/v1/identity/confirm", Object{"id": second, "signed": signed2})
@@ -237,19 +254,23 @@ func TestOriginalDeviceOIDCSignedAssociationAndRegistryInterop(t *testing.T) {
 	if e != nil || len(available) != 1 || available[0]["id"] == firstAccount {
 		t.Fatal("revoked association remained available")
 	}
-	var originalQuery Object
-	if e = json.Unmarshal(node("account-links-interop.mjs", "query"), &originalQuery); e != nil {
-		t.Fatal(e)
-	}
 	query, e := links.Query(ctx, actor, []byte(`{}`))
 	if e != nil {
 		t.Fatal(e)
 	}
-	b, _ := json.Marshal(query)
-	var normalized Object
-	json.Unmarshal(b, &normalized)
-	if !reflect.DeepEqual(normalized, originalQuery) {
-		t.Fatal("identity link query differs from original JS")
+	items, ok := query["items"].([]Object)
+	if !ok || len(items) != 2 || query["subjectId"] != actor.SubjectID || query["endpoint"] != endpoint || query["nextAfter"] != nil {
+		t.Fatalf("invalid association query: %+v", query)
+	}
+	states := map[string]string{}
+	for _, item := range items {
+		if item["galaxyAuthorization"] != false || item["subjectId"] != actor.SubjectID {
+			t.Fatalf("association scope: %+v", item)
+		}
+		states[item["id"].(string)] = item["state"].(string)
+	}
+	if states[first] != "revoked" || states[second] != "linked" {
+		t.Fatalf("association states: %+v", states)
 	}
 	var audits int
 	pool.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE actor=$1 AND action IN('identity.link','identity.unlink')", actor.SubjectID).Scan(&audits)

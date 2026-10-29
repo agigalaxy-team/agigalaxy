@@ -1,8 +1,8 @@
 import {createTaskLocalDraftClient,taskLocalDraftView} from "../tasks/publish/task-local-draft-client.mjs";
 import {createProfileClient} from "../profiles/profile-client.mjs";
-import {trustAudienceAllows} from "../../../../galaxy-official/src/verification/trust-package.mjs";
-import {trustCanonical} from "../../../../galaxy-official/src/shared/trust-package-crypto.mjs";
-import {trustContainerSchema} from "../../../../galaxy-official/src/shared/trust-package-schema.mjs";
+import {trustAudienceAllows} from "../../../../galaxy-contracts/src/verification/trust-package.mjs";
+import {trustCanonical} from "../../../../galaxy-contracts/src/trust-package-crypto.mjs";
+import {trustContainerSchema} from "../../../../galaxy-contracts/src/trust-package-schema.mjs";
 
 export const trustReferenceKey=ref=>JSON.stringify([ref.endpoint,ref.kind,ref.id,ref.version]);
 export function matchingTrustPermission(permissions,ref,audience,subjectId,now=Math.floor(Date.now()/1000)){

@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -17,7 +15,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 )
 
-func TestOriginalOpenPanelNativeReportsScopeAndReceiptReader(t *testing.T) {
+func TestOpenPanelWireReportsScopeAndReceiptReader(t *testing.T) {
 	var mu sync.Mutex
 	calls := []Object{}
 	var omitScope atomic.Bool
@@ -104,28 +102,18 @@ func TestOriginalOpenPanelNativeReportsScopeAndReceiptReader(t *testing.T) {
 	goCalls := append([]Object{}, calls...)
 	calls = nil
 	mu.Unlock()
-	root, _ := filepath.Abs("../../..")
-	script := `import{OpenPanelClient}from './packages/galaxy-official/src/discovery-runtime/native-clients.mjs';const c=new OpenPanelClient(JSON.parse(process.argv[1])),event=JSON.parse(process.argv[2]);Date.now=()=>2000000000000;await c.track(event);const from='2026-01-01T00:00:00.000Z',to='2026-01-02T00:00:00.000Z';console.log(JSON.stringify({business:await c.businessCounts({startDate:from,endDate:to}),recommendation:await c.recommendationReport({startDate:from,endDate:to}),quality:await c.searchQualityReport({startDate:from,endDate:to}),scope:await c.accountAnalysis('get_user_flow',{accountId:'00000000-0000-4000-8000-000000000006',steps:5}),observed:await c.eventObserved(event)}))`
-	cmd := exec.Command("node", "--input-type=module", "-e", script, jsonString(config), jsonString(event))
-	cmd.Dir = root
-	raw, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original OpenPanel %v %s", e, raw)
+	var expected struct {
+		Result Object
+		Calls  []Object
 	}
-	var original Object
-	if e = decode(raw, &original); e != nil {
-		t.Fatal(e)
-	}
+	loadWireFixture(t, "openpanel", &expected)
 	goResult := Object{"business": business, "recommendation": recommendation, "quality": quality, "scope": scope, "observed": observed}
-	if !sameValue(goResult, original) {
-		t.Errorf("native report projection differs Go %s JS %s", jsonString(goResult), jsonString(original))
+	if !sameValue(goResult, expected.Result) {
+		t.Errorf("native report projection differs actual %s expected %s", jsonString(goResult), jsonString(expected.Result))
 	}
-	mu.Lock()
-	jsCalls := append([]Object{}, calls...)
-	mu.Unlock()
 	normalize := func(value any) any { var x any; _ = json.Unmarshal([]byte(jsonString(value)), &x); return x }
-	if !reflect.DeepEqual(normalize(goCalls), normalize(jsCalls)) {
-		t.Errorf("native OpenPanel requests differ Go %s JS %s", jsonString(goCalls), jsonString(jsCalls))
+	if !reflect.DeepEqual(normalize(goCalls), normalize(expected.Calls)) {
+		t.Errorf("native OpenPanel wire differs actual %s expected %s", jsonString(goCalls), jsonString(expected.Calls))
 	}
 	omitScope.Store(true)
 	if _, e = client.AccountAnalysis(ctx, "get_user_flow", Object{}); fault.Code(e) != "discovery_analysis_scope_unavailable" {

@@ -1,0 +1,201 @@
+{
+  "inputs": [
+    {
+      "expectedRevision": 0,
+      "id": "01d6b211-b869-4ecd-92fe-5d061f477d08",
+      "selfDeclared": {
+        "about": "\t Original claim \n",
+        "claimedCapabilities": [
+          "  Unverified claim "
+        ],
+        "displayName": "﻿  Declared name ﻿",
+        "projects": [
+          {
+            "id": "13dcbf5e-294e-4294-a2fd-60cd8e770dee",
+            "kind": "project",
+            "summary": " Not discovered automatically ",
+            "title": " Plain project "
+          }
+        ]
+      },
+      "sharing": {
+        "expiresAt": null,
+        "viewers": [],
+        "visibility": "Public"
+      }
+    },
+    {
+      "expectedRevision": 0,
+      "id": "01d6b211-b869-4ecd-92fe-5d061f477d08",
+      "selfDeclared": {
+        "about": "\t Original claim \n",
+        "capabilityVerified": true,
+        "claimedCapabilities": [
+          "  Unverified claim "
+        ],
+        "displayName": "﻿  Declared name ﻿",
+        "projects": [
+          {
+            "id": "13dcbf5e-294e-4294-a2fd-60cd8e770dee",
+            "kind": "project",
+            "summary": " Not discovered automatically ",
+            "title": " Plain project "
+          }
+        ]
+      },
+      "sharing": {
+        "expiresAt": null,
+        "viewers": [],
+        "visibility": "Public"
+      }
+    },
+    {
+      "expectedRevision": 0,
+      "id": "01d6b211-b869-4ecd-92fe-5d061f477d08",
+      "selfDeclared": {
+        "about": "\t Original claim \n",
+        "claimedCapabilities": [
+          "  Unverified claim "
+        ],
+        "displayName": "﻿  Declared name ﻿",
+        "projects": [
+          {
+            "id": "13dcbf5e-294e-4294-a2fd-60cd8e770dee",
+            "kind": "project",
+            "summary": " Not discovered automatically ",
+            "title": " Plain project "
+          }
+        ]
+      },
+      "sharing": {
+        "expiresAt": null,
+        "viewers": [
+          "GUIDAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        ],
+        "visibility": "Public"
+      }
+    },
+    {
+      "expectedRevision": 0,
+      "id": "01d6b211-b869-4ecd-92fe-5d061f477d08",
+      "selfDeclared": {
+        "about": "\t Original claim \n",
+        "claimedCapabilities": [
+          "  Unverified claim "
+        ],
+        "displayName": "﻿  Declared name ﻿",
+        "projects": [
+          {
+            "discoverable": true,
+            "id": "13dcbf5e-294e-4294-a2fd-60cd8e770dee",
+            "kind": "project",
+            "summary": " Not discovered automatically ",
+            "title": " Plain project "
+          }
+        ]
+      },
+      "sharing": {
+        "expiresAt": null,
+        "viewers": [],
+        "visibility": "Public"
+      }
+    },
+    {
+      "expectedRevision": 0,
+      "id": "01d6b211-b869-4ecd-92fe-5d061f477d08",
+      "selfDeclared": {
+        "about": "\t Original claim \n",
+        "claimedCapabilities": [
+          "  Unverified claim "
+        ],
+        "displayName": "﻿  Declared name ﻿",
+        "projects": [
+          {
+            "id": "13dcbf5e-294e-4294-a2fd-60cd8e770dee",
+            "kind": "project",
+            "sourceUrl": "https://source.example.invalid/project",
+            "summary": " Not discovered automatically ",
+            "title": " Plain project "
+          }
+        ]
+      },
+      "sharing": {
+        "expiresAt": null,
+        "viewers": [],
+        "visibility": "Public"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "accepted": true,
+      "value": {
+        "id": "01d6b211-b869-4ecd-92fe-5d061f477d08",
+        "expectedRevision": 0,
+        "selfDeclared": {
+          "displayName": "Declared name",
+          "about": "Original claim",
+          "claimedCapabilities": [
+            "Unverified claim"
+          ],
+          "projects": [
+            {
+              "id": "13dcbf5e-294e-4294-a2fd-60cd8e770dee",
+              "kind": "project",
+              "title": "Plain project",
+              "summary": "Not discovered automatically",
+              "functions": [],
+              "technologies": [],
+              "discoverable": false
+            }
+          ]
+        },
+        "sharing": {
+          "visibility": "Public",
+          "viewers": [],
+          "expiresAt": null
+        }
+      }
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": true,
+      "value": {
+        "id": "01d6b211-b869-4ecd-92fe-5d061f477d08",
+        "expectedRevision": 0,
+        "selfDeclared": {
+          "displayName": "Declared name",
+          "about": "Original claim",
+          "claimedCapabilities": [
+            "Unverified claim"
+          ],
+          "projects": [
+            {
+              "id": "13dcbf5e-294e-4294-a2fd-60cd8e770dee",
+              "kind": "project",
+              "title": "Plain project",
+              "summary": "Not discovered automatically",
+              "functions": [],
+              "technologies": [],
+              "sourceUrl": "https://source.example.invalid/project",
+              "discoverable": false
+            }
+          ]
+        },
+        "sharing": {
+          "visibility": "Public",
+          "viewers": [],
+          "expiresAt": null
+        }
+      }
+    }
+  ]
+}

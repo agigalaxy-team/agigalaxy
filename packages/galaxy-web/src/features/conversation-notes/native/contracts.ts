@@ -1,6 +1,6 @@
 import type {z} from "zod/v4";
-import {summaryContentSchema} from "../../../../../galaxy-official/src/shared/personal-summary-schema.mjs";
-import type {sourceRefSchema} from "../../../../../galaxy-official/src/shared/personal-summary-schema.mjs";
+import {summaryContentSchema} from "../../../../../galaxy-contracts/src/personal-summary-schema.mjs";
+import type {sourceRefSchema} from "../../../../../galaxy-contracts/src/personal-summary-schema.mjs";
 import type {createWebRuntime} from "../../../runtime.mjs";
 import type {ChatMessage,ChatRoom} from "../../chat/chat-workspace-types";
 

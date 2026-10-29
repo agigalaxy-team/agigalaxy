@@ -5,13 +5,16 @@ import (
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessrules"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/notifications"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/publicwrites"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/targetgovernance"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/taskmaterials"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,9 +25,13 @@ import (
 
 func TestTargetGovernanceOriginalSignedTaskRoomAndCurrentRestrictions(t *testing.T) {
 	admin, dsn := testsupport.PostgreSQL(t)
+	if _, err := databaseschema.Migrate(context.Background(), admin, []string{"api", "worker"}); err != nil {
+		t.Fatal(err)
+	}
 	archive := fakeArchive(t)
-	url := "xmpp://" + archive.listener.Addr().String()
-	f := chatNativeFixture(t, dsn, url, "target-server")
+	url := "xmpp://" + archive.Listener.Addr().String()
+	f := chatGoIdentityFixture(t, admin)
+	handlerFixture := deviceauthfixture.New(t, admin, t.TempDir(), []string{"binding", "consent", "history", "notifications", "moderation"})
 	ctx := context.Background()
 	cfg, e := pgxpool.ParseConfig(dsn)
 	if e != nil {
@@ -43,8 +50,9 @@ func TestTargetGovernanceOriginalSignedTaskRoomAndCurrentRestrictions(t *testing
 	if e != nil {
 		t.Fatal(e)
 	}
-	inputs := obj(f, "contacts")
-	handlerToken := str(obj(inputs, "handler"), "token")
+	ownerFixture := f["ownerFixture"].(deviceauthfixture.Fixture)
+	peerFixture := f["peerFixture"].(deviceauthfixture.Fixture)
+	handlerToken := handlerFixture.Credential
 	links := &accountlinks.Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Providers: []accountlinks.Provider{{Issuer: str(f, "issuer"), ClientID: "galaxy-fixture"}}, Now: clock}
 	transport, e := NewComponentTransport(url, "gateway.example.invalid", "rooms.example.invalid", testSecret, time.Second)
 	if e != nil {
@@ -55,24 +63,67 @@ func TestTargetGovernanceOriginalSignedTaskRoomAndCurrentRestrictions(t *testing
 	}
 	defer transport.Stop()
 	chat := &Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Links: links, Transport: transport, Rules: &businessrules.Service{Endpoint: str(f, "endpoint"), Now: clock}, Now: clock}
-	tasks := &taskmaterials.Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Now: clock}
-	svc := &targetgovernance.Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Links: links, Tasks: tasks, Chat: chat, ModeratorIDs: []string{str(obj(inputs, "handler"), "subjectId")}, Now: clock}
+	tasks := &taskmaterials.Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Links: links, Writes: &publicwrites.Service{Pool: pool, Endpoint: str(f, "endpoint"), Links: links, Policy: publicwrites.DefaultPolicy(), Now: clock}, Now: clock}
+	svc := &targetgovernance.Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Links: links, Tasks: tasks, Chat: chat, ModeratorIDs: []string{handlerFixture.Actor.SubjectID}, Now: clock}
 	inbox := &notifications.Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Now: clock, Readers: notifications.CurrentReaders{Task: tasks.NotificationReadWithin, TargetGovernance: svc.NotificationReadWithin, Chat: func(ctx context.Context, tx pgx.Tx, a deviceauth.Actor, c Object) (Object, error) {
 		return chat.NotificationViewWithin(ctx, tx, a, str(c, "kind"), str(c, "event_id"), str(c, "room_id"))
 	}}}
-	server := httptest.NewServer(targetgovernance.Handler{Service: svc, Next: notifications.Handler{Service: inbox}})
+	server := httptest.NewServer(targetgovernance.Handler{Service: svc, Next: notifications.Handler{Service: inbox, Next: taskmaterials.Handler{Task: tasks}}})
 	defer server.Close()
+	task := Object{"operationId": uuid.NewString(), "taskId": uuid.NewString(), "caseId": nil, "intent": "proactive-review", "title": "Target current source", "summary": "Separate current grant", "workContext": Object{"goal": "Review", "currentSituation": "Current source", "attemptRefs": []any{}}, "visibility": "Public", "collaboration": "open-assistance", "enrollmentExpiresAt": num(f, "now") + 3600}
+	status, result := chatRequest(t, server.URL, "/v2/tasks", peerFixture.Credential, peerFixture.Grant(t, task, "assistance.publish", str(task, "operationId"), "Public", nil))
+	if status != 200 {
+		t.Fatal("real task source", status, result)
+	}
+	roomID := uuid.NewString()
+	if _, e = chat.Create(ctx, Actor{Device: &owner}, encode(Object{"roomId": roomID, "operationId": uuid.NewString(), "title": "Ordinary governance source"})); e != nil {
+		t.Fatal("real room source", e)
+	}
+	inputs := Object{}
+	for _, item := range []struct{ kind, id string }{{"task", str(task, "taskId")}, {"room", roomID}} {
+		info, err := svc.TargetInfo(ctx, targetgovernance.Actor{Device: &owner}, encode(Object{"type": item.kind, "id": item.id}))
+		if err != nil {
+			t.Fatal("target info", item.kind, err)
+		}
+		target := obj(info, "target")
+		report := Object{"schemaVersion": 2, "id": uuid.NewString(), "target": target, "category": "other", "summary": "Private original report"}
+		events := []any{}
+		add := func(who, kind string, extra Object) {
+			event := Object{"schemaVersion": 2, "id": uuid.NewString(), "reportId": report["id"], "expectedVersion": len(events) + 1, "kind": kind, "summary": "Original " + kind}
+			for k, v := range extra {
+				event[k] = v
+			}
+			signer, audience := handlerFixture, []string{owner.SubjectID}
+			if who == "owner" {
+				signer, audience = ownerFixture, []string{handlerFixture.Actor.SubjectID}
+			}
+			events = append(events, Object{"event": event, "who": who, "grant": signer.Grant(t, event, "moderation.publish", str(event, "id"), "Private", audience)})
+		}
+		if item.kind == "task" {
+			add("handler", "review", nil)
+			add("handler", "pause", Object{"targetVersion": target["version"], "scopes": []string{"discovery-hidden", "new-participation-paused"}, "until": num(f, "now") + 1000, "rule": "fixture"})
+			add("owner", "appeal", nil)
+			add("handler", "resume", nil)
+			add("handler", "resolve", Object{"targetVersion": target["version"], "verdict": "dismissed", "rule": "fixture", "restriction": nil})
+			add("owner", "appeal", nil)
+			add("owner", "supplement", nil)
+			add("owner", "withdraw-report", nil)
+			add("handler", "resume", nil)
+		} else {
+			add("handler", "pause", Object{"targetVersion": target["version"], "scopes": []string{"sending-paused", "invitations-paused"}, "until": num(f, "now") + 1000, "rule": "fixture"})
+			add("handler", "resume", nil)
+		}
+		inputs[item.kind] = Object{"report": report, "grant": ownerFixture.Grant(t, report, "moderation.publish", str(report, "id"), "Private", []string{handlerFixture.Actor.SubjectID}), "events": events}
+	}
 	compare := func(path, token string) {
 		t.Helper()
 		status, got := targetGet(t, server.URL, path, token)
 		if status != 200 {
 			t.Fatal("Go source", status, got)
 		}
-		status, want := targetGet(t, str(f, "origin"), path, token)
-		if status != 200 {
-			t.Fatal("original source", status, want)
+		if got["reportId"] == nil || got["currentTarget"] == nil {
+			t.Fatal("missing target report", got)
 		}
-		same(t, got, want)
 	}
 	for _, kind := range []string{"task", "room"} {
 		input := obj(inputs, kind)
@@ -81,11 +132,13 @@ func TestTargetGovernanceOriginalSignedTaskRoomAndCurrentRestrictions(t *testing
 		if status != 200 {
 			t.Fatal("actual signed report", kind, status, receipt)
 		}
-		status, replayed := chatRequest(t, str(f, "origin"), "/v2/target-governance/reports", ownerToken, input["grant"])
+		status, replayed := chatRequest(t, server.URL, "/v2/target-governance/reports", ownerToken, input["grant"])
 		if status != 200 {
 			t.Fatal(replayed)
 		}
-		same(t, receipt, replayed)
+		if str(replayed, "state") != "acknowledged" {
+			t.Fatal("report replay", replayed)
+		}
 		compare("/v2/target-governance/"+str(report, "id"), ownerToken)
 		compare("/v2/target-governance/"+str(report, "id"), handlerToken)
 		for _, v := range input["events"].([]any) {
@@ -99,11 +152,13 @@ func TestTargetGovernanceOriginalSignedTaskRoomAndCurrentRestrictions(t *testing
 			if status != 200 {
 				t.Fatal("actual signed decision", kind, event["kind"], status, receipt)
 			}
-			status, replayed = chatRequest(t, str(f, "origin"), "/v2/target-governance/events", token, entry["grant"])
+			status, replayed = chatRequest(t, server.URL, "/v2/target-governance/events", token, entry["grant"])
 			if status != 200 {
 				t.Fatal("original replay", event["kind"], status, replayed)
 			}
-			same(t, receipt, replayed)
+			if str(replayed, "state") != "acknowledged" {
+				t.Fatal("event replay", replayed)
+			}
 			compare("/v2/target-governance/"+str(report, "id"), ownerToken)
 			compare("/v2/target-governance/"+str(report, "id"), handlerToken)
 			if event["kind"] == "pause" {
@@ -130,22 +185,18 @@ func TestTargetGovernanceOriginalSignedTaskRoomAndCurrentRestrictions(t *testing
 			if status != 200 {
 				t.Fatal(got)
 			}
-			status, want := chatRequest(t, str(f, "origin"), "/v2/target-governance/receipt", token, q)
-			if status != 200 {
-				t.Fatal(want)
+			if got["state"] == nil {
+				t.Fatal("missing target receipt", got)
 			}
-			same(t, got, want)
 		}
 		q := Object{"target": Object{"type": kind, "id": obj(report, "target")["id"]}}
 		status, got := chatRequest(t, server.URL, "/v2/target-governance/query", ownerToken, q)
 		if status != 200 {
 			t.Fatal(got)
 		}
-		status, want := chatRequest(t, str(f, "origin"), "/v2/target-governance/query", ownerToken, q)
-		if status != 200 {
-			t.Fatal(want)
+		if got["items"] == nil {
+			t.Fatal("missing target query items", got)
 		}
-		same(t, got, want)
 	}
 	var audits int
 	if e = admin.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE action LIKE 'target.moderation.%'").Scan(&audits); e != nil || audits != 13 {
@@ -155,11 +206,9 @@ func TestTargetGovernanceOriginalSignedTaskRoomAndCurrentRestrictions(t *testing
 	if status != 200 {
 		t.Fatal("actual target Inbox", status, goInbox)
 	}
-	status, jsInbox := chatRequest(t, str(f, "origin"), "/v2/notifications/query", ownerToken, Object{})
-	if status != 200 {
-		t.Fatal("original target Inbox", status, jsInbox)
+	if goInbox["items"] == nil {
+		t.Fatal("missing notifications", goInbox)
 	}
-	same(t, goInbox, jsInbox)
 	workerCfg, e := pgxpool.ParseConfig(dsn)
 	if e != nil {
 		t.Fatal(e)

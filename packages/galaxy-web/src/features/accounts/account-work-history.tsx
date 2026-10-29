@@ -6,7 +6,7 @@ import {LocalGalaxyPanelEntry} from "../local-galaxy/local-galaxy-entry";
 import {useReadTasks} from "../../shared/reading/use-read-task";
 import {LoadingFeedback,ReadFailure} from "../../shared/feedback/interaction-feedback";
 import type {z} from 'zod/v4';
-import type {accountWorkProjectionSchema} from "../../../../galaxy-official/src/shared/account-work-schema.mjs";
+import type {accountWorkProjectionSchema} from "../../../../galaxy-contracts/src/account-work-schema.mjs";
 import "./account-work-history.css";
 import "./account-reading.css";
 

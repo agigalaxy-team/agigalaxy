@@ -1,4 +1,4 @@
-import {discoveryQueryV2Schema,opportunityRefV2Schema} from "../../../../galaxy-official/src/shared/discovery-schema-v2.mjs";
+import {discoveryQueryV2Schema,opportunityRefV2Schema} from "../../../../galaxy-contracts/src/discovery-schema-v2.mjs";
 import type {DiscoveryPurpose} from "./contracts";
 import {projectErrorText,object,isDiscoveryPurpose} from "./contracts";
 import type {DiscoveryInput} from "../help-search/help-contact-view-types";

@@ -1,5 +1,5 @@
 import type {AiWorkAccount,AiWorkDetail,AiWorkDomain,AiWorkLocation,AiWorkProfileDraft,AiWorkReceipt,AiWorkTab} from "../../components/ai-work-accounts/ai-work-accounts-types";
-import {aiWorkPreparation,aiWorkCapabilities} from "../../../../../packages/galaxy-official/src/shared/operations-ai-work-capabilities.mjs";
+import {aiWorkPreparation,aiWorkCapabilities} from "../../../../../packages/galaxy-contracts/src/operations-ai-work-capabilities.mjs";
 export const aiWorkRoute='/admin/operations/ai-work-accounts';
 export const aiWorkBase='/v1/operations/ai-work-accounts';
 export const aiWorkDomains:ReadonlyArray<{id:AiWorkDomain;label:string}>=[{id:'overview',label:'总控'},{id:'governance',label:'治理'},{id:'messaging',label:'消息'},{id:'discovery',label:'数据与发现'},{id:'maintenance',label:'运维'}];

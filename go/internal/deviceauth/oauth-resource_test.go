@@ -6,15 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -98,47 +98,22 @@ func (a *oauthFixtureAS) verifier(t *testing.T) *OAuthIntrospection {
 	}
 	return v
 }
-func sourceOAuth(t *testing.T, mode string, input map[string]any, env ...string) map[string]any {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	b, _ := json.Marshal(input)
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/oauth-resource-interop.mjs"), mode)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), env...)
-	cmd.Stdin = strings.NewReader(string(b))
-	raw, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original OAuth %s %v %s", mode, e, raw)
-	}
-	var out map[string]any
-	if json.Unmarshal(raw, &out) != nil {
-		t.Fatal("invalid source OAuth reply")
-	}
-	return out
-}
 func TestOriginalOAuthIntrospectionActualBoundTransport(t *testing.T) {
 	a := newOAuthFixtureAS(t)
 	v := a.verifier(t)
 	ctx := context.Background()
-	input := map[string]any{"issuer": a.server.URL, "resource": v.Resource(), "token": "resource-token"}
 	for _, mode := range []string{"", "jwt", "jwt-bad-alg", "missing-active", "redirect", "oversize"} {
 		a.reset()
 		a.mu.Lock()
 		a.mode = mode
 		a.mu.Unlock()
-		source := sourceOAuth(t, "verify", input)
 		claim, e := v.Verify(ctx, "resource-token")
-		if e != nil {
-			if source["error"] != fault.Code(e) {
-				t.Errorf("%s Go %s JS %v", mode, fault.Code(e), source["error"])
+		if mode != "" && mode != "jwt" {
+			if fault.Code(e) != "oauth_introspection_unavailable" {
+				t.Errorf("%s: expected unavailable, got %v", mode, e)
 			}
-		} else {
-			raw, _ := json.Marshal(map[string]any{"issuer": claim.Issuer, "subject": claim.Subject, "clientId": claim.ClientID, "resource": claim.Resource, "expiresAt": claim.ExpiresAt, "scopes": claim.Scopes})
-			var expected map[string]any
-			_ = json.Unmarshal(raw, &expected)
-			if !equalJSON(expected, source["claim"]) {
-				t.Errorf("%s original claim mismatch", mode)
-			}
+		} else if e != nil || claim.Issuer != a.server.URL || claim.Subject != "external" || claim.ClientID != "mcp-client" || claim.Resource != v.Resource() || claim.ExpiresAt != 2000000120 || !equalJSON(claim.Scopes, []string{"openid", "galaxy:binding", "galaxy:history", "galaxy:proof"}) {
+			t.Errorf("%s: original claim mismatch: %+v %v", mode, claim, e)
 		}
 	}
 	for field, value := range map[string]any{"active": false, "sub": strings.Repeat("😀", 256), "client_id": "unapproved", "scope": "galaxy:binding galaxy:binding", "aud": []any{"wrong"}, "iss": "https://wrong.example.invalid", "token_type": "DPoP", "exp": 2000000000} {
@@ -146,10 +121,9 @@ func TestOriginalOAuthIntrospectionActualBoundTransport(t *testing.T) {
 		a.mu.Lock()
 		a.claims[field] = value
 		a.mu.Unlock()
-		source := sourceOAuth(t, "verify", input)
 		_, e := v.Verify(ctx, "resource-token")
-		if e == nil || fault.Code(e) != source["error"] {
-			t.Errorf("%s Go %v JS %v", field, e, source["error"])
+		if fault.Code(e) != "invalid_token" {
+			t.Errorf("%s: expected invalid token, got %v", field, e)
 		}
 	}
 	a.reset()
@@ -177,15 +151,39 @@ func TestOAuthResourceOriginalBindingAssociationAndRevocationPG(t *testing.T) {
 	ctx := context.Background()
 	a := newOAuthFixtureAS(t)
 	dir := t.TempDir()
-	root, _ := filepath.Abs("../../..")
-	setup := exec.Command("node", filepath.Join(root, "scripts/go/device-auth-interop.mjs"), "setup")
-	setup.Dir = root
-	setup.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_DEVICE_DIR="+dir)
-	if out, e := setup.CombinedOutput(); e != nil {
-		t.Fatalf("original existing control fixture %v %s", e, out)
+	m := prepareControlFixture(t, admin, dir, true)
+	fixture, e := Load(ctx, admin, Configuration{Endpoint: "https://device.example.invalid", SigningKeyFile: filepath.Join(dir, "hub-private.pem"), SigningKeyID: "fixture", RootPinsFile: filepath.Join(dir, "root-pins.json"), KeyringFile: filepath.Join(dir, "keyring.json"), TrustDirectory: filepath.Join(dir, "trust"), Now: func() time.Time { return time.Unix(2000000000, 0) }})
+	if e != nil {
+		t.Fatal(e)
 	}
-	env := []string{"GALAXY_GO_TEST_DATABASE_URL=" + dsn, "GALAXY_GO_TEST_DEVICE_DIR=" + dir}
-	base := sourceOAuth(t, "setup", map[string]any{"issuer": a.server.URL}, env...)
+	key, e := identity.PrivatePEM([]byte(m.OwnerPrivate))
+	if e != nil {
+		t.Fatal(e)
+	}
+	challenge, e := fixture.BindingChallenge(ctx, BindingInput{SubjectID: m.Genesis.ID, GenesisProof: m.Genesis.GenesisProof, InstallationID: m.InstallationID, Scopes: []string{"binding", "history"}, Control: &BindingControl{DeviceID: m.DeviceID, KeyID: identity.Digest([]byte(m.PublicKeyPEM)), Epoch: 1}}, true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	signature, e := identity.SignIdentityPayload(key, challenge["challenge"], "galaxy-binding-response+jws")
+	if e != nil {
+		t.Fatal(e)
+	}
+	bound, e := fixture.Bind(ctx, BindInput{Challenge: challenge["challenge"], ClientSession: challenge["clientSession"], Signature: signature}, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	// The account-links suite exercises the actual OIDC confirmation. Here the
+	// existing synthetic association isolates the resource authorization path.
+	linkID := uuid.NewString()
+	payload := `{"fixture":"verified-association"}`
+	linkSignature, e := identity.SignIdentityPayload(key, payload, "galaxy-identity-link+jws")
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, e = admin.Exec(ctx, `INSERT INTO external_identity_links(id,subject_id,binding_id,endpoint,provider_id,issuer,external_subject,client_id,payload_text,payload_hash,signature) VALUES($1,$2,$3,$4,'original',$5,'external','linked-client',$6,$7,$8)`, linkID, m.Genesis.ID, bound.BindingID, "https://device.example.invalid", a.server.URL, payload, identity.Digest([]byte(payload)), linkSignature)
+	if e != nil {
+		t.Fatal(e)
+	}
 	config, _ := pgxpool.ParseConfig(dsn)
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -207,12 +205,8 @@ func TestOAuthResourceOriginalBindingAssociationAndRevocationPG(t *testing.T) {
 	if result.Actor.CredentialHash != "" || len(result.Actor.Scopes) != 2 || result.Actor.Authentication.Profile != "oauth-resource" || result.AuthInfo.ExpiresAt != 2000000120 {
 		t.Fatal("OAuth confused with device bearer or incorrect intersection")
 	}
-	source := sourceOAuth(t, "authenticate", map[string]any{"issuer": a.server.URL, "resource": authority.verifier.Resource(), "token": "resource-token"}, env...)
-	projected := map[string]any{"actor": map[string]any{"subjectId": result.Actor.SubjectID, "bindingId": result.Actor.BindingID, "scopes": result.Actor.Scopes, "authentication": result.Actor.Authentication}, "authInfo": map[string]any{"clientId": result.AuthInfo.ClientID, "scopes": result.AuthInfo.Scopes, "expiresAt": result.AuthInfo.ExpiresAt, "resource": result.AuthInfo.Resource}}
-	if !equalJSON(projected, source) {
-		x, _ := json.Marshal(projected)
-		y, _ := json.Marshal(source)
-		t.Fatalf("original OAuth projection differs\nGo%s\nJS%s", x, y)
+	if result.Actor.SubjectID != m.Genesis.ID || result.Actor.BindingID != bound.BindingID || !equalJSON(result.AuthInfo.Scopes, []string{"galaxy:binding", "galaxy:history"}) || result.AuthInfo.ClientID != "mcp-client" || result.AuthInfo.Resource != authority.verifier.Resource() {
+		t.Fatal("OAuth association or token projection mismatch")
 	}
 	authorize := func(actor Actor, scope string) error {
 		_, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (bool, error) { return true, s.AuthorizeWithin(ctx, tx, actor, scope) })
@@ -231,7 +225,7 @@ func TestOAuthResourceOriginalBindingAssociationAndRevocationPG(t *testing.T) {
 		t.Fatal("OAuth token accepted as device bearer")
 	}
 	var auditCount int
-	if e = admin.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action='oauth.access' AND client_id='mcp-client' AND audience=$1 AND object_id=$2 AND scope='history' AND binding_scopes='["binding","history"]'::jsonb AND credential_scopes='["binding","history"]'::jsonb`, authority.verifier.Resource(), base["linkId"]).Scan(&auditCount); e != nil || auditCount != 2 {
+	if e = admin.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action='oauth.access' AND client_id='mcp-client' AND audience=$1 AND object_id=$2 AND scope='history' AND binding_scopes='["binding","history"]'::jsonb AND credential_scopes='["binding","history"]'::jsonb`, authority.verifier.Resource(), linkID).Scan(&auditCount); e != nil || auditCount != 1 {
 		t.Fatalf("original OAuth audit %d %v", auditCount, e)
 	}
 	rollback := errors.New("owning business failure")
@@ -257,13 +251,13 @@ func TestOAuthResourceOriginalBindingAssociationAndRevocationPG(t *testing.T) {
 		t.Fatal(e)
 	}
 	deadline, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-	_, blocked := admin.Exec(deadline, `UPDATE external_identity_links SET revoked_at=now() WHERE id=$1`, base["linkId"])
+	_, blocked := admin.Exec(deadline, `UPDATE external_identity_links SET revoked_at=now() WHERE id=$1`, linkID)
 	cancel()
 	_ = tx.Rollback(ctx)
 	if blocked == nil {
 		t.Fatal("association revocation passed SHARE fence")
 	}
-	_, e = admin.Exec(ctx, `UPDATE external_identity_links SET revoked_at=now() WHERE id=$1`, base["linkId"])
+	_, e = admin.Exec(ctx, `UPDATE external_identity_links SET revoked_at=now() WHERE id=$1`, linkID)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -273,12 +267,12 @@ func TestOAuthResourceOriginalBindingAssociationAndRevocationPG(t *testing.T) {
 	if _, e = authority.Authenticate(ctx, "resource-token", nil); fault.Code(e) != "invalid_token" {
 		t.Fatal("revoked association authenticated")
 	}
-	_, _ = admin.Exec(ctx, `UPDATE external_identity_links SET revoked_at=NULL WHERE id=$1`, base["linkId"])
-	_, _ = admin.Exec(ctx, `UPDATE device_authorizations SET scopes='["binding"]'::jsonb WHERE subject_id=$1`, base["subjectId"])
+	_, _ = admin.Exec(ctx, `UPDATE external_identity_links SET revoked_at=NULL WHERE id=$1`, linkID)
+	_, _ = admin.Exec(ctx, `UPDATE device_authorizations SET scopes='["binding"]'::jsonb WHERE subject_id=$1`, m.Genesis.ID)
 	if e = authorize(result.Actor, "history"); fault.Status(e) != 401 {
 		t.Fatal("withdrawn current device scope accepted")
 	}
-	_, _ = admin.Exec(ctx, `UPDATE device_authorizations SET scopes='["manage-identity","binding","history"]'::jsonb WHERE subject_id=$1`, base["subjectId"])
+	_, _ = admin.Exec(ctx, `UPDATE device_authorizations SET scopes='["manage-identity","binding","history"]'::jsonb WHERE subject_id=$1`, m.Genesis.ID)
 	a.mu.Lock()
 	a.claims["scope"] = "galaxy:binding"
 	a.mu.Unlock()

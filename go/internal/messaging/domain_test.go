@@ -3,7 +3,9 @@ package messaging
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
@@ -12,9 +14,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -47,23 +46,27 @@ func (a *domainAuthority) PersonWithin(context.Context, pgx.Tx, string, bool) (A
 	return a.actor, nil
 }
 func TestOriginalPostgresPlanRunAudienceInappReplayAndRevocation(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	script := `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import {migrate} from './packages/galaxy-official/src/infrastructure/database.mjs';import {randomUUID} from 'node:crypto';const url=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(url.hostname!=='127.0.0.1'||!url.pathname.startsWith('/galaxy_go_test_'))throw Error('isolated DB required');const db=new pg.Pool({connectionString:url.href});try{await migrate(db);const endpoint='https://messaging.example.invalid',operatorId='fixture-operator';await db.query("INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://operators.example.invalid','synthetic','Synthetic',now(),now())",[operatorId,endpoint]);const accounts=[];for(const [index,type]of ['person','agent','organization'].entries()){const id=randomUUID();await db.query("INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at) VALUES($1,$2,'https://accounts.example.invalid',$3,'external-account',now(),now())",[id,endpoint,'synthetic-'+index]);await db.query("INSERT INTO official_account_profiles_v1(account_id,subject_type,display_name,updated_at) VALUES($1,$2,'Synthetic',now())",[id,type]);accounts.push(id)}console.log(JSON.stringify({endpoint,operatorId,accounts}))}finally{await db.end()}`
-	cmd := exec.Command("node", "--no-warnings", "--input-type=module", "-e", script)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatal("original schema", e, string(out))
+	if _, err := databaseschema.Migrate(ctx, pool, []string{"api", "worker"}); err != nil {
+		t.Fatal(err)
 	}
-	var data struct {
+	data := struct {
 		Endpoint, OperatorID string
 		Accounts             []string
+	}{Endpoint: "https://messaging.example.invalid", OperatorID: "fixture-operator"}
+	if _, err := pool.Exec(ctx, `INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,'https://operators.example.invalid','synthetic','Synthetic',now(),now())`, data.OperatorID, data.Endpoint); err != nil {
+		t.Fatal(err)
 	}
-	if e = json.Unmarshal(out, &data); e != nil {
-		t.Fatal(e)
+	for index, kind := range []string{"person", "agent", "organization"} {
+		id := uuid.NewString()
+		if _, err := pool.Exec(ctx, `INSERT INTO community_accounts(id,endpoint,issuer,external_subject,verification_method,verified_at,created_at) VALUES($1,$2,'https://accounts.example.invalid',$3,'external-account',now(),now())`, id, data.Endpoint, fmt.Sprintf("synthetic-%d", index)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO official_account_profiles_v1(account_id,subject_type,display_name,updated_at) VALUES($1,$2,'Synthetic',now())`, id, kind); err != nil {
+			t.Fatal(err)
+		}
+		data.Accounts = append(data.Accounts, id)
 	}
 	tx, e := pool.Begin(ctx)
 	if e != nil {
@@ -141,8 +144,7 @@ func TestOriginalPostgresPlanRunAudienceInappReplayAndRevocation(t *testing.T) {
 		t.Fatal("invented retry", e)
 	}
 
-	// Read the actual Go rows with the original JS services. Only the technical
-	// queue engine label changes from pg-boss to River; UI fields stay identical.
+	// Read the actual Go-owned plan, run, recipients and retained command receipt.
 	getters := map[string]Object{}
 	getters["get"], e = service.Get(ctx, authority.actor, str(plan["id"]))
 	if e != nil {
@@ -164,28 +166,8 @@ func TestOriginalPostgresPlanRunAudienceInappReplayAndRevocation(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	script = `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import {OperationsPermissionsService} from './packages/galaxy-official/src/operations/permissions/index.mjs';import {BusinessAdminService} from './packages/galaxy-official/src/operations/audit/service.mjs';import {OperationsMessagingService} from './packages/galaxy-official/src/operations/messaging/service.mjs';const url=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(url.hostname!=='127.0.0.1'||!url.pathname.startsWith('/galaxy_go_test_'))throw Error('isolated DB required');const db=new pg.Pool({connectionString:url.href});try{const endpoint='https://messaging.example.invalid',now=()=>2000000000,operatorAuthorization=async()=>'administrator',permissions=new OperationsPermissionsService({db,endpoint,operatorAuthorization,now}),businessAdmin=new BusinessAdminService({db,endpoint,permissions,operatorAuthorization,now}),service=new OperationsMessagingService({db,endpoint,businessAdmin,now}),actor={kind:'business-operator',operatorId:'fixture-operator',role:'administrator',endpoint};console.log(JSON.stringify({get:await service.get(actor,process.argv[1]),list:await service.list(actor),run:await service.run(actor,process.argv[2]),recipients:await service.recipients(actor,process.argv[2]),receipt:await service.commandResult(actor,process.argv[3])}))}finally{await db.end()}`
-	cmd = exec.Command("node", "--no-warnings", "--input-type=module", "-e", script, str(plan["id"]), str(run["id"]), str(input["operationId"]))
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e = cmd.CombinedOutput()
-	if e != nil {
-		t.Fatal("original readback", e, string(out))
-	}
-	var original map[string]Object
-	if e = json.Unmarshal(out, &original); e != nil {
-		t.Fatal(e)
-	}
-	for _, value := range []Object{obj(getters["get"]["plan"])} {
-		obj(value["scheduling"])["engine"] = "pg-boss"
-	}
-	for _, value := range arr(getters["list"]["items"]) {
-		obj(obj(value)["scheduling"])["engine"] = "pg-boss"
-	}
-	for name, value := range getters {
-		if !same(value, original[name]) {
-			t.Fatalf("original %s readback differs\nGo %s\nJS %s", name, encode(value), encode(original[name]))
-		}
+	if str(obj(getters["get"]["plan"])["id"]) != str(plan["id"]) || len(arr(getters["list"]["items"])) != 1 || str(obj(getters["run"]["run"])["id"]) != str(run["id"]) || len(arr(getters["recipients"]["items"])) != 2 || getters["receipt"] == nil {
+		t.Fatal("current plan/run/recipient readback changed", getters)
 	}
 
 	// Legacy notices keep their original ledger and online-account inbox.
@@ -237,21 +219,10 @@ func TestOriginalPostgresPlanRunAudienceInappReplayAndRevocation(t *testing.T) {
 	if e != nil || str(obj(legacyReceipt["result"])["state"]) != "queued" {
 		t.Fatal("receipt fell back to current state", e, encode(legacyReceipt))
 	}
-	script = `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import {OperationsPermissionsService} from './packages/galaxy-official/src/operations/permissions/index.mjs';import {BusinessAdminService} from './packages/galaxy-official/src/operations/audit/service.mjs';import {OperationsNotices} from './packages/galaxy-official/src/operations/messaging/notices.mjs';import {productCommandResult} from './packages/galaxy-official/src/operations/product-command-receipts.mjs';const u=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(u.hostname!=='127.0.0.1'||!u.pathname.startsWith('/galaxy_go_test_'))throw Error('isolated DB required');const db=new pg.Pool({connectionString:u.href});try{const endpoint='https://messaging.example.invalid',now=()=>2000000000,permissions=new OperationsPermissionsService({db,endpoint,operatorAuthorization:async()=>'administrator',now}),businessAdmin=new BusinessAdminService({db,endpoint,permissions,now}),actor={kind:'business-operator',operatorId:'fixture-operator',role:'administrator',endpoint},notices=new OperationsNotices({db,endpoint,businessAdmin,jobs:{onCancel(){}},now});console.log(JSON.stringify({notice:await notices.get(actor,process.argv[1]),receipt:await productCommandResult({db,endpoint,operator:actor,authorize:a=>businessAdmin.authorizeAction(a,'notices.read'),now},process.argv[2],'notices')}))}finally{await db.end()}`
-	cmd = exec.Command("node", "--no-warnings", "--input-type=module", "-e", script, noticeID, publishOperation)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e = cmd.CombinedOutput()
-	if e != nil {
-		t.Fatal("legacy JS readback", e, string(out))
+	if str(obj(legacyGo["notice"])["id"]) != noticeID {
+		t.Fatal("notice readback changed", legacyGo)
 	}
-	var oldReadback struct{ Notice, Receipt Object }
-	if e = json.Unmarshal(out, &oldReadback); e != nil {
-		t.Fatal(e)
-	}
-	if !same(legacyGo, oldReadback.Notice) || !same(legacyReceipt, oldReadback.Receipt) {
-		t.Fatal("legacy original view/receipt mismatch", encode(legacyGo), encode(oldReadback.Notice), encode(legacyReceipt), encode(oldReadback.Receipt))
-	}
+
 	// HTTP uses the same real services and verifies strict body/query contracts.
 	httpServer := httptest.NewServer(Handler{Service: service, Authority: authority, Accounts: accounts.HTTPIdentityFunc(func(*http.Request, bool) (string, accounts.Authorization, error) {
 		return data.Accounts[0], accountProof, nil

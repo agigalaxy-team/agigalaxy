@@ -1,0 +1,423 @@
+{
+  "vectors": [
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "evidenceType": "test-result",
+      "expectedVersion": 0,
+      "expiresAt": null,
+      "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+      "kind": "evidence",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "reportedSourceState": "unknown",
+      "source": {
+        "contentVersion": " 1 ",
+        "externalStableId": " stable ",
+        "issuer": "  author  ",
+        "originSystem": "  fixture  ",
+        "originalAt": "2033-05-18T03:33:20Z",
+        "uri": "mailto:fixture@example.invalid"
+      },
+      "summary": "﻿ summary  ",
+      "synthetic": false
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "evidenceType": "test-result",
+      "expectedVersion": 0,
+      "expiresAt": null,
+      "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+      "kind": "evidence",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "reportedSourceState": "unknown",
+      "source": {
+        "contentVersion": " 1 ",
+        "externalStableId": " stable ",
+        "issuer": "  author  ",
+        "originSystem": "  fixture  ",
+        "originalAt": "2033-05-18T03:33:20Z",
+        "uri": "mailto:fixture@example.invalid"
+      },
+      "summary": "﻿ summary  ",
+      "synthetic": false,
+      "unknown": true
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "evidenceType": "test-result",
+      "expectedVersion": 0,
+      "expiresAt": null,
+      "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+      "kind": "evidence",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+      "participationId": null,
+      "reportedBy": "GUID1234567890123456789012345678",
+      "reportedSourceState": "unknown",
+      "source": {
+        "contentVersion": " 1 ",
+        "externalStableId": " stable ",
+        "issuer": "  author  ",
+        "originSystem": "  fixture  ",
+        "originalAt": "2033-05-18T03:33:20Z",
+        "uri": "mailto:fixture@example.invalid"
+      },
+      "summary": "﻿ summary  ",
+      "synthetic": false,
+      "taskId": null
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "evidenceType": "test-result",
+      "expectedVersion": 0,
+      "expiresAt": null,
+      "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+      "kind": "evidence",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+      "reason": null,
+      "reportedBy": "GUID1234567890123456789012345678",
+      "reportedSourceState": "unknown",
+      "source": {
+        "contentVersion": " 1 ",
+        "externalStableId": " stable ",
+        "issuer": "  author  ",
+        "originSystem": "  fixture  ",
+        "originalAt": "2033-05-18T03:33:20Z",
+        "uri": "mailto:fixture@example.invalid"
+      },
+      "summary": "﻿ summary  ",
+      "synthetic": false
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "evidenceType": "test-result",
+      "expectedVersion": 1000,
+      "expiresAt": null,
+      "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+      "kind": "evidence",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "reportedSourceState": "unknown",
+      "source": {
+        "contentVersion": " 1 ",
+        "externalStableId": " stable ",
+        "issuer": "  author  ",
+        "originSystem": "  fixture  ",
+        "originalAt": "2033-05-18T03:33:20Z",
+        "uri": "mailto:fixture@example.invalid"
+      },
+      "summary": "﻿ summary  ",
+      "synthetic": false
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "evidenceType": "test-result",
+      "expectedVersion": -1,
+      "expiresAt": null,
+      "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+      "kind": "evidence",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "reportedSourceState": "unknown",
+      "source": {
+        "contentVersion": " 1 ",
+        "externalStableId": " stable ",
+        "issuer": "  author  ",
+        "originSystem": "  fixture  ",
+        "originalAt": "2033-05-18T03:33:20Z",
+        "uri": "mailto:fixture@example.invalid"
+      },
+      "summary": "﻿ summary  ",
+      "synthetic": false
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "evidenceType": "test-result",
+      "expectedVersion": 0,
+      "expiresAt": null,
+      "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+      "kind": "evidence",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "reportedSourceState": "unknown",
+      "source": {
+        "contentVersion": " 1 ",
+        "externalStableId": " stable ",
+        "issuer": "  author  ",
+        "originSystem": "  fixture  ",
+        "originalAt": "2033-05-18T03:33:20Z",
+        "uri": "mailto:fixture@example.invalid"
+      },
+      "summary": "﻿ summary  ",
+      "synthetic": null
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "evidenceType": "test-result",
+      "expectedVersion": 0,
+      "expiresAt": null,
+      "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+      "kind": "evidence",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "reportedSourceState": "unknown",
+      "source": {
+        "contentVersion": "z",
+        "externalStableId": "y",
+        "issuer": "author",
+        "originSystem": "x",
+        "originalAt": "2033-05-18T03:33Z"
+      },
+      "summary": "﻿ summary  ",
+      "synthetic": false
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "evidenceType": "test-result",
+      "expectedVersion": 0,
+      "expiresAt": null,
+      "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+      "kind": "evidence",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "reportedSourceState": "unknown",
+      "source": {
+        "contentVersion": "z",
+        "externalStableId": "y",
+        "extra": "rejected",
+        "issuer": "author",
+        "originSystem": "x",
+        "originalAt": "2033-05-18T03:33:20Z"
+      },
+      "summary": "﻿ summary  ",
+      "synthetic": false
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "conditions": {
+        "big": 1e+100,
+        "number": 1.5,
+        "switch": true,
+        "text": " keep "
+      },
+      "evidenceRefs": [],
+      "expectedVersion": 0,
+      "id": "a1b34f64-bd35-4134-88ba-0bf2377fcd1a",
+      "kind": "verification",
+      "method": "participant-feedback",
+      "observation": "accepted",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "aff057bd-aed9-4fc2-8419-629a1cf17b50",
+      "relationship": "unknown",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "scope": " report ",
+      "scopeVersion": 1,
+      "summary": " summary ",
+      "synthetic": true,
+      "target": {
+        "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+        "type": "result",
+        "version": 1
+      }
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "conditions": {
+        "nested": {}
+      },
+      "evidenceRefs": [],
+      "expectedVersion": 0,
+      "id": "a1b34f64-bd35-4134-88ba-0bf2377fcd1a",
+      "kind": "verification",
+      "method": "participant-feedback",
+      "observation": "accepted",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "aff057bd-aed9-4fc2-8419-629a1cf17b50",
+      "relationship": "unknown",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "scope": " report ",
+      "scopeVersion": 1,
+      "summary": " summary ",
+      "synthetic": true,
+      "target": {
+        "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+        "type": "result",
+        "version": 1
+      }
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "conditions": {
+        "big": 1e+100,
+        "number": 1.5,
+        "switch": true,
+        "text": " keep "
+      },
+      "evidenceRefs": [],
+      "expectedVersion": 0,
+      "id": "a1b34f64-bd35-4134-88ba-0bf2377fcd1a",
+      "kind": "verification",
+      "method": "participant-feedback",
+      "observation": "accepted",
+      "observedAt": "2033-05-18T03:33:20.123Z",
+      "operationId": "aff057bd-aed9-4fc2-8419-629a1cf17b50",
+      "relationship": "unknown",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "scope": " report ",
+      "scopeVersion": 1,
+      "summary": " summary ",
+      "synthetic": true,
+      "target": {
+        "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+        "type": "attempt",
+        "version": 0
+      }
+    },
+    {
+      "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+      "expectedVersion": 1,
+      "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+      "kind": "revoke",
+      "objectType": "evidence",
+      "operationId": "59cd5b92-5c15-4370-a754-9523a9c53b9c",
+      "reason": " owner choice ",
+      "reportedBy": "GUID1234567890123456789012345678",
+      "synthetic": true
+    }
+  ],
+  "values": [
+    {
+      "accepted": true,
+      "value": {
+        "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+        "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+        "expectedVersion": 0,
+        "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+        "reportedBy": "GUID1234567890123456789012345678",
+        "synthetic": false,
+        "kind": "evidence",
+        "evidenceType": "test-result",
+        "source": {
+          "originSystem": "fixture",
+          "externalStableId": "stable",
+          "contentVersion": "1",
+          "uri": "mailto:fixture@example.invalid",
+          "originalAt": "2033-05-18T03:33:20Z",
+          "issuer": "author"
+        },
+        "observedAt": "2033-05-18T03:33:20.123Z",
+        "reportedSourceState": "unknown",
+        "summary": "summary ",
+        "expiresAt": null
+      }
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": true,
+      "value": {
+        "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+        "operationId": "271c2296-604a-4c7a-b2d4-0a71eb289a03",
+        "expectedVersion": 0,
+        "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+        "reportedBy": "GUID1234567890123456789012345678",
+        "taskId": null,
+        "participationId": null,
+        "synthetic": false,
+        "kind": "evidence",
+        "evidenceType": "test-result",
+        "source": {
+          "originSystem": "fixture",
+          "externalStableId": "stable",
+          "contentVersion": "1",
+          "uri": "mailto:fixture@example.invalid",
+          "originalAt": "2033-05-18T03:33:20Z",
+          "issuer": "author"
+        },
+        "observedAt": "2033-05-18T03:33:20.123Z",
+        "reportedSourceState": "unknown",
+        "summary": "summary ",
+        "expiresAt": null
+      }
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": true,
+      "value": {
+        "id": "a1b34f64-bd35-4134-88ba-0bf2377fcd1a",
+        "operationId": "aff057bd-aed9-4fc2-8419-629a1cf17b50",
+        "expectedVersion": 0,
+        "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+        "reportedBy": "GUID1234567890123456789012345678",
+        "synthetic": true,
+        "kind": "verification",
+        "target": {
+          "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+          "version": 1,
+          "type": "result"
+        },
+        "scopeVersion": 1,
+        "method": "participant-feedback",
+        "scope": "report",
+        "conditions": {
+          "big": 1e+100,
+          "number": 1.5,
+          "switch": true,
+          "text": " keep "
+        },
+        "observation": "accepted",
+        "summary": "summary",
+        "evidenceRefs": [],
+        "relationship": "unknown",
+        "observedAt": "2033-05-18T03:33:20.123Z"
+      }
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": false
+    },
+    {
+      "accepted": true,
+      "value": {
+        "id": "a773b089-8aea-4a08-b628-7d72667d5320",
+        "operationId": "59cd5b92-5c15-4370-a754-9523a9c53b9c",
+        "expectedVersion": 1,
+        "caseId": "41bdd287-a7f1-46af-9690-b3e02b70ed8c",
+        "reportedBy": "GUID1234567890123456789012345678",
+        "reason": "owner choice",
+        "synthetic": true,
+        "kind": "revoke",
+        "objectType": "evidence"
+      }
+    }
+  ]
+}

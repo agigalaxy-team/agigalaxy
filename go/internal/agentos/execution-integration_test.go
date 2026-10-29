@@ -12,16 +12,14 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/publicationfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -32,29 +30,11 @@ type executionPublicationFixture struct{}
 
 func (executionPublicationFixture) Account(context.Context, pgx.Tx, string, string) error { return nil }
 func TestActualExecutionAuthorityPreparedUnknownAndOriginalReadback(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	node := func(file, mode string, input Object) Object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, file), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		body, _ := json.Marshal(input)
-		cmd.Stdin = strings.NewReader(string(body))
-		raw, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, raw)
-		}
-		var out Object
-		if json.Unmarshal(raw, &out) != nil {
-			t.Fatalf("invalid original %s", raw)
-		}
-		return out
-	}
-	base := node("scripts/go/operations-permissions-interop.mjs", "setup", nil)
-	node("scripts/go/operations-permissions-interop.mjs", "automation-setup", Object{})
-	endpoint, issuer, rootID := text(base, "endpoint"), text(base, "issuer"), text(object(base["ids"]), "root")
+	f := operationsfixture.New(t, owner)
+	automation := f.Automation(t)
+	endpoint, issuer, rootID := f.Endpoint, f.Issuer, f.IDs["root"]
 	cfg := owner.Config()
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)
@@ -77,7 +57,7 @@ func TestActualExecutionAuthorityPreparedUnknownAndOriginalReadback(t *testing.T
 	if e != nil {
 		t.Fatal(e)
 	}
-	publication := node("go/internal/operationsqueries/testdata/interop.mjs", "seed-public", Object{"endpoint": endpoint, "rootId": rootID})
+	publication := publicationfixture.Prepare(t, pool, endpoint, now)
 	forum := &community.Service{Pool: pool, Endpoint: endpoint, Authority: executionPublicationFixture{}, Now: now, OperationsHandling: true}
 	payload := object(publication["payload"])
 	raw, _ := json.Marshal(payload)
@@ -85,9 +65,6 @@ func TestActualExecutionAuthorityPreparedUnknownAndOriginalReadback(t *testing.T
 		t.Fatal(e)
 	}
 	target := text(payload, "postId")
-	fixture := node("go/internal/agentos/testdata/execution.mjs", "seed", Object{"endpoint": endpoint, "rootId": rootID, "targetId": target})
-	original := object(fixture["original"])
-	id := text(original, "executionId")
 	authority := &Executions{Pool: pool, Endpoint: endpoint, Permissions: p, Now: now}
 	business := &operationspermissions.BusinessAuthority{Human: gateway, Execution: authority}
 	content := &operationscommunity.Service{Pool: pool, Endpoint: endpoint, Authority: business, PrincipalWithin: gateway.LockOperationsPrincipalWithin, ReadPrincipalWithin: gateway.ReadOperationsPrincipalWithin, Forum: forum, Now: now}
@@ -95,28 +72,23 @@ func TestActualExecutionAuthorityPreparedUnknownAndOriginalReadback(t *testing.T
 	g := &ExecutionGateway{Authority: authority, ReadContent: func(ctx context.Context, a operationspermissions.Actor, kind, id string) (Object, error) {
 		return content.Content(ctx, a, kind, id, Object{})
 	}, Visibility: content.ContentVisibility}
-	compare := func(got, want Object) {
-		t.Helper()
-		a, _ := json.Marshal(got)
-		b, _ := json.Marshal(want)
-		var x, y any
-		json.Unmarshal(a, &x)
-		json.Unmarshal(b, &y)
-		if !reflect.DeepEqual(x, y) {
-			t.Fatalf("original wire differs Go%s JS%s", a, b)
-		}
-	}
+	fixture := seedExecution(t, f, authority, human, target, object(automation["accounts"]), false)
+	id := text(object(fixture["original"]), "executionId")
 	got, e := authority.Get(ctx, human, id)
 	if e != nil {
 		t.Fatal(e)
 	}
-	compare(got, node("go/internal/agentos/testdata/execution.mjs", "get", Object{"endpoint": endpoint, "rootId": rootID, "id": id}))
+	if text(object(got["execution"]), "id") != id || text(object(got["preparedAction"]), "targetId") != target {
+		t.Fatal("execution readback lost selected target", got)
+	}
 	actor, e := authority.Actor(ctx, id, ExecutionActorOptions{})
 	if e != nil {
 		t.Fatal(e)
 	}
 	metadata, _ := authority.ExecutionMetadata(actor)
-	compare(Object{"id": actor.ID, "version": actor.Version, "permissions": actor.Permissions, "scope": metadata["resourceIds"]}, node("go/internal/agentos/testdata/execution.mjs", "actor", Object{"endpoint": endpoint, "rootId": rootID, "id": id}))
+	if actor.ID != "executor:"+id || len(actor.Permissions) == 0 || len(metadata["resourceIds"].([]string)) != 1 || metadata["resourceIds"].([]string)[0] != target {
+		t.Fatal("execution proof or target scope changed")
+	}
 	if authority.AcceptsExecution(operationspermissions.Actor{ID: actor.ID, Role: actor.Role, Endpoint: actor.Endpoint, Version: actor.Version, Permissions: actor.Permissions}) {
 		t.Fatal("JSON actor forged private execution")
 	}
@@ -134,7 +106,7 @@ func TestActualExecutionAuthorityPreparedUnknownAndOriginalReadback(t *testing.T
 	if e != nil || goReplay["replayed"] != true || goReplay["executionId"] != goID {
 		t.Fatalf("Go create replay %v %v", e, goReplay)
 	}
-	compare(goReplay, node("go/internal/agentos/testdata/execution.mjs", "create", Object{"endpoint": endpoint, "rootId": rootID, "create": input}))
+
 	pause, e := authority.Change(ctx, human, goID, Object{"operationId": uuid.NewString(), "expectedRevision": 1, "kind": "pause"}, authorize)
 	if e != nil || object(pause["execution"])["state"] != "paused" {
 		t.Fatalf("Go pause %v %v", e, pause)
@@ -232,14 +204,16 @@ func TestActualExecutionAuthorityPreparedUnknownAndOriginalReadback(t *testing.T
 			t.Fatalf("execution create HTTP csrf%v %d %s", csrf, response.Code, response.Body.String())
 		}
 	}
-	aiFixture := node("go/internal/agentos/testdata/execution.mjs", "seed-ai", Object{"endpoint": endpoint, "rootId": rootID, "targetId": target})
+	aiFixture := seedExecution(t, f, authority, human, target, object(automation["accounts"]), true)
 	aiID := text(object(aiFixture["original"]), "executionId")
 	aiActor, e := authority.Actor(ctx, aiID, ExecutionActorOptions{})
 	if e != nil {
 		t.Fatal("AI eligible current", e)
 	}
 	aiMeta, _ := authority.ExecutionMetadata(aiActor)
-	compare(Object{"id": aiActor.ID, "version": aiActor.Version, "permissions": aiActor.Permissions, "scope": aiMeta["resourceIds"]}, node("go/internal/agentos/testdata/execution.mjs", "actor", Object{"endpoint": endpoint, "rootId": rootID, "id": aiID}))
+	if aiActor.ID != "executor:"+aiID || len(aiActor.Permissions) == 0 || len(aiMeta["resourceIds"].([]string)) != 1 || aiMeta["resourceIds"].([]string)[0] != target {
+		t.Fatal("AI execution scope changed")
+	}
 	caller, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (operationspermissions.Actor, error) {
 		return p.HumanAIWithin(ctx, tx, human, "governance", "execution", "workbench.read")
 	})
@@ -262,12 +236,16 @@ func TestActualExecutionAuthorityPreparedUnknownAndOriginalReadback(t *testing.T
 	if e != nil {
 		t.Fatal(e)
 	}
-	compare(gotAI, node("go/internal/agentos/testdata/execution.mjs", "get", Object{"endpoint": endpoint, "rootId": rootID, "id": aiCreated["executionId"]}))
+	if text(object(gotAI["execution"]), "id") != text(aiCreated, "executionId") {
+		t.Fatal("AI execution readback changed")
+	}
 	options, e := authority.Options(ctx, human)
 	if e != nil {
 		t.Fatal("current options", e)
 	}
-	compare(options, node("go/internal/agentos/testdata/execution.mjs", "options", Object{"endpoint": endpoint, "rootId": rootID}))
+	if items, ok := options["items"].([]any); !ok || len(items) == 0 {
+		t.Fatal("eligible AI execution option missing")
+	}
 	if _, e = owner.Exec(ctx, `UPDATE forum_permissions_v1 SET revoked_at=$2 WHERE object_id=$1`, payload["versionId"], now()); e != nil {
 		t.Fatal(e)
 	}

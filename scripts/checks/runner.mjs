@@ -1,8 +1,8 @@
 import {spawnSync} from 'node:child_process';
 import {discoverCheckTests} from './test-discovery.mjs';
 
-// The public CLI supplies the repository root. Commands remain fixed local
-// Node checks; no command manifest or arbitrary executable is accepted.
+// The public CLI supplies the repository root. Current Go core/service checks
+// and the remaining JS contract/UI checks have explicit entry points.
 export function runChecks({root,mode='all',env=process.env,testFiles=[]}){
  if(!['all','test','core','official','a2a','lint'].includes(mode)||(mode==='lint'&&testFiles.length)){
   console.error('Usage: node scripts/check.mjs [all|test|core|official|a2a|lint] [related.test.mjs ...]');
@@ -26,12 +26,16 @@ export function runChecks({root,mode='all',env=process.env,testFiles=[]}){
   }
   return 0;
  }
+ if(mode==='core'||mode==='official'){
+  if(testFiles.length){console.error('Go checks select current packages through scripts/check-go.mjs; old JS test selection is unavailable.');return 2;}
+  return run(mode==='core'?'current Go Native':'current Go Hub',['scripts/check-go.mjs',mode==='core'?'native-client':'hub']);
+ }
  if(mode!=='lint'){
   let selection;
   try{selection=discoverCheckTests(root,mode,env,testFiles);}
   catch(error){console.error('[galaxy-check] '+error.message);return 2;}
   const {packages,files,separate}=selection;
-  if(separate.length)console.log('[galaxy-check] separate environment/artifact acceptance (not executed by this run): '+separate.join(', '));
+  if(separate.length)console.log('[galaxy-check] separate environment acceptance (not executed by this run): '+separate.join(', '));
   // Bound file processes only; individual tests retain their own concurrency.
   const flags=['--import','tsx','--experimental-test-module-mocks','--test','--test-concurrency=4'];
   // Windows has a command-line limit; keep the same discovery, isolation and

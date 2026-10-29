@@ -13,13 +13,14 @@ cd agigalaxy
 
 | 范围 | 工具链与安装根 |
 |---|---|
-| 完整开发、Hub、A2A、Admin | Node.js 24.13+，按各自 `package-lock.json` 安装 |
-| 官网生成 | Python 3.11+；根构建器发现本机 Python |
+| Hub 与 Native 核心 | Go 1.27.3，`go/go.mod` 与 `go/go.sum` 锁定依赖 |
+| 网页、宿主、SDK 与平台工具 | Node.js 24.13+，按各自 `package-lock.json` 安装 |
+| 公开内容编译 | Python 3.11+；Next.js 使用生成的数据呈现页面 |
 | AgentOS/Gateway | Python 3.12；AgentOS 独立虚拟环境及 `requirements.lock`；Gateway 固定上游及其锁文件 |
 | 已发行 Native 客户端 | 包要求 Node.js 22.13+，与完整开发门槛分开 |
 | 数据库/外部服务检查 | 专用隔离环境，不使用运行库、运行角色或个人浏览器状态 |
 
-只安装本次需要的组件。根 `npm run setup` 顺序安装根、Official、A2A、`integrations/native-v2/compact-app`，不安装 Admin、不创建数据库或启动服务。Admin 单独运行 `npm ci --ignore-scripts --no-audit --no-fund --prefix apps/galaxy-admin`；AgentOS 按其组件 README 安装锁定依赖。
+只安装本次需要的组件。根 `npm run setup` 安装根、共享合同、客户端 SDK、Official 平台工具、A2A 和 `integrations/native-v2/compact-app`，不安装 Admin、不创建数据库或启动服务。Admin 单独运行 `npm ci --ignore-scripts --no-audit --no-fund --prefix apps/galaxy-admin`；AgentOS 按其组件 README 安装锁定依赖。
 
 根 `opencode.json` 与 `.opencode/tui.json` 是共享开发接入配置，归 Native 组件维护；其他本机宿主配置不入库。
 
@@ -30,7 +31,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run dev
 ```
 
-前台使用 Next.js，开发入口 `http://127.0.0.1:5179/`。首次先运行 `npm run build:site` 准备公开内容与固定历史资源，再 `npm run dev`；已准备的资源可用 `--offline`。`npm run build` 或 `build:web` 生成数据并构建动态网页，`npm start` 启动实际 Node 网页服务。`build:browser-client` 只生成仍供独立浏览器诊断使用的 Vite 薄宿主，不是网站生产入口。
+前台使用 Next.js，开发入口 `http://127.0.0.1:5179/`。首次先运行 `npm run build:site` 准备公开内容与固定历史资源，再 `npm run dev`；已准备的资源可用 `--offline`。`npm run build` 或 `build:web` 生成数据并构建动态网页，`npm start` 启动实际 Node 网页服务。浏览器业务组件直接由 Next.js 消费，不再维护独立 Vite 网站入口。
 
 前台和 Admin 分别构建。根依赖与 Admin 均锁定相同 Next/React/Query 版本，共享源码在各自运行入口仅解析一份 React。Admin 安装与 `npm run build --prefix apps/galaxy-admin` 保持独立。
 
@@ -64,9 +65,9 @@ python scripts/create-release-baseline.py
 
 | 组件/动作 | 能证明什么及仍需输入 |
 |---|---|
-| Web | 共享浏览器组件与独立诊断宿主构建，不承担生产网站路由 |
+| Web | 共享浏览器组件源码，由 Site 和 Admin 消费；不独立承担网站路由 |
 | Site | 公开数据编译、Next.js 构建与独立 Node 运行包；无需先生成 Vite 网站 |
-| Hub capture | API/worker/migration/publisher 四入口、完整迁移和显式资源的服务源码包；不安装或部署 |
+| Hub | 构建 API、Worker、Information Worker、迁移、Publisher 和 Lifecycle 的 Go 产物，嵌入迁移及角色 SQL；不自动迁移或部署 |
 | Auth | Keycloak 主题；Java 邮件验证码 provider 需自己的 Java21/Keycloak26.7.3 构建，再经 `--provider-jar` 合入 |
 | Admin | 独立 Next/Payload 锁和构建；根产品 build 不覆盖它 |
 | AgentOS/Model Gateway | catalog 仅编译 Python 代码对象，不导入服务、连接库、构建镜像或证明持久化运行 |
@@ -82,14 +83,15 @@ CI [`product-checks.yml`](../../.github/workflows/product-checks.yml) 按真实 
 
 | 变化 | 入口 |
 |---|---|
-| JS/权限/恢复 | `npm test -- packages/galaxy-official/test/<相关文件>.test.mjs` |
-| 工具/Core | `npm test -- scripts/test/<相关文件>.test.mjs` 或具体 Core 测试文件 |
+| JS 合同/客户端/恢复 | `npm test -- packages/galaxy-client/test/<相关文件>.test.mjs` 或当前 Web/A2A/平台工具测试 |
+| Go 业务/权限/恢复 | 在 `go/` 执行 `go test ./internal/<相关模块>`；隔离数据库通过 `GALAXY_GO_TEST_PG_BIN` 指定 |
+| 工具 | `npm test -- scripts/test/<相关文件>.test.mjs` |
 | Web 打包/类型 | `npm run build:web` 或 `node node_modules/typescript/bin/tsc --noEmit` |
 | 局部 lint | `node node_modules/oxlint/bin/oxlint <相关文件或目录>`；必要时 `npm run lint` |
 | 官网 | `npm run build:site` |
 | Admin | 在 `apps/galaxy-admin` 按需选择 `npm run types`、相关测试或 `npm run build` |
 
-统一测试 CLI 接受明确 `.test.mjs`，也可在 `test:core`/`test:official`/`test:a2a` 后追加本包文件。未知参数、无效路径、缺专用环境直接失败，不回退全套。根与 Admin 测试复用 `tsx`，生产构建仍走各自工具链。
+统一 JS 测试 CLI 接受明确 `.test.mjs`，根与 Admin 测试复用 `tsx`。`test:core` 和 `test:official` 分别选择当前 Go Native 与 Hub 的有限回归集合，不再发现旧 Node 内核测试；其余 Go 领域按实际改动选择。未知参数、无效路径或缺专用环境须准确报告，不回退全套，跳过数据库用例不算行为通过。
 
 `npm test` 无路径覆盖普通 packages 与 scripts/test 范围；仓库级 test/ 集成用例及专用环境检查按相应入口显式选择。`npm run check` 再含根 lint，只在需要整体回归时选一次。`check:layers` 包含重叠和真实环境前提；需要单层用 `node scripts/verify-layers.mjs --layers=<所需层>`。`npm run check:requirements` 检查本仓库docs及相关链接，可用 `npm run check:requirements -- docs/technical/interfaces.md` 限定文件，不依赖上层项目manifest。`prepare:client` 用于正式客户端候选，不是普通编辑前提。
 

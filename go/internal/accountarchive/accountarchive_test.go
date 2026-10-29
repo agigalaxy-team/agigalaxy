@@ -7,9 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -24,25 +22,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func node(t *testing.T, dsn, mode, path string, stdin []byte) Object {
-	t.Helper()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/accountarchive/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(stdin)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original account archive %s: %v %s", mode, e, stderr.String())
-	}
-	var result Object
-	if json.Unmarshal(out, &result) != nil {
-		t.Fatal("invalid original fixture output")
-	}
-	return result
-}
 func normal(v any) any { var out any; _ = json.Unmarshal(encoded(v), &out); return out }
 func same(t *testing.T, a, b any) {
 	t.Helper()
@@ -57,21 +36,9 @@ func expect(t *testing.T, e error, code string) {
 	}
 }
 func TestOriginalJSGoPrivateCopiesAndLostACK(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "archive-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, e := os.ReadFile(path)
-	if e != nil {
-		t.Fatal(e)
-	}
-	var f struct {
-		Endpoint, Issuer, AccountID, Token, Link string
-		Put, Archive, JSReceipt                  Object
-	}
-	if json.Unmarshal(raw, &f) != nil {
-		t.Fatal("invalid fixture")
-	}
+	f := setupArchive(t, owner)
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -88,7 +55,7 @@ func TestOriginalJSGoPrivateCopiesAndLostACK(t *testing.T) {
 		t.Fatal(e)
 	}
 	a := Actor{Device: verified, AccountID: f.AccountID}
-	original := node(t, dsn, "read", path, nil)
+	original := archiveGolden(t, "archive-read-1")
 	got, e := s.Work(ctx, a, "get", encoded(Object{"workId": f.Put["workId"]}))
 	if e != nil {
 		t.Fatal(e)
@@ -152,14 +119,14 @@ func TestOriginalJSGoPrivateCopiesAndLostACK(t *testing.T) {
 		t.Fatalf("export %v", e)
 	}
 	// Original JavaScript reads the same committed rows, including ordered chunks.
-	original = node(t, dsn, "read", path, nil)
+	original = archiveGolden(t, "archive-read-2")
 	got, e = s.Archive(ctx, a, "status", encoded(Object{"id": f.Archive["id"]}))
 	if e != nil {
 		t.Fatal(e)
 	}
 	same(t, got, original["archive"])
 	put := normal(f.Put).(map[string]any)
-	put["operationId"] = uuid.NewString()
+	put["operationId"] = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
 	put["revision"] = 2
 	put["expectedRevision"] = 1
 	code, _ = call("/v2/account-work/put", put)
@@ -170,7 +137,7 @@ func TestOriginalJSGoPrivateCopiesAndLostACK(t *testing.T) {
 	if code != 200 || status["lastOperationId"] != put["operationId"] || status["revision"] != float64(2) {
 		t.Fatal("lost ACK did not reconcile original operation")
 	}
-	original = node(t, dsn, "read", path, nil)
+	original = archiveGolden(t, "archive-read-3")
 	got, e = s.Work(ctx, a, "get", encoded(Object{"workId": put["workId"]}))
 	if e != nil {
 		t.Fatal(e)
@@ -303,12 +270,7 @@ func TestOriginalJSGoPrivateCopiesAndLostACK(t *testing.T) {
 }
 
 func TestWorkProjectionOriginalStrictSchema(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
-	path := filepath.Join(t.TempDir(), "archive-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
-	var f struct{ Put Object }
-	_ = json.Unmarshal(raw, &f)
+	f := archiveFixture(t)
 	tests := []Object{f.Put}
 	change := func(fn func(Object)) { o := normal(f.Put).(map[string]any); fn(o); tests = append(tests, o) }
 	change(func(o Object) { o["extra"] = true })
@@ -368,7 +330,16 @@ func TestWorkProjectionOriginalStrictSchema(t *testing.T) {
 		d := o["data"].(map[string]any)
 		d["environments"] = []any{Object{"id": uuid.NewString(), "version": 1, "observedAt": "2033-05-18T03:33:20Z", "facts": Object{"selectedModel": "C:/private"}}}
 	})
-	original := node(t, dsn, "validate", path, encoded(tests))
+	cmd := exec.Command("node", "testdata/validate-work.mjs")
+	cmd.Stdin = bytes.NewReader(encoded(tests))
+	raw, e := cmd.CombinedOutput()
+	if e != nil {
+		t.Fatalf("current work contract: %v %s", e, raw)
+	}
+	var original Object
+	if e := json.Unmarshal(raw, &original); e != nil {
+		t.Fatal(e)
+	}
 	checks := original["checks"].([]any)
 	for i, test := range tests {
 		_, e := parseWork(encoded(test), "put")

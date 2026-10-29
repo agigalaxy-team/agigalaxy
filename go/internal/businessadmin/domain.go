@@ -140,7 +140,7 @@ func (d *Domain) RecordAccountRead(ctx context.Context, tx pgx.Tx, a Actor, acti
 // this transaction. Reuse the common attribution and immutable receipt writer.
 func (d *Domain) RecordAccountOperation(ctx context.Context, tx pgx.Tx, a Actor, action string, selection, result Object, accountID, operationID any) error {
 	switch action {
-	case "restriction-set", "restriction-release", "type-change", "notice-delivery":
+	case "restriction-set", "restriction-release", "type-change", "notice-delivery", "smtp-delivery-test":
 		return d.record(ctx, tx, a, action, selection, result, operationID, accountID)
 	}
 	return fail("operations_permission_unknown", 403)

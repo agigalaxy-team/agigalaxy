@@ -2,10 +2,12 @@ package portal
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/feedbackfixture"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -22,70 +25,63 @@ type providerFunc func(context.Context, RefreshRequest) (Tokens, error)
 func (f providerFunc) Refresh(ctx context.Context, r RefreshRequest) (Tokens, error) {
 	return f(ctx, r)
 }
-func node(t *testing.T, dsn, name string, args ...string) []byte {
-	t.Helper()
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
-	if e != nil {
-		t.Fatal(e)
-	}
-	cmd := exec.Command("node", append([]string{filepath.Join(root, "scripts", "go", name)}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	out, e := cmd.Output()
-	if e != nil {
-		var detail string
-		if x, ok := e.(*exec.ExitError); ok {
-			detail = string(x.Stderr)
-		}
-		t.Fatalf("original portal fixture: %v %s", e, detail)
-	}
-	return out
-}
-func TestExistingNodeCipherAndGoCipherAreInteroperable(t *testing.T) {
+
+// The original Node AES-GCM output is a fixed synthetic vector captured once.
+func TestCapturedPortalCipherAndGoWireFormat(t *testing.T) {
 	dir := t.TempDir()
-	var original struct {
-		KeyPath, Hash, Token, Cipher string
-		Scope                        []string
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i + 1)
 	}
-	if e := json.Unmarshal(node(t, "", "portal-fixture.mjs", dir, "create"), &original); e != nil {
+	keyPath := filepath.Join(dir, "portal-key")
+	if e := os.WriteFile(keyPath, []byte(base64.RawURLEncoding.EncodeToString(key)), 0600); e != nil {
 		t.Fatal(e)
 	}
-	p, e := LoadPolicy(original.KeyPath, 604800, 2592000, 60)
+	policy, e := LoadPolicy(keyPath, 604800, 2592000, 60)
 	if e != nil {
 		t.Fatal(e)
 	}
-	s, e := New(nil, "account", original.Scope, p, nil)
+	hash, scope := strings.Repeat("b", 64), []string{strings.Repeat("a", 64)}
+	sessions, e := New(nil, "account", scope, policy, nil)
 	if e != nil {
 		t.Fatal(e)
 	}
-	plain, e := s.Decrypt(original.Cipher, original.Hash)
-	if e != nil || plain != original.Token {
-		t.Fatalf("Node ciphertext not readable: %v", e)
+	const captured = "JOeedWfADezSy6lVngSr0jNFVerlVcE2wfRb-Jhb5WmX3cCa641x6V_MNSWi1Z_MavDi9DbRmKNLLkU"
+	plain, e := sessions.Decrypt(captured, hash)
+	if e != nil || plain != "temporary-fixture-refresh-token" {
+		t.Fatalf("captured cipher: %v", e)
 	}
-	if _, e = s.Decrypt(original.Cipher, strings.Repeat("c", 64)); e == nil {
+	if _, e = sessions.Decrypt(captured, strings.Repeat("c", 64)); e == nil {
 		t.Fatal("different owner context decrypted")
 	}
-	b, e := s.Encrypt("go-fixture-rotated-token", original.Hash)
+	wire, e := sessions.Encrypt("go-fixture-rotated-token", hash)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if e = os.WriteFile(filepath.Join(dir, "go-cipher"), []byte(b), 0600); e != nil {
+	raw, e := base64.RawURLEncoding.DecodeString(wire)
+	if e != nil {
 		t.Fatal(e)
 	}
-	var read struct{ Token string }
-	if e = json.Unmarshal(node(t, "", "portal-fixture.mjs", dir, "decrypt"), &read); e != nil || read.Token != "go-fixture-rotated-token" {
-		t.Fatalf("Go ciphertext not readable by Node: %v", e)
+	block, e := aes.NewCipher(key)
+	if e != nil {
+		t.Fatal(e)
+	}
+	gcm, e := cipher.NewGCM(block)
+	if e != nil {
+		t.Fatal(e)
+	}
+	aad, e := json.Marshal([]string{"account", scope[0], hash})
+	if e != nil {
+		t.Fatal(e)
+	}
+	decoded, e := gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], aad)
+	if e != nil || string(decoded) != "go-fixture-rotated-token" {
+		t.Fatalf("cipher wire format: %v", e)
 	}
 }
 func TestCurrentPortalRowsRefreshOnceAndKeepUnknownAndRevocation(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
-	var seeded struct {
-		Accounts []string
-		Endpoint string
-	}
-	if e := json.Unmarshal(node(t, dsn, "feedback-fixture.mjs", "setup"), &seeded); e != nil {
-		t.Fatal(e)
-	}
+	pool, _ := testsupport.PostgreSQL(t)
+	seeded := feedbackfixture.Create(t, pool)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	now := int64(2000000000)

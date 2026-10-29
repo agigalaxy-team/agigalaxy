@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 const root=fileURLToPath(new URL('../../../',import.meta.url));
 const out=browserToolOutput(import.meta.url, process.env.GALAXY_UI_REPORT_DIR);
 await mkdir(out,{recursive:true});
-const source=resolve(root,'packages/galaxy-core/src/domain/device-key-store.mjs'),sourceSha256=createHash('sha256').update(await readFile(source)).digest('hex');
-const bundle=await build({stdin:{contents:"export {openDeviceKeyStore} from './packages/galaxy-core/src/domain/device-key-store.mjs';",resolveDir:root},bundle:true,write:false,platform:'browser',format:'esm'});
+const source=resolve(root,'packages/galaxy-client/src/browser-identity/device-key-store.mjs'),sourceSha256=createHash('sha256').update(await readFile(source)).digest('hex');
+const bundle=await build({stdin:{contents:"export {openDeviceKeyStore} from './packages/galaxy-client/src/browser-identity/device-key-store.mjs';",resolveDir:root},bundle:true,write:false,platform:'browser',format:'esm'});
 const server=createServer((req,res)=>{if(req.url==='/store.js'){res.setHeader('content-type','text/javascript');res.end(bundle.outputFiles[0].contents);}else{res.setHeader('content-type','text/html');res.end('<!doctype html><title>Galaxy local atomic storage verification</title><main>Local synthetic storage verification only.</main>');}});
 let browser,context;const checks=[],errors=[];
 try{

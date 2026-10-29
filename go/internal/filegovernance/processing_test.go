@@ -4,23 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
 func original(t *testing.T, mode string, input any) Object {
 	t.Helper()
-	path, _ := filepath.Abs(filepath.Join("testdata", "interop.mjs"))
-	cmd := exec.Command("node", path, mode)
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL=postgres://127.0.0.1/galaxy_go_test_file_oracle")
-	cmd.Stdin = bytes.NewReader(encode(input))
-	raw, e := cmd.Output()
+	raw, e := os.ReadFile("testdata/original-processing-facts.json")
 	if e != nil {
-		if ee, ok := e.(*exec.ExitError); ok {
-			t.Fatalf("original oracle: %s", ee.Stderr)
-		}
 		t.Fatal(e)
 	}
 	var out Object

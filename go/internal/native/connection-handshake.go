@@ -97,6 +97,13 @@ func (c *Connection) connectWithPermission(ctx context.Context, approved *connec
 	if e != nil {
 		return nil, e
 	}
+	c.mu.Lock()
+	trusted := c.discoveryTrustCurrentLocked()
+	c.mu.Unlock()
+	if !trusted {
+		return nil, connectionFailure("native_server_pin_invalid")
+	}
+	lease.requireTrust = true
 	active, permission := lease.selection.Active, lease.selection.Permission
 	if approved != nil {
 		permission = approved

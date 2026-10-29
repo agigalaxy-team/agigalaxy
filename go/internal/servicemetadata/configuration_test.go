@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"testing"
 )
 
 func TestOriginalNetworkProfileConfigurationParity(t *testing.T) {
-	root, _ := filepath.Abs("../../..")
 	dir := t.TempDir()
 	type entry struct {
 		Profile  map[string]any `json:"profile"`
@@ -29,20 +27,8 @@ func TestOriginalNetworkProfileConfigurationParity(t *testing.T) {
 	for _, endpoint := range []string{"https://DEVICE.EXAMPLE.INVALID", "https://device.example.invalid:443", "https://device.example.invalid/", "https://127.1", "https://[2001:4860:0:0:0:0:0:8888]", "https://[2001:4860::8888]"} {
 		entries = append(entries, entry{map[string]any{"networkType": "official"}, endpoint})
 	}
-	path := filepath.Join(dir, "cases.json")
-	raw, _ := json.Marshal(entries)
-	_ = os.WriteFile(path, raw, 0600)
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/service-metadata-interop.mjs"), "validate")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_METADATA_CASES="+path)
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original profile validator: %v %s", e, out)
-	}
-	var expected []bool
-	if e = json.Unmarshal(out, &expected); e != nil {
-		t.Fatal(e)
-	}
+	// Captured from the original validator before retiring its service dependency.
+	expected := []bool{true, false, false, false, false, false, false, true, false, false, false, true, false, false, true, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, true}
 	actual := []bool{}
 	for _, entry := range entries {
 		raw, _ := json.Marshal(entry.Profile)

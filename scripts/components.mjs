@@ -83,13 +83,18 @@ async function cli(){
   if(value('--component')!=='hub')throw Error('Runtime resource closure currently belongs to the Hub service family.');
   const hub=catalog.components.find(c=>c.id==='hub');
   if(Object.values(hub.entries).some(entry=>entry.startsWith('go/'))){
-   const artifact=value('--artifact');if(!artifact)throw Error('Go Hub resources are embedded or inventoried in its built artifact; pass --artifact DIRECTORY.');
+   const artifact=value('--artifact');
+   if(!artifact){
+    const sql='go/internal/databaseschema/sql';
+    console.log(JSON.stringify([...new Set([...Object.values(hub.entries),'go/go.mod','go/go.sum',
+     'packages/galaxy-official/public-docs.json','LICENSE','NOTICE',
+     ...(await readdir(join(repositoryRoot,sql))).filter(name=>name.endsWith('.sql')).map(name=>sql+'/'+name)])].sort()));return;
+   }
    const directory=resolve(artifact),manifest=JSON.parse(await readFile(join(directory,'go-core-artifact.json'),'utf8'));
    if(!['galaxy-go-core-local-candidate','galaxy-go-core-release'].includes(manifest.kind)||manifest.backend!=='go')throw Error('Expected a Go core artifact.');
    console.log(JSON.stringify({backend:'go',entries:manifest.entries,embeddedResources:manifest.embeddedResources,files:manifest.files}));return;
   }
-  const {releaseImportResources}=await import('../packages/galaxy-official/src/operations/service-release.mjs');
-  console.log(JSON.stringify(await releaseImportResources(repositoryRoot,Object.values(hub.entries))));return;
+  throw Error('Hub resources require a current Go artifact; the retired Node release is not a source for current runtime resources.');
  }
  if(action==='plan'){
   const selected=value('--files'),base=value('--base');if(!selected&&!base)throw Error('plan requires --files JSON or --base Git commit.');

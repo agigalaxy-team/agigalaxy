@@ -77,7 +77,7 @@ export function saveForumBrowsePosition({ storage, scope, route, pages, y, ancho
   return position;
 }
 
-export {forumBodyParagraphs,forumBodyBlocks,forumBodyExcerpt} from "../../../../galaxy-official/src/shared/community-forum-body-text.mjs";
+export {forumBodyParagraphs,forumBodyBlocks,forumBodyExcerpt} from "../../../../galaxy-contracts/src/community-forum-body-text.mjs";
 
 export function forumLinkLabel(value) {
   try {

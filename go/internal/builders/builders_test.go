@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -27,28 +25,6 @@ import (
 )
 
 func encode(v any) []byte { b, _ := protocol.Encode(v); return b }
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	command := exec.Command("node", filepath.Join(root, "go/internal/builders/testdata/interop.mjs"), mode, path)
-	command.Dir = root
-	command.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	command.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	raw, e := command.Output()
-	if e != nil {
-		t.Fatalf("original builder fixture %s: %v %s", mode, e, stderr.String())
-	}
-	var result Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if protocol.Decode(line, &result) == nil && result != nil {
-			return result
-		}
-	}
-	t.Fatal("original fixture output")
-	return nil
-}
 func same(t *testing.T, got, want any) {
 	t.Helper()
 	var x, y any
@@ -59,18 +35,9 @@ func same(t *testing.T, got, want any) {
 	}
 }
 func TestBuilderManifestSupportAndPackUseOriginalHTTPReceipts(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	file := filepath.Join(t.TempDir(), "builder-fixture.json")
-	node(t, dsn, "setup", file, nil)
-	raw, e := os.ReadFile(file)
-	if e != nil {
-		t.Fatal(e)
-	}
-	var fixture Object
-	if protocol.Decode(raw, &fixture) != nil {
-		t.Fatal("fixture")
-	}
+	fixture := setupBuilders(t, owner, "setup")
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, config)
@@ -146,7 +113,13 @@ func TestBuilderManifestSupportAndPackUseOriginalHTTPReceipts(t *testing.T) {
 		value := obj(fixture[key])
 		checks = append(checks, Object{"schema": schema, "value": value})
 	}
-	oracle := arr(node(t, dsn, "schema", file, checks)["values"])
+	var schema struct {
+		Input  []any `json:"input"`
+		Values []any `json:"values"`
+	}
+	fixtureJSON(t, "schema", &schema)
+	same(t, checks, schema.Input)
+	oracle := schema.Values
 	for i, raw := range checks {
 		check := obj(raw)
 		parsed, e := parse(txt(check, "schema"), encode(check["value"]))
@@ -168,9 +141,21 @@ func TestBuilderManifestSupportAndPackUseOriginalHTTPReceipts(t *testing.T) {
 	}
 	manifest := obj(fixture["manifest"])
 	ok("/v1/builders/events/receipt", Object{"builderId": manifest["builderId"], "eventId": manifest["id"], "payloadHash": identity.Digest([]byte(txt(obj(fixture["manifestGrant"]), "payloadJson")))})
+	stage := 0
+	readCapture := func(queries []any) Object {
+		t.Helper()
+		var capture struct {
+			Input   []any `json:"input"`
+			Results []any `json:"results"`
+		}
+		fixtureJSON(t, fmt.Sprintf("read-%d", stage), &capture)
+		stage++
+		same(t, queries, capture.Input)
+		return Object{"results": capture.Results}
+	}
 	compare := func(queries []any) {
 		t.Helper()
-		expected := arr(node(t, dsn, "read", file, queries)["results"])
+		expected := arr(readCapture(queries)["results"])
 		for i, raw := range queries {
 			q := obj(raw)
 			actor := ""
@@ -193,7 +178,7 @@ func TestBuilderManifestSupportAndPackUseOriginalHTTPReceipts(t *testing.T) {
 	for _, sourceSearch := range []bool{false, true} {
 		input := Object{"query": "Fixture"}
 		options := Object{"sourceSearch": sourceSearch, "publicOnly": true}
-		oracle := node(t, dsn, "read", file, []any{Object{"kind": "query-wire", "actor": true, "input": input, "options": options}})
+		oracle := readCapture([]any{Object{"kind": "query-wire", "actor": true, "input": input, "options": options}})
 		want := txt(obj(obj(arr(oracle["results"])[0])["value"]), "wire")
 		wire, e := service.QueryWire(ctx, &actor, encode(input), QueryOptions{SourceSearch: sourceSearch, PublicOnly: true})
 		if e != nil || string(wire) != want {

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -82,11 +83,12 @@ func InspectServiceRelease(directory, expectedManifestSHA256 string) (*ServiceRe
 	if e = json.Unmarshal(raw, &manifest); e != nil {
 		return nil, e
 	}
-	if manifest.Version != 1 || manifest.Kind != "galaxy-official-service-release" || !ref.MatchString(manifest.ReleaseID) || !ref.MatchString(manifest.ConfigurationVersion) || len(manifest.Migrations) == 0 || len(manifest.Migrations) > len(serviceMigrationVersions) {
+	versions := databaseschema.Versions()
+	if manifest.Version != 1 || manifest.Kind != "galaxy-official-service-release" || !ref.MatchString(manifest.ReleaseID) || !ref.MatchString(manifest.ConfigurationVersion) || len(manifest.Migrations) == 0 || len(manifest.Migrations) > len(versions) {
 		return nil, releaseMismatch("Invalid service release manifest")
 	}
 	for i, m := range manifest.Migrations {
-		if m.Version != serviceMigrationVersions[i] || !sha.MatchString(m.SHA256) {
+		if m.Version != int64(versions[i]) || !sha.MatchString(m.SHA256) {
 			return nil, releaseMismatch("Invalid service release manifest")
 		}
 	}

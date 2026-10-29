@@ -1,0 +1,59 @@
+{
+  "values": [
+    {
+      "value": {
+        "status": "observed",
+        "strength": "ci-execution-fact",
+        "independence": "repository-controlled",
+        "sourceControl": {
+          "version": 1,
+          "observedVia": "github-rest-api",
+          "repositoryOwner": {
+            "id": 3,
+            "login": "Fixture",
+            "type": "Organization"
+          },
+          "submitterControlVerified": false,
+          "independentExecutionVerified": false
+        },
+        "attribution": "submitter-asserted",
+        "capabilitiesVerified": false,
+        "completed": true,
+        "conclusion": "success",
+        "source": {
+          "provider": "github-actions",
+          "owner": "Fixture",
+          "repository": "Synthetic",
+          "runId": 11,
+          "attempt": 1,
+          "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "repositoryId": 77,
+          "sourceUpdatedAt": "2033-05-18T03:33:20.000Z"
+        },
+        "collectedAt": 2000000000,
+        "validUntil": 2000003600,
+        "verifier": "github-actions-api/0.1",
+        "responseHash": "1d66c4db796da9b850bc55511c8fa0b023b783a12ad17c350eba4d4ccf4c0a7e",
+        "limitations": [
+          "Repository workflows may be controlled by the submitter.",
+          "A CI conclusion does not prove task quality or individual contribution."
+        ]
+      }
+    },
+    {
+      "rejected": true
+    },
+    {
+      "rejected": true
+    },
+    {
+      "rejected": true
+    },
+    {
+      "rejected": true
+    },
+    {
+      "rejected": true
+    }
+  ]
+}

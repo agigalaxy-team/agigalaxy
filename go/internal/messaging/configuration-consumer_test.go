@@ -2,7 +2,7 @@ package messaging
 
 import (
 	"encoding/json"
-	"os/exec"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -15,12 +15,7 @@ func TestSMTPHostOriginalTrimAndUnicodeLowercase(t *testing.T) {
 		config["host"] = host
 		configs = append(configs, config)
 	}
-	raw, _ := json.Marshal(configs)
-	root, _ := filepath.Abs("../../..")
-	script := `import{smtpConfigurationSchema}from './packages/galaxy-official/src/shared/operations-smtp-schema.mjs';console.log(JSON.stringify(JSON.parse(process.argv[1]).map(input=>{const p=smtpConfigurationSchema.safeParse(input);return p.success?{valid:true,configuration:p.data}:{valid:false,configuration:null}})))`
-	cmd := exec.Command("node", "--input-type=module", "-e", script, string(raw))
-	cmd.Dir = root
-	out, e := cmd.CombinedOutput()
+	out, e := os.ReadFile(filepath.Join("testdata", "smtp-host-original.json"))
 	if e != nil {
 		t.Fatal(e)
 	}

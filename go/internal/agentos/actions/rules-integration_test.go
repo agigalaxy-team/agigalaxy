@@ -1,13 +1,9 @@
 package actions_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +17,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/publicwrites"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/resourcebudget"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,32 +36,11 @@ func (d cardDirectory) RolesFresh(ctx context.Context, i, s string) ([]string, e
 // The single API-role connection also makes an accidental nested pool lease in
 // the write-time authorize callback fail rather than masking it with spare PGs.
 func TestPreparedRulePublicationUsesCurrentTransactionAndOriginalReceipt(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, e := filepath.Abs("../../../..")
-	if e != nil {
-		t.Fatal(e)
-	}
-	fixture := func(mode string) map[string]any {
-		t.Helper()
-		command := exec.Command("node", filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), mode)
-		command.Dir = root
-		command.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		command.Stdin = bytes.NewBufferString("{}")
-		raw, err := command.CombinedOutput()
-		if err != nil {
-			t.Fatalf("original fixture %s: %v %s", mode, err, raw)
-		}
-		var out map[string]any
-		if err = json.Unmarshal(raw, &out); err != nil {
-			t.Fatal(err)
-		}
-		return out
-	}
-	base := fixture("setup")
-	fixture("automation-setup")
-	endpoint, issuer := base["endpoint"].(string), base["issuer"].(string)
-	rootID := base["ids"].(map[string]any)["root"].(string)
+	f := operationsfixture.New(t, owner)
+	f.Automation(t)
+	endpoint, issuer, rootID := f.Endpoint, f.Issuer, f.IDs["root"]
 	config, e := pgxpool.ParseConfig(dsn)
 	if e != nil {
 		t.Fatal(e)

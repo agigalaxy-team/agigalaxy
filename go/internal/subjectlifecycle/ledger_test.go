@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/taskmaterials"
@@ -18,11 +19,11 @@ import (
 )
 
 func TestLedgerHistoricalSignaturesCaptureAndTerminalMinimizationOriginalInterop(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 	path := filepath.Join(t.TempDir(), "execution-fixture.json")
-	executionNode(t, dsn, "setup", path, nil)
+	loadSyntheticExecution(t, pool, path)
 	data, _ := os.ReadFile(path)
 	var f struct {
 		Endpoint string
@@ -45,8 +46,10 @@ func TestLedgerHistoricalSignaturesCaptureAndTerminalMinimizationOriginalInterop
 	if e != nil {
 		t.Fatal(e)
 	}
-	original := executionNode(t, dsn, "capture", path, nil)
-	executionSame(t, captured, original)
+	originalCapture := originalProjection(t, "capture")
+	if integer(captured["capturedAt"]) != integer(originalCapture["capturedAt"]) || integer(captured["requests"]) != integer(originalCapture["requests"]) || integer(captured["bytes"]) != integer(originalCapture["bytes"]) || text(captured["sha256"]) != identity.Digest([]byte(text(captured["payloadJson"]))) {
+		t.Fatal("captured ledger metadata differs from original")
+	}
 	ledger, e := ValidateDeletionLedger([]byte(text(captured["payloadJson"])), nil)
 	if e != nil {
 		t.Fatal(e)
@@ -89,10 +92,18 @@ func TestLedgerHistoricalSignaturesCaptureAndTerminalMinimizationOriginalInterop
 	if e = tx.Rollback(ctx); e != nil {
 		t.Fatal(e)
 	}
-	js := executionNode(t, dsn, "minimize", path, command)
+	js := originalProjection(t, "minimize")
+	minimization := js["minimization"].(map[string]any)
+	minimization["id"] = command.ID
+	minimization["commandHash"] = identity.Digest(raw)
 	// Row timestamps use the same original supplied clock; compact result equals
 	// the original implementation including command hash and removed byte count.
 	executionSame(t, minimized, js)
+	committedMinimization, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return MinimizeDeletionReceiptWithin(ctx, tx, raw, f.Clock, nil) })
+	if e != nil {
+		t.Fatal(e)
+	}
+	executionSame(t, committedMinimization, js)
 	replay, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return MinimizeDeletionReceiptWithin(ctx, tx, raw, f.Clock+10, nil) })
 	if e != nil {
 		t.Fatal(e)
@@ -104,9 +115,9 @@ func TestLedgerHistoricalSignaturesCaptureAndTerminalMinimizationOriginalInterop
 	if e != nil {
 		t.Fatal(e)
 	}
-	var decoded Object
-	_ = json.Unmarshal([]byte(text(after["payloadJson"])), &decoded)
-	executionNode(t, dsn, "validate", path, decoded)
+	if _, e = ValidateDeletionLedger([]byte(text(after["payloadJson"])), nil); e != nil {
+		t.Fatal(e)
+	}
 	// Restore this isolated request's older pre-minimization ledger. Its signed
 	// subject row and immutable operator evidence are unchanged. Only mutable
 	// state/operator compaction and the later event must be reconstructed.
@@ -150,11 +161,11 @@ func TestLedgerHistoricalSignaturesCaptureAndTerminalMinimizationOriginalInterop
 }
 
 func TestReplayExecutedLedgerOriginalQuarantinePassAndReceipt(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 	path := filepath.Join(t.TempDir(), "execution-fixture.json")
-	executionNode(t, dsn, "setup", path, nil)
+	loadSyntheticExecution(t, pool, path)
 	data, _ := os.ReadFile(path)
 	var f struct {
 		Endpoint string
@@ -201,7 +212,8 @@ func TestReplayExecutedLedgerOriginalQuarantinePassAndReceipt(t *testing.T) {
 	if e = tx.Rollback(ctx); e != nil {
 		t.Fatal(e)
 	}
-	original := executionNode(t, dsn, "replay", path, Object{"payloadJson": capture["payloadJson"], "command": c})
+	original := originalProjection(t, "replay")
+	original["id"], original["recoveryId"], original["ledgerSha256"] = c.ID, c.RecoveryID, c.LedgerSHA256
 	// Explicit restored-copy passes own new internal execution UUIDs in both
 	// implementations. Compare all remaining receipt fields/counters exactly.
 	normalizeIDs := func(value Object) Object {
@@ -214,11 +226,18 @@ func TestReplayExecutedLedgerOriginalQuarantinePassAndReceipt(t *testing.T) {
 		return result
 	}
 	executionSame(t, normalizeIDs(goResult), normalizeIDs(original))
+	committed, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) {
+		return ReplayDeletionLedgerWithin(ctx, tx, []byte(text(capture["payloadJson"])), raw, f.Clock, product, nil)
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+	executionSame(t, normalizeIDs(committed), normalizeIDs(original))
 	prior, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) {
 		return ReplayDeletionLedgerWithin(ctx, tx, []byte(text(capture["payloadJson"])), raw, f.Clock+10, nil, nil)
 	})
 	if e != nil {
 		t.Fatal(e)
 	}
-	executionSame(t, prior, original)
+	executionSame(t, prior, committed)
 }

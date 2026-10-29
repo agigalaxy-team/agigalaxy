@@ -1,6 +1,6 @@
 # 搜索、推荐与使用分析适配
 
-实现位于 `packages/galaxy-official/src/discovery-runtime/`；原生构建源见 [`services/galaxy-discovery/SOURCE_BUILD.md`](../../services/galaxy-discovery/SOURCE_BUILD.md)，运行模板在 `deploy/discovery-stack/`。本页保存adapter、采集和原生配置合同，分析投影的共享解释见[接口](interfaces.md#受控查询投影与使用分析)。
+银河适配实现在 [`go/internal/discovery/`](../../go/internal/discovery/runtime.go)；原生构建源见 [`services/galaxy-discovery/SOURCE_BUILD.md`](../../services/galaxy-discovery/SOURCE_BUILD.md)，运行模板在 `deploy/discovery-stack/`。本页保存adapter、采集和原生配置合同，分析投影的共享解释见[接口](interfaces.md#受控查询投影与使用分析)。
 
 ## 原生栈与启动
 
@@ -18,20 +18,11 @@ OpenPanel API执行自己的migration。首次healthy后在API容器运行 `node
 
 ## Runtime和Worker组合
 
-```js
-const discovery = createDiscoveryRuntime({
-  db, endpoint, forum, accounts, permissions,
-  config: {
-    meilisearch: {url, apiKey, index: 'galaxy_public_community'},
-    gorse: {url, apiKey}, // guard key
-    openpanel: {url, clientId, clientSecret, readClientId, readClientSecret, projectId},
-  },
-});
-```
+API 和 Worker 从受保护的 `GALAXY_DISCOVERY_CONFIG_FILE` 读取当前配置，字段与校验见 [`configuration.go`](../../go/internal/discovery/configuration.go)。`galaxy-api` 装配 Store、当前社区来源、Meilisearch、Gorse、OpenPanel 和权限适配；配置缺失时保留明确 not-connected，不创建第二套 Node Runtime。
 
-从 `runtime.mjs` 导入，未给配置为not-connected；Meili indexing等待native task成功才ack。结构源 `schema.mjs` 提供原迁移106与API/Worker grants，使用中央完整registry/角色管理，不设新retention/删除worker。
+[`Runtime`](../../go/internal/discovery/runtime.go) 维护查询与状态，[`Worker`](../../go/internal/discovery/worker.go) 分页完成 reconciliation sweep，再接续索引和投递；Meili 写入须等原生 task 成功才确认。业务迁移106和角色授权来自 `go/internal/databaseschema/sql/` 的中央迁移，不从 JS schema 生成，也不另设隐含删除任务。
 
-Worker用同配置加sourceReadOnly:true，`new DiscoveryWorker(runtime)`；初始化后bounded seedBatch分页完成整次reconciliation sweep再重启cursor，现有cycle调用indexOne/deliverOne。它以无row-lock的原匿名forum reader读源，不得取得authorization UPDATE。独立worker用 `public-content-source.mjs` 的createDiscoveryReadOnlySource，输入db/endpoint/now/readGrant/forumPolicy/moderatorIds/identityProviders，取实际API moderator与issuer/client元数据；不需要API签名图，不读取附件或写账户授权。source/permission/section/governance/curation/tag/revocation及expiry触发invalidation。
+Worker 使用独立数据库角色及配置中的原 `sourceMetadata`，以当前 Go 社区只读来源核对内容、许可、分类、治理、编排、标签、撤销和到期状态。它不取得账户授权的写权限、不读取私聊或附件，也不在 Worker 启动时重配专业引擎。配置及组装入口见 [Go 核心运行说明](../../go/README.md)。
 
 ## 采集事件和用途
 
@@ -53,7 +44,7 @@ bookmark/publication以原operationId作稳定eventId，并核原账户fresh ses
 
 ## HTTP与原生分析
 
-`http.mjs` 的createDiscoveryHttp({websiteOrigin,visitorSecret,secureCookies:true})与dispatch定义精确入口：
+[`Handler`](../../go/internal/discovery/http.go) 接网站 Origin、访问身份、当前账户和既有权限服务，提供以下入口：
 
 | 路径 | 方法/解析 |
 |---|---|

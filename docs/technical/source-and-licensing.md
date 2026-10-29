@@ -21,7 +21,7 @@
 
 ## 源码归档
 
-归档读取组件 catalog，纳入应用/服务/包源、Java/FTL/Python/Dockerfile、provider 注册描述、宿主脚本/清单、图片署名、锁、配置示例和许可。显式 service/source resource 清单缺失时失败。固定上游完整源码与大锁包按组件获取合同准备，公开历史下载按原发行目录另行获取。
+归档读取组件 catalog，纳入应用/服务/包源、Java/FTL/Python/Dockerfile、provider 注册描述、宿主脚本/清单、图片署名、锁、配置示例和许可。当前组件的入口、嵌入 SQL 和声明资源由同一 catalog 交付；源码归档不加载旧 Node 服务或要求先构建二进制。固定上游完整源码与大锁包按组件获取合同准备，公开历史下载按原发行目录另行获取。
 
 实际环境文件、凭据/私钥、依赖树、缓存、构建输出和运行工件不入源码。运维只保留 `configuration.example.json`，具体主机配置在源码外，通过工具的 `--config` 显式指定。成员哈希只证明包成员完整性及隔离解压校验，不证明权属、运行状态或发布授权。
 
@@ -36,7 +36,7 @@ node scripts/native-license-notices.mjs generate <绝对候选目录>
 node scripts/native-client-release.mjs <绝对候选目录> <新的绝对准备目录> <本机tar绝对路径>
 ```
 
-上述许可工具按其支持的准确发行 profile 使用；Go 候选的编译与包布局另见 [Go 运行样例](../../go/deploy/README.md)，不能把旧 Node 发行许可检查自动当作 Go 二进制及其模块的完整许可核对。命令只构建无凭据候选和准备包，不签名、安装宿主配置或公开发布。生产签名按既有授权短期注入，生成 NOTICE 不需要读取发行私钥。
+`npm run prepare:client -- <新的绝对输出目录>` 统一构建 Go Native、离线安装准确宿主依赖、收集许可并准备包。`go-native-licenses.mjs` 从实际 Go 依赖图收集原文；npm 许可仍按最终 lock 和安装图核对。Go 包布局见 [Go 运行样例](../../go/deploy/README.md)，旧包的验签与许可 profile 仍只用于旧字节。命令只构建无凭据候选和准备包，不签名、安装宿主配置或公开发布。生产签名按既有授权短期注入，生成 NOTICE 不需要读取发行私钥。
 
 `generateNativeLicenseNotices({candidate})` 无网络、按 lock 与实际安装组件新建 `third-party-licenses/` 和 `license-inventory.json`，拒绝覆盖；`verifyNativeLicenseNotices({candidate})` 只读重算。缺文本、版本不符、lock变化、篡改或缺可选平台 lock 成员都阻止准备，不伪造跨平台检查。bundler 外置 npm 依赖，源输入含 node_modules 时拒绝当前许可 profile；esbuild 原文只说明构建工具归属。
 

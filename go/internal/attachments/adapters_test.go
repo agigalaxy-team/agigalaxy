@@ -5,14 +5,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -135,7 +132,7 @@ func TestPayloadDeadlineClosesBlockedRead(t *testing.T) {
 	}
 }
 
-func TestPayloadAgainstCurrentNodeParser(t *testing.T) {
+func TestPayloadFormatCompatibility(t *testing.T) {
 	png, _ := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8GQAAAAASUVORK5CYII=")
 	cases := []struct {
 		Bytes []byte `json:"bytes"`
@@ -145,23 +142,8 @@ func TestPayloadAgainstCurrentNodeParser(t *testing.T) {
 		{[]byte("<?xml version=\"1.0\"?><root/>"), "application/xml"}, {[]byte(`{"ok":true}`), "application/json"},
 		{[]byte("%PDF-1.7\nfixture"), "application/pdf"}, {[]byte{137, 80, 78, 71, 13, 10, 26, 10}, "image/png"},
 	}
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
-	if e != nil {
-		t.Fatal(e)
-	}
-	script := `import {readAttachmentPayload} from './packages/galaxy-official/src/infrastructure/attachment-payload.mjs';import {createHash} from 'node:crypto';let raw='';for await(const b of process.stdin)raw+=b;const out=[];for(const x of JSON.parse(raw)){const bytes=Buffer.from(x.bytes,'base64');try{await readAttachmentPayload((async function*(){yield bytes})(),{size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),mediaType:x.media,maxFileBytes:10485760});out.push('')}catch(e){out.push(e.code??'internal_error')}}console.log(JSON.stringify(out));`
-	raw, _ := json.Marshal(cases)
-	cmd := exec.Command("node", "--input-type=module", "-e", script)
-	cmd.Dir = root
-	cmd.Stdin = bytes.NewReader(raw)
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original payload parser %v %s", e, out)
-	}
-	var expected []string
-	if e = json.Unmarshal(out, &expected); e != nil {
-		t.Fatal(e)
-	}
+	// Captured once from the original parser for these exact synthetic bytes.
+	expected := []string{"", "attachment_media_type_mismatch", "", "", "", "", "attachment_media_type_unrecognized"}
 	for i, c := range cases {
 		_, e := ReadPayload(context.Background(), io.NopCloser(bytes.NewReader(c.Bytes)), Payload{int64(len(c.Bytes)), Digest(c.Bytes), c.Media, 10485760, nil, nil})
 		got := ""

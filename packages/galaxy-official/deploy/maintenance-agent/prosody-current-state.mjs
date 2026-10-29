@@ -1,8 +1,8 @@
 import {createHash} from 'node:crypto';
 import {readFile,writeFile,mkdir,lstat} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {transaction} from "../../src/infrastructure/database.mjs";
-import {validateDeletionLedger} from '../../src/operations/deletion-ledger.mjs';
+import {transaction} from "./recovery-transaction.mjs";
+import {recoveryExecutable,recoveryCall,cloneConnection} from './go-recovery.mjs';
 import {noSymlinkPath,runCommand,postgresSqlArguments} from '../operations-stack/host.mjs';
 
 const fail=code=>Object.assign(Error(code),{code});
@@ -22,8 +22,8 @@ export const prosodyProjectionCaptureSql=`BEGIN; LOCK TABLE chat_rooms,chat_memb
 
 // The original signed intent is all-owned-service-data. An unexecuted approval,
 // account linkage, subject status or submitted deletion is not this authority.
-export async function executedProsodyDeletionSubjects(ledger,endpoint){
- try{await validateDeletionLedger(ledger);}catch{throw fail('maintenance_prosody_deletion_ledger_invalid');}
+export async function executedProsodyDeletionSubjects(ledger,endpoint,{validate}={}){
+ try{if(typeof validate!=='function')throw Error();await validate(ledger);}catch{throw fail('maintenance_prosody_deletion_ledger_invalid');}
  if(ledger.endpoint!==endpoint)throw fail('maintenance_prosody_deletion_endpoint_changed');
  return ledger.tables.deletion_requests.filter(x=>x.execution_result).map(row=>({subjectId:row.subject_id,requestId:row.id}));
 }
@@ -70,31 +70,19 @@ export function verifyProsodyState(native,projection,security,{now=Math.floor(Da
   nativeMessageRows:native.messages.length,withheldOlderRevisions:withheld,bodyReturned:false,physicalMediaErasureProven:false};
 }
 
-// This reuses the existing ChatService erasure and room-transition rules, but
-// only on the exact quarantine and only after the native driver has positively
+// Reuse the Go chat erasure and room-transition rules only on the exact
+// quarantine and only after the native driver has positively
 // acknowledged each key. A retry target alone never becomes authorization.
-export async function reconcileProsodySqlCandidate(database,{operationId,projection,receipts,now=Math.floor(Date.now()/1000)}={}){
+export async function reconcileProsodySqlCandidate(database,{context,config,run=runCommand,operationId,projection,receipts,now=Math.floor(Date.now()/1000)}={}){
  const state=(await database.query('SELECT recovery_id,status FROM recovery_state WHERE singleton=true')).rows[0];
  if(!uuid.test(operationId??'')||state?.status!=='quarantined'||state.recovery_id!==operationId)throw fail('maintenance_exact_quarantine_required');
  const erased=new Set();for(const row of receipts??[]){if(!uuid.test(row.roomId??'')||!uuid.test(row.messageId??'')||row.archiveDeleted!==true||erased.has(key(row)))throw fail('maintenance_prosody_archive_delete_unconfirmed');erased.add(key(row));}
  if(projection.messages.some(row=>row.erase&&!erased.has(key(row))))throw fail('maintenance_prosody_archive_delete_unconfirmed');
- const transport={erase:async row=>{if(!erased.has(key(row)))throw fail('maintenance_prosody_archive_delete_unconfirmed');return{archiveDeleted:true};}};
- // Native metadata reads must not initialize the complete chat/business kernel
- // (its schema imports are cyclic when this adapter is the process entry).
- const {ChatService}=await import("../../src/chat/service.mjs");
- const chat=new ChatService({db:database,transport,now:()=>now});
- for(const target of projection.deletedSubjects){let result;
-  for(let i=0;i<=Math.ceil(limit/1000);i++){result=await chat.eraseSubject(target.subjectId,{limit:1000});if(result.complete)break;}
-  if(!result?.complete)throw fail('maintenance_prosody_native_lifecycle_unconfirmed');
- }
- // Already completed purges have purge_pending=false in the current database.
- // The point's native copy can still contain that key, so mark only these exact
- // source-withdrawn/expired rows for the original positive-receipt consumer.
- for(const row of projection.messages.filter(x=>x.erase)){
-  await database.query("UPDATE chat_message_refs SET state=CASE WHEN state IN ('pending','accepted') AND expires_at<=$2 THEN 'expired' ELSE state END,purge_pending=true WHERE message_id=$1 AND room_id=$3 AND (state IN ('retracted','expired') OR expires_at<=$2)",[row.messageId,new Date(now*1000),row.roomId]);
-  await chat.purgeOne(row.messageId);
- }
- return{currentRoomTransitionsApplied:true,actualNativeReceipts:erased.size,serviceWideDeletionComplete:false};
+ const selected={messages:projection.messages.map(({roomId,messageId,erase})=>({roomId,messageId,erase})),deletedSubjects:projection.deletedSubjects};
+ const exactReceipts=(receipts??[]).map(({roomId,messageId,archiveDeleted})=>({roomId,messageId,archiveDeleted}));
+ const result=await recoveryCall(await recoveryExecutable(context),{mode:'chat-reconcile',...cloneConnection(context,config),projection:selected,receipts:exactReceipts,at:now},run);
+ if(result?.currentRoomTransitionsApplied!==true||result.actualNativeReceipts!==erased.size||result.serviceWideDeletionComplete!==false)throw fail('maintenance_prosody_native_lifecycle_unconfirmed');
+ return result;
 }
 
 export class MaintenanceProsodyCurrentState{
@@ -145,14 +133,14 @@ export class MaintenanceProsodyCurrentState{
   const c=context.currentFacts.deletion,path=this.controlDirectory+'/recovery-facts/'+context.intent.operationId+'-deletion.json';
   if(c?.operationId!==context.intent.operationId||c.artifactPath!==path||c.signatureValidated!==true)throw fail('maintenance_prosody_deletion_ledger_invalid');await noSymlinkPath(path);
   const info=await lstat(path);if(!info.isFile()||info.isSymbolicLink()||(info.mode&0o077)||info.size>maximumBytes)throw fail('maintenance_prosody_private_facts_required');
-  const raw=await readFile(path,'utf8');if(sha(raw)!==c.sha256)throw fail('maintenance_prosody_current_facts_changed');return executedProsodyDeletionSubjects(JSON.parse(raw),context.authority.endpoint);
+  const raw=await readFile(path,'utf8');if(sha(raw)!==c.sha256)throw fail('maintenance_prosody_current_facts_changed');return executedProsodyDeletionSubjects(JSON.parse(raw),context.authority.endpoint,{validate:async ledger=>recoveryCall(await recoveryExecutable(context),{mode:'ledger-validate',ledger},this.run)});
  }
  async prepare(database,context){
   await this.stopped(context);
   const state=(await database.query('SELECT recovery_id,status FROM recovery_state WHERE singleton=true')).rows[0];if(state?.status!=='quarantined'||state.recovery_id!==context.intent.operationId)throw fail('maintenance_exact_quarantine_required');
   const current=await this.facts(context),deletedSubjects=await this.deletedSubjects(context),now=this.now(),before=await prosodyProjectionWithin(database,{now,deletedSubjects});
   const native=await this.command(context,{action:'reconcile',stage:'erase',now,projection:before},{candidate:true,writable:true});
-  await reconcileProsodySqlCandidate(database,{operationId:context.intent.operationId,projection:before,receipts:native.receipts,now});
+  await reconcileProsodySqlCandidate(database,{context,config:this.config,run:this.run,operationId:context.intent.operationId,projection:before,receipts:native.receipts,now});
   const projection=await prosodyProjectionWithin(database,{now,deletedSubjects});
   const merged=await this.command(context,{action:'reconcile',now,projection,security:current.security,tombstones:current.tombstones},{candidate:true,writable:true});
   return{required:true,...verifyProsodyState(merged,projection,current.security,{now}),basis:'original-Prosody-13.0.6-internal-storage-and-verified-current-deletion-ledger',serviceWideDeletionComplete:false};

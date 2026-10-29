@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -47,25 +46,9 @@ func TestOriginalFixedWindowQuotaParity(t *testing.T) {
 		AccountID string `json:"accountId"`
 		ExpiresAt int64  `json:"expiresAt"`
 	}{"11111111-1111-4111-8111-111111111111", 1000}})
-	// The oracle takes lower camel keys, matching the original JS API inputs.
-	encodedEvents := []map[string]any{}
-	for _, event := range events {
-		encodedEvents = append(encodedEvents, map[string]any{"kind": event.Kind, "id": event.ID, "method": event.Method, "path": event.Path, "address": event.Address, "subject": event.Subject, "credential": event.Credential, "hasCredential": event.HasCredential, "at": event.At, "current": event.Current})
-	}
-	// Zero At means unchanged clock rather than a real clock rewind.
-	for _, event := range encodedEvents {
-		if event["at"] == int64(0) {
-			delete(event, "at")
-		}
-	}
-	raw, _ := json.Marshal(map[string]any{"endpoint": "https://api.example.invalid", "origins": []string{}, "requests": []any{}, "policy": policy, "quotaEvents": encodedEvents})
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/http-boundary-interop.mjs"))
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(string(raw))
-	out, e := cmd.CombinedOutput()
+	out, e := os.ReadFile("testdata/http-quota.json")
 	if e != nil {
-		t.Fatalf("original quota oracle: %v %s", e, out)
+		t.Fatal(e)
 	}
 	var oracle struct {
 		QuotaEvents []struct {

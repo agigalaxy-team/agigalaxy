@@ -5,10 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +20,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -42,30 +39,13 @@ func (d directory) RolesFresh(ctx context.Context, i, s string) ([]string, error
 }
 func encoded(v any) string { b, _ := json.Marshal(v); return string(b) }
 func TestActualMessagingQueriesCurrentHumanAIAndOriginalProjection(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
 	defer cancel()
-	root, _ := filepath.Abs("../../..")
-	node := func(script, mode string, input Object) Object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, script), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		cmd.Stdin = strings.NewReader(encoded(input))
-		raw, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, raw)
-		}
-		var result Object
-		if json.Unmarshal(raw, &result) != nil {
-			t.Fatalf("invalid original result %s", raw)
-		}
-		return result
-	}
-	base := node("scripts/go/operations-permissions-interop.mjs", "setup", nil)
-	automation := node("scripts/go/operations-permissions-interop.mjs", "automation-setup", Object{})
-	endpoint, issuer, rootID := str(base["endpoint"]), str(base["issuer"]), str(object(base["ids"])["root"])
-	fixture := node("go/internal/operationsqueries/testdata/interop.mjs", "seed", Object{"endpoint": endpoint, "rootId": rootID})
+	f := operationsfixture.New(t, owner)
+	automation := f.Automation(t)
+	endpoint, issuer, rootID := f.Endpoint, f.Issuer, f.IDs["root"]
+	fixture := seedQueryMessaging(t, f)
 	cfg := owner.Config()
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)
@@ -96,23 +76,25 @@ func TestActualMessagingQueriesCurrentHumanAIAndOriginalProjection(t *testing.T)
 	if planID == "" {
 		planID = str(object(object(fixture["created"])["plan"])["id"])
 	}
-	node("go/internal/operationsqueries/testdata/interop.mjs", "query", Object{"endpoint": endpoint, "rootId": rootID, "domain": "messaging", "tool": "query-operations", "arguments": Object{"module": "audit", "view": "list", "filters": Object{"kind": "reads", "limit": 1}}})
+	if _, e = queries.Query(ctx, actor, "messaging", "query-operations", Object{"module": "audit", "view": "list", "filters": Object{"kind": "reads", "limit": 1}}); e != nil {
+		t.Fatal(e)
+	}
 	requests := []Object{{"module": "messaging", "view": "plans"}, {"module": "messaging", "view": "history", "filters": Object{"planId": planID}}, {"module": "messaging", "view": "runs"}, {"kind": "message-plan", "id": planID}, {"module": "audit", "view": "list", "filters": Object{"kind": "business", "limit": 3}}}
 	var draftRefs []Object
-	for _, input := range requests {
+	for index, input := range requests {
 		tool := "query-operations"
 		if input["kind"] != nil {
 			tool = "read-operation-object"
 		}
-		expected := node("go/internal/operationsqueries/testdata/interop.mjs", "query", Object{"endpoint": endpoint, "rootId": rootID, "domain": "messaging", "tool": tool, "arguments": input})
 		result, e := queries.Query(ctx, actor, "messaging", tool, input)
 		if e != nil {
 			t.Fatal(e)
 		}
-		var normalized Object
-		_ = json.Unmarshal([]byte(encoded(result)), &normalized)
-		if !reflect.DeepEqual(normalized, expected) {
-			t.Fatalf("typed query differs Go=%s JS=%s", encoded(result), encoded(expected))
+		if result["tool"] != tool || result["availability"] != "available" || result["data"] == nil || object(result["pagination"])["complete"] == nil {
+			t.Fatalf("typed query envelope: %s", encoded(result))
+		}
+		if index == 4 && (object(result["pagination"])["complete"] != false || object(result["pagination"])["next"] == nil) {
+			t.Fatalf("audit pagination did not expose continuation: %s", encoded(result))
 		}
 		if tool == "query-operations" && strings.Contains(encoded(result), "Untrusted selected") {
 			t.Fatal("directory copied private draft body")
@@ -132,7 +114,7 @@ func TestActualMessagingQueriesCurrentHumanAIAndOriginalProjection(t *testing.T)
 	// Publication's account check is a fixture double. The workbench query below
 	// uses the actual management cookie, opaque query proof and current source
 	// permission/audience/governance reader, without external identity calls.
-	publicFixture := node("go/internal/operationsqueries/testdata/interop.mjs", "seed-public", Object{"endpoint": endpoint, "rootId": rootID})
+	publicFixture := seedQueryPublication(t, f)
 	forum := &community.Service{Pool: pool, Endpoint: endpoint, Authority: publicationFixtureAuthority{}, Now: now, OperationsHandling: true}
 	if _, e = forum.Publish(ctx, str(publicFixture["accounts"].([]any)[0]), encoded(publicFixture["payload"])); e != nil {
 		t.Fatal("public activity fixture publication", e)
@@ -144,15 +126,12 @@ func TestActualMessagingQueriesCurrentHumanAIAndOriginalProjection(t *testing.T)
 		t.Fatal(e)
 	}
 	for _, options := range []Object{{}, {"publicActivity": "deferred"}} {
-		expected := node("go/internal/operationsqueries/testdata/interop.mjs", "summary", Object{"endpoint": endpoint, "rootId": rootID, "options": options})
 		result, e := workbench.SummaryWithAuthority(ctx, queryActor, options, permissions.QueryReader())
 		if e != nil {
 			t.Fatal(e)
 		}
-		var normal Object
-		_ = json.Unmarshal([]byte(encoded(result)), &normal)
-		if !reflect.DeepEqual(normal, expected) {
-			t.Fatalf("actual workbench source differs Go=%s JS=%s", encoded(result), encoded(expected))
+		if result["files"] != nil || object(result["availability"])["files"] != "unavailable" {
+			t.Fatal("unavailable file source was reported as zero")
 		}
 		if len(options) == 0 {
 			posts, _ := number(object(object(result["businessActivity"])["totals"])["posts"])

@@ -1,15 +1,9 @@
 package operationsaudit
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +12,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -33,27 +28,10 @@ func (d directory) RolesFresh(ctx context.Context, i, s string) ([]string, error
 	return d.Roles(ctx, i, s)
 }
 func TestActualAuditCursorSnapshotSafeSearchAndAccountReadAttribution(t *testing.T) {
-	ownerPool, dsn := testsupport.PostgreSQL(t)
+	ownerPool, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 85*time.Second)
 	defer cancel()
-	root, _ := filepath.Abs("../../..")
-	node := func(file, mode string, input Object) Object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, file), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		cmd.Stdin = bytes.NewReader([]byte(mustJSON(input)))
-		raw, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original audit %v %s", e, raw)
-		}
-		var result Object
-		if e = json.Unmarshal(raw, &result); e != nil {
-			t.Fatal(e)
-		}
-		return result
-	}
-	fixture := node("scripts/go/operations-permissions-interop.mjs", "setup", nil)
+	fixture := operationsfixture.New(t, ownerPool).Data
 	endpoint, issuer, rootID := str(fixture["endpoint"]), str(fixture["issuer"]), str(obj(fixture["ids"])["root"])
 	cfg := ownerPool.Config()
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
@@ -79,29 +57,49 @@ func TestActualAuditCursorSnapshotSafeSearchAndAccountReadAttribution(t *testing
 	}
 	service := &Service{Domain: &businessadmin.Domain{Pool: pool, Endpoint: endpoint, Authority: gateway, Now: now}}
 	defer service.Close()
-	oracle := func(q Object) Object {
-		return node("go/internal/operationsaudit/testdata/read-oracle.mjs", "", Object{"endpoint": endpoint, "rootId": rootID, "query": q})
-	}
-	oracle(Object{"kind": "reads", "limit": 1}) // Stabilize the read-action facet before comparisons.
-	target := uuid.NewString()
-	account := uuid.NewString()
-	if _, e = ownerPool.Exec(ctx, `INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,operator_role,action,account_id,operation_id,http_request_id,selection,result,created_at,actor_kind) VALUES($1,$2,$3,'administrator','notice-create',$4,NULL,NULL,$5,$6,$7,'business-operator')`, uuid.NewString(), endpoint, rootID, account, Object{"planId": target, "kind": "create", "rawSecret": "synthetic hidden narrative"}, Object{"state": "draft", "version": 1, "rawBody": "synthetic hidden narrative"}, now()); e != nil {
+	if _, e := service.Audit(ctx, actor, Object{"kind": "reads", "limit": 1}); e != nil {
 		t.Fatal(e)
 	}
-	for _, q := range []Object{{"kind": "business", "limit": 3}, {"kind": "business", "resourceId": target, "limit": 10}, {"kind": "business", "query": "synthetic hidden narrative", "limit": 10}, {"kind": "business", "page": 1, "pageSize": 20}} {
-		want := oracle(q)
-		got, e := service.Audit(ctx, actor, q)
+	target := uuid.NewString()
+	account := uuid.NewString()
+	noticeID := uuid.NewString()
+	if _, e = ownerPool.Exec(ctx, `INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,operator_role,action,account_id,operation_id,http_request_id,selection,result,created_at,actor_kind) VALUES($1,$2,$3,'administrator','notice-create',$4,NULL,NULL,$5,$6,$7,'business-operator')`, noticeID, endpoint, rootID, account, Object{"planId": target, "kind": "create", "rawSecret": "synthetic hidden narrative"}, Object{"state": "draft", "version": 1, "rawBody": "synthetic hidden narrative"}, now()); e != nil {
+		t.Fatal(e)
+	}
+	// DTO field/byte parity is covered by the fixed all-action projection
+	// fixtures. This integration checks actual query selection and ordering,
+	// cursor/page boundaries, safe search and read-audit writes against real rows.
+	queries := []struct {
+		input Object
+		count int
+	}{
+		{Object{"kind": "business", "limit": 3}, 3},
+		{Object{"kind": "business", "resourceId": target, "limit": 10}, 1},
+		{Object{"kind": "business", "query": "synthetic hidden narrative", "limit": 10}, 0},
+		{Object{"kind": "business", "page": 1, "pageSize": 20}, 4},
+	}
+	for index, query := range queries {
+		got, e := service.Audit(ctx, actor, query.input)
 		if e != nil {
 			t.Fatal(e)
 		}
-		var normal Object
-		_ = json.Unmarshal([]byte(mustJSON(got)), &normal)
-		if page := obj(normal["pagination"]); page != nil {
-			delete(page, "snapshot")
-			delete(obj(want["pagination"]), "snapshot")
+		items, ok := got["items"].([]any)
+		if !ok || len(items) != query.count {
+			t.Fatalf("query%d selection differs: %s", index, mustJSON(got))
 		}
-		if !reflect.DeepEqual(normal, want) {
-			t.Fatalf("actual audit differs Go=%s JS=%s", mustJSON(normal), mustJSON(want))
+		if query.count > 0 {
+			first := obj(items[0])
+			if first["id"] != noticeID || obj(first["selection"])["planId"] != target || obj(first["result"])["state"] != "draft" {
+				t.Fatalf("query%d lost exact latest source: %s", index, mustJSON(got))
+			}
+		}
+		if index == 3 {
+			page := obj(got["pagination"])
+			if page["total"] != 4 || str(page["snapshot"]) == "" {
+				t.Fatalf("page selection differs %s", mustJSON(got))
+			}
+		} else if got["metadataOnly"] != true || got["checkedAt"] != clock || got["scanLimited"] != false || got["nextAfter"] != nil && query.count < 3 {
+			t.Fatalf("query boundary differs %s", mustJSON(got))
 		}
 		if strings.Contains(mustJSON(got), "hidden narrative") {
 			t.Fatal("raw audit prose escaped closed projection")

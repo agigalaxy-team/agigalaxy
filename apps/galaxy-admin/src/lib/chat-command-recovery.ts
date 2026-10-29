@@ -1,5 +1,5 @@
-import {chatOriginalIntent,chatReceiptIntent} from '../../../../packages/galaxy-official/src/shared/operations-chat-receipt-intent.mjs';
-import {canonicalReceiptInput} from '../../../../packages/galaxy-official/src/shared/operations-governance-receipt-intent.mjs';
+import {chatOriginalIntent,chatReceiptIntent} from '../../../../packages/galaxy-contracts/src/operations-chat-receipt-intent.mjs';
+import {canonicalReceiptInput} from '../../../../packages/galaxy-contracts/src/operations-governance-receipt-intent.mjs';
 import {operationsRequest} from './operations-client';
 type Intent=Readonly<{path:string;body:Record<string,unknown>}>;
 export type ChatRecovered={recovered:true;operationId:string;kind:string;reportId:string;version:number;state:string;recordedAt:string;messageId:string|null;messageRevision:number|null;dispositionRevision:number|null;overallHiddenAtCommit:boolean|null};

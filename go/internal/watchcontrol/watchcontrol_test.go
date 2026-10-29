@@ -16,44 +16,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 )
 
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/watchcontrol/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	raw, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original watch %s %v %s", mode, e, stderr.String())
-	}
-	var o Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if json.Unmarshal(line, &o) == nil && o != nil {
-			return o
-		}
-	}
-	t.Fatal("fixture result")
-	return nil
-}
 func same(t *testing.T, a, b any) {
 	t.Helper()
 	var x, y any
 	_ = json.Unmarshal(encode(a), &x)
 	_ = json.Unmarshal(encode(b), &y)
 	if !reflect.DeepEqual(x, y) {
-		t.Fatalf("Go=%s\nJS=%s", encode(a), encode(b))
+		t.Fatalf("HTTP=%s\nGo=%s", encode(a), encode(b))
 	}
 }
 func copyObject(o Object) Object {
@@ -63,15 +38,9 @@ func copyObject(o Object) Object {
 	}
 	return out
 }
-func TestOriginalWatchControlCurrentDevicesLostACKTransferAndRestrictedRetention(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
-	path := filepath.Join(t.TempDir(), "watch-control-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
-	var f Object
-	if e := json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
-	}
+func TestWatchControlCurrentDevicesLostACKTransferAndRestrictedRetention(t *testing.T) {
+	owner, _ := testsupport.PostgreSQL(t)
+	f := setupWatchControl(t, owner)
 	ctx := context.Background()
 	rolePool := func(role string) *pgxpool.Pool {
 		config := owner.Config()
@@ -115,22 +84,34 @@ func TestOriginalWatchControlCurrentDevicesLostACKTransferAndRestrictedRetention
 	}
 	compare := func(queries []any) {
 		t.Helper()
-		oracle := node(t, dsn, "read", path, queries)
-		results, _ := oracle["results"].([]any)
-		for i, value := range queries {
-			want := obj(results[i])
-			got, e := read(obj(value))
-			if code := text(want, "error"); code != "" {
-				if fault.Code(e) != code || int64(fault.Status(e)) != number(want, "status") {
-					t.Fatalf("Go %v JS %v", e, want)
-				}
-				continue
+		for _, value := range queries {
+			q := obj(value)
+			got, err := read(q)
+			action := text(q, "kind")
+			if action == "get" {
+				action = "read"
 			}
-			if e != nil {
+			request := httptest.NewRequest("POST", "/v2/watch-controls/"+action, bytes.NewReader(encode(q["input"])))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer "+text(obj(actorRows[number(q, "actor")]), "token"))
+			response := httptest.NewRecorder()
+			(Handler{Service: svc, Devices: devices}).ServeHTTP(response, request)
+			var actual Object
+			if e := json.Unmarshal(response.Body.Bytes(), &actual); e != nil {
 				t.Fatal(e)
 			}
-			same(t, got, want["value"])
+			if err != nil {
+				if response.Code != fault.Status(err) || text(actual, "error") != fault.Code(err) {
+					t.Fatalf("HTTP/domain error mismatch %d %v %v", response.Code, actual, err)
+				}
+			} else {
+				if response.Code != 200 {
+					t.Fatal(response.Code, actual)
+				}
+				same(t, actual, got)
+			}
 		}
+
 	}
 	register := obj(f["register"])
 	created, e := svc.Register(ctx, actors[0], encode(register))
@@ -188,7 +169,9 @@ func TestOriginalWatchControlCurrentDevicesLostACKTransferAndRestrictedRetention
 	if _, e = svc.Register(ctx, actors[0], encode(blocked)); e != nil {
 		t.Fatal(e)
 	}
-	node(t, dsn, "revoke", path, Object{"grantId": blocked["agentGrantId"]})
+	if _, e = rooms.RevokeAgent(ctx, chat.Actor{Device: &actors[0]}, text(f, "roomId"), encode(Object{"grantId": blocked["agentGrantId"]})); e != nil {
+		t.Fatal(e)
+	}
 	denied := copyObject(takeover)
 	denied["operationId"] = uuid.NewString()
 	denied["watchId"] = blocked["watchId"]

@@ -1,8 +1,8 @@
 import type * as z from 'zod/v4';
 import type {createWebRuntime} from "../../runtime.mjs";
-import type {hubCharterSchema,hubEventSchema} from "../../../../galaxy-official/src/shared/hubs-v2-schema.mjs";
-import type {peeringEventSchema} from "../../../../galaxy-official/src/shared/hub-peering-v2-schema.mjs";
-import type {builderExtensionEventSchema} from "../../../../galaxy-official/src/shared/builder-support-v2-schema.mjs";
+import type {hubCharterSchema,hubEventSchema} from "../../../../galaxy-contracts/src/hubs-v2-schema.mjs";
+import type {peeringEventSchema} from "../../../../galaxy-contracts/src/hub-peering-v2-schema.mjs";
+import type {builderExtensionEventSchema} from "../../../../galaxy-contracts/src/builder-support-v2-schema.mjs";
 import type {PeeringApi} from './hub-peering-state';
 
 export type HubRuntime=Awaited<ReturnType<typeof createWebRuntime>>;

@@ -1,12 +1,12 @@
 import type {z} from 'zod/v4';
 import type {createWebRuntime} from "../../runtime.mjs";
-import {configurationEventV2Schema} from "../../../../galaxy-official/src/shared/configuration-v2-schema.mjs";
-import type {configurationConditionsSchema} from "../../../../galaxy-official/src/shared/configuration-v2-schema.mjs";
-import {packUseEventSchema} from "../../../../galaxy-official/src/shared/worker-pack-uses-v2-schema.mjs";
+import {configurationEventV2Schema} from "../../../../galaxy-contracts/src/configuration-v2-schema.mjs";
+import type {configurationConditionsSchema} from "../../../../galaxy-contracts/src/configuration-v2-schema.mjs";
+import {packUseEventSchema} from "../../../../galaxy-contracts/src/worker-pack-uses-v2-schema.mjs";
 import {createConfigurationClient} from "./configuration-client.mjs";
 import {createWorkerPackUseClient} from "./worker-pack-use-client.mjs";
-import type {caseEventV2Schema} from "../../../../galaxy-official/src/shared/cases-schema.mjs";
-import type {evidenceReferenceRecordSchema,verificationRecordSchema} from "../../../../galaxy-official/src/shared/verification-record-schema.mjs";
+import type {caseEventV2Schema} from "../../../../galaxy-contracts/src/cases-schema.mjs";
+import type {evidenceReferenceRecordSchema,verificationRecordSchema} from "../../../../galaxy-contracts/src/verification-record-schema.mjs";
 import type {WorkerPack} from "../builders/builder-authoring-state";
 import type {BuilderDirectoryRow} from "../builders/builder-workspace-state";
 import type {InterventionOpinionsView,ResolutionDecision} from "../work-records/presentation-types";

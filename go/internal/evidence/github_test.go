@@ -2,7 +2,6 @@ package evidence
 
 import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
-	"path/filepath"
 	"testing"
 )
 
@@ -22,7 +21,7 @@ func TestOriginalGithubSourceObservationAndExactResponseHash(t *testing.T) {
 		}
 		vectors = append(vectors, Object{"reference": reference, "run": o})
 	}
-	expected := arr(node(t, "postgres://unused@127.0.0.1/galaxy_go_test_source", "source", filepath.Join(t.TempDir(), "evidence-fixture.json"), vectors)["values"])
+	expected := arr(fixtureValue(t, "source")["values"])
 	for i, v := range vectors {
 		x := obj(v)
 		got, e := InspectGithubRun(reference, x["run"], 2000000000)

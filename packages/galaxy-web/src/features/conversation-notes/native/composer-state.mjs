@@ -1,4 +1,4 @@
-import {summaryContentSchema} from "../../../../../galaxy-official/src/shared/personal-summary-schema.mjs";
+import {summaryContentSchema} from "../../../../../galaxy-contracts/src/personal-summary-schema.mjs";
 
 /** This revision fences local text only; it is never a sharing or synchronization operation ID. */
 export function checkedSummaryDraft(value){

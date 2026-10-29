@@ -1,5 +1,5 @@
 import {lstat} from 'node:fs/promises';
-import {maintenanceModuleIds,maintenanceOpeningConditions} from "../../src/operations/maintenance/catalog.mjs";
+import {maintenanceModuleIds,maintenanceOpeningConditions} from "../../../galaxy-contracts/src/operations/maintenance/catalog.mjs";
 import {changeWriter,writerIsRunning,postgresSqlArguments,atomicWrite,ensureDirectory} from '../operations-stack/host.mjs';
 import {createOperationsStackPreparation} from './host-restore.mjs';
 import {captureDeletionRecoveryContribution} from './deletion-contribution.mjs';
@@ -99,7 +99,7 @@ export function createProductionRestoreAdapters({config,run,controlDirectory,fet
    const pg=config.postgres.find(x=>x.id==='business');
    const pending=(await run(config.tools.docker,postgresSqlArguments(pg,"SELECT count(*) FROM operations_model_settings_operations_v1 WHERE phase IN ('prepared','submitting','pending','result-unknown')"),{timeout:15000,maxOutput:1024})).stdout.trim();
    if(pending!=='0')throw fail('maintenance_model_configuration_busy');
-   const options={config,controlDirectory,operationId:context.intent.operationId,endpoint:context.authority.endpoint,run};
+   const options={config,controlDirectory,operationId:context.intent.operationId,endpoint:context.authority.endpoint,context,run};
    const configuration=await fingerprint(),current=await captureCurrent(options),deletion=await captureDeletion(options),native=await engines.capture(context);
    if(!same(currentModelAuthority(await loadCurrent(current)),context.modelAuthority))throw fail('maintenance_current_model_binding_unconfirmed');
    const chat=context.intent.moduleIds.includes('chat')?await prosody.capture(context):null;

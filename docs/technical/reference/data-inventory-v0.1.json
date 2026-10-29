@@ -10,7 +10,7 @@
     {
       "table": "access_credentials",
       "introducedByMigration": 1,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/1.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -33,105 +33,105 @@
     {
       "table": "account_chat_governance_events_v1",
       "introducedByMigration": 94,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/94.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_chat_governance_materials_v1",
       "introducedByMigration": 94,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/94.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_chat_reports_v1",
       "introducedByMigration": 94,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/94.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_external_credentials_v1",
       "introducedByMigration": 88,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/88.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_feedback_data_items_v1",
       "introducedByMigration": 116,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/116.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_feedback_data_operations_v1",
       "introducedByMigration": 116,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/116.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_follow_operations_v1",
       "introducedByMigration": 125,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/125.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "account_follows_v1",
       "introducedByMigration": 125,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/125.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "account_operations_notices_v1",
       "introducedByMigration": 97,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/97.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_reading_bookmark_operations_v2",
       "introducedByMigration": 91,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/91.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_reading_bookmarks_v2",
       "introducedByMigration": 91,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/91.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_work_operations_v1",
       "introducedByMigration": 89,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/89.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_work_scopes_v1",
       "introducedByMigration": 89,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/89.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "account_work_v1",
       "introducedByMigration": 89,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/89.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "assistance_events",
       "introducedByMigration": 12,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/12.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -154,7 +154,7 @@
     {
       "table": "assistance_requests",
       "introducedByMigration": 12,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/12.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -177,7 +177,7 @@
     {
       "table": "audit_access_grants",
       "introducedByMigration": 20,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/20.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -200,7 +200,7 @@
     {
       "table": "audit_events",
       "introducedByMigration": 1,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/1.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -246,7 +246,7 @@
     {
       "table": "audit_reads",
       "introducedByMigration": 20,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/20.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -269,7 +269,7 @@
     {
       "table": "binding_challenges",
       "introducedByMigration": 1,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/1.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -292,7 +292,7 @@
     {
       "table": "bindings",
       "introducedByMigration": 1,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/1.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -315,7 +315,7 @@
     {
       "table": "builder_events",
       "introducedByMigration": 17,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/17.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -338,7 +338,7 @@
     {
       "table": "builder_probes",
       "introducedByMigration": 35,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/35.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -361,7 +361,7 @@
     {
       "table": "builders",
       "introducedByMigration": 17,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/17.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -384,14 +384,14 @@
     {
       "table": "business_admin_audit_v1",
       "introducedByMigration": 93,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/93.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "capsule_events",
       "introducedByMigration": 16,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/16.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -414,14 +414,14 @@
     {
       "table": "capsule_permissions",
       "introducedByMigration": 49,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/49.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "capsule_uses",
       "introducedByMigration": 16,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/16.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -444,14 +444,14 @@
     {
       "table": "capsule_uses_v2",
       "introducedByMigration": 49,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/49.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "capsules",
       "introducedByMigration": 16,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/16.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -474,7 +474,7 @@
     {
       "table": "case_events",
       "introducedByMigration": 4,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/4.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -497,14 +497,14 @@
     {
       "table": "case_task_links",
       "introducedByMigration": 43,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/43.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "cases",
       "introducedByMigration": 4,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/4.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -527,196 +527,196 @@
     {
       "table": "chat_agent_grants",
       "introducedByMigration": 47,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/47.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_attachments",
       "introducedByMigration": 65,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/65.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_cursors",
       "introducedByMigration": 47,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/47.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_decisions",
       "introducedByMigration": 47,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/47.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_directory_clock",
       "introducedByMigration": 81,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/81.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_human_message_reads",
       "introducedByMigration": 81,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/81.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_memberships",
       "introducedByMigration": 47,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/47.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_message_operations",
       "introducedByMigration": 47,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/47.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_message_preferences",
       "introducedByMigration": 47,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/47.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_message_refs",
       "introducedByMigration": 47,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/47.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_participants_v3",
       "introducedByMigration": 91,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/91.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "chat_rooms",
       "introducedByMigration": 47,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/47.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "choice_snapshot_heads",
       "introducedByMigration": 62,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/62.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "choice_snapshot_preferences",
       "introducedByMigration": 62,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/62.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "choice_snapshot_versions",
       "introducedByMigration": 62,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/62.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "ci_observations_v2",
       "introducedByMigration": 60,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/60.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "ci_proofs_v2",
       "introducedByMigration": 60,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/60.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "ci_requests_v2",
       "introducedByMigration": 60,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/60.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "comment_governance_events_v2",
       "introducedByMigration": 61,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/61.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "comment_reports_v2",
       "introducedByMigration": 61,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/61.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "community_account_links",
       "introducedByMigration": 44,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/44.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "community_accounts",
       "introducedByMigration": 44,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/44.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "community_daily_usage",
       "introducedByMigration": 44,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/44.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "community_interactions",
       "introducedByMigration": 44,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/44.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "community_write_receipts",
       "introducedByMigration": 44,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/44.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "configuration_events",
       "introducedByMigration": 63,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/63.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "configuration_objects",
       "introducedByMigration": 63,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/63.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "consents",
       "introducedByMigration": 3,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/3.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -739,21 +739,21 @@
     {
       "table": "contact_events_v2",
       "introducedByMigration": 54,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/54.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "contacts_v2",
       "introducedByMigration": 54,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/54.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "context_acceptances",
       "introducedByMigration": 13,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/13.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -776,14 +776,14 @@
     {
       "table": "context_events_v2",
       "introducedByMigration": 59,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/59.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "context_grants",
       "introducedByMigration": 13,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/13.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -806,21 +806,21 @@
     {
       "table": "context_grants_v2",
       "introducedByMigration": 59,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/59.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "contribution_publications",
       "introducedByMigration": 58,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/58.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "data_export_reads",
       "introducedByMigration": 22,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/22.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -843,7 +843,7 @@
     {
       "table": "data_exports",
       "introducedByMigration": 22,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/22.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -866,7 +866,7 @@
     {
       "table": "deletion_events",
       "introducedByMigration": 24,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/24.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -889,7 +889,7 @@
     {
       "table": "deletion_executions",
       "introducedByMigration": 25,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/25.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -912,7 +912,7 @@
     {
       "table": "deletion_replays",
       "introducedByMigration": 26,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/26.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -935,7 +935,7 @@
     {
       "table": "deletion_requests",
       "introducedByMigration": 24,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/24.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -958,63 +958,63 @@
     {
       "table": "device_authorizations",
       "introducedByMigration": 42,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/42.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "discovery_delivery_outbox_v1",
       "introducedByMigration": 106,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/106.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "discovery_feedback_v1",
       "introducedByMigration": 106,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/106.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "discovery_index_control_v1",
       "introducedByMigration": 106,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/106.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "discovery_index_outbox_v1",
       "introducedByMigration": 106,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/106.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "discovery_recommendation_requests_v1",
       "introducedByMigration": 107,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/107.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "discovery_search_requests_v1",
       "introducedByMigration": 108,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/108.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "discovery_usage_events_v1",
       "introducedByMigration": 106,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/106.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "evidence_submissions",
       "introducedByMigration": 5,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/5.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -1037,21 +1037,21 @@
     {
       "table": "experience_events",
       "introducedByMigration": 55,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/55.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "experience_objects",
       "introducedByMigration": 55,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/55.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "external_identity_links",
       "introducedByMigration": 40,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/40.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -1074,119 +1074,119 @@
     {
       "table": "feedback_attachments_v1",
       "introducedByMigration": 100,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/100.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_attachment_links_v1",
       "introducedByMigration": 91,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/91.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_attachments_v1",
       "introducedByMigration": 91,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/91.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_daily_usage_v1",
       "introducedByMigration": 79,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/79.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_events_v1",
       "introducedByMigration": 79,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/79.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_governance_events_v1",
       "introducedByMigration": 79,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/79.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_notification_reads_v2",
       "introducedByMigration": 86,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/86.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_operations_events_v1",
       "introducedByMigration": 96,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/96.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_permissions_v1",
       "introducedByMigration": 79,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/79.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_posts_v1",
       "introducedByMigration": 79,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/79.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_replies_v1",
       "introducedByMigration": 79,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/79.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_reports_v1",
       "introducedByMigration": 79,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/79.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_section_events_v2",
       "introducedByMigration": 86,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/86.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_sections_v2",
       "introducedByMigration": 86,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/86.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_versions_v1",
       "introducedByMigration": 79,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/79.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "forum_write_receipts_v1",
       "introducedByMigration": 79,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/79.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "honor_rule_versions",
       "introducedByMigration": 38,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/38.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -1209,98 +1209,98 @@
     {
       "table": "hub_events_v2",
       "introducedByMigration": 68,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/68.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "hub_heads_v2",
       "introducedByMigration": 68,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/68.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "hub_intake_v2",
       "introducedByMigration": 68,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/68.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "hub_memberships_v2",
       "introducedByMigration": 68,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/68.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "hub_peering_agreements_v2",
       "introducedByMigration": 68,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/68.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "hub_peering_changes_v2",
       "introducedByMigration": 68,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/68.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "hub_peering_events_v2",
       "introducedByMigration": 68,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/68.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "hub_peering_grants_v2",
       "introducedByMigration": 68,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/68.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "hub_peering_receipts_v2",
       "introducedByMigration": 68,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/68.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "identity_control_operations",
       "introducedByMigration": 42,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/42.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "identity_group_approvals_v2",
       "introducedByMigration": 72,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/72.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "identity_group_operations_v2",
       "introducedByMigration": 72,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/72.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "identity_groups_v2",
       "introducedByMigration": 72,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/72.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "incident_notices",
       "introducedByMigration": 29,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/29.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -1323,28 +1323,28 @@
     {
       "table": "information_watch_changes_v2",
       "introducedByMigration": 70,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/70.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "information_watch_operations_v2",
       "introducedByMigration": 70,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/70.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "information_watches_v2",
       "introducedByMigration": 70,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/70.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "jobs",
       "introducedByMigration": 1,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/1.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -1367,14 +1367,14 @@
     {
       "table": "lifecycle_erasure_records",
       "introducedByMigration": 48,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/48.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "moderation_events",
       "introducedByMigration": 15,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/15.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -1397,7 +1397,7 @@
     {
       "table": "moderation_reports",
       "introducedByMigration": 15,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/15.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -1420,14 +1420,14 @@
     {
       "table": "notification_options_v2",
       "introducedByMigration": 52,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/52.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "notification_preferences",
       "introducedByMigration": 14,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/14.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -1450,14 +1450,14 @@
     {
       "table": "notification_presentations",
       "introducedByMigration": 52,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/52.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "notification_reads",
       "introducedByMigration": 14,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/14.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -1480,833 +1480,833 @@
     {
       "table": "official_account_logins_v1",
       "introducedByMigration": 93,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/93.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "official_account_profiles_v1",
       "introducedByMigration": 85,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/85.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "official_account_registrations_v1",
       "introducedByMigration": 127,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/127.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "official_account_sessions_v1",
       "introducedByMigration": 93,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/93.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "official_account_type_history_v1",
       "introducedByMigration": 85,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/85.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "oidc_login_transactions_v1",
       "introducedByMigration": 93,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/93.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_agentos_commands_v1",
       "introducedByMigration": 105,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/105.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_agentos_conversation_cards_v1",
       "introducedByMigration": 114,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/114.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_agentos_conversation_commands_v1",
       "introducedByMigration": 113,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/113.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_agentos_conversation_sources_v1",
       "introducedByMigration": 114,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/114.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_agentos_conversation_tool_calls_v1",
       "introducedByMigration": 114,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/114.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_agentos_conversations_v1",
       "introducedByMigration": 113,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/113.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_agentos_executions_v1",
       "introducedByMigration": 105,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/105.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_agentos_source_refs_v1",
       "introducedByMigration": 105,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/105.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_agentos_tool_calls_v1",
       "introducedByMigration": 105,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/105.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_ai_duty_operations_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_ai_role_delegation_events_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_ai_role_delegations_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_ai_work_accounts_v1",
       "introducedByMigration": 123,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/123.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_ai_work_assignments_v1",
       "introducedByMigration": 123,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/123.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_ai_work_commands_v1",
       "introducedByMigration": 123,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/123.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_automation_grants_v1",
       "introducedByMigration": 103,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/103.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_autonomy_commands_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_configs_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_decisions_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_event_consumers_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_events_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_health_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_receipts_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_runtime_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_runtime_versions_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_strategy_schedules_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_tasks_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_tool_calls_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_versions_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_autonomy_workbench_runs_v1",
       "introducedByMigration": 129,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/129.sql",
       "coverage": "registered-source-table-not-production-database-readback",
       "retention_review": "No inferred TTL; domain lifecycle, current authorization and approved object policy remain applicable."
     },
     {
       "table": "operations_business_roles_v1",
       "introducedByMigration": 103,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/103.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_chat_message_visibility_v1",
       "introducedByMigration": 102,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/102.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_content_visibility_v1",
       "introducedByMigration": 96,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/96.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_feedback_events_v1",
       "introducedByMigration": 98,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/98.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_feedback_v1",
       "introducedByMigration": 98,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/98.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_file_access_events_v1",
       "introducedByMigration": 117,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/117.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_file_access_heads_v1",
       "introducedByMigration": 117,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/117.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_file_cleanup_items_v1",
       "introducedByMigration": 115,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/115.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_file_cleanup_plans_v1",
       "introducedByMigration": 115,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/115.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_forum_content_events_v1",
       "introducedByMigration": 99,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/99.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_forum_curation_v1",
       "introducedByMigration": 99,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/99.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_forum_tags_v1",
       "introducedByMigration": 99,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/99.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_maintenance_events_v1",
       "introducedByMigration": 109,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/109.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_maintenance_plans_v1",
       "introducedByMigration": 109,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/109.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_management_accounts_v1",
       "introducedByMigration": 122,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/122.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_management_commands_v1",
       "introducedByMigration": 122,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/122.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_management_directory_v1",
       "introducedByMigration": 122,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/122.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_management_entries_v1",
       "introducedByMigration": 122,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/122.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_management_generations_v1",
       "introducedByMigration": 122,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/122.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_management_login_fences_v1",
       "introducedByMigration": 122,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/122.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_messaging_announcements_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_messaging_attempts_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_messaging_commands_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_messaging_events_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_messaging_plans_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_messaging_recipients_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_messaging_runs_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_messaging_versions_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_model_settings_operations_v1",
       "introducedByMigration": 110,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/110.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_model_settings_state_v1",
       "introducedByMigration": 110,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/110.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_model_settings_versions_v1",
       "introducedByMigration": 110,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/110.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_notices_v1",
       "introducedByMigration": 97,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/97.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_operator_logins_v1",
       "introducedByMigration": 93,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/93.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_operator_principals_v1",
       "introducedByMigration": 93,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/93.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_operator_sessions_v1",
       "introducedByMigration": 93,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/93.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p13_strategy_commands_v1",
       "introducedByMigration": 112,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/112.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p13_strategy_events_v1",
       "introducedByMigration": 112,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/112.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p13_strategy_heads_v1",
       "introducedByMigration": 112,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/112.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p13_strategy_rehearsals_v1",
       "introducedByMigration": 112,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/112.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p13_strategy_runs_v1",
       "introducedByMigration": 112,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/112.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p13_strategy_versions_v1",
       "introducedByMigration": 112,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/112.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p14_rule_commands_v1",
       "introducedByMigration": 111,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/111.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p14_rule_decisions_v1",
       "introducedByMigration": 111,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/111.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p14_rule_events_v1",
       "introducedByMigration": 111,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/111.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p14_rule_heads_v1",
       "introducedByMigration": 111,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/111.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_p14_rule_versions_v1",
       "introducedByMigration": 111,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/111.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_permission_authority_v1",
       "introducedByMigration": 103,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/103.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_permission_events_v1",
       "introducedByMigration": 103,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/103.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_policy_processes_v1",
       "introducedByMigration": 97,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/97.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_product_commands_v1",
       "introducedByMigration": 97,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/97.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_product_rules_v1",
       "introducedByMigration": 97,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/97.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_recommendation_events_v1",
       "introducedByMigration": 107,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/107.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_recommendation_policy_v1",
       "introducedByMigration": 107,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/107.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_recommendation_themes_v1",
       "introducedByMigration": 107,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/107.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_registered_commands_v1",
       "introducedByMigration": 121,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/121.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_registered_directory_v1",
       "introducedByMigration": 121,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/121.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_registered_entries_v1",
       "introducedByMigration": 121,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/121.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_registered_generations_v1",
       "introducedByMigration": 121,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/121.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_registered_login_fences_v1",
       "introducedByMigration": 121,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/121.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_registered_subjects_v1",
       "introducedByMigration": 121,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/121.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_retention_observations_v1",
       "introducedByMigration": 97,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/97.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_retention_runs_v1",
       "introducedByMigration": 97,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/97.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_role_assignments_v1",
       "introducedByMigration": 103,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/103.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_search_quality_operations_v1",
       "introducedByMigration": 108,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/108.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_search_quality_state_v1",
       "introducedByMigration": 108,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/108.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_search_quality_versions_v1",
       "introducedByMigration": 108,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/108.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_smtp_commands_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_smtp_events_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_smtp_settings_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_smtp_tests_v1",
       "introducedByMigration": 104,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/104.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_system_general_publications_v1",
       "introducedByMigration": 124,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/124.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_system_settings_commands_v1",
       "introducedByMigration": 124,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/124.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_system_settings_heads_v1",
       "introducedByMigration": 124,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/124.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "operations_system_settings_versions_v1",
       "introducedByMigration": 124,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/124.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "outcome_material_events_v2",
       "introducedByMigration": 74,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/74.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "outcome_materials_v2",
       "introducedByMigration": 74,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/74.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "personal_summary_heads",
       "introducedByMigration": 52,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/52.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "personal_summary_preferences",
       "introducedByMigration": 52,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/52.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "personal_summary_versions",
       "introducedByMigration": 52,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/52.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "private_conversation_archives_v1",
       "introducedByMigration": 85,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/85.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "private_conversation_chunks_v1",
       "introducedByMigration": 85,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/85.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "private_conversation_deletions_v1",
       "introducedByMigration": 85,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/85.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "profile_statements",
       "introducedByMigration": 30,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/30.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -2329,49 +2329,49 @@
     {
       "table": "project_events_v2",
       "introducedByMigration": 53,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/53.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "project_field_sources_v2",
       "introducedByMigration": 53,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/53.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "project_preferences_v2",
       "introducedByMigration": 53,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/53.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "project_roles_v2",
       "introducedByMigration": 53,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/53.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "project_transfers_v2",
       "introducedByMigration": 53,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/53.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "projects_v2",
       "introducedByMigration": 53,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/53.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "proofs",
       "introducedByMigration": 6,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/6.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -2394,49 +2394,49 @@
     {
       "table": "qualification_calculation_grants",
       "introducedByMigration": 55,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/55.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "qualification_permission_request_events",
       "introducedByMigration": 66,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/66.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "qualification_permission_requests",
       "introducedByMigration": 66,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/66.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "reading_bookmark_operations_v1",
       "introducedByMigration": 83,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/83.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "reading_bookmarks_v1",
       "introducedByMigration": 83,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/83.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "recovery_authorizations",
       "introducedByMigration": 42,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/42.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "recovery_state",
       "introducedByMigration": 21,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/21.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -2459,35 +2459,35 @@
     {
       "table": "recruitment_events",
       "introducedByMigration": 57,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/57.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "recruitment_opportunities",
       "introducedByMigration": 57,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/57.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "recruitment_task_links",
       "introducedByMigration": 57,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/57.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "room_shared_summaries",
       "introducedByMigration": 56,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/56.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "runtime_config_events",
       "introducedByMigration": 28,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/28.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -2510,7 +2510,7 @@
     {
       "table": "schema_migrations",
       "introducedByMigration": null,
-      "source": "packages/galaxy-official/src/infrastructure/database.mjs",
+      "source": "go/internal/databaseschema/migrate.go",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -2533,7 +2533,7 @@
     {
       "table": "search_documents",
       "introducedByMigration": 32,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/32.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -2556,7 +2556,7 @@
     {
       "table": "search_index_control",
       "introducedByMigration": 32,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/32.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -2579,7 +2579,7 @@
     {
       "table": "session_challenges",
       "introducedByMigration": 2,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/2.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -2602,28 +2602,28 @@
     {
       "table": "site_publications_v1",
       "introducedByMigration": 93,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/93.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "subject_control_events",
       "introducedByMigration": 42,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/42.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "subject_control_heads",
       "introducedByMigration": 42,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/42.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "subjects",
       "introducedByMigration": 1,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/1.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -2646,70 +2646,70 @@
     {
       "table": "target_governance_events_v2",
       "introducedByMigration": 71,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/71.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "target_reports_v2",
       "introducedByMigration": 71,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/71.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "task_comment_events_v2",
       "introducedByMigration": 61,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/61.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "task_comments_v2",
       "introducedByMigration": 61,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/61.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "task_events",
       "introducedByMigration": 45,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/45.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "task_materials_v1",
       "introducedByMigration": 80,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/80.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "task_participations",
       "introducedByMigration": 45,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/45.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "task_requests",
       "introducedByMigration": 45,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/45.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "trust_package_permissions",
       "introducedByMigration": 67,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/67.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "verification_attempts",
       "introducedByMigration": 5,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/5.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "earlier_policy_reference": {
         "as_of": "2026-09-11T07:13:50.231303+08:00",
@@ -2732,56 +2732,56 @@
     {
       "table": "verification_dependencies",
       "introducedByMigration": 46,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/46.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "verification_events",
       "introducedByMigration": 46,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/46.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "verification_objects",
       "introducedByMigration": 46,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/46.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "watch_control_operations_v2",
       "introducedByMigration": 73,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/73.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "watch_controls_v2",
       "introducedByMigration": 73,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/73.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "worker_pack_use_events",
       "introducedByMigration": 69,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/69.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "worker_pack_uses",
       "introducedByMigration": 69,
-      "source": "packages/galaxy-official/src/infrastructure/migrations.mjs",
+      "source": "go/internal/databaseschema/sql/69.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "retention_review": "Use the current domain lifecycle/authorization code and approved per-object policy; this update does not invent a retention period or prove physical erasure."
     },
     {
       "table": "web_event_outbox_v1",
       "introducedByMigration": 133,
-      "source": "packages/galaxy-official/src/infrastructure/web-events-v1-schema.mjs",
+      "source": "go/internal/databaseschema/sql/133.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "purpose": "Bounded change references and delivery cursor; no source body or independent access authority",
       "retention": "Outbox until promoted; published log at most 4096 events and 7 days; cursor retained for gap detection"
@@ -2789,7 +2789,7 @@
     {
       "table": "web_event_sequence_v1",
       "introducedByMigration": 133,
-      "source": "packages/galaxy-official/src/infrastructure/web-events-v1-schema.mjs",
+      "source": "go/internal/databaseschema/sql/133.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "purpose": "Bounded change references and delivery cursor; no source body or independent access authority",
       "retention": "Outbox until promoted; published log at most 4096 events and 7 days; cursor retained for gap detection"
@@ -2797,14 +2797,14 @@
     {
       "table": "web_event_log_v1",
       "introducedByMigration": 133,
-      "source": "packages/galaxy-official/src/infrastructure/web-events-v1-schema.mjs",
+      "source": "go/internal/databaseschema/sql/133.sql",
       "coverage": "registered-source-table-not-live-database-readback",
       "purpose": "Bounded change references and delivery cursor; no source body or independent access authority",
       "retention": "Outbox until promoted; published log at most 4096 events and 7 days; cursor retained for gap detection"
     }
   ],
   "coverage": {
-    "source": "Registered migration CREATE/DROP TABLE declarations through schema131; isolated PGlite deletion locks and independent-record regressions; not production database readback or complete retention audit",
+    "source": "Registered migration CREATE/DROP TABLE declarations through schema133; isolated PGlite deletion locks and independent-record regressions; not production database readback or complete retention audit",
     "business_database_only": true,
     "excluded_separate_stores": [
       "CMS database",
@@ -2822,7 +2822,7 @@
     "isolated_schema131_deletion_verified": true
   },
   "export": {
-    "implementation": "packages/galaxy-official/src/shared/data-export-schema.mjs",
+    "implementation": "packages/galaxy-contracts/src/data-export-schema.mjs",
     "datasets": 134,
     "dataset_names": [
       "identity",
@@ -2989,12 +2989,13 @@
   ],
   "current_source_boundary": {
     "as_of": "2026-10-26",
-    "registered_schema": 131,
-    "inventory_schema": 131,
+    "registered_schema": 133,
+    "inventory_schema": 133,
     "inventory_extended_to_current_schema": true,
     "deletion_inventory_missing_tables": 0,
     "deletion_execution": "Closed explicit schema131 table categories; 39 formerly missing tables retain nonempty independent account/authentication/operator records in isolated deletion and quarantine replay; unknown tables rejected before mutation.",
     "production_restore_enabled": false,
-    "guide": "docs/operations/recovery-adapters.md"
+    "guide": "docs/operations/recovery-adapters.md",
+    "source_registration_updated_at": "2026-10-29"
   }
 }

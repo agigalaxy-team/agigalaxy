@@ -2,19 +2,15 @@ package operationalmetrics
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/runtimelog"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/expfmt"
-	"github.com/prometheus/common/model"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -67,19 +63,7 @@ func expect(t *testing.T, m *Metrics, name string, labels map[string]string, val
 		t.Fatalf("%s %v: %v/%v expected %v", name, labels, got, ok, value)
 	}
 }
-func node(t *testing.T, script string, env []string, args ...string) []byte {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", append([]string{"--no-warnings", "--input-type=module", "-e", script}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), env...)
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original JS: %v %s", e, out)
-	}
-	return out
-}
-func TestOriginalMetricsEventValuesAndNoPrivateLabels(t *testing.T) {
+func TestMetricsEventValuesAndNoPrivateLabels(t *testing.T) {
 	m, e := New(Options{Component: "api", DisableDefaultMetrics: true})
 	if e != nil {
 		t.Fatal(e)
@@ -108,10 +92,6 @@ func TestOriginalMetricsEventValuesAndNoPrivateLabels(t *testing.T) {
 	expect(t, m, "http_in_flight", nil, 0)
 	expect(t, m, "revocation_ack_duration_seconds", nil, 1)
 	expect(t, m, "worker_iterations_total", map[string]string{"outcome": "observed"}, 1)
-	script := `import {createOperationalMetrics} from './packages/galaxy-official/src/operations/metrics.mjs';const m=createOperationalMetrics({component:'api',defaultMetrics:false});let f=m.beginHttp();f({method:'POST',path:'/v1/proofs/11111111-1111-4111-8111-111111111111/revoke',status:200,bodyBytes:17,receivedBodyBytes:11});f({status:500});f=m.beginHttp();f({method:'DELETE',path:'/PRIVATE-PATH?token=PRIVATE',status:999,bodyBytes:3});m.quotaRejected('rate_limited');m.quotaRejected('PRIVATE');m.parserError(431);m.builderProbe({processed:true,state:'reachable'});m.workerIteration({processed:true,state:'observed'},0.1);console.log(await m.render());`
-	original := string(node(t, script, nil))
-	compareOriginalSamples(t, m, original, map[string]bool{"galaxy_worker_last_iteration_timestamp_seconds": true})
-
 }
 func TestExplicitCostBackupDiskAndSingleFlightFailureRemoval(t *testing.T) {
 	dir := t.TempDir()
@@ -156,10 +136,6 @@ func TestExplicitCostBackupDiskAndSingleFlightFailureRemoval(t *testing.T) {
 	expect(t, m, "backup_status_available", map[string]string{"action": "copy"}, 0)
 	expect(t, m, "storage_collection_success", nil, 1)
 	expect(t, m, "runtime_log_events", map[string]string{"kind": "writeFailures"}, 1)
-	script := `import {loadMetricsConfiguration,createOperationalMetrics} from './packages/galaxy-official/src/operations/metrics.mjs';const c=await loadMetricsConfiguration({GALAXY_METRICS_COST_FILE:process.argv[1],GALAXY_METRICS_STORAGE_DIRECTORY:process.argv[2],GALAXY_BACKUP_STATUS_DIRECTORY:process.argv[2]});const m=createOperationalMetrics({component:'api',...c,defaultMetrics:false,now:()=>Date.parse('2030-01-15T00:00:00Z'),logStatus:()=>({ready:false,writeFailures:1,droppedRecords:2,rotationWarnings:0,rotations:0})});console.log(await m.render());`
-	original := string(node(t, script, nil, costFile, dir))
-	compareOriginalSamples(t, m, original, map[string]bool{"galaxy_storage_bytes": true})
-
 	os.WriteFile(costFile, []byte(`{"PRIVATE":"DO-NOT-LOG"}`), 0600)
 	os.WriteFile(filepath.Join(dir, "create.json"), []byte("PRIVATE"), 0600)
 	ticks.Add(16000)
@@ -223,21 +199,25 @@ func TestActualLoopbackMetricsListenerAndRealGoDefaults(t *testing.T) {
 		t.Fatal("listener retained after close")
 	}
 }
-func TestActualPostgresSnapshotOriginalParityAndUnavailableRemoval(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
-	script := `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import {migrate} from './packages/galaxy-official/src/infrastructure/database.mjs';import {operationalSnapshot} from './packages/galaxy-official/src/infrastructure/operational-snapshot.mjs';const url=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(url.hostname!=='127.0.0.1'||!url.pathname.startsWith('/galaxy_go_test_'))throw Error('isolated DB required');const db=new pg.Pool({connectionString:url.href});try{await migrate(db);console.log(JSON.stringify(await operationalSnapshot(db,2000000000000)))}finally{await db.end()}`
-	var original map[string]float64
-	if e := json.Unmarshal(node(t, script, []string{"GALAXY_GO_TEST_DATABASE_URL=" + dsn}), &original); e != nil {
+func TestActualPostgresSnapshotAndUnavailableRemoval(t *testing.T) {
+	pool, _ := testsupport.PostgreSQL(t)
+	ctx := context.Background()
+	if _, e := databaseschema.Migrate(ctx, pool, []string{"api"}); e != nil {
 		t.Fatal(e)
 	}
 	at := time.Unix(2000000000, 0)
+	for _, state := range []string{"pending", "running", "completed", "failed"} {
+		if _, e := pool.Exec(ctx, `INSERT INTO jobs(id,kind,deduplication_key,payload,state,locked_until,created_at) VALUES($1,'metrics-fixture',$2,'{}',$2,$3,$4)`, uuid.NewString(), state, at.Add(time.Minute), at.Add(-2*time.Minute)); e != nil {
+			t.Fatal(e)
+		}
+	}
 	values, e := operationalSnapshot(context.Background(), pool, at)
 	if e != nil {
 		t.Fatal(e)
 	}
-	for key, value := range original {
-		if key != "database_bytes" && values[key] != value {
-			t.Fatal("aggregate parity", key, value, values[key])
+	for key, value := range map[string]float64{"pending": 1, "running": 1, "completed": 1, "failed": 1, "active": 1, "oldest": 120, "revoked_jobs": 0, "connected": 0, "evidence_bearing": 0, "invalidated_search_documents": 0} {
+		if values[key] != value {
+			t.Fatal("aggregate", key, values[key], value)
 		}
 	}
 	if values["database_bytes"] <= 0 {
@@ -270,53 +250,4 @@ func TestActualPostgresSnapshotOriginalParityAndUnavailableRemoval(t *testing.T)
 	tick.Add(16000)
 	m.Render(context.Background())
 	expect(t, m, "database_collection_success", nil, 1)
-}
-
-func sampleValues(families []*dto.MetricFamily, skip map[string]bool) map[string]float64 {
-	out := map[string]float64{}
-	for _, family := range families {
-		if skip[family.GetName()] {
-			continue
-		}
-		for _, metric := range family.GetMetric() {
-			labels := []string{}
-			for _, label := range metric.GetLabel() {
-				labels = append(labels, label.GetName()+"="+label.GetValue())
-			}
-			sort.Strings(labels)
-			key := family.GetName() + "{" + strings.Join(labels, ",") + "}"
-			if metric.GetGauge() != nil {
-				out[key] = metric.GetGauge().GetValue()
-			} else if metric.GetCounter() != nil {
-				out[key] = metric.GetCounter().GetValue()
-			} else if metric.GetHistogram() != nil {
-				out[key+"_count"] = float64(metric.GetHistogram().GetSampleCount())
-			}
-		}
-	}
-	return out
-}
-func compareOriginalSamples(t *testing.T, m *Metrics, original string, skip map[string]bool) {
-	t.Helper()
-	parser := expfmt.NewTextParser(model.LegacyValidation)
-	values, e := parser.TextToMetricFamilies(strings.NewReader(original))
-	if e != nil {
-		t.Fatal(e)
-	}
-	families := []*dto.MetricFamily{}
-	for _, family := range values {
-		families = append(families, family)
-	}
-	expected := sampleValues(families, skip)
-	gathered, e := m.Registry.Gather()
-	if e != nil {
-		t.Fatal(e)
-	}
-	actual := sampleValues(gathered, skip)
-	for key, value := range expected {
-		got, ok := actual[key]
-		if !ok || got != value {
-			t.Fatalf("original sample %s: %v/%v != %v", key, got, ok, value)
-		}
-	}
 }

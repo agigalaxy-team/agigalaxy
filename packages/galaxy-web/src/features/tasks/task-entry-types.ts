@@ -1,5 +1,5 @@
 import type {z} from "zod/v4";
-import type {taskEventV2Schema} from "../../../../galaxy-official/src/shared/task-schema-v2.mjs";
+import type {taskEventV2Schema} from "../../../../galaxy-contracts/src/task-schema-v2.mjs";
 import type {WorkRuntime,WorkSignedRequest,WorkTask} from "./work-task-types";
 import type {WorkAttempt,WorkFacts} from "../work-records/contracts";
 import type {ContactCandidate,SearchRequest,SearchItem,SearchType} from "../help-search/help-contact-view-types";

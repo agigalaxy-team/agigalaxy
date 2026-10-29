@@ -5,7 +5,7 @@ import {sql} from '@payloadcms/db-postgres';
 import {authenticatedCMS} from "../cms";
 import {readOperatorSession,operationsRead} from "../operations.mjs";
 import {adminEnvironment,operatorCookies,operatorForwardedAddress} from "../environment.mjs";
-import {systemGeneralSaveSchema,systemGeneralApplySchema,parseSystemGeneral} from "../../../../../packages/galaxy-official/src/shared/operations-system-general-schema.mjs";
+import {systemGeneralSaveSchema,systemGeneralApplySchema,parseSystemGeneral} from "../../../../../packages/galaxy-contracts/src/operations-system-general-schema.mjs";
 import {systemGeneralIntent,generalConfigurationView} from './system-settings-general-metadata.mjs';
 
 const failure=(code,status=503)=>Object.assign(Error(code),{code,status});

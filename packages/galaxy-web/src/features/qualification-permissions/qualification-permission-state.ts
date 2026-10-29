@@ -1,9 +1,9 @@
 import type {z} from 'zod/v4';
-import {qualificationCalculationSchema} from "../../../../galaxy-official/src/shared/qualification-calculation-schema.mjs";
-import type {qualificationSourceGrantRef} from "../../../../galaxy-official/src/shared/qualification-calculation-schema.mjs";
-import {qualificationRequestEventSchema} from "../../../../galaxy-official/src/shared/qualification-requests-v2-schema.mjs";
-import type {qualificationPlanSchema} from "../../../../galaxy-official/src/shared/qualification-requests-v2-schema.mjs";
-import type {qualificationEvidenceV2Schema} from "../../../../galaxy-official/src/shared/qualification-v2-schema.mjs";
+import {qualificationCalculationSchema} from "../../../../galaxy-contracts/src/qualification-calculation-schema.mjs";
+import type {qualificationSourceGrantRef} from "../../../../galaxy-contracts/src/qualification-calculation-schema.mjs";
+import {qualificationRequestEventSchema} from "../../../../galaxy-contracts/src/qualification-requests-v2-schema.mjs";
+import type {qualificationPlanSchema} from "../../../../galaxy-contracts/src/qualification-requests-v2-schema.mjs";
+import type {qualificationEvidenceV2Schema} from "../../../../galaxy-contracts/src/qualification-v2-schema.mjs";
 import type {ToolJournalClient,ToolPrepared,ToolReceipt,ToolRuntime} from "../tools/tool-workspace-state";
 import {checkedToolPrepared} from "../tools/tool-workspace-state";
 import {createQualificationPermissionClient} from './qualification-permission-client.mjs';

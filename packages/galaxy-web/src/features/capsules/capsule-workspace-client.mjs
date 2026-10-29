@@ -2,12 +2,12 @@ import {
   capsuleEventV2Schema,
   capsuleUseV2Schema,
   capsulePermissionV2Schema,
-} from "../../../../galaxy-official/src/shared/capsule-v2-schema.mjs";
-import { equalJson, sha256Hex } from "../../../../galaxy-official/src/shared/web-primitives.mjs";
-import {configurationEventV2Schema} from "../../../../galaxy-official/src/shared/configuration-v2-schema.mjs";
-import {qualificationRequestEventSchema} from "../../../../galaxy-official/src/shared/qualification-requests-v2-schema.mjs";
-import {qualificationCalculationSchema} from "../../../../galaxy-official/src/shared/qualification-calculation-schema.mjs";
-import {packUseEventSchema} from "../../../../galaxy-official/src/shared/worker-pack-uses-v2-schema.mjs";
+} from "../../../../galaxy-contracts/src/capsule-v2-schema.mjs";
+import { equalJson, sha256Hex } from "../../../../galaxy-contracts/src/web-primitives.mjs";
+import {configurationEventV2Schema} from "../../../../galaxy-contracts/src/configuration-v2-schema.mjs";
+import {qualificationRequestEventSchema} from "../../../../galaxy-contracts/src/qualification-requests-v2-schema.mjs";
+import {qualificationCalculationSchema} from "../../../../galaxy-contracts/src/qualification-calculation-schema.mjs";
+import {packUseEventSchema} from "../../../../galaxy-contracts/src/worker-pack-uses-v2-schema.mjs";
 
 export function capsuleDeviceHasScope(api,scope='capsules'){
   const scopes=api.snapshot()?.scopes??[];

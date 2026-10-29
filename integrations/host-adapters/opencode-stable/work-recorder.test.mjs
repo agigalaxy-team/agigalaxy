@@ -1,10 +1,12 @@
-import test from 'node:test';
+import {test as nodeTest} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {initializeLocalGalaxyId} from '../../../packages/galaxy-core/src/application/local-operations.mjs';
-import {createLocalWorkHistory} from '../../../packages/galaxy-core/src/work-history/index.mjs';
+import {createHostLocalClient} from './bridge/host-local-client.mjs';
+import {randomUUID} from 'node:crypto';
+const executable=process.env.GALAXY_GO_TEST_BINARY;
+const test=(name,fn)=>nodeTest(name,{skip:!executable&&'Set GALAXY_GO_TEST_BINARY to the development Go executable'},fn);
 import {createOpenCodeWorkRecorder} from './work-recorder.mjs';
 import {createOpenCodeWorkSummarizer} from './work-summarizer.mjs';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -15,8 +17,10 @@ async function setup(t){
   // Node runs after hooks in registration order. Keep shutdown and directory
   // removal in one hook so pending summary/fact writes finish before removal.
   t.after(async()=>{for(const close of closers.reverse())await close();await rm(directory,{recursive:true,force:true});});
-  await initializeLocalGalaxyId(directory);
-  const history=createLocalWorkHistory({dataDirectory:directory});
+  const host=createHostLocalClient({dataDirectory:directory,localOnly:true,executable});
+  closers.push(()=>host.close());
+  await host.initialize({initializationPath:'personal-galaxy'});
+  const history={...host.history,recordNote:({host:origin,sessionId,sourceId=randomUUID(),text,title='',sourceKind='model-report'})=>host.history.observe({host:origin,sessionId,sourceId,kind:'claim',title,source:{kind:sourceKind},content:{excerpt:text,originalLength:text.length,retained:'full'},details:{statementOnly:true}})};
   return{directory,history,beforeCleanup:close=>closers.push(close)};
 }
 async function eventually(predicate){for(let i=0;i<100;i++){if(await predicate())return;await delay(10);}assert.fail('Asynchronous host processing did not finish');}

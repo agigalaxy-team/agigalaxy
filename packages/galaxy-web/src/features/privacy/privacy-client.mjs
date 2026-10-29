@@ -1,6 +1,6 @@
-import { exportCreateSchema, exportPageSchema, sameExportViews, exportViewScopes } from "../../../../galaxy-official/src/shared/data-export-schema.mjs";
-import { deletionIntentSchema, deletionReadSchema, deletionQuerySchema, deletionStates, deletionStatusIntentSchema } from "../../../../galaxy-official/src/shared/deletion-schema.mjs";
-import { sha256Hex, stableJson } from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import { exportCreateSchema, exportPageSchema, sameExportViews, exportViewScopes } from "../../../../galaxy-contracts/src/data-export-schema.mjs";
+import { deletionIntentSchema, deletionReadSchema, deletionQuerySchema, deletionStates, deletionStatusIntentSchema } from "../../../../galaxy-contracts/src/deletion-schema.mjs";
+import { sha256Hex, stableJson } from "../../../../galaxy-contracts/src/web-primitives.mjs";
 
 // Keep the original owner's journal even when a committed acknowledgement
 // arrives too late for the current UI. A stopped download is not a revocation.

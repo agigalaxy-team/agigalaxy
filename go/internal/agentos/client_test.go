@@ -1,14 +1,15 @@
 package agentos
 
 import (
-	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -19,21 +20,28 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 )
 
-func original(t *testing.T, input any, out any) {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	command := exec.Command("node", filepath.Join(root, "scripts/go/agentos-interop.mjs"))
-	command.Dir = root
-	body, _ := json.Marshal(input)
-	command.Stdin = bytes.NewReader(body)
-	raw, e := command.Output()
+func verifyFixtureToken(key, token string) (Object, bool) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return nil, false
+	}
+	mac := hmac.New(sha256.New, []byte(key))
+	_, _ = mac.Write([]byte(parts[0] + "." + parts[1]))
+	signature, e := base64.RawURLEncoding.DecodeString(parts[2])
+	if e != nil || !hmac.Equal(signature, mac.Sum(nil)) {
+		return nil, false
+	}
+	payload, e := base64.RawURLEncoding.DecodeString(parts[1])
 	if e != nil {
-		t.Fatal("original AgentOS fixture failed")
+		return nil, false
 	}
-	if protocol.Decode(raw, out) != nil {
-		t.Fatal("original fixture result invalid")
+	var claims Object
+	if protocol.Decode(payload, &claims) != nil {
+		return nil, false
 	}
+	return claims, true
 }
+
 func TestOriginalJWTAndClosedStreamProjection(t *testing.T) {
 	key := strings.Repeat("local-fixture-", 4)
 	client, e := New(Configuration{URL: "https://agentos.invalid", SigningKey: key}, Options{Now: func() time.Time { return time.Unix(2000000000, 0) }})
@@ -44,10 +52,11 @@ func TestOriginalJWTAndClosedStreamProjection(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	var checked Object
-	original(t, Object{"kind": "token", "token": token, "key": key}, &checked)
-	claims := object(checked["claims"])
-	if checked["valid"] != true || claims["sub"] != "conversation:original-conversation" || claims["iss"] != "galaxy-operations" || claims["aud"] != "galaxy-agentos" || claims["iat"] != json.Number("2000000000") || claims["exp"] != json.Number("2000000060") {
+	claims, valid := verifyFixtureToken(key, token)
+	if !valid {
+		t.Fatal("JWT signature invalid")
+	}
+	if claims["sub"] != "conversation:original-conversation" || claims["iss"] != "galaxy-operations" || claims["aud"] != "galaxy-agentos" || claims["iat"] != json.Number("2000000000") || claims["exp"] != json.Number("2000000060") {
 		t.Fatal("native JWT contract changed")
 	}
 	cases := []Object{}
@@ -65,8 +74,15 @@ func TestOriginalJWTAndClosedStreamProjection(t *testing.T) {
 	} {
 		cases = append(cases, Object{"frame": frame, "runId": "run-1", "after": 7})
 	}
+	// Original closed stream projection captured once from the Node client.
+	raw, e := os.ReadFile("testdata/original-stream-frames.json")
+	if e != nil {
+		t.Fatal(e)
+	}
 	var expected []any
-	original(t, Object{"kind": "frames", "cases": cases}, &expected)
+	if protocol.Decode(raw, &expected) != nil {
+		t.Fatal("invalid captured stream projection")
+	}
 	for i, row := range cases {
 		actual := ConversationStreamEvent(object(row["frame"]), "run-1", 7)
 		raw, _ := json.Marshal(actual)

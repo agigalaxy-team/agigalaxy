@@ -4,7 +4,7 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Bell,BriefcaseBusiness,MessageSquare,X} from 'lucide-react';
 import {z} from 'zod/v4';
-import {inboxOptionsSchema} from '../../../../galaxy-official/src/shared/notification-inbox-schema.mjs';
+import {inboxOptionsSchema} from '../../../../galaxy-contracts/src/notification-inbox-schema.mjs';
 import type {createWebRuntime} from '../../runtime.mjs';
 import {createConversationDirectory} from "../chat/conversation-directory";
 import {MemberAvatar,memberName,useMemberNames} from "../../shared/people/conversation-ui";

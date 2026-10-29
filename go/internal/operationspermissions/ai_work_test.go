@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +14,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	perms "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,26 +23,8 @@ import (
 func TestFiveAIAccountsHumanHTTPAndStoredCurrentAuthority(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string, input any) map[string]any {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		if input != nil {
-			cmd.Stdin = strings.NewReader(jsonText(input))
-		}
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o map[string]any
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid original output")
-		}
-		return o
-	}
-	base := node("setup", nil)
+	currentFixture := operationsfixture.New(t, owner)
+	base := currentFixture.Data
 	ids := object(base["ids"])
 	endpoint, issuer := text(base["endpoint"]), text(base["issuer"])
 	cfg, e := pgxpool.ParseConfig(dsn)
@@ -101,9 +81,9 @@ func TestFiveAIAccountsHumanHTTPAndStoredCurrentAuthority(t *testing.T) {
 	if object(pending["initialization"])["recordedCount"] != float64(0) || len(pending["items"].([]any)) != 0 {
 		t.Fatal("AI list initialized identities or permissions")
 	}
-	fixture := node("automation-setup", nil)
+	fixture := currentFixture.Automation(t)
 	accounts := object(fixture["accounts"])
-	source := node("ai-read", map[string]any{})
+	source := currentFixture.AIRead(t, map[string]any{})
 	for name, path := range map[string]string{"list": "", "detail": "/governance", "history": "/governance/history", "runtime": "/governance/runtime"} {
 		status, o := request("root", "GET", path, nil)
 		check(status, o, 200, "")
@@ -112,7 +92,7 @@ func TestFiveAIAccountsHumanHTTPAndStoredCurrentAuthority(t *testing.T) {
 		}
 	}
 	originalInput := map[string]any{"operationId": uuid.NewString(), "kind": "profile-save", "expectedVersion": 2, "name": " Original current name ", "description": " Original current profile "}
-	original := node("ai-command", map[string]any{"domain": "governance", "command": originalInput})
+	original := currentFixture.AICommand(t, map[string]any{"domain": "governance", "command": originalInput})
 	status, retry := request("root", "POST", "/governance/commands", originalInput)
 	check(status, retry, 200, "")
 	if retry["replayed"] != true || !equal(retry["result"], original["result"]) {
@@ -132,7 +112,7 @@ func TestFiveAIAccountsHumanHTTPAndStoredCurrentAuthority(t *testing.T) {
 	}
 	status, o := request("root", "GET", "/operations/"+text(assignment["operationId"]), nil)
 	check(status, o, 200, "")
-	source = node("ai-read", map[string]any{"operationId": assignment["operationId"]})
+	source = currentFixture.AIRead(t, map[string]any{"operationId": assignment["operationId"]})
 	if !equal(o, source["operation"]) {
 		t.Fatal("AI role assignment receipt projection differs")
 	}
@@ -144,7 +124,7 @@ func TestFiveAIAccountsHumanHTTPAndStoredCurrentAuthority(t *testing.T) {
 	state["operationId"], state["expectedVersion"], state["enabled"] = uuid.NewString(), 5, true
 	status, o = request("root", "POST", "/governance/commands", state)
 	check(status, o, 200, "")
-	source = node("ai-read", map[string]any{})
+	source = currentFixture.AIRead(t, map[string]any{})
 	for name, path := range map[string]string{"list": "", "detail": "/governance", "history": "/governance/history", "runtime": "/governance/runtime"} {
 		status, o = request("root", "GET", path, nil)
 		check(status, o, 200, "")

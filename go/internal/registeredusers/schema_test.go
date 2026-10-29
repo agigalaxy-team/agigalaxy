@@ -3,9 +3,9 @@ package registeredusers_test
 import (
 	"encoding/json"
 	r "github.com/agigalaxy-team/agigalaxy/go/internal/registeredusers"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -22,21 +22,16 @@ func TestRegisteredSchemaAndTargetHashOriginalBytes(t *testing.T) {
 		copy[k] = v
 		commands = append(commands, copy)
 	}
+	sort.Slice(commands, func(i, j int) bool { return encode(commands[i]) < encode(commands[j]) })
 	lists := []object{{}, {"query": " 原始😀 ", "pageSize": 50}, {"query": strings.Repeat("😀", 320)}, {"query": strings.Repeat("😀", 321)}, {"registeredFrom": "2026-10-28T10:00:00+08:00", "registeredTo": "2026-10-28T11:00:00+08:00"}, {"registeredFrom": "2026-10-28T11:00:00+08:00", "registeredTo": "2026-10-28T10:00:00+08:00"}, {"source": "all", "extra": true}, {"pageSize": 21}}
 	history := []object{{}, {"after": "9999999999999999999", "limit": 100}, {"after": "0"}, {"limit": 0}}
 	email := "原始@example.invalid"
 	at := "2023-11-14T22:13:20.000Z"
 	user := &r.User{Enabled: true, Email: &email, EmailVerified: true, RegisteredAt: &at}
 	row := object{"registration_id": id, "issuer": "https://website.example.invalid/realms/website", "external_subject": "原始😀", "preset_revision": 0}
-	versions := []object{{"row": row, "identity": user}, {"row": row, "identity": nil}}
-	input := object{"list": lists, "command": commands, "history": history, "versions": versions}
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/registered-users-interop.mjs"), "schema")
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(encode(input))
-	raw, e := cmd.CombinedOutput()
+	raw, e := os.ReadFile("testdata/registered-schema.json")
 	if e != nil {
-		t.Fatalf("source schema %v %s", e, raw)
+		t.Fatal(e)
 	}
 	var expected object
 	if json.Unmarshal(raw, &expected) != nil {

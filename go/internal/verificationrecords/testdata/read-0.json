@@ -1,0 +1,826 @@
+{
+  "queries": [
+    {
+      "actor": "owner",
+      "input": {
+        "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "type": "evidence"
+      },
+      "kind": "record"
+    },
+    {
+      "actor": "viewer",
+      "input": {
+        "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "type": "evidence"
+      },
+      "kind": "record"
+    },
+    {
+      "actor": null,
+      "input": {
+        "id": "86309116-2676-43ca-852e-edd7969885fe",
+        "type": "verification"
+      },
+      "kind": "record"
+    },
+    {
+      "actor": "owner",
+      "input": {
+        "id": "86309116-2676-43ca-852e-edd7969885fe",
+        "operationId": "cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3",
+        "payloadHash": "416dcc607d3f483e0fa3e4d34f13cffe607938d6bb8f67bd2b2e15779e409497",
+        "type": "verification"
+      },
+      "kind": "receipt"
+    },
+    {
+      "actor": "owner",
+      "kind": "case"
+    },
+    {
+      "actor": null,
+      "kind": "case"
+    },
+    {
+      "actor": "owner",
+      "input": {
+        "refs": [
+          {
+            "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+            "type": "evidence"
+          },
+          {
+            "id": "1faf3331-c78d-4a89-ba55-7246237daceb",
+            "type": "evidence"
+          },
+          {
+            "id": "86309116-2676-43ca-852e-edd7969885fe",
+            "type": "verification"
+          }
+        ]
+      },
+      "kind": "status"
+    }
+  ],
+  "results": [
+    {
+      "value": {
+        "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "type": "evidence",
+        "version": 1,
+        "operationId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+        "state": "recorded",
+        "currentVersion": 1,
+        "currentState": "active",
+        "sourceStrength": "submitter-reported-reference",
+        "independentExecutionVerified": false,
+        "capabilityVerified": false,
+        "taskOutcomeVerified": false,
+        "synthetic": false,
+        "record": {
+          "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+          "kind": "evidence",
+          "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+          "source": {
+            "issuer": "Author-reported source",
+            "originalAt": "2033-05-18T03:32:20.000Z",
+            "originSystem": "controlled-test",
+            "contentVersion": "version-1",
+            "externalStableId": "original-source"
+          },
+          "summary": "  Exact retained raw summary  ",
+          "expiresAt": null,
+          "synthetic": false,
+          "observedAt": "2033-05-18T03:33:20.000Z",
+          "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "operationId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+          "evidenceType": "test-result",
+          "expectedVersion": 0,
+          "reportedSourceState": "available"
+        },
+        "provenance": {
+          "sourceKey": "declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31",
+          "synthetic": false,
+          "importedAt": "2033-05-18T03:33:20.000Z",
+          "recordedAt": "2033-05-18T03:33:20.000Z",
+          "claimAuthority": "authenticated-subject-report",
+          "sourceStrength": "submitter-reported-reference",
+          "capabilityVerified": false,
+          "currentSourceState": "not-checked",
+          "externalRevocation": "unknown",
+          "sourceIdentityVerified": false,
+          "independentExecutionVerified": false
+        },
+        "integrity": "payload-hash-matches-storage",
+        "authorization": "current",
+        "externalOwnershipVerified": false,
+        "availability": {
+          "record": "available",
+          "upstream": "not-checked",
+          "upstreamRevocation": "unknown"
+        },
+        "revocation": "not-revoked",
+        "current": true,
+        "referenceStatus": "current"
+      },
+      "wire": "{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"type\":\"evidence\",\"version\":1,\"operationId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"state\":\"recorded\",\"currentVersion\":1,\"currentState\":\"active\",\"sourceStrength\":\"submitter-reported-reference\",\"independentExecutionVerified\":false,\"capabilityVerified\":false,\"taskOutcomeVerified\":false,\"synthetic\":false,\"record\":{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"kind\":\"evidence\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"source\":{\"issuer\":\"Author-reported source\",\"originalAt\":\"2033-05-18T03:32:20.000Z\",\"originSystem\":\"controlled-test\",\"contentVersion\":\"version-1\",\"externalStableId\":\"original-source\"},\"summary\":\"  Exact retained raw summary  \",\"expiresAt\":null,\"synthetic\":false,\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"operationId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"evidenceType\":\"test-result\",\"expectedVersion\":0,\"reportedSourceState\":\"available\"},\"provenance\":{\"sourceKey\":\"declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31\",\"synthetic\":false,\"importedAt\":\"2033-05-18T03:33:20.000Z\",\"recordedAt\":\"2033-05-18T03:33:20.000Z\",\"claimAuthority\":\"authenticated-subject-report\",\"sourceStrength\":\"submitter-reported-reference\",\"capabilityVerified\":false,\"currentSourceState\":\"not-checked\",\"externalRevocation\":\"unknown\",\"sourceIdentityVerified\":false,\"independentExecutionVerified\":false},\"integrity\":\"payload-hash-matches-storage\",\"authorization\":\"current\",\"externalOwnershipVerified\":false,\"availability\":{\"record\":\"available\",\"upstream\":\"not-checked\",\"upstreamRevocation\":\"unknown\"},\"revocation\":\"not-revoked\",\"current\":true,\"referenceStatus\":\"current\"}"
+    },
+    {
+      "value": {
+        "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+        "type": "evidence",
+        "version": 1,
+        "operationId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+        "state": "recorded",
+        "currentVersion": 1,
+        "currentState": "active",
+        "sourceStrength": "submitter-reported-reference",
+        "independentExecutionVerified": false,
+        "capabilityVerified": false,
+        "taskOutcomeVerified": false,
+        "synthetic": false,
+        "record": {
+          "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+          "kind": "evidence",
+          "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+          "source": {
+            "issuer": "Author-reported source",
+            "originalAt": "2033-05-18T03:32:20.000Z",
+            "originSystem": "controlled-test",
+            "contentVersion": "version-1",
+            "externalStableId": "original-source"
+          },
+          "summary": "  Exact retained raw summary  ",
+          "expiresAt": null,
+          "synthetic": false,
+          "observedAt": "2033-05-18T03:33:20.000Z",
+          "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+          "operationId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+          "evidenceType": "test-result",
+          "expectedVersion": 0,
+          "reportedSourceState": "available"
+        },
+        "provenance": {
+          "sourceKey": "declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31",
+          "synthetic": false,
+          "importedAt": "2033-05-18T03:33:20.000Z",
+          "recordedAt": "2033-05-18T03:33:20.000Z",
+          "claimAuthority": "authenticated-subject-report",
+          "sourceStrength": "submitter-reported-reference",
+          "capabilityVerified": false,
+          "currentSourceState": "not-checked",
+          "externalRevocation": "unknown",
+          "sourceIdentityVerified": false,
+          "independentExecutionVerified": false
+        },
+        "integrity": "payload-hash-matches-storage",
+        "authorization": "current",
+        "externalOwnershipVerified": false,
+        "availability": {
+          "record": "available",
+          "upstream": "not-checked",
+          "upstreamRevocation": "unknown"
+        },
+        "revocation": "not-revoked",
+        "current": true,
+        "referenceStatus": "current"
+      },
+      "wire": "{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"type\":\"evidence\",\"version\":1,\"operationId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"state\":\"recorded\",\"currentVersion\":1,\"currentState\":\"active\",\"sourceStrength\":\"submitter-reported-reference\",\"independentExecutionVerified\":false,\"capabilityVerified\":false,\"taskOutcomeVerified\":false,\"synthetic\":false,\"record\":{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"kind\":\"evidence\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"source\":{\"issuer\":\"Author-reported source\",\"originalAt\":\"2033-05-18T03:32:20.000Z\",\"originSystem\":\"controlled-test\",\"contentVersion\":\"version-1\",\"externalStableId\":\"original-source\"},\"summary\":\"  Exact retained raw summary  \",\"expiresAt\":null,\"synthetic\":false,\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"operationId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"evidenceType\":\"test-result\",\"expectedVersion\":0,\"reportedSourceState\":\"available\"},\"provenance\":{\"sourceKey\":\"declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31\",\"synthetic\":false,\"importedAt\":\"2033-05-18T03:33:20.000Z\",\"recordedAt\":\"2033-05-18T03:33:20.000Z\",\"claimAuthority\":\"authenticated-subject-report\",\"sourceStrength\":\"submitter-reported-reference\",\"capabilityVerified\":false,\"currentSourceState\":\"not-checked\",\"externalRevocation\":\"unknown\",\"sourceIdentityVerified\":false,\"independentExecutionVerified\":false},\"integrity\":\"payload-hash-matches-storage\",\"authorization\":\"current\",\"externalOwnershipVerified\":false,\"availability\":{\"record\":\"available\",\"upstream\":\"not-checked\",\"upstreamRevocation\":\"unknown\"},\"revocation\":\"not-revoked\",\"current\":true,\"referenceStatus\":\"current\"}"
+    },
+    {
+      "value": {
+        "id": "86309116-2676-43ca-852e-edd7969885fe",
+        "type": "verification",
+        "version": 1,
+        "currentVersion": 1,
+        "referenceStatus": "dependency-unavailable",
+        "reason": "record_not_authorized",
+        "observedAt": "2033-05-18T03:33:20.000Z",
+        "capabilityVerified": false,
+        "taskOutcomeVerified": false,
+        "record": null
+      },
+      "wire": "{\"id\":\"86309116-2676-43ca-852e-edd7969885fe\",\"type\":\"verification\",\"version\":1,\"currentVersion\":1,\"referenceStatus\":\"dependency-unavailable\",\"reason\":\"record_not_authorized\",\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"capabilityVerified\":false,\"taskOutcomeVerified\":false,\"record\":null}"
+    },
+    {
+      "value": {
+        "type": "verification",
+        "id": "86309116-2676-43ca-852e-edd7969885fe",
+        "operationId": "cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3",
+        "payloadHash": "416dcc607d3f483e0fa3e4d34f13cffe607938d6bb8f67bd2b2e15779e409497",
+        "authority": "accepted-operation-only",
+        "audience": "owner-only",
+        "currentAccessGranted": false,
+        "contentReturned": false,
+        "sourceAccessChecked": false,
+        "state": "acknowledged",
+        "receipt": {
+          "type": "verification",
+          "id": "86309116-2676-43ca-852e-edd7969885fe",
+          "operationId": "cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3",
+          "payloadHash": "416dcc607d3f483e0fa3e4d34f13cffe607938d6bb8f67bd2b2e15779e409497",
+          "version": 1,
+          "acceptedAt": "2026-10-28T18:44:00.017Z"
+        }
+      },
+      "wire": "{\"type\":\"verification\",\"id\":\"86309116-2676-43ca-852e-edd7969885fe\",\"operationId\":\"cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3\",\"payloadHash\":\"416dcc607d3f483e0fa3e4d34f13cffe607938d6bb8f67bd2b2e15779e409497\",\"authority\":\"accepted-operation-only\",\"audience\":\"owner-only\",\"currentAccessGranted\":false,\"contentReturned\":false,\"sourceAccessChecked\":false,\"state\":\"acknowledged\",\"receipt\":{\"type\":\"verification\",\"id\":\"86309116-2676-43ca-852e-edd7969885fe\",\"operationId\":\"cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3\",\"payloadHash\":\"416dcc607d3f483e0fa3e4d34f13cffe607938d6bb8f67bd2b2e15779e409497\",\"version\":1,\"acceptedAt\":\"2026-10-28T18:44:00.017Z\"}}"
+    },
+    {
+      "value": {
+        "attempts": [
+          {
+            "id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+            "version": 1,
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "participationId": null,
+            "taskId": null,
+            "scopeVersion": 1,
+            "eventId": "25071741-4270-4f75-9b4a-c05e190b42f6",
+            "caseVersion": 2,
+            "participationScopeVersion": null,
+            "provenance": "native-v2",
+            "claimAuthority": "participant-reported",
+            "synthetic": false,
+            "strategy": "Controlled fixture",
+            "role": "author",
+            "configurationRef": null,
+            "environment": "unknown",
+            "inputScopeSummary": "Isolated source",
+            "permissionScope": [
+              "test"
+            ],
+            "status": "running",
+            "reportedOutcome": "unrecorded",
+            "startedAt": "2026-10-28T18:43:59.246Z",
+            "endedAt": null,
+            "resultRefs": [
+              {
+                "id": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+                "version": 1
+              }
+            ],
+            "configurationCondition": {
+              "reference": null,
+              "sourceStatus": "unavailable",
+              "record": null,
+              "conditionsKnown": false
+            }
+          }
+        ],
+        "interventions": [
+          {
+            "id": "6512858f-4b41-4601-a573-e05777bf3e2d",
+            "version": 1,
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "participationId": null,
+            "taskId": null,
+            "scopeVersion": 1,
+            "eventId": "6512858f-4b41-4601-a573-e05777bf3e2d",
+            "caseVersion": 4,
+            "participationScopeVersion": null,
+            "provenance": "native-v2",
+            "claimAuthority": "participant-reported",
+            "synthetic": false,
+            "types": [
+              "review"
+            ],
+            "description": "Public event with a private content dependency",
+            "affectsAttemptIds": [
+              "25071741-4270-4f75-9b4a-c05e190b42f6"
+            ],
+            "affectsAttemptRefs": [
+              {
+                "id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+                "version": 1
+              }
+            ],
+            "sourceRefs": [
+              {
+                "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+                "kind": "evidence",
+                "version": 1
+              }
+            ],
+            "observedEffect": "Reported only",
+            "claimState": "self-declared",
+            "confirmation": "unconfirmed",
+            "responses": [],
+            "capabilityVerified": false,
+            "responseCoverage": {
+              "mode": "currently-authorized-latest-per-actor",
+              "complete": true
+            }
+          }
+        ],
+        "results": [
+          {
+            "id": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+            "version": 1,
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "participationId": null,
+            "taskId": null,
+            "scopeVersion": 1,
+            "eventId": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+            "caseVersion": 3,
+            "participationScopeVersion": null,
+            "provenance": "native-v2",
+            "claimAuthority": "participant-reported",
+            "synthetic": false,
+            "origin": {
+              "id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+              "kind": "attempt",
+              "version": 1
+            },
+            "deliverableRefs": [],
+            "reportedOutcome": "partial",
+            "summary": "Reported result",
+            "limitations": "Not independently verified",
+            "acceptance": "not-provided",
+            "verification": "not-provided",
+            "supersedes": null
+          }
+        ],
+        "resolutions": [],
+        "responses": [],
+        "scopes": [
+          {
+            "version": 1,
+            "summary": "Reports stay scoped",
+            "eventId": "a963efb1-3ada-4e93-aebf-9adfab026031"
+          }
+        ],
+        "synthetic": false,
+        "resolution": {
+          "status": "unrecorded"
+        },
+        "version": 4,
+        "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "scopeVersion": 1,
+        "legacyState": "open",
+        "coverage": {
+          "mode": "authorized-events",
+          "visibleEvents": 4,
+          "complete": true,
+          "unavailableReasons": []
+        },
+        "events": [
+          {
+            "caseVersion": 1,
+            "kind": "case-created",
+            "title": "Original report ledger",
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "source": {
+              "kind": "local",
+              "reference": "e3160c0d-b68f-4381-b1c2-5f3cd6773a13"
+            },
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "eventId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "summary": "Reports stay scoped",
+            "localRef": "11364bdf-6766-4bdc-a17f-265ce85280cd",
+            "synthetic": false,
+            "expectedVersion": 0
+          },
+          {
+            "caseVersion": 2,
+            "kind": "attempt-start",
+            "role": "author",
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "eventId": "25071741-4270-4f75-9b4a-c05e190b42f6",
+            "strategy": "Controlled fixture",
+            "expectedVersion": 1,
+            "permissionScope": [
+              "test"
+            ],
+            "inputScopeSummary": "Isolated source"
+          },
+          {
+            "caseVersion": 3,
+            "kind": "result-recorded",
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "origin": {
+              "id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+              "kind": "attempt",
+              "version": 1
+            },
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "eventId": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+            "summary": "Reported result",
+            "limitations": "Not independently verified",
+            "scopeVersion": 1,
+            "deliverableRefs": [],
+            "expectedVersion": 2,
+            "reportedOutcome": "partial"
+          },
+          {
+            "caseVersion": 4,
+            "kind": "intervention",
+            "types": [
+              "review"
+            ],
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "eventId": "6512858f-4b41-4601-a573-e05777bf3e2d",
+            "sourceRefs": [
+              {
+                "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+                "kind": "evidence",
+                "version": 1
+              }
+            ],
+            "description": "Public event with a private content dependency",
+            "observedEffect": "Reported only",
+            "expectedVersion": 3,
+            "affectsAttemptIds": [
+              "25071741-4270-4f75-9b4a-c05e190b42f6"
+            ]
+          }
+        ]
+      },
+      "wire": "{\"attempts\":[{\"id\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"version\":1,\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"participationId\":null,\"taskId\":null,\"scopeVersion\":1,\"eventId\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"caseVersion\":2,\"participationScopeVersion\":null,\"provenance\":\"native-v2\",\"claimAuthority\":\"participant-reported\",\"synthetic\":false,\"strategy\":\"Controlled fixture\",\"role\":\"author\",\"configurationRef\":null,\"environment\":\"unknown\",\"inputScopeSummary\":\"Isolated source\",\"permissionScope\":[\"test\"],\"status\":\"running\",\"reportedOutcome\":\"unrecorded\",\"startedAt\":\"2026-10-28T18:43:59.246Z\",\"endedAt\":null,\"resultRefs\":[{\"id\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"version\":1}],\"configurationCondition\":{\"reference\":null,\"sourceStatus\":\"unavailable\",\"record\":null,\"conditionsKnown\":false}}],\"interventions\":[{\"id\":\"6512858f-4b41-4601-a573-e05777bf3e2d\",\"version\":1,\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"participationId\":null,\"taskId\":null,\"scopeVersion\":1,\"eventId\":\"6512858f-4b41-4601-a573-e05777bf3e2d\",\"caseVersion\":4,\"participationScopeVersion\":null,\"provenance\":\"native-v2\",\"claimAuthority\":\"participant-reported\",\"synthetic\":false,\"types\":[\"review\"],\"description\":\"Public event with a private content dependency\",\"affectsAttemptIds\":[\"25071741-4270-4f75-9b4a-c05e190b42f6\"],\"affectsAttemptRefs\":[{\"id\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"version\":1}],\"sourceRefs\":[{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"kind\":\"evidence\",\"version\":1}],\"observedEffect\":\"Reported only\",\"claimState\":\"self-declared\",\"confirmation\":\"unconfirmed\",\"responses\":[],\"capabilityVerified\":false,\"responseCoverage\":{\"mode\":\"currently-authorized-latest-per-actor\",\"complete\":true}}],\"results\":[{\"id\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"version\":1,\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"participationId\":null,\"taskId\":null,\"scopeVersion\":1,\"eventId\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"caseVersion\":3,\"participationScopeVersion\":null,\"provenance\":\"native-v2\",\"claimAuthority\":\"participant-reported\",\"synthetic\":false,\"origin\":{\"id\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"kind\":\"attempt\",\"version\":1},\"deliverableRefs\":[],\"reportedOutcome\":\"partial\",\"summary\":\"Reported result\",\"limitations\":\"Not independently verified\",\"acceptance\":\"not-provided\",\"verification\":\"not-provided\",\"supersedes\":null}],\"resolutions\":[],\"responses\":[],\"scopes\":[{\"version\":1,\"summary\":\"Reports stay scoped\",\"eventId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\"}],\"synthetic\":false,\"resolution\":{\"status\":\"unrecorded\"},\"version\":4,\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"scopeVersion\":1,\"legacyState\":\"open\",\"coverage\":{\"mode\":\"authorized-events\",\"visibleEvents\":4,\"complete\":true,\"unavailableReasons\":[]},\"events\":[{\"caseVersion\":1,\"kind\":\"case-created\",\"title\":\"Original report ledger\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"source\":{\"kind\":\"local\",\"reference\":\"e3160c0d-b68f-4381-b1c2-5f3cd6773a13\"},\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"eventId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"summary\":\"Reports stay scoped\",\"localRef\":\"11364bdf-6766-4bdc-a17f-265ce85280cd\",\"synthetic\":false,\"expectedVersion\":0},{\"caseVersion\":2,\"kind\":\"attempt-start\",\"role\":\"author\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"eventId\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"strategy\":\"Controlled fixture\",\"expectedVersion\":1,\"permissionScope\":[\"test\"],\"inputScopeSummary\":\"Isolated source\"},{\"caseVersion\":3,\"kind\":\"result-recorded\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"origin\":{\"id\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"kind\":\"attempt\",\"version\":1},\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"eventId\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"summary\":\"Reported result\",\"limitations\":\"Not independently verified\",\"scopeVersion\":1,\"deliverableRefs\":[],\"expectedVersion\":2,\"reportedOutcome\":\"partial\"},{\"caseVersion\":4,\"kind\":\"intervention\",\"types\":[\"review\"],\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"eventId\":\"6512858f-4b41-4601-a573-e05777bf3e2d\",\"sourceRefs\":[{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"kind\":\"evidence\",\"version\":1}],\"description\":\"Public event with a private content dependency\",\"observedEffect\":\"Reported only\",\"expectedVersion\":3,\"affectsAttemptIds\":[\"25071741-4270-4f75-9b4a-c05e190b42f6\"]}]}"
+    },
+    {
+      "value": {
+        "attempts": [
+          {
+            "id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+            "version": 1,
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "participationId": null,
+            "taskId": null,
+            "scopeVersion": 1,
+            "eventId": "25071741-4270-4f75-9b4a-c05e190b42f6",
+            "caseVersion": 2,
+            "participationScopeVersion": null,
+            "provenance": "native-v2",
+            "claimAuthority": "participant-reported",
+            "synthetic": false,
+            "strategy": "Controlled fixture",
+            "role": "author",
+            "configurationRef": null,
+            "environment": "unknown",
+            "inputScopeSummary": "Isolated source",
+            "permissionScope": [
+              "test"
+            ],
+            "status": "running",
+            "reportedOutcome": "unrecorded",
+            "startedAt": "2026-10-28T18:43:59.246Z",
+            "endedAt": null,
+            "resultRefs": [
+              {
+                "id": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+                "version": 1
+              }
+            ],
+            "configurationCondition": {
+              "reference": null,
+              "sourceStatus": "unavailable",
+              "record": null,
+              "conditionsKnown": false
+            }
+          }
+        ],
+        "interventions": [],
+        "results": [
+          {
+            "id": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+            "version": 1,
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "participationId": null,
+            "taskId": null,
+            "scopeVersion": 1,
+            "eventId": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+            "caseVersion": 3,
+            "participationScopeVersion": null,
+            "provenance": "native-v2",
+            "claimAuthority": "participant-reported",
+            "synthetic": false,
+            "origin": {
+              "id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+              "kind": "attempt",
+              "version": 1
+            },
+            "deliverableRefs": [],
+            "reportedOutcome": "partial",
+            "summary": "Reported result",
+            "limitations": "Not independently verified",
+            "acceptance": "not-provided",
+            "verification": "not-provided",
+            "supersedes": null
+          }
+        ],
+        "resolutions": [],
+        "responses": [],
+        "scopes": [
+          {
+            "version": 1,
+            "summary": "Reports stay scoped",
+            "eventId": "a963efb1-3ada-4e93-aebf-9adfab026031"
+          }
+        ],
+        "synthetic": false,
+        "resolution": {
+          "status": "unrecorded"
+        },
+        "version": 4,
+        "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+        "scopeVersion": 1,
+        "legacyState": "open",
+        "coverage": {
+          "mode": "authorized-events",
+          "visibleEvents": 3,
+          "complete": false,
+          "unavailableReasons": [
+            "record_not_authorized"
+          ]
+        },
+        "events": [
+          {
+            "caseVersion": 1,
+            "kind": "case-created",
+            "title": "Original report ledger",
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "source": {
+              "kind": "local",
+              "reference": "e3160c0d-b68f-4381-b1c2-5f3cd6773a13"
+            },
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "eventId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "summary": "Reports stay scoped",
+            "localRef": "11364bdf-6766-4bdc-a17f-265ce85280cd",
+            "synthetic": false,
+            "expectedVersion": 0
+          },
+          {
+            "caseVersion": 2,
+            "kind": "attempt-start",
+            "role": "author",
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "eventId": "25071741-4270-4f75-9b4a-c05e190b42f6",
+            "strategy": "Controlled fixture",
+            "expectedVersion": 1,
+            "permissionScope": [
+              "test"
+            ],
+            "inputScopeSummary": "Isolated source"
+          },
+          {
+            "caseVersion": 3,
+            "kind": "result-recorded",
+            "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+            "origin": {
+              "id": "25071741-4270-4f75-9b4a-c05e190b42f6",
+              "kind": "attempt",
+              "version": 1
+            },
+            "actorId": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+            "eventId": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+            "summary": "Reported result",
+            "limitations": "Not independently verified",
+            "scopeVersion": 1,
+            "deliverableRefs": [],
+            "expectedVersion": 2,
+            "reportedOutcome": "partial"
+          }
+        ]
+      },
+      "wire": "{\"attempts\":[{\"id\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"version\":1,\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"participationId\":null,\"taskId\":null,\"scopeVersion\":1,\"eventId\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"caseVersion\":2,\"participationScopeVersion\":null,\"provenance\":\"native-v2\",\"claimAuthority\":\"participant-reported\",\"synthetic\":false,\"strategy\":\"Controlled fixture\",\"role\":\"author\",\"configurationRef\":null,\"environment\":\"unknown\",\"inputScopeSummary\":\"Isolated source\",\"permissionScope\":[\"test\"],\"status\":\"running\",\"reportedOutcome\":\"unrecorded\",\"startedAt\":\"2026-10-28T18:43:59.246Z\",\"endedAt\":null,\"resultRefs\":[{\"id\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"version\":1}],\"configurationCondition\":{\"reference\":null,\"sourceStatus\":\"unavailable\",\"record\":null,\"conditionsKnown\":false}}],\"interventions\":[],\"results\":[{\"id\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"version\":1,\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"participationId\":null,\"taskId\":null,\"scopeVersion\":1,\"eventId\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"caseVersion\":3,\"participationScopeVersion\":null,\"provenance\":\"native-v2\",\"claimAuthority\":\"participant-reported\",\"synthetic\":false,\"origin\":{\"id\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"kind\":\"attempt\",\"version\":1},\"deliverableRefs\":[],\"reportedOutcome\":\"partial\",\"summary\":\"Reported result\",\"limitations\":\"Not independently verified\",\"acceptance\":\"not-provided\",\"verification\":\"not-provided\",\"supersedes\":null}],\"resolutions\":[],\"responses\":[],\"scopes\":[{\"version\":1,\"summary\":\"Reports stay scoped\",\"eventId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\"}],\"synthetic\":false,\"resolution\":{\"status\":\"unrecorded\"},\"version\":4,\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"scopeVersion\":1,\"legacyState\":\"open\",\"coverage\":{\"mode\":\"authorized-events\",\"visibleEvents\":3,\"complete\":false,\"unavailableReasons\":[\"record_not_authorized\"]},\"events\":[{\"caseVersion\":1,\"kind\":\"case-created\",\"title\":\"Original report ledger\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"source\":{\"kind\":\"local\",\"reference\":\"e3160c0d-b68f-4381-b1c2-5f3cd6773a13\"},\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"eventId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"summary\":\"Reports stay scoped\",\"localRef\":\"11364bdf-6766-4bdc-a17f-265ce85280cd\",\"synthetic\":false,\"expectedVersion\":0},{\"caseVersion\":2,\"kind\":\"attempt-start\",\"role\":\"author\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"eventId\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"strategy\":\"Controlled fixture\",\"expectedVersion\":1,\"permissionScope\":[\"test\"],\"inputScopeSummary\":\"Isolated source\"},{\"caseVersion\":3,\"kind\":\"result-recorded\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"origin\":{\"id\":\"25071741-4270-4f75-9b4a-c05e190b42f6\",\"kind\":\"attempt\",\"version\":1},\"actorId\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"eventId\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"summary\":\"Reported result\",\"limitations\":\"Not independently verified\",\"scopeVersion\":1,\"deliverableRefs\":[],\"expectedVersion\":2,\"reportedOutcome\":\"partial\"}]}"
+    },
+    {
+      "value": {
+        "items": [
+          {
+            "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+            "type": "evidence",
+            "version": 1,
+            "operationId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+            "state": "recorded",
+            "currentVersion": 1,
+            "currentState": "active",
+            "sourceStrength": "submitter-reported-reference",
+            "independentExecutionVerified": false,
+            "capabilityVerified": false,
+            "taskOutcomeVerified": false,
+            "synthetic": false,
+            "record": {
+              "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+              "kind": "evidence",
+              "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+              "source": {
+                "issuer": "Author-reported source",
+                "originalAt": "2033-05-18T03:32:20.000Z",
+                "originSystem": "controlled-test",
+                "contentVersion": "version-1",
+                "externalStableId": "original-source"
+              },
+              "summary": "  Exact retained raw summary  ",
+              "expiresAt": null,
+              "synthetic": false,
+              "observedAt": "2033-05-18T03:33:20.000Z",
+              "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+              "operationId": "00e2f3ac-489e-4b0b-988f-37841dbabc4d",
+              "evidenceType": "test-result",
+              "expectedVersion": 0,
+              "reportedSourceState": "available"
+            },
+            "provenance": {
+              "sourceKey": "declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31",
+              "synthetic": false,
+              "importedAt": "2033-05-18T03:33:20.000Z",
+              "recordedAt": "2033-05-18T03:33:20.000Z",
+              "claimAuthority": "authenticated-subject-report",
+              "sourceStrength": "submitter-reported-reference",
+              "capabilityVerified": false,
+              "currentSourceState": "not-checked",
+              "externalRevocation": "unknown",
+              "sourceIdentityVerified": false,
+              "independentExecutionVerified": false
+            },
+            "integrity": "payload-hash-matches-storage",
+            "authorization": "current",
+            "externalOwnershipVerified": false,
+            "availability": {
+              "record": "available",
+              "upstream": "not-checked",
+              "upstreamRevocation": "unknown"
+            },
+            "revocation": "not-revoked",
+            "current": true,
+            "referenceStatus": "current"
+          },
+          {
+            "id": "1faf3331-c78d-4a89-ba55-7246237daceb",
+            "type": "evidence",
+            "version": 1,
+            "operationId": "9e18ca74-8050-4cf0-b516-1ca4160ae390",
+            "state": "recorded",
+            "currentVersion": 1,
+            "currentState": "active",
+            "sourceStrength": "submitter-reported-reference",
+            "independentExecutionVerified": false,
+            "capabilityVerified": false,
+            "taskOutcomeVerified": false,
+            "synthetic": true,
+            "record": {
+              "id": "1faf3331-c78d-4a89-ba55-7246237daceb",
+              "kind": "evidence",
+              "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+              "source": {
+                "issuer": "Author-reported source",
+                "originalAt": "2033-05-18T03:32:20.000Z",
+                "originSystem": "controlled-test",
+                "contentVersion": "version-1",
+                "externalStableId": "original-source"
+              },
+              "summary": "A second record of the same declared source",
+              "expiresAt": null,
+              "synthetic": true,
+              "observedAt": "2033-05-18T03:33:20.000Z",
+              "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+              "operationId": "9e18ca74-8050-4cf0-b516-1ca4160ae390",
+              "evidenceType": "test-result",
+              "expectedVersion": 0,
+              "reportedSourceState": "available"
+            },
+            "provenance": {
+              "sourceKey": "declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31",
+              "synthetic": true,
+              "importedAt": "2033-05-18T03:33:20.000Z",
+              "recordedAt": "2033-05-18T03:33:20.000Z",
+              "claimAuthority": "authenticated-subject-report",
+              "sourceStrength": "submitter-reported-reference",
+              "capabilityVerified": false,
+              "currentSourceState": "not-checked",
+              "externalRevocation": "unknown",
+              "sourceIdentityVerified": false,
+              "independentExecutionVerified": false
+            },
+            "integrity": "payload-hash-matches-storage",
+            "authorization": "current",
+            "externalOwnershipVerified": false,
+            "availability": {
+              "record": "available",
+              "upstream": "not-checked",
+              "upstreamRevocation": "unknown"
+            },
+            "revocation": "not-revoked",
+            "current": true,
+            "referenceStatus": "current"
+          },
+          {
+            "id": "86309116-2676-43ca-852e-edd7969885fe",
+            "type": "verification",
+            "version": 1,
+            "operationId": "cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3",
+            "state": "recorded",
+            "currentVersion": 1,
+            "currentState": "active",
+            "sourceStrength": "user-side-test-report",
+            "independentExecutionVerified": false,
+            "capabilityVerified": false,
+            "taskOutcomeVerified": false,
+            "synthetic": false,
+            "record": {
+              "id": "86309116-2676-43ca-852e-edd7969885fe",
+              "kind": "verification",
+              "scope": "  Declared scope only  ",
+              "caseId": "a963efb1-3ada-4e93-aebf-9adfab026031",
+              "method": "unit-test",
+              "target": {
+                "id": "87b416f4-e03a-449e-a284-66ef6f8d036e",
+                "type": "result",
+                "version": 1
+              },
+              "summary": "  Derived report  ",
+              "expiresAt": null,
+              "synthetic": false,
+              "conditions": {
+                "count": 1,
+                "platform": "controlled"
+              },
+              "observedAt": "2033-05-18T03:33:20.000Z",
+              "reportedBy": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+              "observation": "passed",
+              "operationId": "cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3",
+              "evidenceRefs": [
+                {
+                  "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+                  "version": 1
+                }
+              ],
+              "relationship": "independent",
+              "scopeVersion": 1,
+              "expectedVersion": 0
+            },
+            "provenance": {
+              "scope": "declared-scope-only",
+              "synthetic": false,
+              "recordedAt": "2033-05-18T03:33:20.000Z",
+              "targetAuthor": "GUID1501M61X70BEQ8YH578CQR3QHVC8",
+              "claimAuthority": "authenticated-subject-report",
+              "sourceStrength": "user-side-test-report",
+              "capabilityVerified": false,
+              "taskOutcomeVerified": false,
+              "declaredRelationship": "independent",
+              "recordedRelationship": "self",
+              "independentExecutionVerified": false,
+              "relationshipIndependentlyVerified": false
+            },
+            "integrity": "payload-hash-matches-storage",
+            "authorization": "current",
+            "externalOwnershipVerified": false,
+            "availability": {
+              "record": "available",
+              "upstream": "not-checked",
+              "upstreamRevocation": "unknown"
+            },
+            "revocation": "not-revoked",
+            "current": true,
+            "referenceStatus": "current",
+            "targetCurrentVersion": 1
+          }
+        ],
+        "checkedAt": "2033-05-18T03:33:20.000Z",
+        "coverage": "requested-visible-references",
+        "sourceSummary": {
+          "evidenceRecordCount": 2,
+          "declaredSourceGroupCount": 1,
+          "duplicateRecordCount": 1,
+          "independentlyVerifiedSourceCount": 0,
+          "globalCountProvided": false,
+          "groups": [
+            {
+              "sourceKey": "declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31",
+              "refs": [
+                {
+                  "id": "59bdd154-62c7-4522-b31e-3935e2c74665",
+                  "version": 1,
+                  "synthetic": false
+                },
+                {
+                  "id": "1faf3331-c78d-4a89-ba55-7246237daceb",
+                  "version": 1,
+                  "synthetic": true
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "wire": "{\"items\":[{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"type\":\"evidence\",\"version\":1,\"operationId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"state\":\"recorded\",\"currentVersion\":1,\"currentState\":\"active\",\"sourceStrength\":\"submitter-reported-reference\",\"independentExecutionVerified\":false,\"capabilityVerified\":false,\"taskOutcomeVerified\":false,\"synthetic\":false,\"record\":{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"kind\":\"evidence\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"source\":{\"issuer\":\"Author-reported source\",\"originalAt\":\"2033-05-18T03:32:20.000Z\",\"originSystem\":\"controlled-test\",\"contentVersion\":\"version-1\",\"externalStableId\":\"original-source\"},\"summary\":\"  Exact retained raw summary  \",\"expiresAt\":null,\"synthetic\":false,\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"operationId\":\"00e2f3ac-489e-4b0b-988f-37841dbabc4d\",\"evidenceType\":\"test-result\",\"expectedVersion\":0,\"reportedSourceState\":\"available\"},\"provenance\":{\"sourceKey\":\"declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31\",\"synthetic\":false,\"importedAt\":\"2033-05-18T03:33:20.000Z\",\"recordedAt\":\"2033-05-18T03:33:20.000Z\",\"claimAuthority\":\"authenticated-subject-report\",\"sourceStrength\":\"submitter-reported-reference\",\"capabilityVerified\":false,\"currentSourceState\":\"not-checked\",\"externalRevocation\":\"unknown\",\"sourceIdentityVerified\":false,\"independentExecutionVerified\":false},\"integrity\":\"payload-hash-matches-storage\",\"authorization\":\"current\",\"externalOwnershipVerified\":false,\"availability\":{\"record\":\"available\",\"upstream\":\"not-checked\",\"upstreamRevocation\":\"unknown\"},\"revocation\":\"not-revoked\",\"current\":true,\"referenceStatus\":\"current\"},{\"id\":\"1faf3331-c78d-4a89-ba55-7246237daceb\",\"type\":\"evidence\",\"version\":1,\"operationId\":\"9e18ca74-8050-4cf0-b516-1ca4160ae390\",\"state\":\"recorded\",\"currentVersion\":1,\"currentState\":\"active\",\"sourceStrength\":\"submitter-reported-reference\",\"independentExecutionVerified\":false,\"capabilityVerified\":false,\"taskOutcomeVerified\":false,\"synthetic\":true,\"record\":{\"id\":\"1faf3331-c78d-4a89-ba55-7246237daceb\",\"kind\":\"evidence\",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"source\":{\"issuer\":\"Author-reported source\",\"originalAt\":\"2033-05-18T03:32:20.000Z\",\"originSystem\":\"controlled-test\",\"contentVersion\":\"version-1\",\"externalStableId\":\"original-source\"},\"summary\":\"A second record of the same declared source\",\"expiresAt\":null,\"synthetic\":true,\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"operationId\":\"9e18ca74-8050-4cf0-b516-1ca4160ae390\",\"evidenceType\":\"test-result\",\"expectedVersion\":0,\"reportedSourceState\":\"available\"},\"provenance\":{\"sourceKey\":\"declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31\",\"synthetic\":true,\"importedAt\":\"2033-05-18T03:33:20.000Z\",\"recordedAt\":\"2033-05-18T03:33:20.000Z\",\"claimAuthority\":\"authenticated-subject-report\",\"sourceStrength\":\"submitter-reported-reference\",\"capabilityVerified\":false,\"currentSourceState\":\"not-checked\",\"externalRevocation\":\"unknown\",\"sourceIdentityVerified\":false,\"independentExecutionVerified\":false},\"integrity\":\"payload-hash-matches-storage\",\"authorization\":\"current\",\"externalOwnershipVerified\":false,\"availability\":{\"record\":\"available\",\"upstream\":\"not-checked\",\"upstreamRevocation\":\"unknown\"},\"revocation\":\"not-revoked\",\"current\":true,\"referenceStatus\":\"current\"},{\"id\":\"86309116-2676-43ca-852e-edd7969885fe\",\"type\":\"verification\",\"version\":1,\"operationId\":\"cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3\",\"state\":\"recorded\",\"currentVersion\":1,\"currentState\":\"active\",\"sourceStrength\":\"user-side-test-report\",\"independentExecutionVerified\":false,\"capabilityVerified\":false,\"taskOutcomeVerified\":false,\"synthetic\":false,\"record\":{\"id\":\"86309116-2676-43ca-852e-edd7969885fe\",\"kind\":\"verification\",\"scope\":\"  Declared scope only  \",\"caseId\":\"a963efb1-3ada-4e93-aebf-9adfab026031\",\"method\":\"unit-test\",\"target\":{\"id\":\"87b416f4-e03a-449e-a284-66ef6f8d036e\",\"type\":\"result\",\"version\":1},\"summary\":\"  Derived report  \",\"expiresAt\":null,\"synthetic\":false,\"conditions\":{\"count\":1,\"platform\":\"controlled\"},\"observedAt\":\"2033-05-18T03:33:20.000Z\",\"reportedBy\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"observation\":\"passed\",\"operationId\":\"cbf02284-3244-4c6f-ab41-8a1ef1f9e9f3\",\"evidenceRefs\":[{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"version\":1}],\"relationship\":\"independent\",\"scopeVersion\":1,\"expectedVersion\":0},\"provenance\":{\"scope\":\"declared-scope-only\",\"synthetic\":false,\"recordedAt\":\"2033-05-18T03:33:20.000Z\",\"targetAuthor\":\"GUID1501M61X70BEQ8YH578CQR3QHVC8\",\"claimAuthority\":\"authenticated-subject-report\",\"sourceStrength\":\"user-side-test-report\",\"capabilityVerified\":false,\"taskOutcomeVerified\":false,\"declaredRelationship\":\"independent\",\"recordedRelationship\":\"self\",\"independentExecutionVerified\":false,\"relationshipIndependentlyVerified\":false},\"integrity\":\"payload-hash-matches-storage\",\"authorization\":\"current\",\"externalOwnershipVerified\":false,\"availability\":{\"record\":\"available\",\"upstream\":\"not-checked\",\"upstreamRevocation\":\"unknown\"},\"revocation\":\"not-revoked\",\"current\":true,\"referenceStatus\":\"current\",\"targetCurrentVersion\":1}],\"checkedAt\":\"2033-05-18T03:33:20.000Z\",\"coverage\":\"requested-visible-references\",\"sourceSummary\":{\"evidenceRecordCount\":2,\"declaredSourceGroupCount\":1,\"duplicateRecordCount\":1,\"independentlyVerifiedSourceCount\":0,\"globalCountProvided\":false,\"groups\":[{\"sourceKey\":\"declared-source:f8e55a948379ab62aff58a69799f14464f4de8b9099dcc0d6bde51f1dcab6d31\",\"refs\":[{\"id\":\"59bdd154-62c7-4522-b31e-3935e2c74665\",\"version\":1,\"synthetic\":false},{\"id\":\"1faf3331-c78d-4a89-ba55-7246237daceb\",\"version\":1,\"synthetic\":true}]}]}}"
+    }
+  ]
+}

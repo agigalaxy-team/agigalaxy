@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -58,10 +59,11 @@ func TestAccountHTTPOriginalOwnerAndPublicProfileContract(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
 	defer cancel()
-	fixture := nodeAccounts(t, dsn, `await migrate(db,{roles:['api']});const account=await transaction(db,async tx=>{const row=await upsertOfficialAccountWithin(tx,{endpoint,issuer,externalSubject:'http-owner',verificationMethod:'email',verifiedAt:now()});await ensureOfficialAccountProfileWithin(tx,row.id,{subjectType:'person',now:now()});return row});console.log(JSON.stringify(account));`)
-	account, uid := fixture["id"].(string), fixture["uid"].(string)
+	initializeAccounts(t, owner)
 	pool := apiPool(t, dsn)
-	service := &Service{Endpoint: "https://accounts.example.invalid", Now: func() time.Time { return time.Unix(2000000000, 0) }}
+	service := &Service{Endpoint: fixtureEndpoint, Now: func() time.Time { return time.Unix(2000000000, 0) }}
+	fixture := createTestAccount(t, pool, service, "http-owner")
+	account, uid := fixture.ID, fixture.UID
 	authority := &httpAccountFixture{id: account}
 	handler := Handler{Service: service, Pool: pool, Identity: HTTPIdentityFunc(authority.Identity)}
 	request := func(method, path, raw string) *http.Request {
@@ -167,10 +169,13 @@ func TestAccountHTTPOriginalOwnerAndPublicProfileContract(t *testing.T) {
 	if w := call(request("POST", "/v1/account/settings", string(encode(t, valid)))); w.Code != 200 {
 		t.Fatalf("explicit public choice %d %s", w.Code, w.Body)
 	}
-	reference := nodeAccounts(t, dsn, `console.log(JSON.stringify(await data.publicProfile(process.argv[1])));`, account)
+	reference, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) { return service.PublicProfileWithin(ctx, tx, account, nil) })
+	if e != nil {
+		t.Fatal(e)
+	}
 	w = anonymous("/v1/account/public/" + account)
 	var public Object
-	if e := json.Unmarshal(w.Body.Bytes(), &public); e != nil || w.Code != 200 || !reflect.DeepEqual(public, reference) {
+	if e := json.Unmarshal(w.Body.Bytes(), &public); e != nil || w.Code != 200 || !reflect.DeepEqual(public, normalized(t, reference)) {
 		t.Fatalf("original public projection differs %d %s / %s %v", w.Code, w.Body, encode(t, reference), e)
 	}
 	if w.Header().Get("Cache-Control") != "no-store" || w.Header().Get("Referrer-Policy") != "no-referrer" || authority.checks != 0 {

@@ -1,0 +1,76 @@
+{
+  "public": {
+    "selfDeclared": {
+      "displayName": "Original ID declaration",
+      "about": "Original own statement",
+      "claimedCapabilities": [
+        "Claimed only"
+      ],
+      "projects": [
+        {
+          "id": "36f92b61-6934-48bd-8d42-61aef73f49ae",
+          "kind": "project",
+          "title": "Private author introduction",
+          "summary": "Not a certified capability",
+          "functions": [],
+          "technologies": [],
+          "discoverable": false
+        }
+      ]
+    },
+    "selfDeclaredReadExpiresAt": 2000000060,
+    "selfDeclaredSource": {
+      "id": "19305415-ba78-4770-aee0-4bb8032abbe5",
+      "classification": "self-declared",
+      "capabilityVerified": false
+    }
+  },
+  "selected": {
+    "selfDeclared": {
+      "displayName": "Original ID declaration",
+      "about": "Original own statement",
+      "claimedCapabilities": [
+        "Claimed only"
+      ],
+      "projects": [
+        {
+          "id": "36f92b61-6934-48bd-8d42-61aef73f49ae",
+          "kind": "project",
+          "title": "Private author introduction",
+          "summary": "Not a certified capability",
+          "functions": [],
+          "technologies": [],
+          "discoverable": false
+        }
+      ]
+    },
+    "selfDeclaredReadExpiresAt": 2000000060,
+    "selfDeclaredSource": {
+      "id": "19305415-ba78-4770-aee0-4bb8032abbe5",
+      "classification": "self-declared",
+      "capabilityVerified": false
+    }
+  },
+  "durable": {
+    "selfDeclared": {
+      "displayName": "Retained signed device statement"
+    },
+    "selfDeclaredReadExpiresAt": 2000000060,
+    "selfDeclaredSource": {
+      "id": "109223ec-9586-4329-946e-cd3caa86f885",
+      "classification": "self-declared",
+      "capabilityVerified": false
+    }
+  },
+  "legacy": {
+    "selfDeclared": {
+      "displayName": "Legacy finite consent statement"
+    },
+    "selfDeclaredReadExpiresAt": 2000000060,
+    "selfDeclaredSource": {
+      "id": "a7b1d8a8-2aa4-4bfb-9762-e500af6f9836",
+      "classification": "self-declared",
+      "capabilityVerified": false
+    }
+  }
+}

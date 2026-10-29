@@ -19,7 +19,7 @@ type Event = map[string]any
 var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$`)
 var releasePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$`)
 var serviceCode = regexp.MustCompile(`^[a-z][a-z0-9_]{0,99}$`)
-var sourcePattern = regexp.MustCompile(`(?:^|/)(packages/galaxy-official/(?:src|scripts)/[a-zA-Z0-9_./-]+\.(?:mjs|js)|go/(?:internal|cmd)/[a-zA-Z0-9_./-]+\.go)$`)
+var sourcePattern = regexp.MustCompile(`(?:^|/)(packages/(?:galaxy-official/(?:src|scripts|deploy)|galaxy-(?:client|contracts)/src)/[a-zA-Z0-9_./-]+\.(?:mjs|js)|go/(?:internal|cmd)/[a-zA-Z0-9_./-]+\.go)$`)
 var dependencyPattern = regexp.MustCompile(`(?:^|/)node_modules/((?:pg|pg-pool|pg-boss|pino|rotating-file-stream|@electric-sql/pglite)/[a-zA-Z0-9_./-]+\.(?:mjs|cjs|js))$`)
 
 func text(v any) string { s, _ := v.(string); return s }

@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,35 +13,18 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	perms "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestAutomationAndHumanAIDelegationOriginalInterop(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string, input any) map[string]any {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		if input != nil {
-			cmd.Stdin = strings.NewReader(jsonText(input))
-		}
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o map[string]any
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid oracle output")
-		}
-		return o
-	}
-	base := node("setup", nil)
-	fixture := node("automation-setup", nil)
+	currentFixture := operationsfixture.New(t, owner)
+	base := currentFixture.Data
+	fixture := currentFixture.Automation(t)
 	ids := object(base["ids"])
 	endpoint, issuer := text(base["endpoint"]), text(base["issuer"])
 	cfg, e := pgxpool.ParseConfig(dsn)
@@ -100,7 +80,7 @@ func TestAutomationAndHumanAIDelegationOriginalInterop(t *testing.T) {
 	if o["replayed"] != true {
 		t.Fatal("JS automation replay missing")
 	}
-	source := node("automation-read", nil)
+	source := currentFixture.AutomationRead(t, nil)
 	status, o = request("GET", "automation", nil)
 	check(status, o, 200, "")
 	if !equal(o, source["automation"]) {
@@ -129,7 +109,7 @@ func TestAutomationAndHumanAIDelegationOriginalInterop(t *testing.T) {
 	check(status, o, 400, "operations_automation_scope_required")
 	status, o = request("GET", "operations/"+text(input["operationId"]), nil)
 	check(status, o, 200, "")
-	source = node("automation-read", map[string]any{"operationId": input["operationId"]})
+	source = currentFixture.AutomationRead(t, map[string]any{"operationId": input["operationId"]})
 	if !equal(o, source["operation"]) {
 		t.Fatalf("automation receipt differs Go%s JS%s", jsonText(o), jsonText(source["operation"]))
 	}
@@ -174,7 +154,7 @@ func TestAutomationAndHumanAIDelegationOriginalInterop(t *testing.T) {
 	bad["operationId"], bad["expectedVersion"], bad["grantablePermissions"] = uuid.NewString(), 2, []string{"ai.roles.create"}
 	status, o = request("POST", "ai-delegation", bad)
 	check(status, o, 403, "operations_ai_delegation_ceiling_denied")
-	source = node("automation-read", map[string]any{"delegationOperationId": update["operationId"]})
+	source = currentFixture.AutomationRead(t, map[string]any{"delegationOperationId": update["operationId"]})
 	for name, path := range map[string]string{"automation": "automation", "delegation": "ai-delegation", "delegationOperation": "ai-delegation/operations/" + text(update["operationId"]), "history": "history?limit=100"} {
 		status, o = request("GET", path, nil)
 		check(status, o, 200, "")

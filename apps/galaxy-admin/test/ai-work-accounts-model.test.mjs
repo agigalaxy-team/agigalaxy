@@ -1,20 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
-import {aiWorkDomains,aiWorkCommandSchema,aiWorkAssignmentSchema,aiWorkCapabilities,aiWorkQueryPermissions,aiWorkPreparation} from '../../../packages/galaxy-official/src/operations/accounts/ai-work-schema.mjs';
+import {aiWorkCapabilities,aiWorkQueryPermissions,aiWorkPreparation} from '../../../packages/galaxy-contracts/src/operations-ai-work-capabilities.mjs';
 import {aiWorkLocation,aiWorkHref,aiWorkProfileMerge,aiWorkReceiptMatches,aiWorkRestoredReceiptMatches,aiWorkRoleImpact,aiWorkPermissionUse} from "../src/lib/ai-work-accounts/ai-work-accounts-view-model.ts";
 
 const memorySource=process.env.GALAXY_AI_WORK_MEMORY_SOURCE?pathToFileURL(process.env.GALAXY_AI_WORK_MEMORY_SOURCE).href:new URL('../src/lib/settings-draft-memory.ts',import.meta.url).href;
 const {createSettingsDraftMemory,settingsAiWorkReceiptPath}=await import(memorySource);
 
-test('AI work account schemas and drafts separate role limits, human decisions, execution bindings and original GET recovery',()=>{
- assert.deepEqual(aiWorkDomains,['overview','governance','messaging','discovery','maintenance']);
+test('AI work account drafts separate role limits, human decisions, execution bindings and original GET recovery',()=>{
  const operationId='11111111-1111-4111-8111-111111111111',id='22222222-2222-4222-8222-222222222222',roleId='33333333-3333-4333-8333-333333333333',otherRole='44444444-4444-4444-8444-444444444444',assignmentId='55555555-5555-4555-8555-555555555555';
- const command={operationId,kind:'state-save',expectedVersion:1,enabled:false};
- assert.equal(aiWorkCommandSchema.parse(command).enabled,false);
- assert.equal(aiWorkCommandSchema.safeParse({operationId,kind:'state-save',expectedVersion:1}).success,false);
- for(const field of ['temporaryPassword','email','actor','aiDomains','apiKey'])assert.equal(aiWorkCommandSchema.safeParse({...command,[field]:'SYNTHETIC_NOT_SECRET'}).success,false);
- assert.equal(aiWorkAssignmentSchema.safeParse({operationId,expectedVersion:0,roleId,enabled:true,operatorId:'a'.repeat(64)}).success,false);
  const allCurrent=[...aiWorkQueryPermissions,...new Set(aiWorkPreparation.flatMap(row=>[row.read,...(Array.isArray(row.actions)?row.actions:[])]))];
  assert.deepEqual([...aiWorkCapabilities('overview',allCurrent).preparableKinds].sort((a,b)=>a.localeCompare(b)),aiWorkPreparation.map(row=>row.kind).sort((a,b)=>a.localeCompare(b)));
  const diagnostic=aiWorkCapabilities('maintenance',['maintenance.read','maintenance.logs.read','files.read','files.cleanup.approve','models.configure']);

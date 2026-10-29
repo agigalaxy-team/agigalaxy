@@ -31,7 +31,7 @@ func TestOriginalNativeDeviceHandshakeAndRevocation(t *testing.T) {
 	var origin string
 	run := func(mode string) []byte {
 		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/device-auth-interop.mjs"), mode)
+		cmd := exec.Command("node", filepath.Join(root, "scripts/go/device-client-fixture.mjs"), mode)
 		cmd.Dir = root
 		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN="+origin)
 		out, e := cmd.CombinedOutput()
@@ -40,10 +40,8 @@ func TestOriginalNativeDeviceHandshakeAndRevocation(t *testing.T) {
 		}
 		return out
 	}
-	var metadata struct{ SubjectID, DeviceID, PublicKeyPEM, HubPublic string }
-	if e := json.Unmarshal(run("setup"), &metadata); e != nil {
-		t.Fatal(e)
-	}
+	fixture := prepareControlFixture(t, pool, dir, true)
+	metadata := struct{ SubjectID, DeviceID, PublicKeyPEM, HubPublic string }{fixture.Genesis.ID, fixture.DeviceID, fixture.PublicKeyPEM, fixture.HubPublic}
 	keyBytes, e := os.ReadFile(filepath.Join(dir, "hub-private.pem"))
 	if e != nil {
 		t.Fatal(e)
@@ -70,9 +68,9 @@ func TestOriginalNativeDeviceHandshakeAndRevocation(t *testing.T) {
 	if _, e = Load(ctx, apiPool, configuration); e != nil {
 		t.Fatalf("same trust state reload: %v", e)
 	}
-	var trustResult struct{ Sequence, History int }
-	if e = json.Unmarshal(run("trust-check"), &trustResult); e != nil || trustResult.Sequence != 1 || trustResult.History != 1 {
-		t.Fatalf("Go trust-state incompatible with JS: %v", e)
+	// Repeated loading must preserve the established Go trust sequence.
+	if service.Signer.(*SessionKeyring).TrustSequence() != 1 {
+		t.Fatal("trust sequence changed")
 	}
 	server := httptest.NewServer(Handler{Service: service})
 	defer server.Close()

@@ -2,9 +2,9 @@ package operationsqueries
 
 import (
 	"encoding/json"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -22,18 +22,19 @@ func TestOriginalFiveDomainSummaryProjectionDoesNotCarrySourceProse(t *testing.T
 		}
 		value[key] = row
 	}
-	inputs, got := []Object{}, []Object{}
+	got := []Object{}
+	domains := make([]string, 0, len(summaryBlocks))
 	for domain := range summaryBlocks {
+		domains = append(domains, domain)
+	}
+	sort.Strings(domains)
+	for _, domain := range domains {
 		for _, p := range [][]string{{}, {"autonomy.read"}} {
-			inputs = append(inputs, Object{"value": value, "domain": domain, "permissions": p})
 			got = append(got, ConversationSummary(value, domain, p))
 		}
 	}
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/operationsqueries/testdata/summary-oracle.mjs"))
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(encoded(inputs))
-	raw, e := cmd.CombinedOutput()
+	// Fixed synthetic outputs cover each domain with and without autonomy.read.
+	raw, e := os.ReadFile("testdata/summary-projections.json")
 	if e != nil {
 		t.Fatalf("original summary %v %s", e, raw)
 	}

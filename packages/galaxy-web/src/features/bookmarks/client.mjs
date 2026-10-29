@@ -1,8 +1,8 @@
 import * as z from 'zod/v4';
 import {readWithTransientRecovery} from '../../../../../integrations/shared/read-task.mjs';
-import {sha256Hex, equalJson} from '../../../../galaxy-official/src/shared/web-primitives.mjs';
+import {sha256Hex, equalJson} from '../../../../galaxy-contracts/src/web-primitives.mjs';
 import {readingBookmarkReferenceSchema, readingBookmarkCommandSchema, readingBookmarkStateSchema,
-  readingBookmarkReceiptReplySchema, accountReadingBookmarksPageSchema, readingBookmarkKey} from '../../../../galaxy-official/src/shared/reading-bookmarks-v1-schema.mjs';
+  readingBookmarkReceiptReplySchema, accountReadingBookmarksPageSchema, readingBookmarkKey} from '../../../../galaxy-contracts/src/reading-bookmarks-v1-schema.mjs';
 import {accountBookmarkJournalStore} from "./account-bookmark-pending.mjs";
 
 /** @typedef {import('zod/v4').infer<typeof readingBookmarkReferenceSchema>} ReadingBookmarkReference */

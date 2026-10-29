@@ -7,7 +7,7 @@ import {Bookmark,BookmarkCheck} from "lucide-react";
 import type {z} from "zod/v4";
 import {createAccountReadingBookmarksClient} from "./client.mjs";
 import {createPublicCommunityFeedback} from "../discovery/public-feedback.mjs";
-import {readingBookmarkReferenceSchema,readingBookmarkStateSchema,readingBookmarkKey} from "../../../../galaxy-official/src/shared/reading-bookmarks-v1-schema.mjs";
+import {readingBookmarkReferenceSchema,readingBookmarkStateSchema,readingBookmarkKey} from "../../../../galaxy-contracts/src/reading-bookmarks-v1-schema.mjs";
 import type {useOfficialAccountSession} from "../accounts/official-account-panel";
 import {rememberBookmarkLogin} from "./account-bookmark-pending.mjs";
 import './workspace.css';

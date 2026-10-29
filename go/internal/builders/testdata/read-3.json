@@ -1,0 +1,984 @@
+{
+  "input": [
+    {
+      "actor": true,
+      "input": {
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5"
+      },
+      "kind": "use-read"
+    },
+    {
+      "input": {
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5"
+      },
+      "kind": "use-read"
+    },
+    {
+      "input": {},
+      "kind": "use-query"
+    },
+    {
+      "actor": true,
+      "input": {},
+      "kind": "use-candidates"
+    }
+  ],
+  "results": [
+    {
+      "value": {
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+        "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+        "version": 1,
+        "currentVersion": 1,
+        "state": "active",
+        "workerStarted": false,
+        "successfulReuseVerified": false,
+        "professionalCapabilityVerified": false,
+        "record": {
+          "schemaVersion": 2,
+          "operationId": "59772b6f-df59-414b-8e5d-72fd88055b14",
+          "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+          "expectedVersion": 0,
+          "kind": "record",
+          "pack": {
+            "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+            "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+            "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534"
+          },
+          "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+          "attempt": {
+            "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+            "version": 1
+          },
+          "configuration": {
+            "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+            "version": 1
+          },
+          "result": null,
+          "evidenceRefs": [],
+          "verificationRefs": [],
+          "follows": null
+        },
+        "sources": {
+          "pack": {
+            "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+            "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+            "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534",
+            "authorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "declarationId": "58f09d72-ccad-4184-9b68-169ec82c0368",
+            "manifest": {
+              "profile": "galaxy-worker-pack/1",
+              "name": "Synthetic worker",
+              "version": "0.1.0",
+              "source": "https://builder.example/artifact",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "license": "Fixture licence declaration",
+              "licenseSource": "https://builder.example/license",
+              "dependencies": [
+                {
+                  "kind": "mcp",
+                  "name": "fixture-mcp",
+                  "version": "1",
+                  "source": "https://builder.example/mcp",
+                  "license": "Fixture"
+                }
+              ],
+              "modelRequirements": "Owner supplied model",
+              "environment": "Fixture environment",
+              "permissions": [
+                {
+                  "resource": "Selected task",
+                  "purpose": "Read explicitly granted context",
+                  "required": true
+                }
+              ],
+              "configurationRequirements": "Link a real separately recorded Configuration before actual work",
+              "capabilities": [
+                "Read selected metadata"
+              ],
+              "changes": "Initial synthetic fixture",
+              "installation": "Use original publisher mechanism",
+              "upgrade": "Choose a new version",
+              "rollback": "Return to prior host configuration",
+              "runtimeLocation": "user-controlled",
+              "automaticActivation": false
+            },
+            "versionStatus": "current",
+            "delisted": false,
+            "securityIssue": false,
+            "installationPerformed": false,
+            "workerStarted": false,
+            "capabilityVerified": false
+          },
+          "configuration": {
+            "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+            "version": 1,
+            "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "sourceStatus": "current",
+            "record": {
+              "schemaVersion": 2,
+              "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+              "operationId": "4ac4c0c4-9d5e-4f89-a5dc-2210dd87a77f",
+              "expectedVersion": 0,
+              "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+              "kind": "record",
+              "title": "合成所选环境",
+              "summary": "只登记选定的软件条件",
+              "conditions": {
+                "model": {
+                  "name": null,
+                  "version": null
+                },
+                "runtime": {
+                  "name": "Node",
+                  "version": "24"
+                },
+                "environment": {
+                  "name": "synthetic",
+                  "version": null
+                },
+                "tools": [
+                  {
+                    "name": "compiler",
+                    "version": "1"
+                  }
+                ],
+                "skills": [],
+                "mcp": [],
+                "promptPolicyVersion": null,
+                "rulesVersion": null,
+                "operationScope": [
+                  "selected-context"
+                ],
+                "inputScopeSummary": "合成材料可用性报告，不是授权",
+                "limitations": "未读取真实机器、原始提示词或文件"
+              },
+              "observedAt": "2033-05-18T03:33:20.000Z",
+              "synthetic": true,
+              "selectedFieldsOnly": true
+            },
+            "contentAvailable": true,
+            "actualInstallationVerified": false,
+            "unknownFieldsMeaning": "not-disclosed-or-not-known; no-equivalence-inferred",
+            "management": {
+              "version": 1,
+              "state": "active"
+            },
+            "disclosure": {
+              "visibility": "Public",
+              "viewers": []
+            },
+            "reference": {
+              "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+              "version": 1
+            },
+            "conditionsKnown": true,
+            "meaning": "reported-conditions; not-authorization-to-republish"
+          },
+          "attempt": {
+            "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+            "version": 1,
+            "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+            "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "reportedBy": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "participationId": null,
+            "taskId": null,
+            "scopeVersion": 1,
+            "eventId": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+            "caseVersion": 2,
+            "participationScopeVersion": null,
+            "provenance": "native-v2",
+            "claimAuthority": "participant-reported",
+            "synthetic": true,
+            "strategy": "Selected original Pack",
+            "role": "runner",
+            "configurationRef": {
+              "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+              "version": 1
+            },
+            "environment": "unknown",
+            "inputScopeSummary": "Only selected synthetic material",
+            "permissionScope": [
+              "selected-text"
+            ],
+            "status": "running",
+            "reportedOutcome": "unrecorded",
+            "startedAt": "2026-10-28T18:52:04.892Z",
+            "endedAt": null,
+            "resultRefs": [
+              {
+                "id": "85cb3824-f95a-4c56-a69d-646e429ee8a2",
+                "version": 1
+              }
+            ],
+            "configurationCondition": {
+              "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+              "version": 1,
+              "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+              "sourceStatus": "current",
+              "record": {
+                "schemaVersion": 2,
+                "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                "operationId": "4ac4c0c4-9d5e-4f89-a5dc-2210dd87a77f",
+                "expectedVersion": 0,
+                "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "kind": "record",
+                "title": "合成所选环境",
+                "summary": "只登记选定的软件条件",
+                "conditions": {
+                  "model": {
+                    "name": null,
+                    "version": null
+                  },
+                  "runtime": {
+                    "name": "Node",
+                    "version": "24"
+                  },
+                  "environment": {
+                    "name": "synthetic",
+                    "version": null
+                  },
+                  "tools": [
+                    {
+                      "name": "compiler",
+                      "version": "1"
+                    }
+                  ],
+                  "skills": [],
+                  "mcp": [],
+                  "promptPolicyVersion": null,
+                  "rulesVersion": null,
+                  "operationScope": [
+                    "selected-context"
+                  ],
+                  "inputScopeSummary": "合成材料可用性报告，不是授权",
+                  "limitations": "未读取真实机器、原始提示词或文件"
+                },
+                "observedAt": "2033-05-18T03:33:20.000Z",
+                "synthetic": true,
+                "selectedFieldsOnly": true
+              },
+              "contentAvailable": true,
+              "actualInstallationVerified": false,
+              "unknownFieldsMeaning": "not-disclosed-or-not-known; no-equivalence-inferred",
+              "management": {
+                "version": 1,
+                "state": "active"
+              },
+              "disclosure": {
+                "visibility": "Public",
+                "viewers": []
+              },
+              "reference": {
+                "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                "version": 1
+              },
+              "conditionsKnown": true,
+              "meaning": "reported-conditions; not-authorization-to-republish"
+            }
+          },
+          "result": null,
+          "evidence": [],
+          "verifications": [],
+          "synthetic": true,
+          "attemptVersionStatus": "current",
+          "resultVersionStatus": "current",
+          "reportedOutcome": "unrecorded",
+          "resolution": "unrecorded",
+          "executionAttribution": "runner-signed-association; not-independently-proven",
+          "roles": {
+            "packAuthorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "runnerId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "configurationAuthorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "resultAuthorId": null,
+            "verificationAuthorIds": []
+          },
+          "successfulReuseVerified": false,
+          "professionalCapabilityVerified": false
+        },
+        "sourceStatus": "available",
+        "payloadHash": "7526dbdf83526da2169bae24168f5385cd45685b8f90917838df11f7606f6f01",
+        "disclosure": {
+          "visibility": "Public",
+          "viewers": []
+        }
+      }
+    },
+    {
+      "value": {
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+        "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+        "version": 1,
+        "currentVersion": 1,
+        "state": "active",
+        "workerStarted": false,
+        "successfulReuseVerified": false,
+        "professionalCapabilityVerified": false,
+        "record": {
+          "schemaVersion": 2,
+          "operationId": "59772b6f-df59-414b-8e5d-72fd88055b14",
+          "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+          "expectedVersion": 0,
+          "kind": "record",
+          "pack": {
+            "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+            "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+            "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534"
+          },
+          "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+          "attempt": {
+            "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+            "version": 1
+          },
+          "configuration": {
+            "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+            "version": 1
+          },
+          "result": null,
+          "evidenceRefs": [],
+          "verificationRefs": [],
+          "follows": null
+        },
+        "sources": {
+          "pack": {
+            "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+            "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+            "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534",
+            "authorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "declarationId": "58f09d72-ccad-4184-9b68-169ec82c0368",
+            "manifest": {
+              "profile": "galaxy-worker-pack/1",
+              "name": "Synthetic worker",
+              "version": "0.1.0",
+              "source": "https://builder.example/artifact",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "license": "Fixture licence declaration",
+              "licenseSource": "https://builder.example/license",
+              "dependencies": [
+                {
+                  "kind": "mcp",
+                  "name": "fixture-mcp",
+                  "version": "1",
+                  "source": "https://builder.example/mcp",
+                  "license": "Fixture"
+                }
+              ],
+              "modelRequirements": "Owner supplied model",
+              "environment": "Fixture environment",
+              "permissions": [
+                {
+                  "resource": "Selected task",
+                  "purpose": "Read explicitly granted context",
+                  "required": true
+                }
+              ],
+              "configurationRequirements": "Link a real separately recorded Configuration before actual work",
+              "capabilities": [
+                "Read selected metadata"
+              ],
+              "changes": "Initial synthetic fixture",
+              "installation": "Use original publisher mechanism",
+              "upgrade": "Choose a new version",
+              "rollback": "Return to prior host configuration",
+              "runtimeLocation": "user-controlled",
+              "automaticActivation": false
+            },
+            "versionStatus": "current",
+            "delisted": false,
+            "securityIssue": false,
+            "installationPerformed": false,
+            "workerStarted": false,
+            "capabilityVerified": false
+          },
+          "configuration": {
+            "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+            "version": 1,
+            "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "sourceStatus": "current",
+            "record": {
+              "schemaVersion": 2,
+              "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+              "operationId": "4ac4c0c4-9d5e-4f89-a5dc-2210dd87a77f",
+              "expectedVersion": 0,
+              "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+              "kind": "record",
+              "title": "合成所选环境",
+              "summary": "只登记选定的软件条件",
+              "conditions": {
+                "model": {
+                  "name": null,
+                  "version": null
+                },
+                "runtime": {
+                  "name": "Node",
+                  "version": "24"
+                },
+                "environment": {
+                  "name": "synthetic",
+                  "version": null
+                },
+                "tools": [
+                  {
+                    "name": "compiler",
+                    "version": "1"
+                  }
+                ],
+                "skills": [],
+                "mcp": [],
+                "promptPolicyVersion": null,
+                "rulesVersion": null,
+                "operationScope": [
+                  "selected-context"
+                ],
+                "inputScopeSummary": "合成材料可用性报告，不是授权",
+                "limitations": "未读取真实机器、原始提示词或文件"
+              },
+              "observedAt": "2033-05-18T03:33:20.000Z",
+              "synthetic": true,
+              "selectedFieldsOnly": true
+            },
+            "contentAvailable": true,
+            "actualInstallationVerified": false,
+            "unknownFieldsMeaning": "not-disclosed-or-not-known; no-equivalence-inferred",
+            "reference": {
+              "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+              "version": 1
+            },
+            "conditionsKnown": true,
+            "meaning": "reported-conditions; not-authorization-to-republish"
+          },
+          "attempt": {
+            "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+            "version": 1,
+            "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+            "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "reportedBy": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "participationId": null,
+            "taskId": null,
+            "scopeVersion": 1,
+            "eventId": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+            "caseVersion": 2,
+            "participationScopeVersion": null,
+            "provenance": "native-v2",
+            "claimAuthority": "participant-reported",
+            "synthetic": true,
+            "strategy": "Selected original Pack",
+            "role": "runner",
+            "configurationRef": {
+              "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+              "version": 1
+            },
+            "environment": "unknown",
+            "inputScopeSummary": "Only selected synthetic material",
+            "permissionScope": [
+              "selected-text"
+            ],
+            "status": "running",
+            "reportedOutcome": "unrecorded",
+            "startedAt": "2026-10-28T18:52:04.892Z",
+            "endedAt": null,
+            "resultRefs": [
+              {
+                "id": "85cb3824-f95a-4c56-a69d-646e429ee8a2",
+                "version": 1
+              }
+            ],
+            "configurationCondition": {
+              "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+              "version": 1,
+              "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+              "sourceStatus": "current",
+              "record": {
+                "schemaVersion": 2,
+                "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                "operationId": "4ac4c0c4-9d5e-4f89-a5dc-2210dd87a77f",
+                "expectedVersion": 0,
+                "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "kind": "record",
+                "title": "合成所选环境",
+                "summary": "只登记选定的软件条件",
+                "conditions": {
+                  "model": {
+                    "name": null,
+                    "version": null
+                  },
+                  "runtime": {
+                    "name": "Node",
+                    "version": "24"
+                  },
+                  "environment": {
+                    "name": "synthetic",
+                    "version": null
+                  },
+                  "tools": [
+                    {
+                      "name": "compiler",
+                      "version": "1"
+                    }
+                  ],
+                  "skills": [],
+                  "mcp": [],
+                  "promptPolicyVersion": null,
+                  "rulesVersion": null,
+                  "operationScope": [
+                    "selected-context"
+                  ],
+                  "inputScopeSummary": "合成材料可用性报告，不是授权",
+                  "limitations": "未读取真实机器、原始提示词或文件"
+                },
+                "observedAt": "2033-05-18T03:33:20.000Z",
+                "synthetic": true,
+                "selectedFieldsOnly": true
+              },
+              "contentAvailable": true,
+              "actualInstallationVerified": false,
+              "unknownFieldsMeaning": "not-disclosed-or-not-known; no-equivalence-inferred",
+              "reference": {
+                "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                "version": 1
+              },
+              "conditionsKnown": true,
+              "meaning": "reported-conditions; not-authorization-to-republish"
+            }
+          },
+          "result": null,
+          "evidence": [],
+          "verifications": [],
+          "synthetic": true,
+          "attemptVersionStatus": "current",
+          "resultVersionStatus": "current",
+          "reportedOutcome": "unrecorded",
+          "resolution": "unrecorded",
+          "executionAttribution": "runner-signed-association; not-independently-proven",
+          "roles": {
+            "packAuthorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "runnerId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "configurationAuthorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "resultAuthorId": null,
+            "verificationAuthorIds": []
+          },
+          "successfulReuseVerified": false,
+          "professionalCapabilityVerified": false
+        },
+        "sourceStatus": "available",
+        "payloadHash": "7526dbdf83526da2169bae24168f5385cd45685b8f90917838df11f7606f6f01"
+      }
+    },
+    {
+      "value": {
+        "items": [
+          {
+            "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+            "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+            "version": 1,
+            "currentVersion": 1,
+            "state": "active",
+            "workerStarted": false,
+            "successfulReuseVerified": false,
+            "professionalCapabilityVerified": false,
+            "record": {
+              "schemaVersion": 2,
+              "operationId": "59772b6f-df59-414b-8e5d-72fd88055b14",
+              "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+              "expectedVersion": 0,
+              "kind": "record",
+              "pack": {
+                "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+                "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+                "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534"
+              },
+              "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+              "attempt": {
+                "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+                "version": 1
+              },
+              "configuration": {
+                "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                "version": 1
+              },
+              "result": null,
+              "evidenceRefs": [],
+              "verificationRefs": [],
+              "follows": null
+            },
+            "sources": {
+              "pack": {
+                "builderId": "00157e21-c31c-44c3-8214-ab5ec92652fe",
+                "manifestId": "ccdd0663-7f1d-49cf-84b1-1a2b8c001d96",
+                "manifestHash": "0f074daaa446ebd7c54a4500f99e28a63cb3727da40ad6689b6068cf09313534",
+                "authorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "declarationId": "58f09d72-ccad-4184-9b68-169ec82c0368",
+                "manifest": {
+                  "profile": "galaxy-worker-pack/1",
+                  "name": "Synthetic worker",
+                  "version": "0.1.0",
+                  "source": "https://builder.example/artifact",
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "license": "Fixture licence declaration",
+                  "licenseSource": "https://builder.example/license",
+                  "dependencies": [
+                    {
+                      "kind": "mcp",
+                      "name": "fixture-mcp",
+                      "version": "1",
+                      "source": "https://builder.example/mcp",
+                      "license": "Fixture"
+                    }
+                  ],
+                  "modelRequirements": "Owner supplied model",
+                  "environment": "Fixture environment",
+                  "permissions": [
+                    {
+                      "resource": "Selected task",
+                      "purpose": "Read explicitly granted context",
+                      "required": true
+                    }
+                  ],
+                  "configurationRequirements": "Link a real separately recorded Configuration before actual work",
+                  "capabilities": [
+                    "Read selected metadata"
+                  ],
+                  "changes": "Initial synthetic fixture",
+                  "installation": "Use original publisher mechanism",
+                  "upgrade": "Choose a new version",
+                  "rollback": "Return to prior host configuration",
+                  "runtimeLocation": "user-controlled",
+                  "automaticActivation": false
+                },
+                "versionStatus": "current",
+                "delisted": false,
+                "securityIssue": false,
+                "installationPerformed": false,
+                "workerStarted": false,
+                "capabilityVerified": false
+              },
+              "configuration": {
+                "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                "version": 1,
+                "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "sourceStatus": "current",
+                "record": {
+                  "schemaVersion": 2,
+                  "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                  "operationId": "4ac4c0c4-9d5e-4f89-a5dc-2210dd87a77f",
+                  "expectedVersion": 0,
+                  "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                  "kind": "record",
+                  "title": "合成所选环境",
+                  "summary": "只登记选定的软件条件",
+                  "conditions": {
+                    "model": {
+                      "name": null,
+                      "version": null
+                    },
+                    "runtime": {
+                      "name": "Node",
+                      "version": "24"
+                    },
+                    "environment": {
+                      "name": "synthetic",
+                      "version": null
+                    },
+                    "tools": [
+                      {
+                        "name": "compiler",
+                        "version": "1"
+                      }
+                    ],
+                    "skills": [],
+                    "mcp": [],
+                    "promptPolicyVersion": null,
+                    "rulesVersion": null,
+                    "operationScope": [
+                      "selected-context"
+                    ],
+                    "inputScopeSummary": "合成材料可用性报告，不是授权",
+                    "limitations": "未读取真实机器、原始提示词或文件"
+                  },
+                  "observedAt": "2033-05-18T03:33:20.000Z",
+                  "synthetic": true,
+                  "selectedFieldsOnly": true
+                },
+                "contentAvailable": true,
+                "actualInstallationVerified": false,
+                "unknownFieldsMeaning": "not-disclosed-or-not-known; no-equivalence-inferred",
+                "reference": {
+                  "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                  "version": 1
+                },
+                "conditionsKnown": true,
+                "meaning": "reported-conditions; not-authorization-to-republish"
+              },
+              "attempt": {
+                "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+                "version": 1,
+                "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+                "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "reportedBy": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "participationId": null,
+                "taskId": null,
+                "scopeVersion": 1,
+                "eventId": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+                "caseVersion": 2,
+                "participationScopeVersion": null,
+                "provenance": "native-v2",
+                "claimAuthority": "participant-reported",
+                "synthetic": true,
+                "strategy": "Selected original Pack",
+                "role": "runner",
+                "configurationRef": {
+                  "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                  "version": 1
+                },
+                "environment": "unknown",
+                "inputScopeSummary": "Only selected synthetic material",
+                "permissionScope": [
+                  "selected-text"
+                ],
+                "status": "running",
+                "reportedOutcome": "unrecorded",
+                "startedAt": "2026-10-28T18:52:04.892Z",
+                "endedAt": null,
+                "resultRefs": [
+                  {
+                    "id": "85cb3824-f95a-4c56-a69d-646e429ee8a2",
+                    "version": 1
+                  }
+                ],
+                "configurationCondition": {
+                  "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                  "version": 1,
+                  "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                  "sourceStatus": "current",
+                  "record": {
+                    "schemaVersion": 2,
+                    "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                    "operationId": "4ac4c0c4-9d5e-4f89-a5dc-2210dd87a77f",
+                    "expectedVersion": 0,
+                    "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                    "kind": "record",
+                    "title": "合成所选环境",
+                    "summary": "只登记选定的软件条件",
+                    "conditions": {
+                      "model": {
+                        "name": null,
+                        "version": null
+                      },
+                      "runtime": {
+                        "name": "Node",
+                        "version": "24"
+                      },
+                      "environment": {
+                        "name": "synthetic",
+                        "version": null
+                      },
+                      "tools": [
+                        {
+                          "name": "compiler",
+                          "version": "1"
+                        }
+                      ],
+                      "skills": [],
+                      "mcp": [],
+                      "promptPolicyVersion": null,
+                      "rulesVersion": null,
+                      "operationScope": [
+                        "selected-context"
+                      ],
+                      "inputScopeSummary": "合成材料可用性报告，不是授权",
+                      "limitations": "未读取真实机器、原始提示词或文件"
+                    },
+                    "observedAt": "2033-05-18T03:33:20.000Z",
+                    "synthetic": true,
+                    "selectedFieldsOnly": true
+                  },
+                  "contentAvailable": true,
+                  "actualInstallationVerified": false,
+                  "unknownFieldsMeaning": "not-disclosed-or-not-known; no-equivalence-inferred",
+                  "reference": {
+                    "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                    "version": 1
+                  },
+                  "conditionsKnown": true,
+                  "meaning": "reported-conditions; not-authorization-to-republish"
+                }
+              },
+              "result": null,
+              "evidence": [],
+              "verifications": [],
+              "synthetic": true,
+              "attemptVersionStatus": "current",
+              "resultVersionStatus": "current",
+              "reportedOutcome": "unrecorded",
+              "resolution": "unrecorded",
+              "executionAttribution": "runner-signed-association; not-independently-proven",
+              "roles": {
+                "packAuthorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "runnerId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "configurationAuthorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "resultAuthorId": null,
+                "verificationAuthorIds": []
+              },
+              "successfulReuseVerified": false,
+              "professionalCapabilityVerified": false
+            },
+            "sourceStatus": "available",
+            "payloadHash": "7526dbdf83526da2169bae24168f5385cd45685b8f90917838df11f7606f6f01"
+          }
+        ],
+        "nextAfter": null,
+        "coverage": "current-authorized-associations",
+        "countsAreCapabilityScores": false
+      }
+    },
+    {
+      "value": {
+        "items": [
+          {
+            "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+            "summary": "Original source records",
+            "attempts": [
+              {
+                "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+                "version": 1,
+                "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+                "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "reportedBy": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "participationId": null,
+                "taskId": null,
+                "scopeVersion": 1,
+                "eventId": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+                "caseVersion": 2,
+                "participationScopeVersion": null,
+                "provenance": "native-v2",
+                "claimAuthority": "participant-reported",
+                "synthetic": true,
+                "strategy": "Selected original Pack",
+                "role": "runner",
+                "configurationRef": {
+                  "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                  "version": 1
+                },
+                "environment": "unknown",
+                "inputScopeSummary": "Only selected synthetic material",
+                "permissionScope": [
+                  "selected-text"
+                ],
+                "status": "running",
+                "reportedOutcome": "unrecorded",
+                "startedAt": "2026-10-28T18:52:04.892Z",
+                "endedAt": null,
+                "resultRefs": [
+                  {
+                    "id": "85cb3824-f95a-4c56-a69d-646e429ee8a2",
+                    "version": 1
+                  }
+                ],
+                "configurationCondition": {
+                  "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                  "version": 1,
+                  "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                  "sourceStatus": "current",
+                  "record": {
+                    "schemaVersion": 2,
+                    "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                    "operationId": "4ac4c0c4-9d5e-4f89-a5dc-2210dd87a77f",
+                    "expectedVersion": 0,
+                    "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                    "kind": "record",
+                    "title": "合成所选环境",
+                    "summary": "只登记选定的软件条件",
+                    "conditions": {
+                      "model": {
+                        "name": null,
+                        "version": null
+                      },
+                      "runtime": {
+                        "name": "Node",
+                        "version": "24"
+                      },
+                      "environment": {
+                        "name": "synthetic",
+                        "version": null
+                      },
+                      "tools": [
+                        {
+                          "name": "compiler",
+                          "version": "1"
+                        }
+                      ],
+                      "skills": [],
+                      "mcp": [],
+                      "promptPolicyVersion": null,
+                      "rulesVersion": null,
+                      "operationScope": [
+                        "selected-context"
+                      ],
+                      "inputScopeSummary": "合成材料可用性报告，不是授权",
+                      "limitations": "未读取真实机器、原始提示词或文件"
+                    },
+                    "observedAt": "2033-05-18T03:33:20.000Z",
+                    "synthetic": true,
+                    "selectedFieldsOnly": true
+                  },
+                  "contentAvailable": true,
+                  "actualInstallationVerified": false,
+                  "unknownFieldsMeaning": "not-disclosed-or-not-known; no-equivalence-inferred",
+                  "management": {
+                    "version": 1,
+                    "state": "active"
+                  },
+                  "disclosure": {
+                    "visibility": "Public",
+                    "viewers": []
+                  },
+                  "reference": {
+                    "id": "627ac1a8-fd30-456a-9037-f854df98d8e3",
+                    "version": 1
+                  },
+                  "conditionsKnown": true,
+                  "meaning": "reported-conditions; not-authorization-to-republish"
+                }
+              }
+            ],
+            "results": [
+              {
+                "id": "85cb3824-f95a-4c56-a69d-646e429ee8a2",
+                "version": 1,
+                "caseId": "0629fbf7-b209-43b0-9ac3-1e7fec7f618d",
+                "actorId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "reportedBy": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+                "participationId": null,
+                "taskId": null,
+                "scopeVersion": 1,
+                "eventId": "85cb3824-f95a-4c56-a69d-646e429ee8a2",
+                "caseVersion": 3,
+                "participationScopeVersion": null,
+                "provenance": "native-v2",
+                "claimAuthority": "participant-reported",
+                "synthetic": true,
+                "origin": {
+                  "id": "094aa1f0-e341-4868-bc77-39cfd182ab3b",
+                  "kind": "attempt",
+                  "version": 1
+                },
+                "deliverableRefs": [],
+                "reportedOutcome": "partial",
+                "summary": "Runner-reported only",
+                "limitations": "No execution attribution verified",
+                "acceptance": "not-provided",
+                "verification": "not-provided",
+                "supersedes": null
+              }
+            ],
+            "evidence": [],
+            "verifications": [],
+            "synthetic": true
+          }
+        ],
+        "nextAfter": null,
+        "automaticExecution": false
+      }
+    }
+  ]
+}

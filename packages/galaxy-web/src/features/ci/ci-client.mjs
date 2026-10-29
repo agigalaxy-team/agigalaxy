@@ -1,6 +1,6 @@
-import {ciRequestV2Schema,ciProofV2Schema,ciSourceMetadata} from "../../../../galaxy-official/src/shared/ci-observation-v2-schema.mjs";
-import {githubReference} from "../../../../galaxy-official/src/shared/github-evidence-schema.mjs";
-import {sha256Hex} from "../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {ciRequestV2Schema,ciProofV2Schema,ciSourceMetadata} from "../../../../galaxy-contracts/src/ci-observation-v2-schema.mjs";
+import {githubReference} from "../../../../galaxy-contracts/src/github-evidence-schema.mjs";
+import {sha256Hex} from "../../../../galaxy-contracts/src/web-primitives.mjs";
 const clients=new WeakMap();
 export function ciSourceFromEvidence(view){
   const record=view?.record;if(view?.referenceStatus!=='current'||record?.kind!=='evidence'||record.evidenceType!=='ci-result'||record.source.originSystem!=='github-actions')return null;

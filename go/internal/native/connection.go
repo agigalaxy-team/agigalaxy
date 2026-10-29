@@ -72,23 +72,29 @@ type connectionLease struct {
 	generation     int64
 	bindingID      string
 	requireSession bool
+	requireTrust   bool
 }
 
 func NewConnection(store *Store, configuration Configuration, options ConnectionOptions) (*Connection, error) {
 	u, e := url.Parse(configuration.Endpoint)
-	if e != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" || u.String() != configuration.Endpoint || len(configuration.TrustedKeys) == 0 || store == nil || store.Endpoint != configuration.Endpoint || filepath.Clean(configuration.DataDirectory) != store.Directory {
+	if e != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" || u.String() != configuration.Endpoint || len(configuration.TrustedKeys) == 0 && len(configuration.RootPins) == 0 || store == nil || store.Endpoint != configuration.Endpoint || filepath.Clean(configuration.DataDirectory) != store.Directory {
 		return nil, fault.New("native_connection_configuration_invalid", 400)
 	}
 	if u.Port() == "443" || u.Host != strings.ToLower(u.Host) {
 		return nil, fault.New("native_connection_configuration_invalid", 400)
 	}
+	if (len(configuration.RootPins) > 0) != (configuration.TrustDirectory != "") || configuration.TrustDirectory != "" && !filepath.IsAbs(configuration.TrustDirectory) || configuration.NetworkType != "" && configuration.NetworkType != "official" && configuration.NetworkType != "hub" {
+		return nil, fault.New("native_connection_configuration_invalid", 400)
+	}
 	pins := make(map[string]Pin, len(configuration.TrustedKeys))
-	for k, pin := range configuration.TrustedKeys {
-		if pin.TrustedUntil != nil {
-			value := *pin.TrustedUntil
-			pin.TrustedUntil = &value
+	if len(configuration.RootPins) == 0 {
+		for k, pin := range configuration.TrustedKeys {
+			if pin.TrustedUntil != nil {
+				value := *pin.TrustedUntil
+				pin.TrustedUntil = &value
+			}
+			pins[k] = pin
 		}
-		pins[k] = pin
 	}
 	configuration.TrustedKeys = pins
 	client := http.Client{Timeout: 30 * time.Second}
@@ -179,6 +185,10 @@ func (c *Connection) lease(ctx context.Context, requireSession bool) (connection
 	if c.closed || c.fingerprint != selected.fingerprint {
 		return connectionLease{}, connectionFailure("native_connection_selection_changed")
 	}
+	if requireSession && !c.discoveryTrustCurrentLocked() {
+		c.session = nil
+		return connectionLease{}, connectionFailure("native_server_pin_invalid")
+	}
 	if c.session != nil && c.session.snapshot.ExpiresAt <= c.now().Unix() {
 		c.session = nil
 	}
@@ -201,7 +211,10 @@ func (c *Connection) check(ctx context.Context, lease connectionLease) error {
 	if c.closed || selected.fingerprint != lease.selection.fingerprint || c.generation != lease.generation {
 		return connectionFailure("native_connection_selection_changed")
 	}
-	if lease.requireSession && (c.session == nil || c.session.snapshot.BindingID != lease.bindingID || c.session.snapshot.ExpiresAt <= c.now().Unix()) {
+	if lease.requireTrust && !c.discoveryTrustCurrentLocked() {
+		return connectionFailure("native_server_pin_invalid")
+	}
+	if lease.requireSession && (!c.discoveryTrustCurrentLocked() || c.session == nil || c.session.snapshot.BindingID != lease.bindingID || c.session.snapshot.ExpiresAt <= c.now().Unix()) {
 		return connectionFailure("native_connection_selection_changed")
 	}
 	return nil
@@ -215,7 +228,7 @@ func (c *Connection) Snapshot(ctx context.Context) (*ConnectionSnapshot, error) 
 	if c.session == nil {
 		return nil, nil
 	}
-	if c.session.snapshot.ExpiresAt <= c.now().Unix() {
+	if !c.discoveryTrustCurrentLocked() || c.session.snapshot.ExpiresAt <= c.now().Unix() {
 		c.session = nil
 		return nil, nil
 	}

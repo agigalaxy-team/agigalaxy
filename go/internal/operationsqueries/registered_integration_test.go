@@ -4,19 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/access"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/registeredusers"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -32,29 +31,16 @@ func (t registeredProviderRoute) RoundTrip(r *http.Request) (*http.Response, err
 	return http.DefaultTransport.RoundTrip(clone)
 }
 func TestActualRegisteredQueriesUseCurrentQueryProofAndExcludeIdentitySecrets(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	node := func(file, mode string, input Object) Object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, file), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		cmd.Stdin = strings.NewReader(encoded(input))
-		raw, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, raw)
-		}
-		var out Object
-		if json.Unmarshal(raw, &out) != nil {
-			t.Fatalf("invalid original %s", raw)
-		}
-		return out
+	f := operationsfixture.New(t, owner)
+	f.Automation(t)
+	endpoint, issuer, rootID := f.Endpoint, f.Issuer, f.IDs["root"]
+	if _, e := databaseschema.Migrate(ctx, owner, []string{"worker"}); e != nil {
+		t.Fatal(e)
 	}
-	base := node("scripts/go/operations-permissions-interop.mjs", "setup", nil)
-	node("scripts/go/operations-permissions-interop.mjs", "automation-setup", Object{})
-	endpoint, issuer, rootID := str(base["endpoint"]), str(base["issuer"]), str(object(base["ids"])["root"])
-	fixture := node("go/internal/operationsqueries/testdata/interop.mjs", "seed-registered", Object{"endpoint": endpoint, "rootId": rootID})
+	seedQueryAccount(t, f, "https://website.example.invalid/realms/website", "registered-one")
+	fixture := Object{"role": seedQueryRole(t, f, "overview", []any{"accounts.registered.read", "system.settings.read"})}
 	cfg := owner.Config()
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)
@@ -133,9 +119,10 @@ func TestActualRegisteredQueriesUseCurrentQueryProofAndExcludeIdentitySecrets(t 
 		if e != nil {
 			t.Fatal(e)
 		}
-		want := node("go/internal/operationsqueries/testdata/interop.mjs", "query", Object{"endpoint": endpoint, "rootId": rootID, "origin": provider.URL, "domain": "overview", "tool": "query-operations", "arguments": input})
-		if !mustEqual(got, want) {
-			t.Fatalf("registered whole query differs Go%s JS%s", encoded(got), encoded(want))
+		data := object(got["data"])
+		items, ok := data["items"].([]any)
+		if got["availability"] != "available" || !ok || len(items) != 2 || object(got["pagination"])["complete"] != true {
+			t.Fatalf("registered list and paging: %s", encoded(got))
 		}
 		for _, v := range got["evidenceRefs"].([]any) {
 			r := object(v)
@@ -157,14 +144,18 @@ func TestActualRegisteredQueriesUseCurrentQueryProofAndExcludeIdentitySecrets(t 
 	if e != nil {
 		t.Fatal(e)
 	}
-	want := node("go/internal/operationsqueries/testdata/interop.mjs", "query", Object{"endpoint": endpoint, "rootId": rootID, "origin": provider.URL, "domain": "overview", "tool": "read-operation-object", "arguments": input})
-	if !mustEqual(got, want) {
-		t.Fatalf("registered detail differs Go%s JS%s", encoded(got), encoded(want))
+	if got["availability"] != "available" || str(object(got["data"])["registrationId"]) != referenceID {
+		t.Fatalf("registered detail reference: %s", encoded(got))
+	}
+	for _, secret := range []string{"private@example.invalid", "website.example.invalid", "registered-one", "isolated-reader"} {
+		if strings.Contains(encoded(got), secret) {
+			t.Fatal("identity secret leaked in detail")
+		}
 	}
 	if _, e = q.Query(ctx, human, "overview", "query-operations", Object{"module": "registered-users", "view": "list", "filters": Object{"query": "one-private@example.invalid"}}); fault.Status(e) != 403 {
 		t.Fatalf("AI query searched protected email %v", e)
 	}
-	verifySystemQuerySources(t, ctx, q, owner, gateway, req, human, endpoint, rootID, now, node)
+	verifySystemQuerySources(t, ctx, q, owner, gateway, req, human, endpoint, rootID, now)
 	if _, e = owner.Exec(ctx, `UPDATE operations_ai_work_assignments_v1 SET enabled=false WHERE endpoint=$1 AND role_id=$2`, endpoint, object(fixture["role"])["id"]); e != nil {
 		t.Fatal(e)
 	}

@@ -1,6 +1,7 @@
 package qualification
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -17,16 +18,22 @@ func TestOriginalPolicyNormalizationAndDefinitionHash(t *testing.T) {
 		inputs = append(inputs, value)
 	}
 	root, _ := filepath.Abs("../../..")
-	file := filepath.Join(t.TempDir(), "policies.json")
 	raw, _ := json.Marshal(inputs)
-	if e := os.WriteFile(file, raw, 0600); e != nil {
-		t.Fatal(e)
-	}
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/task-materials-interop.mjs"), "qualification-policies", file)
+	script := `import {qualificationPolicySchema} from './packages/galaxy-contracts/src/qualification-schema.mjs';let text='';for await(const c of process.stdin)text+=c;console.log(JSON.stringify(JSON.parse(text).map(input=>{try{return{accepted:true,policy:qualificationPolicySchema.parse(input)}}catch{return{accepted:false}}})))`
+	cmd := exec.Command("node", "--input-type=module", "-e", script)
 	cmd.Dir = root
+	cmd.Stdin = bytes.NewReader(raw)
 	output, e := cmd.CombinedOutput()
 	if e != nil {
-		t.Fatalf("original policy: %v %s", e, output)
+		t.Fatalf("current policy schema %v %s", e, output)
+	}
+	captured, e := os.ReadFile("policy-capture.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	var hashes []struct{ DefinitionHash string }
+	if e = json.Unmarshal(captured, &hashes); e != nil {
+		t.Fatal(e)
 	}
 	var expected []struct {
 		Accepted       bool
@@ -48,7 +55,7 @@ func TestOriginalPolicyNormalizationAndDefinitionHash(t *testing.T) {
 				t.Errorf("original policy normalization differs at %d", i)
 			}
 			hash, e := DefinitionHash(input)
-			if e != nil || hash != expected[i].DefinitionHash {
+			if e != nil || hash != hashes[i].DefinitionHash {
 				t.Errorf("original definition hash differs at %d: %v", i, e)
 			}
 		}

@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,18 +14,13 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/portal"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/feedbackfixture"
 	"github.com/jackc/pgx/v5"
 )
 
 func TestAccountLoginTransactionsInteropReplacementAndFences(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/feedback-fixture.mjs"), "setup")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	if out, e := cmd.CombinedOutput(); e != nil {
-		t.Fatalf("original migrations: %v %s", e, out)
-	}
+	pool, _ := testsupport.PostgreSQL(t)
+	feedbackfixture.Create(t, pool)
 	ctx := context.Background()
 	g := &Gateway{Pool: pool, Config: Config{Endpoint: "https://account.example.invalid", WebsiteOrigin: "https://web.example.invalid", AccountIssuer: "https://issuer.example.invalid/realms/users", AccountScope: strings.Repeat("a", 64), AssociationClients: []string{"association"}}, Now: func() time.Time { return time.Unix(2000000000, 0) }}
 	hash := func(s string) string { return identity.Digest([]byte(s)) }
@@ -67,21 +59,14 @@ func TestAccountLoginTransactionsInteropReplacementAndFences(t *testing.T) {
 	if e := issue("first", "token-first"); e != nil {
 		t.Fatal(e)
 	}
-	// Read Go-issued session with the unchanged JavaScript session store.
-	script := `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import {OfficialAccountSessionStore} from './packages/galaxy-official/src/accounts/session-store.mjs';const u=new URL(process.env.GALAXY_GO_TEST_DATABASE_URL);if(u.hostname!=='127.0.0.1'||!u.pathname.startsWith('/galaxy_go_test_'))throw Error('isolated only');const db=new pg.Pool({connectionString:u.href});try{const s=new OfficialAccountSessionStore({db,scope:process.env.TEST_SCOPE,now:()=>2000000000});console.log(JSON.stringify(await s.session(process.env.TEST_HASH)));}finally{await db.end()}`
-	cmd = exec.Command("node", "--input-type=module", "-e", script)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "TEST_SCOPE="+g.Config.AccountScope, "TEST_HASH="+hash("token-first"))
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("JS session read: %v %s", e, out)
-	}
-	var original struct {
-		AccountID, Issuer, ExternalSubject string
-		Account                            struct{ EmailVerified bool }
-	}
-	if e = json.Unmarshal(out, &original); e != nil || original.ExternalSubject != principal.Subject || !original.Account.EmailVerified {
-		t.Fatalf("JS projection mismatch %v %s", e, out)
+	// Fixed fields from the captured original session projection; the account ID
+	// remains the one actually created by the current transaction.
+	var accountID, issuer, subject, csrf, state string
+	var verified bool
+	var created, expires int64
+	e := pool.QueryRow(ctx, `SELECT account_id::text,issuer,external_subject,email_verified,csrf_token,created_at,expires_at,refresh_state FROM official_account_sessions_v1 WHERE scope_hash=$1 AND token_hash=$2`, g.Config.AccountScope, hash("token-first")).Scan(&accountID, &issuer, &subject, &verified, &csrf, &created, &expires, &state)
+	if e != nil || accountID == "" || issuer != principal.Issuer || subject != principal.Subject || !verified || csrf != strings.Repeat("c", 43) || created != 2000000000 || expires != 2000003600 || state != "ready" {
+		t.Fatalf("captured original session fields differ: %v", e)
 	}
 	create("seen-successor", "state-seen", hash("first"), hash("token-first"))
 	var revoked *int64

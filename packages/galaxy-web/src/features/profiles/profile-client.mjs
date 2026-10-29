@@ -1,5 +1,5 @@
 import {z} from 'zod/v4';
-import {readProfileDisplayNames} from "../../../../galaxy-official/src/accounts/profile-display-names.mjs";
+import {readProfileDisplayNames} from "../../../../galaxy-client/src/accounts/profile-display-names.mjs";
 
 const subject=z.string().regex(/^GUID[0-9A-Z]{28}$/);
 const unavailableHonor=error=>['honor_subject_outside_scope','honor_rule_unavailable','honor_source_profile_mismatch'].includes(error?.code??error?.message);

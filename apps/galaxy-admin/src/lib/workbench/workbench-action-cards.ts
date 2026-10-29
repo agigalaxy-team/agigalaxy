@@ -1,5 +1,5 @@
 import type {AgentOsDomain} from './agentos-client';
-import {aiWorkPreparationRegistry} from "../../../../../packages/galaxy-official/src/shared/operations-ai-action-registry.mjs";
+import {aiWorkPreparationRegistry} from "../../../../../packages/galaxy-contracts/src/operations-ai-action-registry.mjs";
 import {workbenchAiPromptReview,workbenchAiPromptReceipt,type WorkbenchAiPromptReview,type WorkbenchAiPromptReceipt} from "../ai-work-accounts/ai-work-prompt";
 
 export type WorkbenchActionCard={cardId:string;operationId:string;turnId?:string|null;kind:string;domain:AgentOsDomain;target:{kind:string;label:string;href:string|null};title:string;impact:string[];basis:{label:string;value:string}[];review?:WorkbenchAiPromptReview|null;requiredAction:string;capability:{canConfirm:boolean;canDismiss?:boolean;reason:string|null};state:'prepared'|'processing'|'completed'|'unknown'|'not-available';result:{state:string;summary:string;operationId:string;receipt?:WorkbenchAiPromptReceipt|null}|null;checkedAt:number;readExpiresAt:number};

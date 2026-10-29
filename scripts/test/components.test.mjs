@@ -23,7 +23,7 @@ test('shared check and setup entrypoints select the complete component set',()=>
  for(const file of ['scripts/check.mjs','scripts/setup-development.mjs','scripts/checks/runner.mjs'])assert.equal(plan(file).affected.length,catalog.components.length);
 });
 test('declared configuration inputs participate in ownership and propagation',()=>{
- assert.equal(ownerOf(catalog,'scripts/serve-product.mjs'),'web');assert(plan('scripts/serve-product.mjs').affected.includes('site'));
+ assert.equal(ownerOf(catalog,'scripts/web-runtime.mjs'),'site');assert(plan('scripts/web-runtime.mjs').affected.includes('site'));
  assert.equal(ownerOf(catalog,'scripts/test/capsule-lease-independent-review.test.mjs'),'web');
  for(const file of ['opencode.json','.opencode/tui.json']){
   assert.equal(ownerOf(catalog,file),'native-client');assert.deepEqual(plan(file).unclassified,[]);

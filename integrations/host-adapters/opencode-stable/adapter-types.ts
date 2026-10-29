@@ -38,40 +38,61 @@ export interface StableHostApi {
     DialogSelect(input: { title: string; skipFilter: boolean; options: { title: string; description?: string; value: string; disabled: boolean; onSelect: Action }[] }): unknown;
   };
 }
-export type ConnectionController = ReturnType<typeof import("../../../packages/galaxy-official/src/clients/flows/host-connection-controller.mjs").createHostConnectionController> & {
-  createContextDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['createContextDraft'];
-  getContextDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['getContextDraft'];
-  previewContextFile?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['previewContextFile'];
-  saveContextDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['saveContextDraft'];
-  rebaseContextDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['rebaseContextDraft'];
-  listContextDrafts?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['listContextDrafts'];
-  forgetContextDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['forgetContextDraft'];
-  getLocalContextOperation?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['getLocalContextOperation'];
-  listBindingReceipts?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['listBindingReceipts'];
-  createAssistanceDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['createAssistanceDraft'];
-  createAssistanceEventDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['createAssistanceEventDraft'];
-  rebaseAssistanceDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['rebaseAssistanceDraft'];
-  getAssistanceDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['getAssistanceDraft'];
-  saveAssistanceDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['saveAssistanceDraft'];
-  listAssistanceDrafts?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['listAssistanceDrafts'];
-  forgetAssistanceDraft?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['forgetAssistanceDraft'];
-  querySearchFeedback?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['querySearchFeedback'];
-  editSearchFeedback?: ReturnType<typeof import("../../../packages/galaxy-official/src/clients/local/host-runtime.mjs").createLocalHostRuntime>['controller']['editSearchFeedback'];
+// Optional legacy-host controller interface consumed by the UI; the installed
+// Native path obtains its operations from the Go bridge.
+export type ConnectionController = {
+  [name: string]: ((...args: any[]) => any) | undefined;
+  prepare: (...args: any[]) => Promise<any>;
+  execute: (...args: any[]) => Promise<any>;
+  cancel: (...args: any[]) => any;
+  disconnect: (...args: any[]) => any;
+  status: (...args: any[]) => Promise<any>;
+  checkRemote?: (...args: any[]) => Promise<any>;
+  queryHistory?: (...args: any[]) => Promise<any>;
+  querySearch?: (...args: any[]) => Promise<any>;
+  recordSearchFeedback?: (...args: any[]) => Promise<any>;
+  prepareCase?: (...args: any[]) => Promise<any>;
+  executeCase?: (...args: any[]) => Promise<any>;
+  preparePublication?: (...args: any[]) => Promise<any>;
+  executePublication?: (...args: any[]) => Promise<any>;
+  reconcilePublication?: (...args: any[]) => Promise<any>;
+  createContextDraft?: (...args: any[]) => Promise<any>;
+  getContextDraft?: (...args: any[]) => Promise<any>;
+  previewContextFile?: (...args: any[]) => Promise<any>;
+  saveContextDraft?: (...args: any[]) => Promise<any>;
+  rebaseContextDraft?: (...args: any[]) => Promise<any>;
+  listContextDrafts?: (...args: any[]) => Promise<any>;
+  forgetContextDraft?: (...args: any[]) => Promise<any>;
+  getLocalContextOperation?: (...args: any[]) => Promise<any>;
+  listBindingReceipts?: (...args: any[]) => Promise<any>;
+  createAssistanceDraft?: (...args: any[]) => Promise<any>;
+  createAssistanceEventDraft?: (...args: any[]) => Promise<any>;
+  rebaseAssistanceDraft?: (...args: any[]) => Promise<any>;
+  getAssistanceDraft?: (...args: any[]) => Promise<any>;
+  saveAssistanceDraft?: (...args: any[]) => Promise<any>;
+  listAssistanceDrafts?: (...args: any[]) => Promise<any>;
+  forgetAssistanceDraft?: (...args: any[]) => Promise<any>;
+  querySearchFeedback?: (...args: any[]) => Promise<any>;
+  editSearchFeedback?: (...args: any[]) => Promise<any>;
 };
-export type DiscoverySource = ReturnType<typeof import('./configured-runtime.mjs').createConfiguredRuntime>;
+// Shape consumed by the optional host discovery UI; the normal installed
+// Native host supplies its Go tool bridge and does not instantiate a JS core.
+export type DiscoverySource = Pick<ConnectionController,
+  'querySearchFeedback' | 'editSearchFeedback' | 'listBindingReceipts' |
+  'createContextDraft' | 'getContextDraft' | 'previewContextFile' | 'saveContextDraft' | 'rebaseContextDraft' |
+  'listContextDrafts' | 'forgetContextDraft' | 'getLocalContextOperation' |
+  'createAssistanceDraft' | 'createAssistanceEventDraft' | 'rebaseAssistanceDraft' | 'getAssistanceDraft' |
+  'saveAssistanceDraft' | 'listAssistanceDrafts' | 'forgetAssistanceDraft'> & {
+    endpoint: string;
+    scopes: readonly string[];
+    status(): {state: string};
+    read(signal: AbortSignal): Promise<{controller: ConnectionController; networkType: string; displayName: string; operator: string; checkedAt: number}>;
+    close(): void;
+  };
 export type BindingReceiptView = { endpoint: string; bindingId: string; subjectId: string; installationId: string; scopes: string[];
   receivedAt: number; bindingExpiresAt: number; verification: string; lifetime: string; configurationMatches: boolean };
 export type CaseSubmission = { consentId: string; payloadJson: string };
 export type HistoryFilters = { query: string; limit: number; after?: string } & Partial<Record<'subjectId' | 'sourceKind' | 'environment' | 'createdFrom' | 'createdBefore' | 'outcome' | 'capabilityId' | 'verificationStrength', string>>;
-export type InitializationView = {
-  header: { title: string };
-  currentStage: { title: string; prompt: string; note?: string;
-    welcome?: { title: string; purpose: string; vision: string };
-    options: { title: string; description?: string; disabledReason?: string; selectable?: boolean }[] };
-};
-export type AdapterCore = Omit<typeof import('../../../packages/galaxy-core/src/integration-modules.mjs'), 'getGalaxyInitializationContract'> & {
-  getGalaxyInitializationContract(input: { language: string; stage: number; subjectType?: 'person'|'organization'; uploadPrivacy?: Record<string, unknown>; hostCapabilities?: Record<string, boolean> }): InitializationView;
-};
 export type PublicationDraft = { localCaseId: string; title: string; status: string };
 export type HistoryItem = {
   caseId: string; title: unknown; summary: unknown; state: unknown; matchReasons: unknown[];

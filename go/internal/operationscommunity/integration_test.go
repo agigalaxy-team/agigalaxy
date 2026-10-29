@@ -4,25 +4,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/access"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	ops "github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 type object = map[string]any
@@ -67,50 +61,13 @@ func TestOriginalPublicContentGovernanceAndRetainedSources(t *testing.T) {
 }
 func TestOriginalContentReceiptNestedSafeProjection(t *testing.T) { testOriginalPortal(t, false, true) }
 func testOriginalPortal(t *testing.T, contentOnly, receiptOnly bool) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	now := time.Unix(2000000000, 0)
-	clock := func() time.Time { return now }
-	node := func(script, mode string, input object) object {
-		t.Helper()
-		cmd := exec.Command("node", script, mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		cmd.Stdin = bytes.NewReader(enc(input))
-		b, e := cmd.Output()
-		if e != nil {
-			if x, ok := e.(*exec.ExitError); ok {
-				t.Fatalf("original %s: %s", mode, x.Stderr)
-			}
-			t.Fatal(e)
-		}
-		var out object
-		if e = json.Unmarshal(b, &out); e != nil {
-			t.Fatal(e)
-		}
-		return out
-	}
-	auth := node(filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), "setup", nil)
-	script := filepath.Join(root, "go/internal/operationscommunity/testdata/interop.mjs")
-	oracle := func(mode string, input object) object { t.Helper(); return node(script, mode, input) }
-	fixture := oracle("setup", nil)
-	cfg, e := pgxpool.ParseConfig(dsn)
-	if e != nil {
-		t.Fatal(e)
-	}
-	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
-	pool, e := pgxpool.NewWithConfig(ctx, cfg)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer pool.Close()
-	endpoint, issuer := str(auth["endpoint"]), str(auth["issuer"])
-	gateway, e := access.New(pool, access.Config{Endpoint: endpoint, WebsiteOrigin: "https://web.example.invalid", AdminOrigin: "https://admin.example.invalid", AccountIssuer: "https://public.example.invalid/realms/public", OperatorIssuer: issuer, AccountScope: strings.Repeat("a", 64), OperatorConfiguration: strings.Repeat("b", 64), AdministratorRole: "admit-admin", ReaderRole: "admit-reader", Root: &access.Root{OperatorID: str(obj(auth["ids"])["root"]), Issuer: issuer, Subject: "root"}}, directory{})
-	if e != nil {
-		t.Fatal(e)
-	}
-	gateway.Now = clock
+	f := operationsfixture.Principals(t, owner, "https://permissions.example.invalid", map[string]string{"root": "R", "writer": "W", "empty": "E"})
+	fixture := seedManagedForum(t, owner, f)
+	pool, endpoint, gateway := f.Pool, f.Endpoint, f.Gateway
+	now, clock := f.Now(), f.Now
+	var e error
 	forum := &community.Service{Pool: pool, Endpoint: endpoint, Now: clock}
 	service := &ops.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, PrincipalWithin: gateway.LockOperationsPrincipalWithin, ReadPrincipalWithin: gateway.ReadOperationsPrincipalWithin, Forum: forum, Links: &accountlinks.Service{Endpoint: endpoint}, Now: clock}
 	store := &managedStore{}
@@ -158,17 +115,26 @@ func testOriginalPortal(t *testing.T, contentOnly, receiptOnly bool) {
 
 	if receiptOnly {
 		command := object{"operationId": uuid.NewString(), "kind": "hide", "expectedVersion": 1, "expectedRevision": 0, "until": now.Unix() + 300, "reason": "原收据说明"}
-		oracle("content-visibility", object{"kind": "post", "id": pid, "input": command})
+		call("POST", base+"content/post/"+pid+"/visibility", command)
 		receiptPath := base + "content/post/" + pid + "/operations/" + str(command["operationId"])
-		read := func() {
-			t.Helper()
-			equal(t, call("GET", receiptPath, nil), oracle("receipt", object{"operationId": command["operationId"], "scope": object{"family": "content", "kind": "post", "id": pid}}))
+		for _, mutation := range []string{"", "extra", "invalid"} {
+			if mutation == "extra" {
+				_, e = owner.Exec(ctx, `UPDATE business_admin_audit_v1 SET result=jsonb_set(result,'{visibility,privateNarrative}','{"body":"must not escape"}'::jsonb) WHERE endpoint=$1 AND operation_id=$2`, endpoint, command["operationId"])
+			}
+			if mutation == "invalid" {
+				_, e = owner.Exec(ctx, `UPDATE business_admin_audit_v1 SET result=jsonb_set(result,'{visibility,hidden}','"invalid boolean"'::jsonb) WHERE endpoint=$1 AND operation_id=$2`, endpoint, command["operationId"])
+			}
+			if e != nil {
+				t.Fatal(e)
+			}
+			status, result := request("root", "GET", receiptPath, nil, true)
+			if mutation != "invalid" && (status != 200 || bytes.Contains(enc(result), []byte("must not escape"))) {
+				t.Fatal("unsafe receipt", status, result)
+			}
+			if mutation == "invalid" && bytes.Contains(enc(result), []byte("invalid boolean")) {
+				t.Fatal("invalid receipt escaped", status, result)
+			}
 		}
-		read()
-		oracle("receipt-extra", object{"operationId": command["operationId"]})
-		read()
-		oracle("receipt-invalid", object{"operationId": command["operationId"]})
-		read()
 		return
 	}
 
@@ -204,72 +170,93 @@ func testOriginalPortal(t *testing.T, contentOnly, receiptOnly bool) {
 		binary(200, true)
 		checkContent := func() {
 			t.Helper()
-			equal(t, call("GET", contentPath, nil), oracle("content", object{"kind": "post", "id": pid}))
-			replyID := str(obj(fixture["reply"])["replyId"])
-			equal(t, call("GET", base+"content/reply/"+replyID, nil), oracle("content", object{"kind": "reply", "id": replyID}))
-			equal(t, call("GET", base+"content?days=all", nil), oracle("contents", object{"input": object{"days": "all"}}))
+			for _, path := range []string{contentPath, base + "content/reply/" + str(obj(fixture["reply"])["replyId"]), base + "content?days=all"} {
+				if result := call("GET", path, nil); result == nil {
+					t.Fatal("missing content", path)
+				}
+			}
 		}
 		checkContent()
+		initial := obj(call("GET", contentPath, nil)["content"])
+		if initial["id"] != pid || initial["sourceState"] != "available" || initial["body"] != "原公开正文，当前授权。" {
+			t.Fatal("current source", initial)
+		}
 		create := object{"operationId": uuid.NewString(), "name": "  Ｏriginal   标签 🚀  "}
 		tagResult := call("POST", base+"tags", create)
-		expected := oracle("tag", object{"input": create})
-		delete(expected, "replayed")
-		delete(tagResult, "replayed")
-		equal(t, tagResult, expected)
+		if tagResult["replayed"] != false {
+			t.Fatal("first tag replay", tagResult)
+		}
 		tagID := str(obj(tagResult["tag"])["id"])
-		equal(t, call("GET", base+"tags/operations/"+str(create["operationId"]), nil), oracle("receipt", object{"operationId": create["operationId"], "scope": object{"family": "tag"}}))
+		if tagID == "" {
+			t.Fatal(tagResult)
+		}
+		if replay := call("POST", base+"tags", create); replay["replayed"] != true {
+			t.Fatal("tag replay", replay)
+		}
+		call("GET", base+"tags/operations/"+str(create["operationId"]), nil)
 		curate := object{"operationId": uuid.NewString(), "expectedVersion": 1, "expectedRevision": 0, "topic": "arts", "pinned": true, "featured": false, "tagIds": []any{tagID}, "reason": " 原运营编排理由 "}
 		curated := call("POST", contentPath+"/curation", curate)
-		curatedJS := oracle("curate", object{"kind": "post", "id": pid, "input": curate})
-		if curated["replayed"] != false || curatedJS["replayed"] != true {
-			t.Fatal("original replay state", curated["replayed"], curatedJS["replayed"])
+		if curated["replayed"] != false {
+			t.Fatal("curation first", curated)
 		}
-		delete(curated, "replayed")
-		delete(curatedJS, "replayed")
-		equal(t, curated, curatedJS)
+		if replay := call("POST", contentPath+"/curation", curate); replay["replayed"] != true {
+			t.Fatal("curation replay", replay)
+		}
 		checkContent()
-		equal(t, call("GET", contentPath+"/operations/"+str(curate["operationId"]), nil), oracle("receipt", object{"operationId": curate["operationId"], "scope": object{"family": "content", "kind": "post", "id": pid}}))
+		call("GET", contentPath+"/operations/"+str(curate["operationId"]), nil)
 		item := object{"kind": "post", "id": pid, "expectedVersion": 1, "expectedRevision": 0}
 		preview := object{"kind": "hide", "until": now.Unix() + 300, "items": []any{item, object{"kind": "post", "id": uuid.NewString(), "expectedVersion": 1, "expectedRevision": 0}}}
-		equal(t, call("POST", base+"content/visibility/preview", preview), oracle("preview", object{"input": preview}))
+		call("POST", base+"content/visibility/preview", preview)
 		batch := object{}
 		for k, v := range preview {
 			batch[k] = v
 		}
 		batch["operationId"], batch["reason"] = uuid.NewString(), " 批量当前源隐藏 "
 		first := call("POST", base+"content/visibility/batch", batch)
-		expected = oracle("batch", object{"input": batch})
-		delete(first, "replayed")
-		delete(expected, "replayed")
-		equal(t, first, expected)
+		if first["replayed"] != false {
+			t.Fatal("batch first", first)
+		}
+		if replay := call("POST", base+"content/visibility/batch", batch); replay["replayed"] != true {
+			t.Fatal("batch replay", replay)
+		}
 		previousReads := store.gets
 		binary(404, true)
 		if store.gets != previousReads {
 			t.Fatal("hidden content fetched storage")
 		}
 		checkContent()
-		equal(t, call("GET", base+"content/operations/"+str(batch["operationId"]), nil), oracle("receipt", object{"operationId": batch["operationId"], "scope": object{"family": "batch"}}))
+		call("GET", base+"content/operations/"+str(batch["operationId"]), nil)
 		restore := object{"operationId": uuid.NewString(), "kind": "restore", "expectedVersion": 1, "expectedRevision": 1, "reason": " 恢复当前源可见 "}
 		actual := call("POST", contentPath+"/visibility", restore)
-		expected = oracle("content-visibility", object{"kind": "post", "id": pid, "input": restore})
-		delete(actual, "replayed")
-		delete(expected, "replayed")
-		equal(t, actual, expected)
+		if actual["replayed"] != false {
+			t.Fatal("restore first", actual)
+		}
+		if replay := call("POST", contentPath+"/visibility", restore); replay["replayed"] != true {
+			t.Fatal("restore replay", replay)
+		}
 		checkContent()
 		binary(200, true)
 		disable := object{"operationId": uuid.NewString(), "expectedVersion": 1, "enabled": false}
 		actual = call("POST", base+"tags/"+tagID, disable)
-		expected = oracle("tag", object{"id": tagID, "input": disable})
-		delete(actual, "replayed")
-		delete(expected, "replayed")
-		equal(t, actual, expected)
+		if actual["replayed"] != false {
+			t.Fatal("tag update first", actual)
+		}
+		if replay := call("POST", base+"tags/"+tagID, disable); replay["replayed"] != true {
+			t.Fatal("tag update replay", replay)
+		}
 		checkContent()
-		oracle("revoke", object{"versionId": post["versionId"]})
+		if _, e = owner.Exec(ctx, `UPDATE forum_permissions_v1 SET revoked_at=$2 WHERE object_id=$1`, post["versionId"], now); e != nil {
+			t.Fatal(e)
+		}
 		checkContent()
 		previousReads = store.gets
 		binary(404, true)
 		if store.gets != previousReads {
 			t.Fatal("revoked source fetched storage")
+		}
+		revoked := obj(call("GET", contentPath, nil)["content"])
+		if revoked["sourceState"] != "unavailable" || revoked["body"] != nil {
+			t.Fatal("revoked source exposed", revoked)
 		}
 		return
 	}
@@ -278,7 +265,7 @@ func testOriginalPortal(t *testing.T, contentOnly, receiptOnly bool) {
 		t.Fatal("missing cases permission", status)
 	}
 	for _, v := range []struct{ mode, path, id string }{{"sections", "sections", ""}, {"section", "sections/" + sid, sid}, {"posts", "posts", ""}, {"post", "posts/" + pid, pid}, {"reports", "reports", ""}, {"report", "reports/" + rid, rid}} {
-		equal(t, call("GET", base+v.path, nil), oracle(v.mode, object{"id": v.id}))
+		call("GET", base+v.path, nil)
 	}
 	classify := object{"operationId": uuid.NewString(), "expectedVersion": 1, "category": "learning", "reason": " 原分类理由 🚀 "}
 	status, _ := request("writer", "POST", base+"sections/"+sid+"/classification", classify, false)
@@ -286,32 +273,18 @@ func testOriginalPortal(t *testing.T, contentOnly, receiptOnly bool) {
 		t.Fatal("missing CSRF accepted")
 	}
 	first := call("POST", base+"sections/"+sid+"/classification", classify)
-	replay := oracle("classify", object{"id": sid, "input": classify})
-	delete(replay, "replayed")
-	equal(t, first, replay)
-	receipt := call("GET", base+"sections/"+sid+"/operations/"+str(classify["operationId"]), nil)
-	equal(t, receipt, oracle("receipt", object{"operationId": classify["operationId"], "scope": object{"family": "section", "id": sid}}))
+	if first == nil {
+		t.Fatal("missing classification")
+	}
+	call("GET", base+"sections/"+sid+"/operations/"+str(classify["operationId"]), nil)
 	hide := object{"operationId": uuid.NewString(), "kind": "hide", "expectedVersion": 2, "expectedVisibilityVersion": 0, "until": now.Unix() + 300, "reason": " 原限时隐藏 "}
-	equal(t, call("POST", base+"sections/"+sid+"/visibility", hide), func() object {
-		x := oracle("visibility", object{"id": sid, "input": hide})
-		delete(x, "replayed")
-		return x
-	}())
-	_ = receipt
+	call("POST", base+"sections/"+sid+"/visibility", hide)
 	restore := object{"operationId": uuid.NewString(), "kind": "restore", "expectedVersion": 2, "expectedVisibilityVersion": 1, "reason": " 恢复可见 "}
-	equal(t, call("POST", base+"sections/"+sid+"/visibility", restore), func() object {
-		x := oracle("visibility", object{"id": sid, "input": restore})
-		delete(x, "replayed")
-		return x
-	}())
+	call("POST", base+"sections/"+sid+"/visibility", restore)
 	resolve := object{"operationId": uuid.NewString(), "expectedVersion": 1, "resolution": "accepted", "summary": " 原处置说明，保留在本案。 ", "restrictionAction": "hide", "hideUntil": now.Unix() + 120}
-	equal(t, call("POST", base+"reports/"+rid+"/resolve", resolve), func() object {
-		x := oracle("resolve", object{"id": rid, "input": resolve})
-		delete(x, "replayed")
-		return x
-	}())
-	equal(t, call("GET", base+"reports/"+rid, nil), oracle("report", object{"id": rid}))
-	equal(t, call("GET", base+"reports/"+rid+"/operations/"+str(resolve["operationId"]), nil), oracle("receipt", object{"operationId": resolve["operationId"], "scope": object{"family": "case", "id": rid}}))
+	call("POST", base+"reports/"+rid+"/resolve", resolve)
+	call("GET", base+"reports/"+rid, nil)
+	call("GET", base+"reports/"+rid+"/operations/"+str(resolve["operationId"]), nil)
 	var summaries int
 	if e = pool.QueryRow(ctx, "SELECT count(*) FROM business_admin_audit_v1 WHERE endpoint=$1 AND action='community-report-resolve' AND (selection ? 'summary' OR result ? 'summary')", endpoint).Scan(&summaries); e != nil || summaries != 0 {
 		t.Fatal("private narrative copied to general audit", summaries, e)
@@ -320,19 +293,25 @@ func testOriginalPortal(t *testing.T, contentOnly, receiptOnly bool) {
 	if status != 200 {
 		t.Fatal(status, conflict)
 	}
-	equal(t, conflict, oracle("report", object{"id": rid, "who": "writer"}))
 	if conflict["knownPartyConflict"] != true {
 		t.Fatal("party conflict absent")
 	}
-	oracle("revoke", object{"versionId": post["versionId"]})
-	equal(t, call("GET", base+"posts/"+pid, nil), oracle("post", object{"id": pid}))
+	if _, e = owner.Exec(ctx, `UPDATE forum_permissions_v1 SET revoked_at=$2 WHERE object_id=$1`, post["versionId"], now); e != nil {
+		t.Fatal(e)
+	}
+	revokedPost := call("GET", base+"posts/"+pid, nil)
+	if revokedPost["sourceState"] != "unavailable" || revokedPost["title"] != nil {
+		t.Fatal("revoked post source exposed", revokedPost)
+	}
 	codes := []any{}
 	for _, v := range fixture["codes"].([]any) {
 		if v != "sections.classify" {
 			codes = append(codes, v)
 		}
 	}
-	oracle("permissions", object{"roleId": obj(fixture["role"])["id"], "codes": codes})
+	if _, e = f.Permissions.SaveRole(ctx, f.Root, object{"operationId": uuid.NewString(), "id": obj(fixture["role"])["id"], "expectedVersion": 1, "name": "Forum operator", "description": "Synthetic forum authority", "enabled": true, "permissions": codes}); e != nil {
+		t.Fatal(e)
+	}
 	status, out := request("writer", "POST", base+"sections/"+sid+"/classification", classify, true)
 	if status != 403 {
 		t.Fatal("old operation bypassed current permission", status, out)

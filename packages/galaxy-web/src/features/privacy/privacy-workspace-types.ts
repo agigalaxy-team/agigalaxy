@@ -1,7 +1,7 @@
 import type * as z from 'zod/v4';
 import type {createWebRuntime} from "../../runtime.mjs";
-import type {deletionIntentSchema} from "../../../../galaxy-official/src/shared/deletion-schema.mjs";
-import type {exportViewSchema} from "../../../../galaxy-official/src/shared/data-export-schema.mjs";
+import type {deletionIntentSchema} from "../../../../galaxy-contracts/src/deletion-schema.mjs";
+import type {exportViewSchema} from "../../../../galaxy-contracts/src/data-export-schema.mjs";
 
 export type PrivacyRuntime=Awaited<ReturnType<typeof createWebRuntime>>;
 export type ExportView=z.infer<typeof exportViewSchema>&{title?:string};

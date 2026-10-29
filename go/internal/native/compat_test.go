@@ -3,6 +3,8 @@ package native
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
@@ -14,19 +16,29 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
 
 func fixture(t *testing.T) (*Store, map[string]any) {
 	t.Helper()
-	_, file, _, _ := runtime.Caller(0)
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "../../.."))
 	dir := t.TempDir()
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/native-fixture.mjs"), dir)
-	cmd.Dir = root
-	if b, e := cmd.CombinedOutput(); e != nil {
-		t.Fatalf("native Node fixture: %v: %s", e, b)
+	for _, name := range []string{"galaxy-id.json", "public-key.txt", "galaxy-local-state.json", "expected.json", "work-history/history.sqlite", "conversation-archive/private.sqlite"} {
+		raw, err := os.ReadFile(filepath.Join("testdata", "legacy-native", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, name)
+		if name == "public-key.txt" {
+			path = filepath.Join(dir, "galaxy-id-public-key.pem")
+		}
+		if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(path, raw, 0600); err != nil {
+			t.Fatal(err)
+		}
 	}
 	var expected map[string]any
 	b, e := os.ReadFile(filepath.Join(dir, "expected.json"))
@@ -92,11 +104,14 @@ func TestNativeReadsActualNodeDataAndSignsExactPayload(t *testing.T) {
 	if !bytes.Equal(original, after) {
 		t.Fatal("read changed original identity")
 	}
-	keyBytes, e := os.ReadFile(filepath.Join(s.Directory, "galaxy-id-private-key.pem"))
+	publicBytes, e := os.ReadFile(filepath.Join(s.Directory, "galaxy-id-public-key.pem"))
 	if e != nil {
 		t.Fatal(e)
 	}
-	key, e := identity.PrivatePEM(keyBytes)
+	if e = connectionVerifyJWS(want["signature"].(string), string(publicBytes), want["payloadText"].(string), "galaxy-identity-control-v2+jws"); e != nil {
+		t.Fatal("legacy signature invalid", e)
+	}
+	public, key, e := ed25519.GenerateKey(rand.Reader)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -104,8 +119,16 @@ func TestNativeReadsActualNodeDataAndSignsExactPayload(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if signature != want["signature"] {
-		t.Fatal("signature changed exact protocol bytes")
+	actualParts, originalParts := strings.Split(signature, "."), strings.Split(want["signature"].(string), ".")
+	if len(actualParts) != 3 || len(originalParts) != 3 || actualParts[0] != originalParts[0] || actualParts[1] != originalParts[1] {
+		t.Fatal("signature header or payload bytes changed")
+	}
+	publicPEM, e := identity.PublicPEM(public)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = connectionVerifyJWS(signature, publicPEM, want["payloadText"].(string), "galaxy-identity-control-v2+jws"); e != nil {
+		t.Fatal("Go signature invalid", e)
 	}
 	if _, e = s.WorkList(ctx, WorkQuery{GalaxyID: "other-owner"}); e == nil {
 		t.Fatal("foreign owner accepted")
@@ -208,7 +231,7 @@ func TestCrossProcessNodeLockBlocksGoWithoutDeletingLock(t *testing.T) {
 	s, _ := fixture(t)
 	_, file, _, _ := runtime.Caller(0)
 	root := filepath.Clean(filepath.Join(filepath.Dir(file), "../../.."))
-	script := "import {withLocalWrite} from './packages/galaxy-core/src/storage/write-lock.mjs';await withLocalWrite(process.argv[1],async()=>{console.log('locked');await new Promise(r=>setTimeout(r,550));});"
+	script := "import {DatabaseSync} from 'node:sqlite';const db=new DatabaseSync(process.argv[1]+'/.galaxy-coordination.sqlite');db.exec('BEGIN EXCLUSIVE');console.log('locked');await new Promise(r=>setTimeout(r,550));db.close();"
 	cmd := exec.Command("node", "--input-type=module", "-e", script, s.Directory)
 	cmd.Dir = root
 	out, e := cmd.StdoutPipe()

@@ -1,4 +1,4 @@
-import { authoredRows } from '../../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
+import { authoredRows } from '../../../native-v2/presentation/native-result.mjs';
 import { createNativeTaskMenu } from '../task-native-menu.mjs';
 import { plain } from './presentation.mjs';
 

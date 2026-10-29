@@ -1,4 +1,4 @@
-import {summaryContentSchema} from "../../../../../galaxy-official/src/shared/personal-summary-schema.mjs";
+import {summaryContentSchema} from "../../../../../galaxy-contracts/src/personal-summary-schema.mjs";
 import type {SummaryBridge,SummaryContent,SummaryEmptyContent,SummaryRef,SummarySource,SummaryUnavailableSource} from './contracts';
 
 

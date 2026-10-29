@@ -1,4 +1,4 @@
-import {authoredRows,nativeStateLabel,nativeAudienceLabel,a2aParticipantContent} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
+import {authoredRows,nativeStateLabel,nativeAudienceLabel,a2aParticipantContent} from '../../native-v2/presentation/native-result.mjs';
 import {nativeChoiceUrl} from '../../native-v2/compact-app/browser-choice.mjs';
 
 const unwrap=r=>{if(r?.resultType==='input_required')return{state:'host-choice-required'};const d=r?.structuredContent??r;if(r?.isError)throw Object.assign(Error(d.error??'a2a_operation_incomplete'),{associationId:d.associationId});return d;};

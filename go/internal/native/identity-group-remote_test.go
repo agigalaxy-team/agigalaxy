@@ -9,6 +9,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identitygroups"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,8 +19,6 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -28,14 +27,8 @@ import (
 func TestNativeIdentityGroupRemoteOriginalToolsAndUnknownReceipt(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	store, meta, transport := workUploadServiceFixtureDatabase(t, dsn)
+	store, meta, transport := nativeGoUploadFixtureDatabase(t, dsn)
 	now := func() time.Time { return time.Unix(meta.Now, 0) }
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", "--input-type=module", "-e", `import pg from './packages/galaxy-official/node_modules/pg/lib/index.js';import {migrate} from './packages/galaxy-official/src/infrastructure/database.mjs';const u=new URL(process.argv[1]);if(u.hostname!=='127.0.0.1'||!/^\/galaxy_go_test_[a-z0-9_]+$/.test(u.pathname))throw Error('isolated database required');const db=new pg.Pool({connectionString:u.href});try{await migrate(db,{roles:['api']})}finally{await db.end()}`, dsn)
-	cmd.Dir = root
-	if b, e := cmd.CombinedOutput(); e != nil {
-		t.Fatalf("fixture migration: %v %s", e, b)
-	}
 	cfg := owner.Config()
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)
@@ -145,10 +138,7 @@ func TestNativeIdentityGroupRemoteOriginalToolsAndUnknownReceipt(t *testing.T) {
 		t.Fatal("invalid input sent HTTP")
 	}
 	current := materialCall(t, session, "galaxy_identity_group_current", map[string]any{}, false)
-	var member string
-	if e = owner.QueryRow(ctx, "SELECT id FROM subjects WHERE id<>$1 ORDER BY id LIMIT 1", scope.Owner).Scan(&member); e != nil {
-		t.Fatal(e)
-	}
+	member := deviceauthfixture.Prepare(t, owner, t.TempDir(), []string{"binding"}).Materials.Genesis.ID
 	intent := map[string]any{"schemaVersion": 2, "operationId": uuid.NewString(), "groupId": uuid.NewString(), "kind": "create", "expectedVersion": 0, "previousOperationId": nil, "endpoint": scope.Endpoint, "issuedAt": meta.Now, "expiresAt": meta.Now + 300, "memberIds": []string{scope.Owner, member}, "canonicalDisplayId": scope.Owner, "visibility": "Private", "viewers": []any{}, "sourceRefs": []any{}, "attributionCorrections": []any{}, "purpose": "canonical-display-only", "capabilityMerged": false, "accessGranted": false}
 	payload := hostJSONString(intent)
 	proof := map[string]any{"schemaVersion": 2, "id": uuid.NewString(), "operationId": intent["operationId"], "groupId": intent["groupId"], "payloadHash": identity.Digest([]byte(payload)), "endpoint": scope.Endpoint, "subjectId": scope.Owner, "keyId": current["keyId"], "epoch": current["epoch"], "decision": "approve", "issuedAt": meta.Now, "expiresAt": meta.Now + 300}
@@ -208,19 +198,6 @@ func TestNativeIdentityGroupRemoteOriginalToolsAndUnknownReceipt(t *testing.T) {
 		t.Fatal("unknown local journal", rows)
 	}
 
-	// The original Native Store and original SDK read the Go journal directly.
-	originalRead := exec.Command("node", "--input-type=module", "-e", `import {createNativeStore} from './packages/galaxy-edge-mcp/src/native-v2/store.mjs';import {createIdentityGroupClientV2} from './packages/galaxy-official/src/clients/identity-group-v2.mjs';const [dir,endpoint,subjectId,bindingId]=process.argv.slice(1),store=createNativeStore(dir),prefix='native-identity-group:'+endpoint+':'+subjectId+':';const client=createIdentityGroupClientV2({api:{endpoint,snapshot:()=>({subjectId,bindingId}),call:()=>{throw Error('read-only journal fixture must not request network')}},subjectId,sign:()=>{throw Error('read-only')},getLocal:name=>store.get(prefix+name),putLocal:()=>{throw Error('read-only')}});console.log(JSON.stringify(await client.pending()));`, meta.Configuration.DataDirectory, scope.Endpoint, scope.Owner, lease.bindingID)
-	originalRead.Dir = root
-	var journalErrors bytes.Buffer
-	originalRead.Stderr = &journalErrors
-	raw, e := originalRead.Output()
-	if e != nil {
-		t.Fatalf("original journal reader: %v %s", e, journalErrors.String())
-	}
-	var originalRows []any
-	if e = protocol.Decode(raw, &originalRows); e != nil || !connectionEqual(originalRows, rows) {
-		t.Fatalf("original SDK journal projection changed: %v", e)
-	}
 	id := text(uploadObject(rows[0])["proofId"])
 	recovered := materialCall(t, session, "galaxy_identity_group_native_recover", map[string]any{"action": "retry", "proofId": id}, false)
 	if recovered["ownApprovalAcknowledged"] != true || writes != count || len(pending()) != 0 {

@@ -14,37 +14,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 )
 
 func encode(v any) []byte { b, _ := protocol.Encode(v); return b }
-func node(t *testing.T, dsn, mode, file string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	command := exec.Command("node", filepath.Join(root, "go/internal/hubs/testdata/interop.mjs"), mode, file)
-	command.Dir = root
-	command.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	command.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	raw, e := command.Output()
-	if e != nil {
-		t.Fatalf("original Hub fixture %s: %v %s", mode, e, stderr.String())
-	}
-	var out Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if protocol.Decode(line, &out) == nil && out != nil {
-			return out
-		}
-	}
-	t.Fatal("original output")
-	return nil
-}
 func same(t *testing.T, a, b any) {
 	t.Helper()
 	var x, y any
@@ -55,18 +30,15 @@ func same(t *testing.T, a, b any) {
 	}
 }
 func TestHubOriginalScopeLifecycleIntakeReceiptsAndWorkerRetention(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	file := filepath.Join(t.TempDir(), "hub-fixture.json")
-	node(t, dsn, "setup", file, nil)
-	raw, e := os.ReadFile(file)
-	if e != nil {
-		t.Fatal(e)
+	f := setupHubs(t, owner)
+	var reads []struct {
+		Input   Object   `json:"input"`
+		Results []Object `json:"results"`
 	}
-	var f Object
-	if protocol.Decode(raw, &f) != nil {
-		t.Fatal("fixture")
-	}
+	fixtureJSON(t, "read", &reads)
+	readIndex := 0
 	clock := num(f, "clock")
 	now := func() time.Time { return time.Unix(clock, 0) }
 	rolePool := func(role string) *pgxpool.Pool {
@@ -141,13 +113,19 @@ func TestHubOriginalScopeLifecycleIntakeReceiptsAndWorkerRetention(t *testing.T)
 	}
 	compare := func(queries []any) {
 		t.Helper()
-		oracle := arr(node(t, dsn, "read", file, Object{"queries": queries})["results"])
+		if readIndex >= len(reads) {
+			t.Fatal("missing captured hub read")
+		}
+		entry := reads[readIndex]
+		readIndex++
+		same(t, Object{"queries": queries}, entry.Input)
+		oracle := entry.Results
 		for i, raw := range queries {
 			q := obj(raw)
 			method := txt(q, "method")
 			path := map[string]string{"get": "read", "query": "query", "manage": "manage", "members": "memberships", "intake": "intake", "receipt": "receipt"}[method]
 			code, v, e := call("/v2/hubs/"+path, txt(q, "actor"), q["input"])
-			expected := obj(oracle[i])
+			expected := oracle[i]
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -198,6 +176,9 @@ func TestHubOriginalScopeLifecycleIntakeReceiptsAndWorkerRetention(t *testing.T)
 	submit("resume")
 	submit("exit")
 	compare([]any{Object{"method": "members", "actor": "member", "input": hub}, Object{"method": "query", "actor": "member", "input": Object{"view": "joined"}}})
+	if readIndex != len(reads) {
+		t.Fatalf("unconsumed captured hub reads: %d", len(reads)-readIndex)
+	}
 	clock += 7776001
 	retention := &Service{Pool: rolePool("galaxy_evidence_worker"), Now: now}
 	out, e := retention.PurgeExpired(ctx, 100)

@@ -1,6 +1,6 @@
 import type {createWebRuntime} from "../../runtime.mjs";
 import type {MemberAvatarProfile} from "../../shared/people/conversation-ui";
-import {accountAvatarKey} from "../../../../galaxy-official/src/shared/account-profile-presentation.mjs";
+import {accountAvatarKey} from "../../../../galaxy-contracts/src/account-profile-presentation.mjs";
 
 export type ConversationDirectoryRuntime=Pick<Awaited<ReturnType<typeof createWebRuntime>>,'api'|'receiptStatus'>;
 type Kind='contacts'|'rooms';

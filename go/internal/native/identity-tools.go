@@ -91,6 +91,7 @@ func registerIdentityControlTools(server *mcp.Server, tools *toolRuntime, runtim
 			return devices.StopRetryReviewed(ctx, input.OperationID, scope)
 		})
 	})
+	registerNativeRecoveryTools(server, tools, runtime)
 	registerNativeIdentityAccountTools(server, tools, runtime)
 	registerNativeHandoffTools(server, tools, runtime)
 }

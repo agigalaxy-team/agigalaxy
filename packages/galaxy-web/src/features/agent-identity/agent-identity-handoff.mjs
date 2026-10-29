@@ -1,5 +1,5 @@
-import {browserScopes} from "../../../../galaxy-official/src/browser-client.mjs";
-import {fromBase64Url,identityKeyId} from "../../../../galaxy-core/src/domain/identity-material.mjs";
+import {browserScopes} from "../../../../galaxy-client/src/browser-client.mjs";
+import {fromBase64Url,identityKeyId} from "../../../../galaxy-contracts/src/identity/identity-material.mjs";
 
 const protocol='galaxy-web-identity-handoff',proofType='galaxy-web-identity-handoff-v1+jws';
 const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);

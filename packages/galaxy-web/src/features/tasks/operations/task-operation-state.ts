@@ -1,6 +1,6 @@
 import * as z from 'zod/v4';
 import type {createWebRuntime} from "../../../runtime.mjs";
-import {participationEventV2Schema,taskRequestV2Schema} from "../../../../../galaxy-official/src/shared/task-schema-v2.mjs";
+import {participationEventV2Schema,taskRequestV2Schema} from "../../../../../galaxy-contracts/src/task-schema-v2.mjs";
 import {draftMaterialBodySchema} from "../materials/task-material-types";
 import type {TaskMaterialBody,TaskMaterialStates} from "../materials/task-material-types";
 import {localTaskTextView} from "../materials/task-material-client.mjs";

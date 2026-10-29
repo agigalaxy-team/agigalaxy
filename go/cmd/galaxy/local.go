@@ -93,13 +93,16 @@ func serviceConfigurationCommand(ctx context.Context, args []string) error {
 	flags.StringVar(&request.Endpoint, "endpoint", "", "")
 	flags.StringVar(&request.DataDirectory, "data-dir", "", "")
 	flags.StringVar(&request.Output, "output", "", "")
+	flags.StringVar(&request.RootPinsFile, "root-pins-file", "", "")
+	flags.StringVar(&request.TrustDirectory, "trust-directory", "", "")
+	flags.StringVar(&request.NetworkType, "network-type", "", "")
 	if flags.Parse(args[1:]) != nil || flags.NArg() != 0 {
 		return fault.New("native_arguments_invalid", 400)
 	}
 	var value any
 	var e error
 	if args[0] == "inspect" {
-		if request.DataDirectory != "" || request.Output != "" {
+		if request.DataDirectory != "" || request.Output != "" || request.RootPinsFile != "" || request.TrustDirectory != "" || request.NetworkType != "" {
 			return fault.New("native_arguments_invalid", 400)
 		}
 		value, e = native.InspectServiceConfiguration(ctx, request, native.ServiceConfigurationOptions{})
@@ -154,7 +157,7 @@ func usage() {
   galaxy integration-mcp [--data-dir <path>]  Local-only MCP; ignores service configuration
   galaxy integration-host [--data-dir <path>] Local-only trusted Host JSONL; no service configuration
   galaxy service-config inspect --website <HTTPS origin> [--endpoint <HTTPS origin>]
-  galaxy service-config prepare --website <HTTPS origin> --endpoint <HTTPS origin> --data-dir <absolute path> --output <new absolute file>
+  galaxy service-config prepare --website <HTTPS origin> --endpoint <HTTPS origin> --data-dir <absolute path> --output <new absolute file> [--root-pins-file <absolute JSON> --trust-directory <absolute path>] [--network-type official|hub]
   galaxy host-configs <absolute config> <new output directory> [--package-dir <candidate>] [--hosts <comma-separated ids>]
   galaxy setup <website URL> [--host <host id>] [--data-dir <path>] [--organization]
 

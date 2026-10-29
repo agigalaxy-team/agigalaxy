@@ -2,7 +2,6 @@ package native
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
@@ -15,7 +14,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -47,7 +45,7 @@ func handoffMCPClient(t *testing.T, runtime *Runtime, choices *atomic.Int32) *mc
 func TestNativeHandoffBlankDeviceOriginalProofAndSelectionFence(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	controllerStore, meta, transport := workUploadServiceFixtureDatabase(t, dsn)
+	controllerStore, meta, transport := nativeGoUploadFixtureDatabase(t, dsn)
 	now := func() time.Time { return time.Unix(meta.Now, 0) }
 	authority := &deviceauth.Service{Pool: pool, Endpoint: meta.Configuration.Endpoint, Now: now, AllowedScopes: connectionBrowserScopes}
 	original, _ := url.Parse(meta.Origin)
@@ -188,23 +186,13 @@ func TestNativeHandoffBlankDeviceOriginalProofAndSelectionFence(t *testing.T) {
 	if e != nil || uploadObject(uploadObject(result)["receipt"])["state"] != "committed" || uploadObject(result)["activated"] != false {
 		t.Fatalf("committed operation was canceled: %v", e)
 	}
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	metadata, _ := protocol.Encode(map[string]any{"configuration": config, "now": meta.Now})
-	metadataPath := filepath.Join(joiningStore.Directory, "handoff-fixture.json")
-	if e = os.WriteFile(metadataPath, metadata, 0600); e != nil {
-		t.Fatal(e)
+	pending, e := h.Pending(ctx)
+	if e != nil || uploadObject(pending)["state"] != "committed" || uploadObject(pending)["hasOriginalCommit"] != true {
+		t.Fatal("committed handoff journal unavailable", pending, e)
 	}
-	script := `import {readFile} from 'node:fs/promises';import {createNativeRuntime} from './packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';const dir=process.argv[1],origin=process.argv[2],f=JSON.parse(await readFile(dir+'/handoff-fixture.json','utf8')),c=f.configuration;const native=await createNativeRuntime({...c,trustedKeys:new Map(Object.entries(c.trustedKeys)),fetch:(url,options)=>fetch(origin+new URL(url).pathname,options),now:()=>f.now,autoResumePrivateSync:false});const pending=await native.device.pending(),result=await native.device.reconcile(pending.operationId,{});console.log(JSON.stringify({state:pending.state,hasOriginalCommit:pending.hasOriginalCommit,activated:result.activated,alreadyActivated:result.alreadyActivated}));await native.close();`
-	command := exec.Command("node", "--input-type=module", "-e", script, joiningStore.Directory, server.URL)
-	command.Dir = root
-	var diagnostic strings.Builder
-	command.Stderr = &diagnostic
-	out, e := command.Output()
-	if e != nil {
-		t.Fatalf("original handoff reader: %v %s", e, diagnostic.String())
+	result, e = h.Reconcile(ctx, text(offer["operationId"]))
+	if e != nil || uploadObject(result)["activated"] != false || uploadObject(result)["alreadyActivated"] != true {
+		t.Fatal("handoff replay activated again", result, e)
 	}
-	var checked map[string]any
-	if json.Unmarshal(out, &checked) != nil || checked["state"] != "committed" || checked["hasOriginalCommit"] != true || checked["activated"] != false || checked["alreadyActivated"] != true {
-		t.Fatal("original Native could not resume Go handoff journal")
-	}
+
 }

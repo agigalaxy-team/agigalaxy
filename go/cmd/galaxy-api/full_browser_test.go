@@ -25,8 +25,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/access"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/accessfixture"
 	"github.com/google/uuid"
 )
 
@@ -112,29 +114,15 @@ func TestFullEntryBrowserFlow(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	optionsFile := filepath.Join(directory, "origins.json")
-	writeJSON(optionsFile, options)
-	command := func(name string, args ...string) []byte {
-		t.Helper()
-		c := exec.CommandContext(ctx, "node", append([]string{filepath.Join(root, "scripts/go", name)}, args...)...)
-		c.Dir = root
-		c.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		raw, err := c.CombinedOutput()
-		if err != nil {
-			t.Fatalf("isolated source %s: %v %s", name, err, raw)
-		}
-		return raw
-	}
-	raw := command("access-fixture.mjs", filepath.Join(directory, "portal"), optionsFile)
-	var files map[string]any
-	if e = json.Unmarshal(raw, &files); e != nil {
+	portalFiles := accessfixture.Create(t, filepath.Join(directory, "portal"), options["endpoint"].(string), options["websiteOrigin"].(string), options["adminOrigin"].(string))
+	gateway, e := access.Load(ctx, nil, portalFiles.Endpoint, portalFiles.AccountFile, portalFiles.OperationsFile, portalFiles.IdentityFile)
+	if e != nil {
 		t.Fatal(e)
 	}
-	filesJSON := filepath.Join(directory, "source-files.json")
-	writeJSON(filesJSON, files)
+	files := map[string]any{"endpoint": portalFiles.Endpoint, "accountFile": portalFiles.AccountFile, "operationsFile": portalFiles.OperationsFile, "identityFile": portalFiles.IdentityFile, "rootID": portalFiles.RootID, "accountScope": gateway.Config.AccountScope, "operatorConfiguration": gateway.Config.OperatorConfiguration}
 	descriptorFile := filepath.Join(directory, "browser.json")
-	command("full-api-browser-seed.mjs", filesJSON, descriptorFile)
-	raw, e = os.ReadFile(descriptorFile)
+	seedFullBrowser(t, ctx, pool, directory, descriptorFile, portalFiles, gateway.Config, options["websiteOrigin"].(string), options["adminOrigin"].(string))
+	raw, e := os.ReadFile(descriptorFile)
 	if e != nil {
 		t.Fatal(e)
 	}

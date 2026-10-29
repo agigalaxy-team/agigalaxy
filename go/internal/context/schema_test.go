@@ -2,7 +2,6 @@ package contextdata
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -28,7 +27,13 @@ func TestOriginalContextSchemasAndMaterialOrder(t *testing.T) {
 	badSecret := clone(v1)
 	badSecret["materials"] = []any{Object{"id": id, "label": "Selected", "mediaType": "text/plain", "content": "password=😀😀😀😀"}}
 	cases = append(cases, Object{"payload": badSecret})
-	expected := list(node(t, "postgres://127.0.0.1:1/galaxy_go_test_context_schema", "schema", filepath.Join(t.TempDir(), "context-fixture.json"), cases)["values"])
+	var fixture struct {
+		Input  []Object `json:"input"`
+		Values []Object `json:"values"`
+	}
+	fixtureJSON(t, "schema", &fixture)
+	same(t, cases, fixture.Input)
+	expected := fixture.Values
 	for i, c := range cases {
 		var p *ordered
 		var e error
@@ -37,7 +42,7 @@ func TestOriginalContextSchemasAndMaterialOrder(t *testing.T) {
 		} else {
 			p, e = parseGrant(string(encode(c["payload"])), c["v2"] == true)
 		}
-		want := obj(expected[i])
+		want := expected[i]
 		if e != nil {
 			if want["error"] != true {
 				t.Fatalf("schema%d Go=%v JS=%v", i, e, want)

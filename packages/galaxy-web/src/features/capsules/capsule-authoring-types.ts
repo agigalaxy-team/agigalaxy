@@ -1,9 +1,9 @@
 import type {ReactNode} from 'react';
 import type {z} from 'zod/v4';
-import type {capsuleEventV2Schema,capsulePermissionV2Schema,capsuleSourceV2Schema,capsuleUseV2Schema} from "../../../../galaxy-official/src/shared/capsule-v2-schema.mjs";
-import type {capsuleVersionSchema} from "../../../../galaxy-official/src/shared/capsule-schema.mjs";
-import type {configurationEventV2Schema} from "../../../../galaxy-official/src/shared/configuration-v2-schema.mjs";
-import type {verificationRecordSchema} from "../../../../galaxy-official/src/shared/verification-record-schema.mjs";
+import type {capsuleEventV2Schema,capsulePermissionV2Schema,capsuleSourceV2Schema,capsuleUseV2Schema} from "../../../../galaxy-contracts/src/capsule-v2-schema.mjs";
+import type {capsuleVersionSchema} from "../../../../galaxy-contracts/src/capsule-schema.mjs";
+import type {configurationEventV2Schema} from "../../../../galaxy-contracts/src/configuration-v2-schema.mjs";
+import type {verificationRecordSchema} from "../../../../galaxy-contracts/src/verification-record-schema.mjs";
 import type {ChoiceViewLease} from "../../shared/operations/choice-retained-operations";
 import type {createWebRuntime} from "../../runtime.mjs";
 import type {CapsuleAttributionResponses} from './capsule-attribution-responses';

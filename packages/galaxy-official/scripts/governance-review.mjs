@@ -1,6 +1,6 @@
 import { readFile,lstat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
-import { prepareGovernanceBundle } from '../src/operations/governance-review.mjs';
+import { prepareGovernanceBundle } from '../../galaxy-client/src/node/governance-review.mjs';
 try{
   const [path]=process.argv.slice(2);if(typeof path!=='string'||!isAbsolute(path))throw new Error();
   const info=await lstat(path);if(!info.isFile()||info.isSymbolicLink()||info.size>8192)throw new Error();

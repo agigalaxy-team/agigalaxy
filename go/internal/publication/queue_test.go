@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/access"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
@@ -24,23 +25,17 @@ import (
 
 func TestRestrictedPublisherQueueWithStoredCurrentAuthority(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
-	node(t, dsn, "setup")
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	config, files, snapshot, _, configPath := fixtureFiles(t)
-	root, _ := filepath.Abs("../../..")
 	execute := func(sql string, args ...any) {
 		t.Helper()
 		if _, e := pool.Exec(ctx, sql, args...); e != nil {
 			t.Fatal(e)
 		}
 	}
-	for _, name := range []string{"api-role.sql", "worker-role.sql", "content-publisher-role.sql"} {
-		b, e := os.ReadFile(filepath.Join(root, "packages/galaxy-official/src/infrastructure", name))
-		if e != nil {
-			t.Fatal(e)
-		}
-		execute(string(b))
+	if _, err := databaseschema.Migrate(ctx, pool, []string{"api", "worker", "content-publisher"}); err != nil {
+		t.Fatal(err)
 	}
 	tx, e := pool.Begin(ctx)
 	if e != nil {

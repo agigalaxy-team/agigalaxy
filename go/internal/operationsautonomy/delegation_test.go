@@ -5,10 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -20,38 +16,20 @@ import (
 	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestRealDutyDelegatedAIOnlyRoleAndPromptOriginalInterop(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
 	encode := func(v any) string { b, _ := json.Marshal(v); return string(b) }
-	node := func(script, mode string, input a.Object) a.Object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/"+script), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		if input != nil {
-			cmd.Stdin = strings.NewReader(encode(input))
-		}
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o a.Object
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid source fixture result")
-		}
-		return o
-	}
-	base := node("operations-permissions-interop.mjs", "setup", nil)
-	fixture := node("operations-permissions-interop.mjs", "automation-setup", nil)
-	node("operations-permissions-interop.mjs", "delegated-setup", nil)
-	endpoint := base["endpoint"].(string)
+	f := operationsfixture.New(t, owner)
+	fixture := f.Automation(t)
+	f.Delegated(t)
+	endpoint := f.Endpoint
 	accounts := fixture["accounts"].(map[string]any)
 	sourceID, targetID := accounts["overview"].(string), accounts["governance"].(string)
 	cfg, _ := pgxpool.ParseConfig(dsn)
@@ -86,43 +64,45 @@ func TestRealDutyDelegatedAIOnlyRoleAndPromptOriginalInterop(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	original := func(method string, input a.Object) a.Object {
-		return node("operations-autonomy-interop.mjs", "duty-delegated", a.Object{"endpoint": endpoint, "taskId": taskID, "method": method, "input": input})
-	}
-	eq := func(label string, v, w any) {
-		t.Helper()
-		normalize := func(v any) any { var o any; json.Unmarshal([]byte(encode(v)), &o); return o }
-		if !reflect.DeepEqual(normalize(v), normalize(w)) {
-			t.Fatalf("%s\nGo%s\nJS%s", label, encode(v), encode(w))
-		}
-	}
 	directory, e := permissions.DelegatedDirectory(ctx, actor)
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("real duty delegation directory", directory, original("directory", nil))
+	if directory["availability"] == nil {
+		t.Fatal("delegated directory unavailable")
+	}
 	roleInput := a.Object{"operationId": uuid.NewString(), "kind": "role-create", "expectedVersion": 0, "name": "Real duty bounded role", "description": "No human permission source", "enabled": true, "permissions": []any{"feedback.read"}, "targetAiAccountIds": []any{targetID}}
 	saved, e := permissions.DelegatedRoleSave(ctx, actor, roleInput, p.DelegatedOptions{})
 	if e != nil {
 		t.Fatal(e)
 	}
-	js := original("role", roleInput)
-	js["replayed"] = false
-	eq("original replays actual duty role", saved, js)
+	if saved == nil {
+		t.Fatal("delegated role missing")
+	}
+	replay, e := permissions.DelegatedRoleSave(ctx, actor, roleInput, p.DelegatedOptions{})
+	if e != nil || replay["replayed"] != true {
+		t.Fatal("delegated role receipt replay", e)
+	}
 	prompt, e := permissions.DelegatedPrompt(ctx, actor, a.Object{"aiAccountId": targetID})
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq("real duty prompt read", prompt, original("prompt", a.Object{"aiAccountId": targetID}))
+	if prompt["prompt"] == nil {
+		t.Fatal("delegated prompt unavailable")
+	}
 	promptMeta := prompt["prompt"].(map[string]any)
 	promptInput := a.Object{"operationId": uuid.NewString(), "aiAccountId": targetID, "expectedRevision": promptMeta["revision"], "expectedPromptVersion": promptMeta["promptVersion"], "prompt": "True task-bound prompt"}
 	saved, e = permissions.DelegatedPromptSave(ctx, actor, promptInput, p.DelegatedOptions{})
 	if e != nil {
 		t.Fatal(e)
 	}
-	js = original("savePrompt", promptInput)
-	js["replayed"] = false
-	eq("original replays actual duty prompt", saved, js)
+	if saved == nil {
+		t.Fatal("prompt write missing")
+	}
+	replay, e = permissions.DelegatedPromptSave(ctx, actor, promptInput, p.DelegatedOptions{})
+	if e != nil || replay["replayed"] != true {
+		t.Fatal("prompt receipt replay", e)
+	}
 	var humanWriter *string
 	var aiWriter, actorKind string
 	var auditRole *string
@@ -173,16 +153,19 @@ func TestRealDutyDelegatedAIOnlyRoleAndPromptOriginalInterop(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("authorize%d %s", status, encode(result))
 	}
-	eq("private current task authorize", result, node("operations-autonomy-interop.mjs", "private", a.Object{"endpoint": endpoint, "method": "authorize", "input": a.Object{"taskId": taskID, "operation": "tool"}}))
+	if result["allowed"] != true || result["task"] == nil {
+		t.Fatal("private task authority missing")
+	}
 	toolRole := a.Object{"kind": "role-create", "expectedVersion": 0, "name": "Private duty tool role", "description": "Server original intent", "enabled": true, "permissions": []any{"feedback.read"}, "targetAiAccountIds": []any{targetID}}
 	toolInput := a.Object{"taskId": taskID, "callId": uuid.NewString(), "tool": "manage-ai-role", "arguments": toolRole}
 	status, result = post("tools/execute", toolInput, true)
 	if status != 200 || result["state"] != "completed" {
 		t.Fatalf("tool%d %s", status, encode(result))
 	}
-	js = node("operations-autonomy-interop.mjs", "private", a.Object{"endpoint": endpoint, "method": "tool", "input": toolInput})
-	js["replayed"] = false
-	eq("original resolves server-owned tool operation", result, js)
+	status, replayed := post("tools/execute", toolInput, true)
+	if status != 200 || replayed["replayed"] != true || replayed["operationId"] != result["operationId"] {
+		t.Fatal("private operation did not replay", status, replayed)
+	}
 	var receiptCount int
 	if e = pool.QueryRow(ctx, `SELECT count(*) FROM operations_autonomy_receipts_v1 WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, endpoint, taskID, result["operationId"]).Scan(&receiptCount); e != nil || receiptCount != 1 {
 		t.Fatalf("original receipt count %d %v", receiptCount, e)

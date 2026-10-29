@@ -1,0 +1,28 @@
+{
+  "input": [
+    {
+      "actor": true,
+      "input": {
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+        "version": 1
+      },
+      "kind": "use-read"
+    }
+  ],
+  "results": [
+    {
+      "value": {
+        "id": "b1fe7ffb-2a4e-456d-babc-fe052ee5e7c5",
+        "subjectId": "GUID1501M61XNTKCXKC1CG3ZVSG2AA32",
+        "version": 1,
+        "currentVersion": 3,
+        "state": "revoked",
+        "workerStarted": false,
+        "successfulReuseVerified": false,
+        "professionalCapabilityVerified": false,
+        "record": null,
+        "sourceStatus": "revoked"
+      }
+    }
+  ]
+}

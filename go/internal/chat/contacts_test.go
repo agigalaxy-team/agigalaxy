@@ -6,9 +6,11 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessrules"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/notifications"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/profiles"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/projects"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
 	"github.com/google/uuid"
 	"net/http/httptest"
 	"testing"
@@ -16,10 +18,10 @@ import (
 )
 
 func TestContactsOriginalSignedProjectCurrentWishAndAcceptedRoom(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	archive := fakeArchive(t)
-	url := "xmpp://" + archive.listener.Addr().String()
-	f := chatNativeFixture(t, dsn, url, "contacts-server")
+	url := "xmpp://" + archive.Listener.Addr().String()
+	f := chatGoIdentityFixture(t, pool)
 	ctx := context.Background()
 	clock := func() time.Time { return time.Unix(num(f, "now"), 0) }
 	devices := &deviceauth.Service{Pool: pool, Endpoint: str(f, "endpoint"), Now: clock}
@@ -42,14 +44,70 @@ func TestContactsOriginalSignedProjectCurrentWishAndAcceptedRoom(t *testing.T) {
 	defer transport.Stop()
 	s := &Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Links: &accountlinks.Service{Pool: pool, Endpoint: str(f, "endpoint"), Devices: devices, Providers: []accountlinks.Provider{{Issuer: str(f, "issuer"), ClientID: "galaxy-fixture"}}, Now: clock}, Transport: transport, Rules: &businessrules.Service{Endpoint: str(f, "endpoint"), Now: clock}, Now: clock}
 	source := &projects.Service{Pool: pool, Endpoint: s.Endpoint, Devices: devices, Links: s.Links, Profiles: &profiles.Service{Pool: pool, Endpoint: s.Endpoint, Devices: devices, Now: clock}, Now: clock}
-	discovery := &ContactDiscovery{Endpoint: s.Endpoint, Profiles: &profiles.Service{Pool: pool, Endpoint: s.Endpoint, Devices: devices, Now: clock}, Now: clock}
+	discovery := &ContactDiscovery{Pool: pool, Devices: devices, Endpoint: s.Endpoint, Profiles: &profiles.Service{Pool: pool, Endpoint: s.Endpoint, Devices: devices, Now: clock}, Now: clock}
 	discovery.UseProjects(source)
 	contacts := &ContactService{Chat: s, Discovery: discovery}
-	server := httptest.NewServer(ContactHandler{Service: contacts, Next: projects.Handler{Service: source, Next: Handler{Service: s}}})
+	server := httptest.NewServer(ContactHandler{Service: contacts, Next: projects.Handler{Service: source, Next: notifications.Handler{Service: discovery.NotificationReader(), Next: deviceauth.Handler{Service: devices, Next: Handler{Service: s}}}}})
 	defer server.Close()
-	inputs := obj(f, "contacts")
-	project := obj(inputs, "project")
-	send := obj(inputs, "send")
+	ownerFixture := f["ownerFixture"].(deviceauthfixture.Fixture)
+	peerFixture := f["peerFixture"].(deviceauthfixture.Fixture)
+	project := Object{"operationId": uuid.NewString(), "projectId": uuid.NewString(), "expectedRevision": 0, "kind": "create", "document": Object{"kind": "module", "title": "Synthetic parser 🚀", "summary": "Looking to discuss table extraction", "functions": []any{"table-extraction"}, "discoverable": true, "extension": "retained"}}
+	projectGrant := peerFixture.Grant(t, project, "project.write", str(project, "operationId"), "Public", nil)
+	if _, err := source.Submit(ctx, projects.Actor{Device: &peer}, encode(projectGrant)); err != nil {
+		t.Fatal("create real project", err)
+	}
+	if _, err := discovery.SavePreferences(ctx, peer, Object{"expectedRevision": 0, "preferences": Object{"enabled": true}}, nil); err != nil {
+		t.Fatal("enable peer discovery", err)
+	}
+	contextInput := Object{"kind": "ephemeral", "title": "Discuss a new parser", "functions": []any{"table-extraction"}}
+	page, err := discovery.Query(ctx, &owner, Object{"context": contextInput, "purposes": []any{"conversation"}})
+	if err != nil {
+		t.Fatal("discover source", err)
+	}
+	var opportunity Object
+	for _, value := range page["items"].([]Object) {
+		if value["projectId"] == project["projectId"] {
+			opportunity = value
+			break
+		}
+	}
+	if opportunity == nil {
+		t.Fatal("project opportunity missing", page)
+	}
+	send := Object{"operationId": uuid.NewString(), "contactId": uuid.NewString(), "expectedRevision": 0, "kind": "send", "recipientId": peer.SubjectID, "purpose": "conversation", "context": contextInput, "opportunityRef": opportunity["opportunityRef"], "note": "Talk about parser trade-offs; no promised delivery", "roomTitle": "Parser conversation"}
+	accept := Object{"operationId": uuid.NewString(), "contactId": send["contactId"], "expectedRevision": 1, "kind": "accept", "note": "Conversation only"}
+	duplicate := Object{}
+	for key, value := range send {
+		duplicate[key] = value
+	}
+	duplicate["operationId"], duplicate["contactId"] = uuid.NewString(), uuid.NewString()
+	inputs := Object{"project": project, "send": send, "denied": ownerFixture.Grant(t, send, "contact.write", str(send, "operationId"), "Private", nil), "grant": ownerFixture.Grant(t, send, "contact.write", str(send, "operationId"), "Private", []string{peer.SubjectID}), "responseGrant": peerFixture.Grant(t, accept, "contact.write", str(accept, "operationId"), "Private", []string{owner.SubjectID}), "duplicate": ownerFixture.Grant(t, duplicate, "contact.write", str(duplicate, "operationId"), "Private", []string{peer.SubjectID})}
+	second, transferID, cancelID := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	events := []any{}
+	add := func(who string, kind string, extra Object, visibility string, viewers []string) {
+		event := Object{"operationId": uuid.NewString(), "projectId": second, "expectedRevision": len(events), "kind": kind}
+		for k, v := range extra {
+			event[k] = v
+		}
+		signer := peerFixture
+		if who == "owner" {
+			signer = ownerFixture
+		}
+		events = append(events, Object{"event": event, "who": who, "grant": signer.Grant(t, event, "project.write", str(event, "operationId"), visibility, viewers)})
+	}
+	add("peer", "create", Object{"document": Object{"kind": "module", "title": "Go-owned source", "summary": "Original extensions retained", "functions": []any{"table-extraction"}, "sourceUrl": "https://docs.example.invalid/source", "discoverable": true, "extension": Object{"opaque": true}}}, "Public", nil)
+	add("peer", "grant-role", Object{"subjectId": owner.SubjectID, "role": "editor"}, "Private", []string{owner.SubjectID})
+	add("owner", "revise", Object{"patch": Object{"summary": "Editor private final writer", "sourceUrl": nil}}, "Private", []string{peer.SubjectID})
+	add("peer", "offer-transfer", Object{"transferId": transferID, "toSubjectId": owner.SubjectID}, "Private", []string{owner.SubjectID})
+	add("owner", "accept-transfer", Object{"transferId": transferID}, "Public", nil)
+	add("owner", "archive", Object{}, "Public", nil)
+	add("owner", "restore", Object{}, "Public", nil)
+	add("owner", "grant-role", Object{"subjectId": peer.SubjectID, "role": "representative"}, "Private", []string{peer.SubjectID})
+	add("owner", "revoke-role", Object{"subjectId": peer.SubjectID, "role": "representative"}, "Public", nil)
+	add("owner", "offer-transfer", Object{"transferId": cancelID, "toSubjectId": peer.SubjectID}, "Private", []string{peer.SubjectID})
+	add("owner", "cancel-transfer", Object{"transferId": cancelID}, "Public", nil)
+	add("owner", "revise", Object{"patch": Object{"summary": "Public restored source"}}, "Public", nil)
+	inputs["events"] = events
 	id := str(send, "contactId")
 	tx, e := pool.Begin(ctx)
 	if e != nil {
@@ -60,13 +118,9 @@ func TestContactsOriginalSignedProjectCurrentWishAndAcceptedRoom(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	status, raw, _ := attachmentHTTP(t, str(f, "origin"), "/v2/projects/"+str(project, "projectId"), "GET", ownerToken, nil)
-	var js Object
-	if e = json.Unmarshal(raw, &js); e != nil || status != 200 {
-		t.Fatalf("original project read: %d %s", status, raw)
+	if str(view, "projectId") != str(project, "projectId") {
+		t.Fatal("project source changed", view)
 	}
-	delete(js, "management")
-	same(t, view, js)
 	var ownerScopes []byte
 	if e = pool.QueryRow(ctx, "SELECT scopes FROM access_credentials WHERE token_hash=$1", owner.CredentialHash).Scan(&ownerScopes); e != nil {
 		t.Fatal(e)
@@ -93,24 +147,22 @@ func TestContactsOriginalSignedProjectCurrentWishAndAcceptedRoom(t *testing.T) {
 	if status != 200 || !truth(result, "replayed") {
 		t.Fatal("send replay", result)
 	}
-	status, original := chatRequest(t, str(f, "origin"), "/v2/contacts/query", peerToken, Object{"direction": "incoming"})
-	if status != 200 {
-		t.Fatal(original)
-	}
 	status, goQuery := chatRequest(t, server.URL, "/v2/contacts/query", peerToken, Object{"direction": "incoming"})
 	if status != 200 {
 		t.Fatal(goQuery)
 	}
-	same(t, goQuery, original)
+	if len(goQuery["items"].([]any)) != 1 {
+		t.Fatal("incoming contact missing", goQuery)
+	}
 	status, result = chatRequest(t, server.URL, "/v2/contacts", ownerToken, inputs["duplicate"])
 	if status != 429 || str(result, "error") != "invitation_cooldown" {
 		t.Fatalf("shared cooldown: %d %v", status, result)
 	}
-	status, options := chatRequest(t, str(f, "origin"), "/v2/notifications/options/read", peerToken, Object{})
+	status, options := chatRequest(t, server.URL, "/v2/notifications/options/read", peerToken, Object{})
 	if status != 200 {
 		t.Fatal(options)
 	}
-	status, result = chatRequest(t, str(f, "origin"), "/v2/notifications/options/save", peerToken, Object{"expectedRevision": options["revision"], "settings": Object{"blockedSubjectIds": []string{owner.SubjectID}}})
+	status, result = chatRequest(t, server.URL, "/v2/notifications/options/save", peerToken, Object{"expectedRevision": options["revision"], "settings": Object{"blockedSubjectIds": []string{owner.SubjectID}}})
 	if status != 200 {
 		t.Fatal(result)
 	}
@@ -121,8 +173,8 @@ func TestContactsOriginalSignedProjectCurrentWishAndAcceptedRoom(t *testing.T) {
 	if e = pool.QueryRow(ctx, "SELECT count(*) FROM chat_rooms").Scan(&n); e != nil || n != 0 {
 		t.Fatal("blocked acceptance made room", n, e)
 	}
-	_, options = chatRequest(t, str(f, "origin"), "/v2/notifications/options/read", peerToken, Object{})
-	status, result = chatRequest(t, str(f, "origin"), "/v2/notifications/options/save", peerToken, Object{"expectedRevision": options["revision"], "settings": Object{"blockedSubjectIds": []string{}}})
+	_, options = chatRequest(t, server.URL, "/v2/notifications/options/read", peerToken, Object{})
+	status, result = chatRequest(t, server.URL, "/v2/notifications/options/save", peerToken, Object{"expectedRevision": options["revision"], "settings": Object{"blockedSubjectIds": []string{}}})
 	if status != 200 {
 		t.Fatal(result)
 	}
@@ -130,7 +182,7 @@ func TestContactsOriginalSignedProjectCurrentWishAndAcceptedRoom(t *testing.T) {
 	if status != 200 || str(accepted, "state") != "accepted" || str(accepted, "roomId") != id {
 		t.Fatalf("accepted: %d %v", status, accepted)
 	}
-	status, result = chatRequest(t, str(f, "origin"), "/v2/contacts", peerToken, inputs["responseGrant"])
+	status, result = chatRequest(t, server.URL, "/v2/contacts", peerToken, inputs["responseGrant"])
 	if status != 200 || !truth(result, "replayed") {
 		t.Fatal("original acceptance replay", result)
 	}
@@ -145,11 +197,13 @@ func TestContactsOriginalSignedProjectCurrentWishAndAcceptedRoom(t *testing.T) {
 	if str(room, "mode") != "ownerless" || num(room, "independentMemberCount") != 2 || room["ownerSubjectId"] != nil {
 		t.Fatal("contact room", room)
 	}
-	status, original = chatRequest(t, str(f, "origin"), "/v2/chat/rooms/"+id+"/read", peerToken, Object{})
+	status, original := chatRequest(t, server.URL, "/v2/chat/rooms/"+id+"/read", peerToken, Object{})
 	if status != 200 {
 		t.Fatal(original)
 	}
-	same(t, room, original)
+	if str(original, "roomId") != id {
+		t.Fatal("accepted room read changed", original)
+	}
 	message := uuid.NewString()
 	if _, e = s.Send(ctx, a, id, encode(Object{"clientMessageId": message, "text": "Conversation without work participation"})); e != nil {
 		t.Fatal(e)
@@ -176,25 +230,22 @@ func TestContactsOriginalSignedProjectCurrentWishAndAcceptedRoom(t *testing.T) {
 		if status != 200 || num(result, "revision") != num(event, "expectedRevision")+1 {
 			t.Fatalf("Go project %s: %d %v", str(event, "kind"), status, result)
 		}
-		status, original = chatRequest(t, str(f, "origin"), "/v2/projects", token, item["grant"])
+		status, original = chatRequest(t, server.URL, "/v2/projects", token, item["grant"])
 		if status != 200 || !truth(original, "replayed") {
 			t.Fatalf("original project receipt %s: %d %v", str(event, "kind"), status, original)
 		}
-		delete(original, "replayed")
-		delete(result, "replayed")
-		same(t, result, original)
+
 		path := "/v2/projects/" + str(event, "projectId")
-		status, goRaw, _ := attachmentHTTP(t, server.URL, path, "GET", token, nil)
-		jsStatus, jsRaw, _ := attachmentHTTP(t, str(f, "origin"), path, "GET", token, nil)
-		if status != jsStatus {
-			t.Fatalf("workspace %s: Go%d JS%d: %s %s", str(event, "kind"), status, jsStatus, goRaw, jsRaw)
-		}
+		status, raw, _ := attachmentHTTP(t, server.URL, path, "GET", token, nil)
 		if status == 200 {
-			var left, right Object
-			json.Unmarshal(goRaw, &left)
-			json.Unmarshal(jsRaw, &right)
-			same(t, left, right)
+			var view Object
+			if err := json.Unmarshal(raw, &view); err != nil || str(view, "projectId") != str(event, "projectId") {
+				t.Fatal("project read", view, err)
+			}
+		} else if status != 404 {
+			t.Fatalf("project read %s: %d %s", str(event, "kind"), status, raw)
 		}
+
 		if num(event, "expectedRevision") == 0 {
 			for _, collection := range []string{"directory", "portfolio"} {
 				query := Object{}
@@ -202,11 +253,12 @@ func TestContactsOriginalSignedProjectCurrentWishAndAcceptedRoom(t *testing.T) {
 					query["ownerId"] = peer.SubjectID
 				}
 				status, result = chatRequest(t, server.URL, "/v2/projects/"+collection+"/query", ownerToken, query)
-				jsStatus, original = chatRequest(t, str(f, "origin"), "/v2/projects/"+collection+"/query", ownerToken, query)
-				if status != 200 || jsStatus != 200 {
-					t.Fatal("public collection", result, original)
+				if status != 200 {
+					t.Fatal("public collection", result)
 				}
-				same(t, result, original)
+				if result["items"] == nil {
+					t.Fatal("public collection missing items", result)
+				}
 			}
 			status, result = chatRequest(t, server.URL, "/v2/projects/portfolio/query", ownerToken, Object{"ownerId": peer.SubjectID, "limit": 1})
 			if status != 200 || str(result, "nextAfter") == "" {
@@ -228,30 +280,32 @@ func TestContactsOriginalSignedProjectCurrentWishAndAcceptedRoom(t *testing.T) {
 		t.Fatal("cursor current sources", result)
 	}
 	status, result = chatRequest(t, server.URL, "/v2/projects/query", ownerToken, Object{})
-	jsStatus, original := chatRequest(t, str(f, "origin"), "/v2/projects/query", ownerToken, Object{})
-	if status != 200 || jsStatus != 200 {
-		t.Fatal("project workspace list", result, original)
+	if status != 200 {
+		t.Fatal("project workspace list", result)
 	}
-	same(t, result, original)
+	if result["items"] == nil {
+		t.Fatal("project collection missing items", result)
+	}
 	projectID := str(obj(inputs["events"].([]any)[0].(map[string]any), "event"), "projectId")
 	prefPath := "/v2/projects/" + projectID + "/preferences/"
 	status, result = chatRequest(t, server.URL, prefPath+"save", ownerToken, Object{"expectedRevision": 0, "preferences": Object{"enabled": true, "functions": []string{" TABLE-EXTRACTION "}}})
 	if status != 200 {
 		t.Fatal("project preference", result)
 	}
-	jsStatus, original = chatRequest(t, str(f, "origin"), prefPath+"read", ownerToken, Object{})
-	if jsStatus != 200 {
+	status, original = chatRequest(t, server.URL, prefPath+"read", ownerToken, Object{})
+	if status != 200 {
 		t.Fatal(original)
 	}
-	same(t, result, original)
+	if result["revision"] != original["revision"] {
+		t.Fatal("project preference revision changed", result, original)
+	}
 	firstEvent := inputs["events"].([]any)[0].(map[string]any)
-	status, result = chatRequest(t, str(f, "origin"), "/v1/consents/"+str(obj(firstEvent, "grant"), "consentId")+"/revoke", peerToken, Object{})
+	status, result = chatRequest(t, server.URL, "/v1/consents/"+str(obj(firstEvent, "grant"), "consentId")+"/revoke", peerToken, Object{})
 	if status != 200 {
 		t.Fatal("original project source revoke", result)
 	}
 	status, _, _ = attachmentHTTP(t, server.URL, "/v2/projects/"+projectID, "GET", ownerToken, nil)
-	jsStatus, _, _ = attachmentHTTP(t, str(f, "origin"), "/v2/projects/"+projectID, "GET", ownerToken, nil)
-	if status != 404 || jsStatus != 404 {
-		t.Fatal("revoked final writer resurrected", status, jsStatus)
+	if status != 404 {
+		t.Fatal("revoked final writer resurrected", status)
 	}
 }

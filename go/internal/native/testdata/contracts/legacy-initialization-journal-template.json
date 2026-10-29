@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "identity": {
+    "version": 2,
+    "id": "__ID__",
+    "genesisProof": {
+      "version": 1,
+      "publicKeyPem": "__PUBLIC__",
+      "nonce": "__NONCE__"
+    },
+    "idFormat": "guid-32-v1",
+    "birthOrigin": "local",
+    "birthOriginCode": "0",
+    "subjectType": "person",
+    "clientKind": "normal",
+    "publicKeyFingerprint": "__FINGERPRINT__",
+    "keyAlgorithm": "Ed25519",
+    "createdAt": "__CREATED__",
+    "localOnly": true,
+    "transport": "none",
+    "note": "This Galaxy ID was created locally. It has not been registered, verified, or uploaded."
+  },
+  "privateKeyPem": "__PRIVATE__",
+  "publicKeyPem": "__PUBLIC__",
+  "state": {
+    "version": 2,
+    "integration": null,
+    "uploadPrivacy": {
+      "version": 1,
+      "revision": 0,
+      "level": "history-overview",
+      "includeFullConversations": false,
+      "sessionIds": []
+    },
+    "cases": [],
+    "disclosurePlans": [],
+    "consentGrants": [],
+    "localProofDrafts": [],
+    "auditEvents": [
+      {
+        "id": "__EVENT__",
+        "action": "galaxy_id.initialized",
+        "subjectId": "__ID__",
+        "occurredAt": "__CREATED__",
+        "details": {
+          "localOnly": true
+        }
+      }
+    ]
+  }
+}

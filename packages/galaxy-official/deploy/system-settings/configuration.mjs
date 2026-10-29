@@ -7,7 +7,7 @@ import {SystemSettingsRuntime,SystemSettingsControlClient} from './runtime.mjs';
 import {UnifiedMailAdapter} from './mail-runtime.mjs';
 import {SystemSettingsKeycloakMail} from './mail-native.mjs';
 import {ServiceConnectionsAdapter} from './service-connections-runtime.mjs';
-import {serviceConnectionTargets} from '../../src/operations/system-settings/service-connections.mjs';
+import {serviceConnectionTargets} from '../support/service-connections.mjs';
 
 const absolute=z.string().refine(isAbsolute),permanent=absolute.refine(value=>value.startsWith('/etc/galaxy/')||value.startsWith('/var/lib/galaxy/config/'));
 const pair=z.strictObject({api:permanent,worker:permanent});

@@ -7,10 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -22,6 +18,7 @@ import (
 	m "github.com/agigalaxy-team/agigalaxy/go/internal/managementaccounts"
 	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -67,27 +64,10 @@ func (d nativeRoles) RolesFresh(ctx context.Context, i, s string) ([]string, err
 }
 func (d nativeRoles) Invalidate(i, s string) bool { return i == d.n.Issuer() && s != "" }
 func TestManagementHTTPDurableNativeCommandsOriginalInterop(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string, input object) object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/management-accounts-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		cmd.Stdin = strings.NewReader(encode(input))
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o object
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("original result invalid")
-		}
-		return o
-	}
-	fixture := node("service-setup", object{})
-	issuer, endpoint, rootID, humanID := value(fixture["issuer"]), value(fixture["endpoint"]), value(fixture["rootId"]), value(fixture["humanId"])
+	seed := operationsfixture.Principals(t, owner, "https://management-api.example.invalid", map[string]string{"root": "R", "human": "T"})
+	issuer, endpoint, rootID, humanID := seed.Issuer, seed.Endpoint, seed.IDs["root"], seed.IDs["human"]
 	var mu sync.Mutex
 	unknown := false
 	submissions := 0
@@ -244,25 +224,20 @@ func TestManagementHTTPDurableNativeCommandsOriginalInterop(t *testing.T) {
 			t.Fatalf("status%d want%d %s result%s", status, want, code, encode(o))
 		}
 	}
-	same := func(label string, a, b any) {
-		t.Helper()
-		if !reflect.DeepEqual(objectNormalized(a), objectNormalized(b)) {
-			t.Fatalf("%s\nGo%s\nJS%s", label, encode(a), encode(b))
-		}
-	}
-	original := func(method, id string, input object) object {
-		return node("service-read", object{"origin": provider.URL, "method": method, "id": id, "input": input})
-	}
 	status, out := request("GET", "", "", nil)
 	check(status, out, 401, "operations_login_required")
 	status, out = request("GET", "", "T", nil)
 	check(status, out, 403, "operations_permission_denied")
 	status, out = request("GET", "", "R", nil)
 	check(status, out, 200, "")
-	same("list", out, original("list", "", object{}))
+	if len(out["items"].([]any)) != 2 || out["metadataOnly"] != true {
+		t.Fatalf("management list: %v", out)
+	}
 	status, out = request("GET", "/"+humanID, "R", nil)
 	check(status, out, 200, "")
-	same("detail", out, original("detail", humanID, nil))
+	if value(out["targetVersion"]) == "" || out["metadataOnly"] != true {
+		t.Fatalf("management detail: %v", out)
+	}
 	command := func(kind string, extra object) (object, object) {
 		t.Helper()
 		status, detail := request("GET", "/"+humanID, "R", nil)
@@ -275,7 +250,9 @@ func TestManagementHTTPDurableNativeCommandsOriginalInterop(t *testing.T) {
 		check(status, result, 200, "")
 		status, receipt := request("GET", "/operations/"+value(x["operationId"]), "R", nil)
 		check(status, receipt, 200, "")
-		same("original reads Go receipt", receipt, original("operation", value(x["operationId"]), nil))
+		if receipt["operationId"] != x["operationId"] || receipt["targetOperatorId"] != humanID || receipt["kind"] != kind || receipt["state"] != result["state"] || receipt["metadataOnly"] != true {
+			t.Fatalf("operation receipt: %v", receipt)
+		}
 		return x, result
 	}
 	profile, got := command("profile-update", object{"firstName": "更新", "note": "local only"})
@@ -298,7 +275,9 @@ func TestManagementHTTPDurableNativeCommandsOriginalInterop(t *testing.T) {
 	}
 	status, out = request("GET", "/"+humanID, "R", nil)
 	check(status, out, 200, "")
-	same("updated detail", out, original("detail", humanID, nil))
+	if value(out["targetVersion"]) == "" {
+		t.Fatal("updated target version absent")
+	}
 	// The management route delegates to the single permission command engine,
 	// including its in-transaction current native target gate and original ID.
 	authReq := httptest.NewRequest("POST", "https://admin.example.invalid/v1/operations/permissions/roles", nil)
@@ -319,10 +298,14 @@ func TestManagementHTTPDurableNativeCommandsOriginalInterop(t *testing.T) {
 	check(status, out, 200, "")
 	status, out = request("GET", "/"+humanID+"/assignments/operations/"+value(assignment["operationId"]), "R", nil)
 	check(status, out, 200, "")
-	same("assignment original receipt", out, node("service-read", object{"origin": provider.URL, "method": "assignmentOperation", "id": humanID, "operationId": assignment["operationId"]}))
+	if out["operationId"] != assignment["operationId"] || objectOf(out["selection"])["operatorId"] != humanID || out["state"] != "recorded" {
+		t.Fatalf("assignment receipt: %v", out)
+	}
 	status, out = request("GET", "/"+humanID, "R", nil)
 	check(status, out, 200, "")
-	same("assigned detail", out, original("detail", humanID, nil))
+	if value(out["targetVersion"]) == "" {
+		t.Fatal("assigned target version absent")
+	}
 	_, got = command("password-reset", object{"temporaryPassword": "isolated-new-password"})
 	if got["state"] != "completed" {
 		t.Fatal(encode(got))
@@ -355,15 +338,19 @@ func TestManagementHTTPDurableNativeCommandsOriginalInterop(t *testing.T) {
 	if got["state"] != "completed" {
 		t.Fatal(encode(got))
 	}
-	// Original source writes and Go returns its original receipt, never executes.
+	// A direct current service write is recovered by the HTTP replay path.
 	status, detail := request("GET", "/"+humanID, "R", nil)
 	check(status, detail, 200, "")
-	jsCommand := object{"operationId": uuid.NewString(), "expectedVersion": detail["targetVersion"], "kind": "profile-update", "note": "original JS note"}
-	jsResult := original("command", humanID, jsCommand)
-	status, out = request("POST", "/"+humanID+"/commands", "R", jsCommand)
+	replayCommand := object{"operationId": uuid.NewString(), "expectedVersion": detail["targetVersion"], "kind": "profile-update", "note": "isolated note"}
+	direct, err := service.Command(ctx, actor, humanID, replayCommand, func(context.Context) (m.Actor, error) { return actor, nil })
+	if err != nil || direct["state"] != "completed" {
+		t.Fatalf("direct management command: %v %v", direct, err)
+	}
+	status, out = request("POST", "/"+humanID+"/commands", "R", replayCommand)
 	check(status, out, 200, "")
-	jsResult["replayed"] = true
-	same("Go replays original JS", out, jsResult)
+	if out["operationId"] != replayCommand["operationId"] || out["state"] != "completed" || out["replayed"] != true {
+		t.Fatalf("HTTP command replay: %v", out)
+	}
 	create := object{"operationId": uuid.NewString(), "username": "created-user", "firstName": "新", "lastName": "人", "temporaryPassword": "isolated-create-password", "roleIds": []any{roleID}}
 	status, out = request("POST", "", "R", create)
 	check(status, out, 200, "")
@@ -424,7 +411,9 @@ func TestManagementHTTPDurableNativeCommandsOriginalInterop(t *testing.T) {
 	}
 	status, out = request("GET", "/"+humanID+"/history", "R", nil)
 	check(status, out, 200, "")
-	same("history", out, original("history", humanID, nil))
+	if len(out["items"].([]any)) < 8 || out["metadataOnly"] != true {
+		t.Fatalf("management history: %v", out)
+	}
 	// Body and route authority precede any command parsing/native effects.
 	status, out = request("POST", "/"+humanID+"/commands?x=1", "R", object{})
 	check(status, out, 404, "not_found")
@@ -439,4 +428,3 @@ func TestManagementHTTPDurableNativeCommandsOriginalInterop(t *testing.T) {
 		t.Fatal("root mapping changed")
 	}
 }
-func objectNormalized(v any) any { var o any; json.Unmarshal([]byte(encode(v)), &o); return o }

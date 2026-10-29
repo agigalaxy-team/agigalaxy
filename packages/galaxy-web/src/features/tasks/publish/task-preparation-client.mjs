@@ -1,5 +1,5 @@
 import {withholdTaskMaterialTree} from "../materials/task-material-client.mjs";
-import {sha256Hex} from "../../../../../galaxy-official/src/shared/web-primitives.mjs";
+import {sha256Hex} from "../../../../../galaxy-contracts/src/web-primitives.mjs";
 import {contactCandidates} from "../contact/task-contact-client.mjs";
 import {taskOriginReturn} from "../../help-search/help-origin-client.mjs";
 

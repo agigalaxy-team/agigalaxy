@@ -27,11 +27,7 @@ func TestRemoteChatOriginalInputDefaultsRefinementsAndStrictTools(t *testing.T) 
 	add("galaxy_chat_send", map[string]any{"roomId": id, "agentGrantId": id, "clientMessageId": id, "text": "\ufeff \n"})
 	add("galaxy_chat_send", map[string]any{"roomId": id, "agentGrantId": id, "clientMessageId": id, "text": "", "attachments": []any{map[string]any{"id": id, "sha256": strings.Repeat("a", 64)}}})
 	add("galaxy_chat_send", map[string]any{"roomId": id, "agentGrantId": id, "clientMessageId": id, "text": "content", "unknown": true})
-	path := filepath.Join(t.TempDir(), "cases.json")
-	if e := writeJSON(path, cases); e != nil {
-		t.Fatal(e)
-	}
-	original := initializationNode(t, `import {readFile} from 'node:fs/promises';import {chatToolDefinitions} from './packages/galaxy-official/src/adapters/mcp/personal/tools/chat-v2.mjs';const tools=chatToolDefinitions({chat:{}},null),cases=JSON.parse(await readFile(process.argv[1],'utf8'));console.log(JSON.stringify({items:cases.map(x=>{const parsed=tools[x.name].inputSchema.safeParse(x.input);return parsed.success?{ok:true,value:parsed.data}:{ok:false}})}));`, path)
+	original := readNativeContractFixture(t, "chat-input-v1.json")
 	for i, item := range uploadRows(original["items"]) {
 		expected := uploadObject(item)
 		value, e := remoteChatNormalize(text(cases[i]["name"]), cases[i]["input"])

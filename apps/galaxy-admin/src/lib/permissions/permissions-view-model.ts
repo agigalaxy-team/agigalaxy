@@ -1,6 +1,6 @@
 import type {AutomationAiAccount,AutomationAiAccountOption,AutomationAiAccountOptions,AutomationAiBindingState,AutomationGrant,AutomationResourceScope,BusinessRole,ManagementPerson,PermissionAction,PermissionHistoryItem,PermissionOperationRead,PermissionRead,PermissionSave} from "../../components/permissions/permissions-types";
 
-import {requiresManagementMaintainer} from "../../../../../packages/galaxy-official/src/shared/operations-management-maintainer-actions.mjs";
+import {requiresManagementMaintainer} from "../../../../../packages/galaxy-contracts/src/operations-management-maintainer-actions.mjs";
 
 export type PermissionsTab='roles'|'personnel'|'automatic';
 export type PermissionsLocation={tab:PermissionsTab;id:string;after:string;trail:string[];roleId?:string;aiAccountId?:string};

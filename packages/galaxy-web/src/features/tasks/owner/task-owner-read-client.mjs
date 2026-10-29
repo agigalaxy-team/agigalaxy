@@ -1,5 +1,5 @@
-import { sha256Hex } from "../../../../../galaxy-official/src/shared/web-primitives.mjs";
-import { taskOwnerReadDescriptorV2Schema, taskOwnerReadPreviewV2Schema, taskOwnerReadResultV2Schema } from "../../../../../galaxy-official/src/shared/task-owner-read-v2-schema.mjs";
+import { sha256Hex } from "../../../../../galaxy-contracts/src/web-primitives.mjs";
+import { taskOwnerReadDescriptorV2Schema, taskOwnerReadPreviewV2Schema, taskOwnerReadResultV2Schema } from "../../../../../galaxy-contracts/src/task-owner-read-v2-schema.mjs";
 
 const projection = 'currently-authorized-authored-events';
 const clone = value => structuredClone(value);

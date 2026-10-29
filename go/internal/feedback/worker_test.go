@@ -3,10 +3,7 @@ package feedback
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
-	"os"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,6 +12,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/feedbackfixture"
 	"github.com/google/uuid"
 )
 
@@ -45,26 +43,7 @@ func TestFeedbackRiverOriginalLeasesPauseAndOwnerHEADRecovery(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	var fixture struct {
-		Accounts []string
-		Endpoint string
-	}
-	if e := json.Unmarshal(nodeFixture(t, dsn, "setup"), &fixture); e != nil {
-		t.Fatal(e)
-	}
-	root, e := filepath.Abs(filepath.Join("..", "..", ".."))
-	if e != nil {
-		t.Fatal(e)
-	}
-	for _, name := range []string{"api-role.sql", "worker-role.sql"} {
-		sql, e := os.ReadFile(filepath.Join(root, "packages", "galaxy-official", "src", "infrastructure", name))
-		if e != nil {
-			t.Fatal(e)
-		}
-		if _, e = pool.Exec(ctx, string(sql)); e != nil {
-			t.Fatal(e)
-		}
-	}
+	fixture := feedbackfixture.Create(t, pool, "api", "worker")
 	tx, e := pool.Begin(ctx)
 	if e != nil {
 		t.Fatal(e)

@@ -9,41 +9,23 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsqueries"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
 
 func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
+	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	node := func(mode string) Object {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		raw, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("fixture %v %s", e, raw)
-		}
-		var out Object
-		if json.Unmarshal(raw, &out) != nil {
-			t.Fatal("invalid fixture")
-		}
-		return out
-	}
-	base := node("setup")
-	node("automation-setup")
-	endpoint, issuer, idRoot := text(base, "endpoint"), text(base, "issuer"), text(object(base["ids"]), "root")
+	f := operationsfixture.New(t, owner)
+	f.Automation(t)
+	endpoint, issuer, idRoot := f.Endpoint, f.Issuer, f.IDs["root"]
 	cfg := owner.Config()
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)

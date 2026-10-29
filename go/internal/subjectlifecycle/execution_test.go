@@ -1,7 +1,6 @@
 package subjectlifecycle
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/cases"
@@ -14,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -22,28 +20,18 @@ import (
 	"time"
 )
 
-func executionNode(t *testing.T, dsn, mode, path string, input any) Object {
+// originalProjection freezes the one-time original implementation output.
+func originalProjection(t *testing.T, name string) Object {
 	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	command := exec.Command("node", filepath.Join(root, "go/internal/subjectlifecycle/testdata/execution.mjs"), mode, path)
-	command.Dir = root
-	command.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	raw, _ := protocol.EncodeJS(input)
-	command.Stdin = bytes.NewReader(raw)
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	out, e := command.Output()
+	raw, e := os.ReadFile(filepath.Join("testdata", "original-"+name+".json"))
 	if e != nil {
-		t.Fatalf("original lifecycle %s %v %s", mode, e, stderr.String())
+		t.Fatal(e)
 	}
 	var value Object
-	for _, line := range bytes.Split(out, []byte("\n")) {
-		if json.Unmarshal(line, &value) == nil && value != nil {
-			return value
-		}
+	if e = json.Unmarshal(raw, &value); e != nil {
+		t.Fatal(e)
 	}
-	t.Fatal("fixture result")
-	return nil
+	return value
 }
 func executionSame(t *testing.T, a, b any) {
 	t.Helper()
@@ -64,11 +52,11 @@ func mustExecutionJSON(v any) []byte {
 	return raw
 }
 func TestApprovedExecutionOriginalReceiptsForeignSnapshotsAndJSONBCopyErasure(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 	path := filepath.Join(t.TempDir(), "execution-fixture.json")
-	executionNode(t, dsn, "setup", path, nil)
+	loadSyntheticExecution(t, pool, path)
 	raw, _ := os.ReadFile(path)
 	var fixture struct {
 		Endpoint, Subject, Other                                   string
@@ -183,8 +171,15 @@ func TestApprovedExecutionOriginalReceiptsForeignSnapshotsAndJSONBCopyErasure(t 
 		t.Fatal(e)
 	}
 	// The original executor receives the exact Go-recorded approval and command.
-	oracle := executionNode(t, dsn, "execute", path, nil)
+	oracle := originalProjection(t, "execute")
+	committed, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (Object, error) {
+		return ExecuteWithin(ctx, tx, fixture.Command, fixture.Clock, ExecutionOptions{Product: product})
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
 	executionSame(t, goResult, oracle["execution"])
+	executionSame(t, committed, oracle["execution"])
 	before, e := onePoolExecution(ctx, pool, `SELECT revision FROM deletion_requests WHERE id=$1`, fixture.Command.RequestID)
 	if e != nil {
 		t.Fatal(e)

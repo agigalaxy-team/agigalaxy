@@ -3,9 +3,8 @@ package systemsettings
 import (
 	"context"
 	"encoding/json"
-	"github.com/google/uuid"
+	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -15,33 +14,25 @@ import (
 
 func TestServiceAdoptionUsesActualBindingAndOriginalAtomicReceipt(t *testing.T) {
 	ctx := context.Background()
-	version := uuid.NewString()
+	version := "00000000-0000-4000-8000-000000000100"
 	secret := strings.Repeat("x", 32)
 	ids := map[string]string{}
-	for _, kind := range serviceKinds {
-		ids[kind] = uuid.NewString()
+	for index, kind := range serviceKinds {
+		ids[kind] = fmt.Sprintf("00000000-0000-4000-8000-%012d", index+10)
 	}
-	connections := []any{Object{"id": ids["analysis"], "kind": "analysis", "url": "https://analysis.example.invalid", "projectId": uuid.NewString(), "clientId": uuid.NewString(), "readClientId": uuid.NewString(), "credentialRef": "system-key:" + uuid.NewString()}, Object{"id": ids["recommendation"], "kind": "recommendation", "url": "https://recommend.example.invalid", "credentialRef": nil}, Object{"id": ids["search"], "kind": "search", "url": "https://search.example.invalid", "index": "original_index", "credentialRef": "system-key:" + uuid.NewString()}, Object{"id": ids["ai-execution"], "kind": "ai-execution", "url": "https://agentos.example.invalid", "credentialRef": "system-key:" + uuid.NewString()}, Object{"id": ids["file-scanning"], "kind": "file-scanning", "host": "127.0.0.1", "port": 3310, "timeoutMs": 30000}}
-	analysis := obj(connections[0])
-	actual := Object{"discoveryRuntime": Object{"openpanel": Object{"origin": analysis["url"], "projectId": analysis["projectId"], "headers": Object{"openpanel-client-id": analysis["clientId"], "openpanel-client-secret": secret}, "reader": Object{"origin": analysis["url"], "headers": Object{"openpanel-client-id": analysis["readClientId"], "openpanel-client-secret": secret}}}, "gorse": Object{"origin": "https://recommend.example.invalid", "headers": Object{"X-API-Key": secret}}, "meili": Object{"origin": "https://search.example.invalid", "index": "original_index", "headers": Object{"Authorization": "Bearer " + secret}}}, "agentOsClient": Object{"url": "https://agentos.example.invalid", "signingKey": secret, "serviceKey": secret}, "attachmentConfiguration": Object{"scanner": Object{"host": "127.0.0.1", "port": 3310, "timeoutMs": 30000}}}
+	connections := []any{Object{"id": ids["analysis"], "kind": "analysis", "url": "https://analysis.example.invalid", "projectId": "00000000-0000-4000-8000-000000000101", "clientId": "00000000-0000-4000-8000-000000000102", "readClientId": "00000000-0000-4000-8000-000000000103", "credentialRef": "system-key:" + "00000000-0000-4000-8000-000000000104"}, Object{"id": ids["recommendation"], "kind": "recommendation", "url": "https://recommend.example.invalid", "credentialRef": nil}, Object{"id": ids["search"], "kind": "search", "url": "https://search.example.invalid", "index": "original_index", "credentialRef": "system-key:" + "00000000-0000-4000-8000-000000000105"}, Object{"id": ids["ai-execution"], "kind": "ai-execution", "url": "https://agentos.example.invalid", "credentialRef": "system-key:" + "00000000-0000-4000-8000-000000000106"}, Object{"id": ids["file-scanning"], "kind": "file-scanning", "host": "127.0.0.1", "port": 3310, "timeoutMs": 30000}}
 	current := []any{Object{"id": ids["search"], "kind": "search", "credentialConfigured": true, "state": "available", "appliedVersionId": version}}
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(component string) Object {
+	golden := func(component string) Object {
 		t.Helper()
-		input := Object{"actual": actual, "component": component, "versionId": version, "connections": connections, "current": current}
-		raw, _ := json.Marshal(input)
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/system-settings-interop.mjs"), "adoption")
-		cmd.Dir = root
-		cmd.Stdin = strings.NewReader(string(raw))
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("source readback %v %s", e, out)
+		raw, err := os.ReadFile("testdata/settings-adoption-" + component + ".json")
+		if err != nil {
+			t.Fatal(err)
 		}
-		var v Object
-		if json.Unmarshal(out, &v) != nil {
-			t.Fatal("invalid source readback")
+		var value Object
+		if err = json.Unmarshal(raw, &value); err != nil {
+			t.Fatal(err)
 		}
-		return v
+		return value
 	}
 	equal := func(a, b any) {
 		t.Helper()
@@ -78,7 +69,7 @@ func TestServiceAdoptionUsesActualBindingAndOriginalAtomicReceipt(t *testing.T) 
 		if e != nil {
 			t.Fatal(e)
 		}
-		expected := node(component)
+		expected := golden(component)
 		equal(value, expected["value"])
 		adopted := []bool{}
 		for _, v := range connections {

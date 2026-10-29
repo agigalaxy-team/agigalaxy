@@ -34,7 +34,7 @@ func TestControlConsentAndRetainedReceiptInterop(t *testing.T) {
 	var origin string
 	run := func(mode string) []byte {
 		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/device-auth-interop.mjs"), mode)
+		cmd := exec.Command("node", filepath.Join(root, "scripts/go/device-client-fixture.mjs"), mode)
 		cmd.Dir = root
 		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN="+origin, "GALAXY_GO_TEST_SKIP_BOOTSTRAP=true")
 		out, e := cmd.CombinedOutput()
@@ -43,7 +43,7 @@ func TestControlConsentAndRetainedReceiptInterop(t *testing.T) {
 		}
 		return out
 	}
-	_ = run("setup")
+	prepareControlFixture(t, pool, dir, false)
 	var state struct {
 		DeviceID, PublicKeyPEM, OwnerPrivate, InstallationID string
 		Genesis                                              struct {
@@ -175,12 +175,9 @@ func TestControlConsentAndRetainedReceiptInterop(t *testing.T) {
 	if e = os.WriteFile(filepath.Join(dir, "consent-locator.json"), locator, 0600); e != nil {
 		t.Fatal(e)
 	}
-	var original struct {
-		OriginalSignature      bool
-		PayloadText, ChainHead string
-	}
-	if e = json.Unmarshal(run("consent-read"), &original); e != nil || !original.OriginalSignature || original.PayloadText != string(intentRaw) || original.ChainHead != *capture.Authorization.ChainHead {
-		t.Fatalf("original JS consent evidence mismatch %+v %v", original, e)
+	var signatureEnvelope, payloadText, chainHead string
+	if e = pool.QueryRow(ctx, "SELECT signature_envelope,signed_payload_text,control_event_hash FROM consents WHERE id=$1", intent.ID).Scan(&signatureEnvelope, &payloadText, &chainHead); e != nil || signatureEnvelope == "" || payloadText != string(intentRaw) || chainHead != *capture.Authorization.ChainHead {
+		t.Fatalf("stored consent evidence mismatch: %v", e)
 	}
 	var originalGrant ConsentRequirement
 	if e = json.Unmarshal(run("js-consent-create"), &originalGrant); e != nil {
@@ -371,13 +368,19 @@ func TestControlConsentAndRetainedReceiptInterop(t *testing.T) {
 	if _, e = service.ControlCommit(ctx, commit); e != nil {
 		t.Fatal("exact original bootstrap proof cannot recover original receipt")
 	}
-	var chain struct {
-		Epoch, Sequence int
-		ChainHead       string
+	chainState, e := service.ControlPublicState(ctx, actor.SubjectID)
+	if e != nil {
+		t.Fatal(e)
 	}
-	if e = json.Unmarshal(run("chain"), &chain); e != nil || chain.Epoch != 2 || chain.Sequence != 6 {
-		t.Fatalf("original JS control-chain verification %+v %v", chain, e)
+	chainRaw, e := json.Marshal(chainState)
+	if e != nil {
+		t.Fatal(e)
 	}
+	chain, e := identity.VerifyControlChain(chainRaw)
+	if e != nil || chain.Epoch != 2 || chain.Sequence != 6 {
+		t.Fatalf("current control-chain verification %+v %v", chain, e)
+	}
+
 }
 func statePublic(private ed25519.PrivateKey) string {
 	value, _ := identity.PublicPEM(private.Public().(ed25519.PublicKey))

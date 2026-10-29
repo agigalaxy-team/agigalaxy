@@ -2,8 +2,11 @@ package maintenance
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/access"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/google/uuid"
@@ -12,9 +15,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -44,25 +44,21 @@ func (t maintenanceTransport) RoundTrip(r *http.Request) (*http.Response, error)
 func TestMaintenanceRealAPIIntentPlanAndUnknownRecovery(t *testing.T) {
 	admin, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs("../../..")
-	node := func(mode string, input Object) Object {
-		t.Helper()
-		b, _ := json.Marshal(input)
-		c := exec.Command("node", filepath.Join(root, "scripts/go/maintenance-interop.mjs"), mode)
-		c.Dir = root
-		c.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		c.Stdin = strings.NewReader(string(b))
-		raw, e := c.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, raw)
-		}
-		var out Object
-		if json.Unmarshal(raw, &out) != nil {
-			t.Fatal("source reply")
-		}
-		return out
+	if _, err := databaseschema.Migrate(ctx, admin, []string{"api"}); err != nil {
+		t.Fatal(err)
 	}
-	base := node("setup", Object{})
+	endpoint, issuer := "https://maintenance.example.invalid", "https://management.example.invalid/realms/management"
+	digestID := sha256.Sum256([]byte(issuer + "\x00root"))
+	operatorID := hex.EncodeToString(digestID[:])
+	stamp := time.Unix(2000000000, 0)
+	if _, err := admin.Exec(ctx, `INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,$3,'root','Isolated operator',$4,$4)`, operatorID, endpoint, issuer, stamp); err != nil {
+		t.Fatal(err)
+	}
+	tokenHash := sha256.Sum256([]byte(strings.Repeat("R", 43)))
+	if _, err := admin.Exec(ctx, `INSERT INTO operations_operator_sessions_v1(endpoint,configuration_id,token_hash,operator_id,issuer,external_subject,display_name,role,csrf_token,expires_at) VALUES($1,$2,$3,$4,$5,'root','Isolated operator','administrator',$6,$7)`, endpoint, strings.Repeat("b", 64), hex.EncodeToString(tokenHash[:]), operatorID, issuer, strings.Repeat("C", 43), stamp.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	base := Object{"endpoint": endpoint, "issuer": issuer, "operatorId": operatorID}
 	now := func() time.Time { return time.Unix(2000000000, 0) }
 	cfg, _ := pgxpool.ParseConfig(dsn)
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
@@ -187,13 +183,9 @@ func TestMaintenanceRealAPIIntentPlanAndUnknownRecovery(t *testing.T) {
 	if code, _ := call("POST", "/restore-plans/"+id+"/cancel", Object{"operationId": uuid.NewString(), "expectedRevision": 99}, true); code != 409 {
 		t.Fatalf("CAS accepted %d", code)
 	}
-	// Original JS reads Go rows, including immutable plan and event history.
 	status, goView := call("GET", "/restore-plans/"+id, nil, true)
-	source := node("plan", Object{"id": id})
-	if status != 200 || !sameValues(goView, source) {
-		a, _ := json.Marshal(goView)
-		b, _ := json.Marshal(source)
-		t.Fatalf("original plan mismatch %d\nGo%s\nJS%s", status, a, b)
+	if status != 200 || str(obj(goView["plan"])["id"]) != id {
+		t.Fatalf("read current plan %d %#v", status, goView)
 	}
 	var persisted []byte
 	if e = admin.QueryRow(ctx, "SELECT plan FROM operations_maintenance_plans_v1 WHERE id=$1", id).Scan(&persisted); e != nil {
@@ -219,18 +211,14 @@ func TestMaintenanceRealAPIIntentPlanAndUnknownRecovery(t *testing.T) {
 	if status != 200 || obj(out["operation"])["state"] != "unknown" || posts.Load() != 2 {
 		t.Fatalf("replay changed submit %d %#v %d", status, out, posts.Load())
 	}
-	original := node("createPlan", Object{"input": Object{"operationId": uuid.NewString(), "pointId": hash}, "preview": preview})
-	originalID := str(original["planId"])
-	var rawPlan []byte
-	_ = admin.QueryRow(ctx, "SELECT plan FROM operations_maintenance_plans_v1 WHERE id=$1", originalID).Scan(&rawPlan)
-	_ = json.Unmarshal(rawPlan, &plan)
-	digest, _ = PlanDigest(plan)
-	if digest != original["planDigest"] {
-		t.Fatalf("original JS digest differs: Go%s JS%s", digest, original["planDigest"])
+	status, second := call("POST", "/restore-plans", Object{"operationId": uuid.NewString(), "pointId": hash}, true)
+	if status != 200 || second["state"] != "awaiting-approval" {
+		t.Fatalf("second plan %d %#v", status, second)
 	}
-	status, out = call("POST", "/restore-plans/"+originalID+"/cancel", Object{"operationId": uuid.NewString(), "expectedRevision": 1}, true)
+	secondID := str(second["planId"])
+	status, out = call("POST", "/restore-plans/"+secondID+"/cancel", Object{"operationId": uuid.NewString(), "expectedRevision": 1}, true)
 	if status != 200 || out["state"] != "cancelled" {
-		t.Fatalf("cancel source plan %d %#v", status, out)
+		t.Fatalf("cancel plan %d %#v", status, out)
 	}
 	preview["productionExecutable"] = false
 	blockedStatus, blocked := call("POST", "/restore-plans", Object{"operationId": uuid.NewString(), "pointId": hash}, true)

@@ -1,5 +1,5 @@
-import {caseEventV2Schema,taskCaseContainerSummary,taskMaterialCaseContainerTitle} from '../../../../galaxy-official/src/shared/cases-schema.mjs';
-import {verificationEventSchema} from '../../../../galaxy-official/src/shared/verification-record-schema.mjs';
+import {caseEventV2Schema,taskCaseContainerSummary,taskMaterialCaseContainerTitle} from '../../../../galaxy-contracts/src/cases-schema.mjs';
+import {verificationEventSchema} from '../../../../galaxy-contracts/src/verification-record-schema.mjs';
 /** @typedef {import('./client.mjs').FactWriteOptions} FactWriteOptions */
 
 // Build business payloads; the shared client owns authorization, queue and receipts.

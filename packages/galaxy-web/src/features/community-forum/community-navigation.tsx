@@ -1,6 +1,6 @@
 import React from 'react';
 import {BookOpen, Code2, Leaf, MessageCircle, Palette, Grid2X2} from 'lucide-react';
-import {forumTopics} from "../../../../galaxy-official/src/shared/community-forum-topics-v1.mjs";
+import {forumTopics} from "../../../../galaxy-contracts/src/community-forum-topics-v1.mjs";
 import {forumBrowsePath, forumBrowseSelection} from './community-forum-browse.mjs';
 import './community-navigation.css';
 import './selected-community.css';

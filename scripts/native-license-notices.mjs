@@ -17,14 +17,14 @@ async function collect(candidate){
  if(!isAbsolute(candidate))fail('Absolute native candidate required');
  const pkg=await object(join(candidate,'package.json')),lockBytes=await bytes(join(candidate,'package-lock.json')),lock=JSON.parse(lockBytes),
   manifest=await object(join(candidate,'native-v2.json')),sourceBytes=await bytes(join(candidate,'source-hashes.json'));
- if(pkg.name!=='@galaxy/native-client'||pkg.license!=='Apache-2.0'||manifest.kind!=='galaxy-native-v2-local-candidate'
+ if(pkg.name!=='@galaxy/native-go-candidate'||pkg.license!=='Apache-2.0'||manifest.kind!=='galaxy-native-go-local-candidate'
   ||!isDeepStrictEqual(pkg.dependencies,lock.packages?.['']?.dependencies))fail('Native licensing package or dependency lock differs');
  const files={},components=[];
  for(const name of ['LICENSE','NOTICE']){const original=await bytes(join(legal,name));if(!original.equals(await bytes(join(candidate,name))))fail('First-party '+name+' differs');}
  const expected=Object.entries(lock.packages).filter(([name])=>name).sort(([a],[b])=>a.localeCompare(b,'en'));
  for(const[path,entry]of expected){
   if(entry.dev||entry.link||!/^node_modules\/(?:@[^/]+\/)?[^/]+(?:\/node_modules\/(?:@[^/]+\/)?[^/]+)*$/.test(path))fail('Unexpected native lock member '+path);
-  const folder=inside(candidate,path),stat=await lstat(folder);if(!stat.isDirectory()||stat.isSymbolicLink())fail('Installed dependency directory required: '+path);
+  const folder=inside(candidate,path);let stat;try{stat=await lstat(folder);}catch(error){if(error.code==='ENOENT'&&entry.optional)continue;throw error;}if(!stat.isDirectory()||stat.isSymbolicLink())fail('Installed dependency directory required: '+path);
   const packageBytes=await bytes(join(folder,'package.json')),dependency=JSON.parse(packageBytes),expectedName=path.slice(path.lastIndexOf('node_modules/')+13);
   if(dependency.name!==expectedName||dependency.version!==entry.version)fail('Installed license dependency differs: '+path);
   const texts=[];
@@ -55,17 +55,17 @@ async function collect(candidate){
  const inventory={version:1,profile:'galaxy-native-license-inventory/v1',authority:'CUR-33/ROOT-Q-RELEASE-POLICY; execution CUR-35',
   scope:'selected-first-party-native-distribution-only; not-entire-repository-or-user-data',firstPartyLicense:'Apache-2.0',
   packageName:pkg.name,packageVersion:pkg.version,lockSha256:sha(lockBytes),sourceHashesSha256:sha(sourceBytes),
-  thirdPartyCodeBundled:false,packageMetadataIsNotLicenseText:true,components,
+  thirdPartyCodeBundled:true,bundledCodeScope:'compact app SDK; see dist/EXT_APPS_LICENSE.txt',packageMetadataIsNotLicenseText:true,components,
   buildTool:{name:builder.name,version:builder.version,relationship:'build-tool-attribution; binary-not-distributed',
    notice:{path:builderPath,sha256:sha(builderText),bytes:builderText.length}}};
  const lines=['# Third-party notices for the selected Galaxy native distribution','',
   'Galaxy-authored files in this selected distribution use Apache-2.0. Third-party components retain their original terms; this table does not relicense them.',
-  'Runtime dependencies are installed separately from the exact package-lock.json. Their package files are unmodified, and are not bundled in Galaxy JavaScript.',
+  'Host adapter runtime dependencies are installed from package-lock.json. Their package files are unmodified. The compact app includes the SDK code and its original text at dist/EXT_APPS_LICENSE.txt.',
   'The metadata label is shown for provenance only. Read the complete copied upstream license and NOTICE texts, including any mixed-license or documentation-only conditions.','',
   '| Component | Installed version | Package metadata | Original texts |','| --- | --- | --- | --- |'];
  for(const c of components)lines.push(`| ${c.name} | ${c.version} | ${JSON.stringify(c.declaredPackageLicense).replaceAll('|','\\|')} | ${c.notices.map(n=>`[${n.sourcePath.slice(c.installationPath.length+1)}](${n.path})`).join(', ')} |`);
  lines.push('',`Build-tool attribution only: esbuild ${builder.version}, [original license](${builderPath}). Its executable is not included.`,
-  '', 'MCP SDK transition notices, original MIT contributions and applicable documentation terms remain in their full upstream license files. No global conversion to Apache-2.0 is asserted.',
+  '', 'Applicable upstream license, NOTICE and documentation terms remain in their full original texts. No global conversion to Apache-2.0 is asserted.',
   '', 'Exact source paths, component versions, file byte counts and SHA256 digests are recorded in license-inventory.json. This is a distribution inventory, not host compatibility, operational availability, or data-sharing permission.','');
  files['THIRD_PARTY_NOTICES.md']=Buffer.from(lines.join('\n'));files['license-inventory.json']=Buffer.from(json(inventory));
  return {inventory,files};
@@ -74,10 +74,10 @@ async function collect(candidate){
 export async function generateNativeLicenseNotices({candidate}){
  const generated=await collect(candidate);
  // Never overwrite a previous generated inventory or a frozen package.
- await mkdir(join(candidate,'third-party-licenses'));
+ await mkdir(join(candidate,'third-party-licenses'),{recursive:true});
  for(const[name,content]of Object.entries(generated.files)){const path=inside(candidate,name);await mkdir(dirname(path),{recursive:true});await writeFile(path,content,{flag:'wx'});}
  return {candidate,components:generated.inventory.components.length,generatedFiles:Object.keys(generated.files).length,
-  lockSha256:generated.inventory.lockSha256,networkCalls:0,thirdPartyCodeBundled:false};
+  lockSha256:generated.inventory.lockSha256,networkCalls:0,thirdPartyCodeBundled:true};
 }
 export async function verifyNativeLicenseNotices({candidate}){
  const expected=await collect(candidate);

@@ -7,7 +7,7 @@ import {generateKeyPairSync,createPrivateKey,createPublicKey} from 'node:crypto'
 import {setTimeout as delay} from 'node:timers/promises';
 import {createGalaxyAdapter} from '../galaxy.tui.ts';
 import {createHostLocalClient} from './host-local-client.mjs';
-import {verifyGalaxyGenesis} from '../../../../packages/galaxy-core/src/galaxy-guid.mjs';
+import {verifyGalaxyGenesis} from '../../../../packages/galaxy-contracts/src/identity/galaxy-guid.mjs';
 const executable=process.env.GALAXY_GO_TEST_BINARY;
 async function eventually(predicate){for(let index=0;index<150;index++){if(await predicate())return;await delay(20);}assert.fail('Actual host initialization did not finish');}
 async function fixture(t){

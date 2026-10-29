@@ -2,20 +2,21 @@ package operationsautonomy_test
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	files "github.com/agigalaxy-team/agigalaxy/go/internal/filegovernance"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/objectremoval"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	a "github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/autonomyfixture"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,37 +27,34 @@ import (
 func TestCodeRuleSchedulesRealFileWithCurrentProgramGrant(t *testing.T) {
 	admin, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	dir := t.TempDir()
-	node := func(script, mode string, input a.Object) a.Object {
-		t.Helper()
-		b, _ := json.Marshal(input)
-		cmd := exec.Command("node", filepath.Join(root, script), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		cmd.Stdin = strings.NewReader(string(b))
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o a.Object
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid source result")
-		}
-		return o
+	f := operationsfixture.New(t, admin)
+	automation := f.Automation(t)
+	setup := autonomyfixture.Setup(t, f, automation)
+	endpoint, aiID := f.Endpoint, setup["aiAccountId"].(string)
+	if _, e := databaseschema.Migrate(ctx, admin, []string{"worker"}); e != nil {
+		t.Fatal(e)
 	}
-	const fixture = "scripts/go/operations-autonomy-interop.mjs"
-	base := node("scripts/go/operations-permissions-interop.mjs", "setup", a.Object{})
-	endpoint := base["endpoint"].(string)
-	setup := node(fixture, "setup", a.Object{"endpoint": endpoint})
-	aiID := setup["aiAccountId"].(string)
-	data := node("go/internal/filegovernance/testdata/interop.mjs", "setup", a.Object{"dir": dir})
-	var target string
-	for _, v := range data["rows"].([]any) {
-		r := v.(map[string]any)
-		if r["kind"] == "scan" {
-			target = r["id"].(string)
+	if _, e := postgres.InTx(ctx, admin, func(tx pgx.Tx) (bool, error) {
+		if e := objectremoval.MigrateWithin(ctx, tx); e != nil {
+			return false, e
 		}
+		return true, objectremoval.ProvisionRolesWithin(ctx, tx)
+	}); e != nil {
+		t.Fatal(e)
+	}
+	at := time.Unix(2000000000, 0)
+	accountService := &accounts.Service{Endpoint: endpoint, Now: func() time.Time { return at }}
+	account, e := postgres.InTx(ctx, admin, func(tx pgx.Tx) (accounts.Account, error) {
+		return accountService.EnsureAccountWithin(ctx, tx, accounts.VerifiedIdentity{Issuer: f.Issuer, ExternalSubject: uuid.NewString(), VerificationMethod: "external-account", VerifiedAt: at})
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+	target := uuid.NewString()
+	bytes := []byte("Synthetic managed bytes " + target)
+	hash := identity.Digest(bytes)
+	if _, e = admin.Exec(ctx, `INSERT INTO forum_attachments_v1(id,account_id,request_hash,name,media_type,byte_size,sha256,storage_key,encryption_key_id,state,created_at,prepare_expires_at,uploaded_at,expires_at,scan_attempts,scan_result,last_error) VALUES($1,$2,$3,'Synthetic scan','text/plain',$4,$3,$5,'isolated-managed-key','scan-pending',$6,$7,$6,$7,1,NULL,'attachment_scan_failed')`, target, account.ID, hash, len(bytes), "forum-attachments/"+target, at, at.Add(time.Hour)); e != nil {
+		t.Fatal(e)
 	}
 	cfg, _ := pgxpool.ParseConfig(dsn)
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
@@ -74,7 +72,7 @@ func TestCodeRuleSchedulesRealFileWithCurrentProgramGrant(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	node(fixture, "operation-setup", a.Object{"endpoint": endpoint, "taskId": task, "aiAccountId": aiID, "targetId": target, "permission": "files.scan.retry", "mode": "code"})
+	autonomyfixture.Operation(t, admin, endpoint, f.IDs["root"], task, aiID, target, "files.scan.retry", true)
 	if _, e = admin.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=ARRAY['files.read','files.scan.retry'] WHERE id=$1;`, setup["role"]); e != nil {
 		t.Fatal(e)
 	}
@@ -84,10 +82,10 @@ func TestCodeRuleSchedulesRealFileWithCurrentProgramGrant(t *testing.T) {
 	if _, e = admin.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET source='routine',target_type='file-forum',target_id=$3 WHERE endpoint=$1 AND id=$2`, endpoint, task, target); e != nil {
 		t.Fatal(e)
 	}
-	f := &files.Service{Pool: pool, Endpoint: endpoint, Authority: &p.BusinessAuthority{Duty: s}, Duty: s, Forum: &files.FileAdapter{Available: func() bool { return true }}, Now: now}
+	fileService := &files.Service{Pool: pool, Endpoint: endpoint, Authority: &p.BusinessAuthority{Duty: s}, Duty: s, Forum: &files.FileAdapter{Available: func() bool { return true }}, Now: now}
 	s.ActionReady = func(code string) bool { return code == "files.scan.retry" }
 	s.QueryTool = func(ctx context.Context, actor p.Actor, domain, tool string, input a.Object) (a.Object, error) {
-		read, e := f.Get(ctx, actor, "forum", input["id"].(string))
+		read, e := fileService.Get(ctx, actor, "forum", input["id"].(string))
 		if e != nil {
 			return nil, e
 		}
@@ -99,7 +97,7 @@ func TestCodeRuleSchedulesRealFileWithCurrentProgramGrant(t *testing.T) {
 		if reconcile {
 			t.Fatal("new intent treated as recovery")
 		}
-		read, e := f.Get(ctx, actor, "forum", target)
+		read, e := fileService.Get(ctx, actor, "forum", target)
 		if e != nil {
 			return nil, e
 		}
@@ -110,7 +108,7 @@ func TestCodeRuleSchedulesRealFileWithCurrentProgramGrant(t *testing.T) {
 		if e != nil {
 			return nil, e
 		}
-		receipt, e := f.Retry(ctx, bound, "forum", target, command)
+		receipt, e := fileService.Retry(ctx, bound, "forum", target, command)
 		if e != nil {
 			return nil, e
 		}

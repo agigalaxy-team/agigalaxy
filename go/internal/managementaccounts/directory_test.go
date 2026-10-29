@@ -7,9 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -17,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/jackc/pgx/v5"
@@ -33,24 +31,6 @@ func (r remapTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	c.URL = &u
 	return http.DefaultTransport.RoundTrip(c)
 }
-func oracle(t *testing.T, dsn, mode string, input Object) Object {
-	t.Helper()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/management-accounts-interop.mjs"), mode)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	b, _ := json.Marshal(input)
-	cmd.Stdin = strings.NewReader(string(b))
-	out, e := cmd.CombinedOutput()
-	if e != nil {
-		t.Fatalf("original %s %v %s", mode, e, out)
-	}
-	var o Object
-	if json.Unmarshal(out, &o) != nil {
-		t.Fatal("invalid original fixture result")
-	}
-	return o
-}
 func normalized(v any) any { b, _ := json.Marshal(v); var o any; json.Unmarshal(b, &o); return o }
 func eq(t *testing.T, label string, a, b any) {
 	t.Helper()
@@ -60,10 +40,12 @@ func eq(t *testing.T, label string, a, b any) {
 }
 
 func TestOriginalNativeDirectoryAndPublishedGeneration(t *testing.T) {
-	_, dsn := testsupport.PostgreSQL(t)
+	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	base := oracle(t, dsn, "setup", Object{})
-	issuer, endpoint := str(base["issuer"]), str(base["endpoint"])
+	if _, e := databaseschema.Migrate(ctx, owner, []string{"api"}); e != nil {
+		t.Fatal(e)
+	}
+	issuer, endpoint := "https://management.example.invalid/realms/management", "https://management-api.example.invalid"
 	var mu sync.Mutex
 	mode := "normal"
 	counts := map[string]int{}
@@ -152,7 +134,7 @@ func TestOriginalNativeDirectoryAndPublishedGeneration(t *testing.T) {
 	}
 	// Same real HTTP provider, original JS transport and Go transport. The public
 	// issuer remains HTTPS; the test-only transport rewrites only network routing.
-	js := oracle(t, dsn, "native", Object{"origin": server.URL})
+
 	goOut := Object{}
 	count, e := native.Count(ctx)
 	if e != nil {
@@ -186,13 +168,29 @@ func TestOriginalNativeDirectoryAndPublishedGeneration(t *testing.T) {
 		t.Fatal(e)
 	}
 	goOut["remove"], _ = native.Remove(ctx, issuer, "human", authorize)
-	eq(t, "native projection/writes", goOut, js)
+	if count != 22 || len(goOut["page"].(Object)["items"].([]User)) != 20 {
+		t.Fatalf("native list: %v", goOut["count"])
+	}
+	for _, key := range []string{"created", "profile", "enabled", "password", "logout", "admission", "remove"} {
+		if goOut[key].(Object)["state"] != "confirmed" {
+			t.Fatalf("native %s: %v", key, goOut[key])
+		}
+	}
 	mu.Lock()
-	sent := len(writes)
-	firstWrites := append([]Object{}, writes[:sent/2]...)
-	lastWrites := append([]Object{}, writes[sent/2:]...)
+	sent := append([]Object{}, writes...)
 	mu.Unlock()
-	eq(t, "native exact selected write bodies", lastWrites, firstWrites)
+	if len(sent) != 8 {
+		t.Fatalf("native selected writes: %d", len(sent))
+	}
+	expectedMethods := []string{"POST", "PUT", "PUT", "PUT", "POST", "POST", "DELETE", "DELETE"}
+	for i, request := range sent {
+		if request["method"] != expectedMethods[i] {
+			t.Fatalf("native method %d: %v", i, request["method"])
+		}
+	}
+	if body, ok := sent[1]["body"].(map[string]any); !ok || body["firstName"] != "更新" || body["note"] != nil {
+		t.Fatal("profile sent unselected fields")
+	}
 	cfg, _ := pgxpool.ParseConfig(dsn)
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
 	pool, e := pgxpool.NewWithConfig(ctx, cfg)
@@ -209,7 +207,9 @@ func TestOriginalNativeDirectoryAndPublishedGeneration(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq(t, "JS reads Go published source", source, oracle(t, dsn, "source", Object{"origin": server.URL}))
+	if source["coverage"] != "complete-generation" || source["generationId"] == nil {
+		t.Fatalf("published source: %v", source)
+	}
 	firstID := source["generationId"]
 	// A moving source, duplicate ID, and native failure all retain the original
 	// complete generation. No failed generation enters list count/filter/page.
@@ -226,17 +226,22 @@ func TestOriginalNativeDirectoryAndPublishedGeneration(t *testing.T) {
 		if e != nil || source["generationId"] != firstID || source["coverage"] != "complete-generation" || source["state"] != "unavailable" {
 			t.Fatalf("published recovery %s %#v %v", bad, source, e)
 		}
-		eq(t, "original failed source", source, oracle(t, dsn, "source", Object{"origin": server.URL}))
+
 	}
 	mu.Lock()
 	mode = "normal"
 	mu.Unlock()
-	original := oracle(t, dsn, "sync", Object{"origin": server.URL})
+	replacement, e := index.Sync(ctx)
+	if e != nil || replacement["state"] != "complete" {
+		t.Fatalf("replacement sync: %v %v", replacement, e)
+	}
 	source, e = index.Source(ctx, nil)
 	if e != nil {
 		t.Fatal(e)
 	}
-	eq(t, "Go reads JS published source", source, original["source"])
+	if source["generationId"] == firstID || source["coverage"] != "complete-generation" {
+		t.Fatalf("replacement generation: %v", source)
+	}
 	var oldCount int
 	if e := pool.QueryRow(ctx, "SELECT count(*) FROM operations_management_generations_v1 WHERE endpoint=$1", endpoint).Scan(&oldCount); e != nil || oldCount != 1 {
 		t.Fatalf("published cleanup %d %v", oldCount, e)

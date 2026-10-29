@@ -15,37 +15,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
 
-func node(t *testing.T, dsn, mode, path string, input any) Object {
-	t.Helper()
-	root, _ := filepath.Abs("../../..")
-	cmd := exec.Command("node", filepath.Join(root, "go/internal/capsules/testdata/interop.mjs"), mode, path)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-	cmd.Stdin = bytes.NewReader(encode(input))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	raw, e := cmd.Output()
-	if e != nil {
-		t.Fatalf("original capsule %s %v %s", mode, e, stderr.String())
-	}
-	var result Object
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		if json.Unmarshal(line, &result) == nil && result != nil {
-			return result
-		}
-	}
-	t.Fatal("fixture result")
-	return nil
-}
 func same(t *testing.T, goValue, jsValue any) {
 	t.Helper()
 	var a, b any
@@ -56,14 +31,14 @@ func same(t *testing.T, goValue, jsValue any) {
 	}
 }
 func TestOriginalCapsulePublicationPermissionsUseReceiptsAndCurrentSourceHTTP(t *testing.T) {
-	owner, dsn := testsupport.PostgreSQL(t)
-	path := filepath.Join(t.TempDir(), "capsule-fixture.json")
-	node(t, dsn, "setup", path, nil)
-	raw, _ := os.ReadFile(path)
-	var f Object
-	if e := json.Unmarshal(raw, &f); e != nil {
-		t.Fatal(e)
+	owner, _ := testsupport.PostgreSQL(t)
+	f := setupCapsules(t, owner)
+	var reads []struct {
+		Input   []any    `json:"input"`
+		Results []Object `json:"results"`
 	}
+	fixtureJSON(t, "read", &reads)
+	readIndex := 0
 	ctx := context.Background()
 	config := owner.Config()
 	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
@@ -133,11 +108,17 @@ func TestOriginalCapsulePublicationPermissionsUseReceiptsAndCurrentSourceHTTP(t 
 	}
 	compare := func(queries []any) {
 		t.Helper()
-		oracle := node(t, dsn, "read", path, queries)
+		if readIndex >= len(reads) {
+			t.Fatal("missing captured capsule read")
+		}
+		entry := reads[readIndex]
+		readIndex++
+		same(t, queries, entry.Input)
+		oracle := entry.Results
 		for i, v := range queries {
 			q := obj(v)
 			got, e := call(q)
-			want := obj(list(oracle["results"])[i])
+			want := oracle[i]
 			if code := text(want, "error"); code != "" {
 				if fault.Code(e) != code || int64(fault.Status(e)) != number(want, "status") {
 					t.Fatalf("%s Go %v JS %v", q["kind"], e, want)
@@ -243,6 +224,20 @@ func TestOriginalCapsulePublicationPermissionsUseReceiptsAndCurrentSourceHTTP(t 
 	if _, e = svc.RecordUseV2(ctx, b, encode(f["applyGrant"]), ""); e != nil {
 		t.Fatal(e)
 	}
+	// These database-generated times are fixed to the captured original values
+	// so the original ordered history wire remains a deterministic vector.
+	for i, query := range reads[1].Input {
+		if obj(query)["kind"] != "usesV2" {
+			continue
+		}
+		for _, raw := range list(obj(reads[1].Results[i]["value"])["items"]) {
+			item := obj(raw)
+			result, err := owner.Exec(ctx, `UPDATE capsule_uses_v2 SET created_at=$2::timestamptz WHERE id=$1 AND created_at IS NOT NULL`, item["eventId"], item["recordedAt"])
+			if err != nil || result.RowsAffected() != 1 {
+				t.Fatalf("pin use event time: %v", err)
+			}
+		}
+	}
 	legacyID := obj(f["legacyVersion"])["capsuleId"]
 	receipt := Object{"type": "publication", "operationId": base["id"], "payloadHash": identity.Digest([]byte(text(obj(f["versionGrant"]), "payloadJson")))}
 	queries := []any{Object{"kind": "getV2", "input": Object{"capsuleId": base["capsuleId"]}}, Object{"kind": "getV2", "actor": "owner", "input": Object{"capsuleId": base["capsuleId"]}}, Object{"kind": "getV2", "actor": "other", "input": Object{"capsuleId": base["capsuleId"]}}, Object{"kind": "queryV2", "input": Object{}}, Object{"kind": "usesV2", "actor": "other", "input": Object{"capsuleId": base["capsuleId"]}}, Object{"kind": "history", "actor": "other", "id": obj(obj(f["target"])["root"])["caseId"]}, Object{"kind": "get", "input": Object{"capsuleId": legacyID}}, Object{"kind": "query", "input": Object{}}, Object{"kind": "uses", "actor": "other", "input": Object{"capsuleId": legacyID}}, Object{"kind": "versionsV2", "actor": "owner", "input": Object{"capsuleId": base["capsuleId"]}}, Object{"kind": "permissionsQueryV2", "actor": "other", "input": Object{"view": "owned"}}, Object{"kind": "permissionsQueryV2", "actor": "owner", "input": Object{"view": "granted"}}, Object{"kind": "receiptV2", "actor": "owner", "input": receipt}}
@@ -310,7 +305,16 @@ func TestOriginalCapsulePublicationPermissionsUseReceiptsAndCurrentSourceHTTP(t 
 		value["externalReferences"] = []any{Object{"url": url, "description": "Reference only", "license": nil, "inclusion": "reference-only; no-imported-body"}}
 		schemaQueries = append(schemaQueries, Object{"kind": "event2", "input": value})
 	}
-	oracle := node(t, dsn, "schema", path, schemaQueries)
+	if readIndex != len(reads) {
+		t.Fatalf("unconsumed capsule reads: %d", len(reads)-readIndex)
+	}
+	var schema []struct {
+		Input  []any    `json:"input"`
+		Values []Object `json:"values"`
+	}
+	fixtureJSON(t, "schema", &schema)
+	same(t, schemaQueries, schema[0].Input)
+	oracle := schema[0].Values
 	for i, v := range schemaQueries {
 		q := obj(v)
 		kind := text(q, "kind")
@@ -323,7 +327,7 @@ func TestOriginalCapsulePublicationPermissionsUseReceiptsAndCurrentSourceHTTP(t 
 			purpose = "permission"
 		}
 		got, e := parsePayload(string(encode(q["input"])), purpose, v2)
-		want := obj(list(oracle["values"])[i])
+		want := oracle[i]
 		if want["error"] == true {
 			if e == nil {
 				t.Fatal("accepted original-invalid schema")

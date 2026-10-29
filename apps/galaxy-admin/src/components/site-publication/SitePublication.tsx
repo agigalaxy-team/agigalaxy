@@ -1,14 +1,14 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
-import {useRouter,useSearchParams} from 'next/navigation';
+import {useSearchParams} from 'next/navigation';
 import {useOperationsRead} from '../../lib/use-operations-read';
 import type {Publication,PublicationPage,SnapshotSummary} from './publication-types';
 const states={queued:'等待发布',building:'正在发布官网',published:'已发布',failed:'发布未完成'};
 const emptyPublications:PublicationPage={items:[],nextAfter:null};
 type Pending={operationId:string;snapshot:unknown};
 export function SitePublication({summary,snapshotError,publications,listError,csrfToken,canPublish}:{summary:SnapshotSummary|null;snapshotError:string;publications:PublicationPage;listError:string;csrfToken:string;canPublish:boolean}){
-  const router=useRouter(),inFlight=useRef(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[pending,setPending]=useState<Pending|null>(null),[current,setCurrent]=useState<Publication|null>(publications.items.find(item=>item.state==='queued'||item.state==='building')??null);
+  const inFlight=useRef(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[pending,setPending]=useState<Pending|null>(null),[current,setCurrent]=useState<Publication|null>(publications.items.find(item=>item.state==='queued'||item.state==='building')??null);
   const search=useSearchParams(),after=search.get('after');
   const directory=useOperationsRead<PublicationPage>({path:'/v1/operations/content/publications'+(after?'?after='+encodeURIComponent(after):''),initial:publications,initialError:listError,failureMessage:'发布记录暂时无法读取。'});
   const records=directory.value??emptyPublications,id=current?.id;
@@ -21,13 +21,13 @@ export function SitePublication({summary,snapshotError,publications,listError,cs
     try{
       if(intent){
         const recovery=await fetch('/v1/operations/content/publications/'+encodeURIComponent(intent.operationId),{cache:'no-store',signal:AbortSignal.timeout(20000)});
-        if(recovery.ok){const value:{publication:Publication}=await recovery.json();setPending(null);setCurrent(value.publication);router.refresh();return;}
+        if(recovery.ok){const value:{publication:Publication}=await recovery.json();setPending(null);setCurrent(value.publication);void directory.read();return;}
         if(recovery.status!==404)throw Error(recovery.status===403?'denied':'unknown');
       }
       if(!intent){const response=await fetch('/api/site/export',{cache:'no-store',signal:AbortSignal.timeout(20000)});if(!response.ok)throw Error('snapshot');intent={operationId:crypto.randomUUID(),snapshot:await response.json()};setPending(intent);}
       const response=await fetch('/v1/operations/content/publications',{method:'POST',headers:{'Content-Type':'application/json','X-Galaxy-Operator-CSRF':csrfToken},body:JSON.stringify(intent),signal:AbortSignal.timeout(20000)});
       if(!response.ok){if(response.status<500)setPending(null);throw Error(response.status===403?'denied':response.status===413?'large':response.status===409?'conflict':'unknown');}
-      const value:{publication:Publication}=await response.json();setPending(null);setCurrent(value.publication);router.refresh();
+      const value:{publication:Publication}=await response.json();setPending(null);setCurrent(value.publication);void directory.read();
     }catch(error){const code=error instanceof Error?error.message:'';setError(code==='snapshot'?'发布内容暂时无法取得，请确认页面和站点设置已发布。':code==='denied'?'当前登录无权发布，请重新登录。':code==='large'?'发布内容超过 1 MiB，请减少本次已发布内容。':code==='conflict'?'原发布操作的内容已变化，请读取当前记录。':'发布请求暂未确认，重试会继续原操作。');}finally{inFlight.current=false;setBusy(false);}
   }
   const waiting=current?.state==='queued'||current?.state==='building';

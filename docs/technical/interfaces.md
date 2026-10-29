@@ -6,35 +6,23 @@
 
 | 边界 | 权威入口 | 必须保留 |
 |---|---|---|
-| Hub 服务族 | `packages/galaxy-official/src/operations/configuration.mjs`、`deploy/runtime-settings.example.json`、`release-resources.json` | 四入口同发行、完整迁移列表、业务库及角色分离 |
-| Web/Native | Official `browser-client.mjs`、`src/shared/`，Web runtime 与 Native handoff | 账户登录、本机控制、连接 scope、来源 Consent 各自有效；网页不因登录创建/恢复本机 ID |
-| Admin/BFF | `apps/galaxy-admin/.env.example`、`lib/access/`、Node 运营路由 | 独立管理会话，当前人权与所选 AI 角色交集，后端事务内重新核权 |
-| AgentOS | `services/galaxy-operations-agentos/runtime.env.example`、`config.py`、`tool_schemas.py` | 私有 service key/JWT，Node 签发控制与原操作归因；服务 key 不等于业务角色 |
+| Hub 服务族 | `go/internal/runtimeconfig`、`go/deploy`、`go-core-artifact.json` | 各 Go 入口同发行、完整迁移列表、业务库及角色分离 |
+| Web/Native | `packages/galaxy-client`、`packages/galaxy-contracts`，Web runtime 与 Go Native handoff | 账户登录、本机控制、连接 scope、来源 Consent 各自有效；网页不因登录创建/恢复本机 ID |
+| Admin/BFF | `apps/galaxy-admin/.env.example`、`lib/access/`、Go 运营接口 | 独立管理会话，当前人权与所选 AI 角色交集，后端事务内重新核权 |
+| AgentOS | `services/galaxy-operations-agentos/runtime.env.example`、`config.py`、`tool_schemas.py` | 私有 service key/JWT，Go 签发控制与原操作归因；服务 key 不等于业务角色 |
 | Gateway | `services/galaxy-model-gateway/SOURCE.json`、`models.empty.yaml` 与原生读回 | 固定上游、人工模型配置，测试不自动选择 provider 或发送真实模型请求 |
 | Keycloak | `apps/galaxy-auth/client-contract.json`、`realm-profile.mjs` | 普通账户、管理账户、本机 ID 分离；主题复用 Web/Mail 源 |
-| 发行恢复 | `service-release.mjs`、`deploy/service-release-host.mjs` | 主机文件、unit 与读回显式输入，原 operationId，不伪造 schema 降级 |
+| 发行恢复 | `scripts/build-go-core.mjs`、`go/internal/runtimeconfig`、现行维护代理 | 主机文件、unit 与读回显式输入，原 operationId，不伪造 schema 降级 |
 
 所有上述配置示例只描述格式。真实 `.env`、provider key、数据库密码、Cookie、私钥及运行配置通过保护存储或短期进程注入，不进入 Git、网页配置、源码包、日志或提示。
 
 ## 定位 HTTP 与生成参考
 
-Official `src/adapters/http/` 下各 dispatcher 负责准入和解析，领域层负责当前授权与事务：
+`go/cmd/galaxy-api` 装配现行 HTTP 路由，`go/internal` 的对应领域处理解析、权限和事务；共享 JS schema 位于 `packages/galaxy-contracts`。网页 BFF 只处理现有身份和传输边界，不重做业务判断。定位某一路由时先查 Go 装配和该领域的 HTTP handler，不通过已退出的 Node dispatcher 查当前能力。
 
-| 修改目标 | dispatcher 文件（相对该目录） |
-|---|---|
-| 网站账户/注册用户 | `official-account-http.mjs`、`operations-registered-users-http.mjs` |
-| 管理账户/AI 账户/角色 | `operations-management-accounts-http.mjs`、`operations-ai-work-accounts-http.mjs`、`operations-permissions-http.mjs` |
-| 审计/业务对象/文件 | `business-admin-http.mjs`、`operations-business-http.mjs`、`operations-file-access-http.mjs`、`operations-file-cleanup-http.mjs` |
-| 社区与聊天治理/反馈 | `operations-forum-content-http.mjs`、`account-chat-governance-http.mjs`、`operations-chat-message-http.mjs`、`operations-feedback-http.mjs` |
-| 消息/SMTP | `operations-messaging-http.mjs`、`operations-smtp-http.mjs` |
-| 推荐/搜索质量 | `operations-recommendation-http.mjs`、`operations-search-quality-http.mjs` |
-| 策略/固定规则 | `operations-strategies-http.mjs`、`operations-rules-http.mjs` |
-| 工作台/模型 | `operations-agentos-http.mjs`、`operations-model-settings-http.mjs` |
-| 系统/维护 | `operations-system-settings-http.mjs`、`operations-maintenance-http.mjs` |
+公开搜索、推荐、事件和管理分析仍由当前 Go 发现适配实现。`GET /v1/operations/discovery/analytics` 使用当前 `analytics.read`，并核验 kind/days/scope/accountId；自动运行位于 `/v1/operations/autonomy/`。接口存在不等于其配置、授权和外部服务已经就绪。
 
-公开搜索、推荐、事件及管理分析另在 `src/discovery-runtime/http.mjs`；`GET /v1/operations/discovery/analytics` 使用当前 `analytics.read`，并校验 kind/days/scope/accountId。自动运行在源码中定位 `/v1/operations/autonomy/`，不把接口存在视为处理器或执行环境就绪。
-
-[`development-api-reference-v1.json`](reference/development-api-reference-v1.json) 是显式登记子集，未登记不等于接口不存在；[`api-error-catalog-v0.1.json`](reference/api-error-catalog-v0.1.json) 是静态 ServiceError 字面量索引，不推断动态/库错误或每路径可达性。生成使用 `node scripts/build-api-reference.mjs`，`--check` 只比对生成结果；扫描限 Official 源，不读取凭据或项目档案。相应测试入口为 `node --test packages/galaxy-official/test/api-reference.test.mjs`。
+[`development-api-reference-v1.json`](reference/development-api-reference-v1.json) 是显式登记子集，未登记不等于接口不存在；[`api-error-catalog-v0.1.json`](reference/api-error-catalog-v0.1.json) 是当前 Go `fault.New` 静态字面量索引，不推断动态/库错误或每路径可达性。手写子集维护在 `scripts/reference/http-api-entries.mjs`，生成使用 `node scripts/build-api-reference.mjs`，`--check` 只比对生成结果；扫描当前 Go 源，不读取凭据或项目档案。相应参考检查入口为 `node --test scripts/test/api-reference.test.mjs`，实际请求、权限与数据行为由各 Go 领域测试检查。
 
 目录的源码包版本不是部署发行号；空 `publicApiEndpoints` 不表示现网无 API。`input.fields` 是精确顶层字段，`input.schema` 指向业务定义，不能将同一文件的任意对象混用于操作。`signed`/`payloadJson` 保留原签名字节，不按说明自行生成证明。
 
@@ -52,9 +40,9 @@ Official `src/adapters/http/` 下各 dispatcher 负责准入和解析，领域�
 
 管理邮箱通过原生 `UpdateEmailActionTokenHandler` 验证成功才替换，保持 subject/角色；Keycloak26.7.3 的 build 需 update-email feature，不因此启用整个 realm 的 verifyEmail 或 UPDATE_EMAIL required action。提交邮件仅为 submitted。provider 更新须核实际挂载 JAR、索引 mtime 与镜像，而非只检查导出文件。
 
-自动运行由 PostgreSQL/pg-boss 保存计划、任务、领取、版本和回执，Agno 处理模型/工具。新任务冻结工程参数、岗位提示词和策略版本，每次业务写仍重核停用、撤权、接管及对象。PAUSED 仅在原 run/待决调用上接续，CANCELLED/完成不伪称恢复。总并发仅支持1或2，日计划须明确时刻。具体调用次数/token 取真实请求与 SDK 元数据；缺项未知，业务完成取实际业务回执。原任务/工具/稳定身份生成审计 actor_context，拒绝 HTTP/模型自报。
+自动运行由 PostgreSQL/River 保存计划、任务、领取、版本和回执，Agno 处理模型/工具。新任务冻结工程参数、岗位提示词和策略版本，每次业务写仍重核停用、撤权、接管及对象。PAUSED 仅在原 run/待决调用上接续，CANCELLED/完成不伪称恢复。总并发仅支持1或2，日计划须明确时刻。具体调用次数/token 取真实请求与 SDK 元数据；缺项未知，业务完成取实际业务回执。原任务/工具/稳定身份生成审计 actor_context，拒绝 HTTP/模型自报。
 
-Conversation原provider工具ID只供SDK配对/后续模型请求，Node接收按当前run与完整provider值派生的短UUID5引用，公开元数据不带thought signature；持久化核同run真实已存投影，不能仅凭UUID形状或marker认引用。Duty私有PAUSED保存继续原工具所需坐标，公开读取仍过滤。相关原生持久化与续接见[原生运行](agent-runtime.md#持久化调用与有限恢复)。
+Conversation原provider工具ID只供SDK配对/后续模型请求，Go接收按当前run与完整provider值派生的短UUID5引用，公开元数据不带thought signature；持久化核同run真实已存投影，不能仅凭UUID形状或marker认引用。Duty私有PAUSED保存继续原工具所需坐标，公开读取仍过滤。相关原生持久化与续接见[原生运行](agent-runtime.md#持久化调用与有限恢复)。
 
 `jobs.cancel/jobs.retry/search.retry` 使用已有队列或索引事务与同事务审计。具体操作卡冻结任务状态、重试次数或索引代数；原operation只读恢复，不因任务后续变化重复派发。泛化队列自主处理限已获准的information-watch，发布、消息与清理队列仍经具体人工卡并检查各自业务权限；索引重排继续在后续构建时核当前来源资格。
 

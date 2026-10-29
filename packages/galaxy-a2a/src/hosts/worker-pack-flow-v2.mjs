@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as z from 'zod/v4';
-import { packUseEventSchema } from '../../../galaxy-official/src/shared/worker-pack-uses-v2-schema.mjs';
+import { packUseEventSchema } from '../../../galaxy-contracts/src/worker-pack-uses-v2-schema.mjs';
 
 const packRef = z.strictObject({ builderId: z.uuid(), manifestId: z.uuid(), manifestHash: z.string().regex(/^[a-f0-9]{64}$/) });
 const workerSchema = z.strictObject({ id: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/), peerId: z.string().min(1).max(80), pack: packRef,

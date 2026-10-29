@@ -4,7 +4,7 @@ import {UserRound} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {AccountEntryPage} from "../accounts/account-center";
 import {useQueryReads} from "../../application/query-reads";
-import {accountFollowPageSchema} from '../../../../galaxy-official/src/shared/account-follows-schema.mjs';
+import {accountFollowPageSchema} from '../../../../galaxy-contracts/src/account-follows-schema.mjs';
 import {AccountFollowControl,accountFollowMessage,useAccountFollows} from './controls';
 import './account-follows.css';
 

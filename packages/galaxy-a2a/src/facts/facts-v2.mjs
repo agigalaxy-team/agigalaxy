@@ -1,6 +1,6 @@
 import * as z from 'zod/v4';
 import { isDeepStrictEqual } from 'node:util';
-import { caseEventV2Schema } from '../../../galaxy-official/src/shared/cases-schema.mjs';
+import { caseEventV2Schema } from '../../../galaxy-contracts/src/cases-schema.mjs';
 import { terminal } from './mapping.mjs';
 
 const ref = z.strictObject({ id: z.uuid(), version: z.number().int().positive() });

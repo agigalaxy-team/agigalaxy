@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -18,6 +15,7 @@ import (
 	perms "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -58,27 +56,8 @@ func equal(a, b any) bool {
 func TestPermissionRolesPersonnelHistoryRealPortalAndOriginalJS(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string, input any) map[string]any {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		if input != nil {
-			raw, _ := json.Marshal(input)
-			cmd.Stdin = strings.NewReader(string(raw))
-		}
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original %s %v %s", mode, e, out)
-		}
-		var o map[string]any
-		if json.Unmarshal(out, &o) != nil {
-			t.Fatal("invalid oracle output")
-		}
-		return o
-	}
-	fixture := node("setup", nil)
+	currentFixture := operationsfixture.New(t, owner)
+	fixture := currentFixture.Data
 	ids := object(fixture["ids"])
 	cfg, e := pgxpool.ParseConfig(dsn)
 	if e != nil {
@@ -137,7 +116,7 @@ func TestPermissionRolesPersonnelHistoryRealPortalAndOriginalJS(t *testing.T) {
 	}
 	status, catalog := request("root", "GET", "catalog", nil, false)
 	check(status, catalog, 200, "")
-	source := node("read", nil)
+	source := currentFixture.Read(t, nil)
 	if !equal(catalog, source["catalog"]) {
 		t.Fatal("catalog metadata/lease hash differs from original")
 	}
@@ -204,7 +183,7 @@ func TestPermissionRolesPersonnelHistoryRealPortalAndOriginalJS(t *testing.T) {
 	if len(history["items"].([]any)) != 1 {
 		t.Fatal("person history missing")
 	}
-	source = node("read", map[string]any{"operationId": input["operationId"]})
+	source = currentFixture.Read(t, map[string]any{"operationId": input["operationId"]})
 	for name, path := range map[string]string{"roles": "roles", "personnel": "personnel", "history": "history?limit=100", "operation": "operations/" + text(input["operationId"])} {
 		status, o = request("root", "GET", path, nil, false)
 		check(status, o, 200, "")

@@ -8,9 +8,9 @@ import {createTrustPackageWorkspaceClient,mergeTrustWorks,trustReferenceKey,matc
 import {TrustPeopleChooser} from './trust-package-presentation';
 import {useMemberNames,memberName} from "../../shared/people/conversation-ui";
 import './trust-package-workspace.css';
-import {trustSourceRefSchema,trustContainerSchema} from "../../../../galaxy-official/src/shared/trust-package-schema.mjs";
+import {trustSourceRefSchema,trustContainerSchema} from "../../../../galaxy-contracts/src/trust-package-schema.mjs";
 import "../../profile-settings.css";
-import {verifyTrustPackage} from "../../../../galaxy-official/src/verification/trust-package.mjs";
+import {verifyTrustPackage} from "../../../../galaxy-contracts/src/verification/trust-package.mjs";
 import type {HubRuntime} from "../hubs/hub-workspace-types";
 import {initialCompose,contextualCompose,contentShareDraftKey,initialPermission,restoredCompose,restoredPermission,trustTextBody,trustPackageObjects,trustErrorField,trustReadingSnapshot,currentTrustReading,trustMaterialsSchema,trustChoiceExpiry,trustPackageExpiry} from './trust-package-state';
 import type {ContentShareContext,TrustAudience,TrustCompose,TrustContainer,TrustDraft,TrustDraftBinding,TrustLicense,TrustMaterial,TrustOnline,TrustOperationResult,TrustOriginal,TrustPending,TrustPermissionForm,TrustPermissionStatus,TrustPrepared,TrustPreparation,TrustReading,TrustRef,TrustReport,TrustSelection,TrustSource,TrustWork} from './trust-package-state';

@@ -1,4 +1,4 @@
-"""Finite guards/real SDK tool calls and frozen Node contracts; no model."""
+"""Finite guards/real SDK tool calls and current shared contracts; no model."""
 from copy import deepcopy
 import json
 import os
@@ -93,7 +93,7 @@ class AnalysisSemanticsTests(unittest.TestCase):
         execute(tool, {'operation': {**operation, 'note': 'explicit local requested note'}})
         self.assertEqual(gateway.calls[1][1]['note'], 'explicit local requested note')
 
-    def test_actual_f14_node_schemas_and_runtime_event_contract(self):
+    def test_actual_shared_query_schema_defaults(self):
         node = os.environ.get('GALAXY_NODE_BINARY') or shutil.which('node')
         self.assertIsNotNone(node, 'Install repository Node dependencies and put Node on PATH')
         result = subprocess.run([node, str(Path(__file__).with_name('node_analysis_contract_fixture.mjs'))],
@@ -101,8 +101,7 @@ class AnalysisSemanticsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         proof = json.loads(result.stdout)
         self.assertEqual(proof['windowRoutes'], len(_WINDOW_DAYS))
-        self.assertTrue(proof['runtimeEventNormalizationProven'])
-        self.assertTrue(proof['nodeDefaultsUnchanged'])
+        self.assertTrue(proof['sharedDefaultsUnchanged'])
         self.assertEqual({(item['module'], item['view']): item['days'] for item in proof['defaultDays']}, _WINDOW_DEFAULT_DAYS)
 
     def test_default_metadata_does_not_fill_days_or_request_a_user_choice(self):

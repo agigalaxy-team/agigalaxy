@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {Client,StreamableHTTPClientTransport} from '../../packages/galaxy-official/node_modules/@modelcontextprotocol/client/dist/index.mjs';
+import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client';
 import bundle from '../../packages/galaxy-official/public-docs.json' with {type:'json'};
 const endpoint=new URL(process.env.GALAXY_GO_TEST_DOCS_ORIGIN??'');
 if(endpoint.protocol!=='http:'||endpoint.hostname!=='127.0.0.1')throw Error('isolated loopback required');

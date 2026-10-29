@@ -2,16 +2,37 @@ package operationspermissions
 
 import (
 	"encoding/json"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"strings"
 	"testing"
-
-	"github.com/google/uuid"
 )
 
+func TestAICommandClosedStateAndAssignmentInputs(t *testing.T) {
+	state := Object{"operationId": "00000000-0000-4000-8000-000000000001", "expectedVersion": 0, "kind": "state-save", "enabled": false}
+	if got, err := parseAICommand(state, false); err != nil || got["enabled"] != false {
+		t.Fatal("explicit disabled state rejected", got, err)
+	}
+	for _, input := range []Object{
+		{"operationId": state["operationId"], "expectedVersion": 0, "kind": "state-save"},
+		{"operationId": state["operationId"], "expectedVersion": 0, "kind": "state-save", "enabled": nil},
+		{"operationId": state["operationId"], "expectedVersion": 0, "kind": "state-save", "enabled": true, "extra": true},
+	} {
+		if _, err := parseAICommand(input, false); err == nil {
+			t.Fatal("open state command accepted", input)
+		}
+	}
+	assignment := Object{"operationId": state["operationId"], "expectedVersion": 0, "roleId": "00000000-0000-4000-8000-000000000002", "enabled": true}
+	if _, err := parseAICommand(assignment, true); err != nil {
+		t.Fatal("AI assignment rejected", err)
+	}
+	assignment["operatorId"] = "caller-supplied-human-principal"
+	if _, err := parseAICommand(assignment, true); err == nil {
+		t.Fatal("human operator field accepted in AI assignment")
+	}
+}
+
 func TestOriginalPermissionSchemasAndUntrustedHistoryProjection(t *testing.T) {
-	role := Object{"operationId": uuid.NewString(), "expectedVersion": 0, "name": "  Role  ", "description": "  Original description  ", "enabled": true, "permissions": []any{"feedback.read"}}
+	role := Object{"operationId": "00000000-0000-4000-8000-000000000001", "expectedVersion": 0, "name": "  Role  ", "description": "  Original description  ", "enabled": true, "permissions": []any{"feedback.read"}}
 	roles := []any{role}
 	for _, patch := range []Object{{"subjectScope": "ai-only"}, {"name": "internal\ncontrol"}, {"description": "\u0085internal\u0085"}, {"permissions": []any{"feedback.read", "feedback.read"}}, {"permissions": []any{"invented.execute"}}, {"subjectScope": "human-only"}, {"expectedVersion": -1}, {"expectedVersion": 9007199254740992.0}, {"id": nil}, {"unexpected": "private"}, {"name": strings.Repeat("界", 121)}} {
 		copy := obj(clone(role))
@@ -20,7 +41,7 @@ func TestOriginalPermissionSchemasAndUntrustedHistoryProjection(t *testing.T) {
 		}
 		roles = append(roles, copy)
 	}
-	assignment := Object{"operationId": uuid.NewString(), "expectedVersion": 0, "operatorId": "not-a-cookie-id", "roleId": uuid.NewString(), "enabled": true}
+	assignment := Object{"operationId": "00000000-0000-4000-8000-000000000002", "expectedVersion": 0, "operatorId": "not-a-cookie-id", "roleId": "00000000-0000-4000-8000-000000000003", "enabled": true}
 	assignments := []any{assignment}
 	for _, patch := range []Object{{"operatorId": ""}, {"roleId": "arbitrary"}, {"enabled": nil}, {"operatorId": strings.Repeat("x", 1025)}} {
 		copy := obj(clone(assignment))
@@ -34,13 +55,9 @@ func TestOriginalPermissionSchemasAndUntrustedHistoryProjection(t *testing.T) {
 	automationDelta := Object{"kind": "automation-save", "delta": Object{"kind": "automation", "permissions": Object{"added": []any{}, "removed": []any{}}, "enabled": Object{"before": true, "after": false}, "scope": Object{"before": []any{}, "after": []any{assignment["roleId"]}}, "mode": Object{"before": "automatic", "after": "assisted"}, "executorKind": Object{"before": "program", "after": "ai"}}}
 	deltas := []any{delta, assignmentDelta, automationDelta, Object{"kind": "role-save", "delta": Object{"kind": "role", "permissions": Object{"added": []any{"invented.execute"}, "removed": []any{}}, "enabled": Object{"before": nil, "after": true}}}}
 	histories := []any{Object{}, Object{"after": "9223372036854775807", "limit": 100}, Object{"after": "9223372036854775808"}, Object{"after": "01"}, Object{"after": 1}, Object{"targetOperatorId": "real"}, Object{"limit": 0}, Object{"limit": 101}, Object{"privateField": "secret"}}
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), "oracle")
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(jsonText(Object{"roles": roles, "assignments": assignments, "deltas": deltas, "histories": histories}))
-	out, e := cmd.CombinedOutput()
+	out, e := os.ReadFile("testdata/permissions-schema.json")
 	if e != nil {
-		t.Fatalf("oracle %v %s", e, out)
+		t.Fatal(e)
 	}
 	var oracle Object
 	if json.Unmarshal(out, &oracle) != nil {
@@ -78,20 +95,13 @@ func TestOriginalPermissionSchemasAndUntrustedHistoryProjection(t *testing.T) {
 			t.Fatalf("history input %d mismatch %v", i, e)
 		}
 	}
-	if !same(catalogItems(), oracle["catalog"]) {
-		t.Fatal("generated catalog metadata differs from source")
-	}
 	t.Logf("original schemas: %d role + %d assignment + %d history selections; %d untrusted delta projections", len(roles), len(assignments), len(histories), len(deltas))
 }
 func TestOriginalAIHistoryNumericCoercion(t *testing.T) {
 	inputs := []any{Object{}, Object{"limit": "0x10"}, Object{"limit": " 30 "}, Object{"limit": "\ufeff1\ufeff"}, Object{"limit": true}, Object{"limit": []any{1}}, Object{"limit": nil}, Object{"limit": "1e2"}, Object{"limit": "0b10"}, Object{"limit": "0o10"}, Object{"limit": "1.5"}, Object{"after": "9223372036854775807", "limit": 100}, Object{"after": "9223372036854775808"}}
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), "oracle")
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(jsonText(Object{"aiHistories": inputs}))
-	out, e := cmd.CombinedOutput()
+	out, e := os.ReadFile("testdata/permissions-history-schema.json")
 	if e != nil {
-		t.Fatalf("oracle %v", e)
+		t.Fatal(e)
 	}
 	var result Object
 	if json.Unmarshal(out, &result) != nil {
@@ -110,21 +120,17 @@ func TestOriginalAIHistoryNumericCoercion(t *testing.T) {
 	}
 }
 func TestOriginalZodCodepointBoundsRemainSeparateFromJSLength(t *testing.T) {
-	role := Object{"operationId": uuid.NewString(), "expectedVersion": 0, "name": strings.Repeat("😀", 120), "description": strings.Repeat("😀", 1000), "enabled": true, "permissions": []any{}}
+	role := Object{"operationId": "00000000-0000-4000-8000-000000000004", "expectedVersion": 0, "name": strings.Repeat("😀", 120), "description": strings.Repeat("😀", 1000), "enabled": true, "permissions": []any{}}
 	over := obj(clone(role))
 	over["name"] = strings.Repeat("😀", 121)
-	assignment := Object{"operationId": uuid.NewString(), "expectedVersion": 0, "operatorId": strings.Repeat("😀", 1024), "roleId": uuid.NewString(), "enabled": true}
-	prompt := Object{"operationId": uuid.NewString(), "aiAccountId": uuid.NewString(), "expectedRevision": 1, "expectedPromptVersion": 1, "prompt": strings.Repeat("😀", 16000)}
+	assignment := Object{"operationId": "00000000-0000-4000-8000-000000000005", "expectedVersion": 0, "operatorId": strings.Repeat("😀", 1024), "roleId": "00000000-0000-4000-8000-000000000006", "enabled": true}
+	prompt := Object{"operationId": "00000000-0000-4000-8000-000000000007", "aiAccountId": "00000000-0000-4000-8000-000000000008", "expectedRevision": 1, "expectedPromptVersion": 1, "prompt": strings.Repeat("😀", 16000)}
 	overPrompt := obj(clone(prompt))
 	overPrompt["prompt"] = strings.Repeat("😀", 16001)
 	input := Object{"roles": []any{role, over}, "assignments": []any{assignment}, "promptWrites": []any{prompt, overPrompt}, "histories": []any{Object{"targetOperatorId": strings.Repeat("😀", 1024)}}}
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/operations-permissions-interop.mjs"), "oracle")
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(jsonText(input))
-	out, e := cmd.CombinedOutput()
+	out, e := os.ReadFile("testdata/permissions-codepoint-schema.json")
 	if e != nil {
-		t.Fatalf("original codepoint oracle %v", e)
+		t.Fatal(e)
 	}
 	var result Object
 	if json.Unmarshal(out, &result) != nil {

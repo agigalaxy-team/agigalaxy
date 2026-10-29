@@ -1,4 +1,4 @@
-import {governanceReceiptIntent} from '../../../../packages/galaxy-official/src/shared/operations-governance-receipt-intent.mjs';
+import {governanceReceiptIntent} from '../../../../packages/galaxy-contracts/src/operations-governance-receipt-intent.mjs';
 import {operationsRequest} from './operations-client';
 
 export const governanceRecoveryPendingMessage='处理时间比平时长，内容已保留。';

@@ -18,7 +18,7 @@ assert.equal(api.protocol,'http:');assert.equal(api.hostname,'127.0.0.1');
 assert.equal(cms.protocol,'postgres:');assert.equal(cms.hostname,'127.0.0.1');assert.match(cms.pathname,/^\/galaxy_go_test_[a-z0-9_]+$/);
 for(const [origin,hostname] of [[website,'web.galaxy.localhost'],[admin,'admin.galaxy.localhost'],[endpoint,'api.galaxy.localhost']]){assert.equal(origin.protocol,'https:');assert.equal(origin.hostname,hostname);assert.equal(Number(origin.port||443),d.proxyPort);}
 assert.equal(new Set([website.host,admin.host,endpoint.host]).size,3);
-assert(d.browserScope===undefined||d.browserScope==='admin');const adminOnly=d.browserScope==='admin';
+assert(d.browserScope===undefined||d.browserScope==='admin'||d.browserScope==='full');const adminOnly=d.browserScope==='admin';
 const adminMode=d.adminMode??process.env.GALAXY_GO_BROWSER_ADMIN_MODE??'standalone';assert(['standalone','development'].includes(adminMode));const adminDevelopment=adminMode==='development';
 assert(d.expiresAt>Math.floor(Date.now()/1000));assert(d.feedbackId);if(!adminOnly){assert.equal(d.forum.published,false);assert.equal(d.chat.messageDeliverySeeded,false);}
 const directory=await mkdtemp(join(tmpdir(),'galaxy-full-api-browser-')),children=[],logs=[],ownedProcesses=[];

@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -19,26 +19,18 @@ import (
 func TestOriginalRuntimeConfigurationLedgerInterop(t *testing.T) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	node := func(mode string, input any) []byte {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/runtime-config-interop.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		if input != nil {
-			cmd.Stdin = strings.NewReader(jsonText(input))
-		}
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original JS %s: %v %s", mode, e, out)
-		}
-		return out
-	}
 	var fixture struct {
 		Values, RecordInput Object
 		Event               Event
 	}
-	if e := json.Unmarshal(node("setup", nil), &fixture); e != nil {
+	raw, e := os.ReadFile("testdata/runtime-config-setup.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := json.Unmarshal(raw, &fixture); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := databaseschema.Migrate(ctx, owner, []string{"api"}); e != nil {
 		t.Fatal(e)
 	}
 	cfg, e := pgxpool.ParseConfig(dsn)
@@ -58,10 +50,14 @@ func TestOriginalRuntimeConfigurationLedgerInterop(t *testing.T) {
 	if !equal(built, fixture.RecordInput["snapshot"]) {
 		t.Fatalf("snapshot differs\nGo %s\nJS %s", jsonText(built), jsonText(fixture.RecordInput["snapshot"]))
 	}
-	gov := object(fixture.Values["governance"])
-	oracleRaw := node("oracle", Object{"values": fixture.Values, "governance": gov})
+	oracleRaw, e := os.ReadFile("testdata/runtime-config-oracle.json")
+	if e != nil {
+		t.Fatal(e)
+	}
 	var oracle Object
-	json.Unmarshal(oracleRaw, &oracle)
+	if e = json.Unmarshal(oracleRaw, &oracle); e != nil {
+		t.Fatal(e)
+	}
 	prepared, _, e := prepareRegistries(fixture.RecordInput)
 	if e != nil {
 		t.Fatal(e)
@@ -76,8 +72,22 @@ func TestOriginalRuntimeConfigurationLedgerInterop(t *testing.T) {
 		t.Fatalf("JS event verify %v", e)
 	}
 	opts := Options{Now: func() time.Time { return time.Unix(2000000000, 0) }}
+	initial, e := Record(ctx, pool, fixture.RecordInput, opts)
+	baseline := fixture.Event
+	baseline.CreatedAt = initial.CreatedAt // database insertion time is independent of observedAt
+	if e != nil || !equal(initial, baseline) {
+		t.Fatalf("fixed historical event differs %v\nGo%s\nFixture%s", e, jsonText(initial), jsonText(fixture.Event))
+	}
+	if _, e = time.Parse(time.RFC3339Nano, initial.CreatedAt); e != nil {
+		t.Fatal(e)
+	}
+	// Seed the retained historical insertion timestamp, then require the normal
+	// idempotent read to return that original row without restamping it.
+	if _, e = owner.Exec(ctx, "UPDATE runtime_config_events SET created_at=$2 WHERE id=$1", fixture.Event.ID, fixture.Event.CreatedAt); e != nil {
+		t.Fatal(e)
+	}
 	retry, e := Record(ctx, pool, fixture.RecordInput, opts)
-	if e != nil || retry.ID != fixture.Event.ID {
+	if e != nil || !equal(retry, fixture.Event) {
 		t.Fatalf("JS→Go idempotency %v", e)
 	}
 	next := object(clone(fixture.RecordInput))
@@ -139,7 +149,12 @@ func TestOriginalRuntimeConfigurationLedgerInterop(t *testing.T) {
 	if e != nil || nextPage["lastHash"] != row.EventHash {
 		t.Fatalf("archive anchor %v", e)
 	}
-	node("verify", Object{"event": row, "page": nextPage})
+	pageBody := object(clone(nextPage))
+	delete(pageBody, "sha256")
+	canonical, err := identity.Canonical(pageBody)
+	if err != nil || identity.Digest(canonical) != nextPage["sha256"] {
+		t.Fatalf("archive page bytes/hash mismatch %v", err)
+	}
 	if _, e = ExportPage(ctx, pool, Object{"endpoint": fixture.RecordInput["endpoint"], "component": "api", "after": 999}); e == nil || e.Error() != "Runtime configuration archive cursor unavailable" {
 		t.Fatalf("missing cursor %v", e)
 	}
@@ -193,10 +208,15 @@ func TestOriginalRuntimeConfigurationLedgerInterop(t *testing.T) {
 	r["changeId"] = uuid.NewString()
 	r["revision"] = 2
 	r["previousConfigurationSha256"] = confHash
-	if _, e = Record(ctx, pool, validNext, opts); e != nil {
+	nextReviewed, e := Record(ctx, pool, validNext, opts)
+	if e != nil {
 		t.Fatalf("next reviewed revision %v", e)
 	}
-	node("verify", Object{"event": reviewed})
+	for _, event := range []Event{fixture.Event, row, reviewed, nextReviewed} {
+		if e := VerifyEvent(event); e != nil {
+			t.Fatal(e)
+		}
+	}
 	t.Log("original JS↔Go snapshot, registry, ledger hashes, API-role record/retry/rollback, reviewed governance and archive interop passed")
 }
 func TestScalarCanonicalAndSectionDifference(t *testing.T) {

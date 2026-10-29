@@ -1,5 +1,5 @@
 import React,{useId} from 'react';
-import {accountAvatarKey,accountAvatarOptions} from "../../../../galaxy-official/src/shared/account-profile-presentation.mjs";
+import {accountAvatarKey,accountAvatarOptions} from "../../../../galaxy-contracts/src/account-profile-presentation.mjs";
 import {accountAvatarSelection} from './account-avatar-assets.mjs';
 import './account-profile-avatar.css';
 

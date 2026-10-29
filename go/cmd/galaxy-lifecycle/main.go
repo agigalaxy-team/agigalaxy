@@ -283,6 +283,16 @@ func run(ctx context.Context, args []string, getenv func(string) string, lookup 
 	return json.NewEncoder(stdout).Encode(summary)
 }
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "recovery-bridge" {
+		if _, e := runtimeconfig.RuntimeServiceRelease(os.Getenv, "lifecycle", ""); e != nil {
+			os.Exit(1)
+		}
+		if e := recoveryBridge(context.Background(), os.Stdin, os.Stdout); e != nil {
+			_ = json.NewEncoder(os.Stderr).Encode(map[string]any{"event": "recovery_bridge_failed", "code": fault.Code(e)})
+			os.Exit(1)
+		}
+		return
+	}
 	if e := run(context.Background(), os.Args[1:], os.Getenv, os.LookupEnv, os.Stdout); e != nil {
 		event := "deletion_maintenance_incomplete"
 		if len(os.Args) > 1 {

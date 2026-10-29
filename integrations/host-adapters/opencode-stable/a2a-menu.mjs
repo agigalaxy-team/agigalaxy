@@ -1,6 +1,6 @@
 import {showExactChoice} from './exact-choice.mjs';
 import {createLegacyWorkSelection} from './legacy-work-selection.mjs';
-import {authoredRows,nativeStateLabel} from '../../../packages/galaxy-edge-mcp/src/native-v2/interaction/presentation.mjs';
+import {authoredRows,nativeStateLabel} from '../../native-v2/presentation/native-result.mjs';
 
 // v1 imports keep their original generated Result and Consent. Separate only
 // the exact known provenance lines, bound to this actual association/response.

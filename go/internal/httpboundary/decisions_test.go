@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -64,14 +63,9 @@ func TestOriginalHTTPBoundaryDecisions(t *testing.T) {
 		}
 	}
 	cases = append(cases, boundaryCase{Method: "GET", URL: "https://API.EXAMPLE.INVALID:443/v1/service-status"}, boundaryCase{Method: "GET", URL: "https://elsewhere.invalid/v1/service-status"}, boundaryCase{Method: "GET", URL: "/v1/service-status", Headers: map[string]string{"Origin": "https://elsewhere.invalid"}}, boundaryCase{Method: "GET", URL: "/v1/service-status", RemoteAddress: "::ffff:127.0.0.1"}, boundaryCase{Method: "GET", URL: "/v1/service-status", RemoteAddress: "127.0.0.1", Proxies: []string{"127.0.0.1", "10.0.0.1"}, Headers: map[string]string{"X-Forwarded-For": "198.51.100.1, 10.0.0.1"}}, boundaryCase{Method: "GET", URL: "/v1/service-status", RemoteAddress: "127.0.0.1", Proxies: []string{"127.0.0.1"}, Headers: map[string]string{"X-Forwarded-For": "forged, 198.51.100.1"}}, boundaryCase{Method: "GET", URL: "/v1/service-status", RemoteAddress: "198.51.100.2", Proxies: []string{"127.0.0.1"}, Headers: map[string]string{"X-Forwarded-For": "forged"}})
-	input, _ := json.Marshal(map[string]any{"endpoint": endpoint, "origins": origins, "requests": cases})
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
-	cmd := exec.Command("node", filepath.Join(root, "scripts/go/http-boundary-interop.mjs"))
-	cmd.Dir = root
-	cmd.Stdin = strings.NewReader(string(input))
-	output, e := cmd.CombinedOutput()
+	output, e := os.ReadFile("testdata/http-decisions.json")
 	if e != nil {
-		t.Fatalf("original oracle: %v %s", e, output)
+		t.Fatal(e)
 	}
 	var original struct{ Requests []originalDecision }
 	if e = json.Unmarshal(output, &original); e != nil {

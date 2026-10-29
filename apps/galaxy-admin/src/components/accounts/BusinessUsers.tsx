@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect,useLayoutEffect,useMemo,useRef,useState,useTransition} from 'react';
+import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import Link from 'next/link';
 import {useRouter,useSearchParams} from 'next/navigation';
 import type {AccountType,AuditPage,BusinessUser,BusinessUserOperationAction,BusinessUserOperationReceipt,BusinessUserWriteResult,LinkedId,TypeHistoryItem,UserDetail,UserPage} from "../business-types";
@@ -63,7 +63,7 @@ function AccountCard({account,detail,summary,loading,error,href,retry}:{account:
 }
 
 function BusinessUsersContent({list,detail:providedDetail,audit:providedAudit,query:providedQuery,error:providedError,auditError:providedAuditError,csrfToken,businessAuthorization,embedded}:Props){
-  const router=useRouter(),location=useSearchParams(),[refreshing,startRefresh]=useTransition();
+  const router=useRouter(),location=useSearchParams();
   const [pendingLocation,setPendingLocation]=useState<{accountId:string;search:string;registrationId?:string;tab?:AccountTab}|null>(null),search=new URLSearchParams(pendingLocation?.search??location.toString());
   const [resumed,setResumed]=useState<BusinessUserPendingReceipt|null>(null),pendingSession=useRef<SettingsDraftSession|null>(null),resolved=useRef(''),intent=useRef<CurrentBusinessIntent|null>(null),[lastResult,setLastResult]=useState<{action:BusinessUserOperationAction;value:BusinessUserWriteResult}|null>(null);
   const typeHeading=useRef<HTMLHeadingElement|null>(null),restrictionHeading=useRef<HTMLHeadingElement|null>(null);
@@ -78,8 +78,8 @@ function BusinessUsersContent({list,detail:providedDetail,audit:providedAudit,qu
   const historyRead=useOperationsRead<{items:TypeHistoryItem[];nextAfter:number|null;checkedAt:number}>({path:requestedAccountId&&canReadEmbedded&&historyAfter?'/v1/operations/users/'+requestedAccountId+'/type-history?'+new URLSearchParams({limit:'100',after:historyAfter}):null,initial:canReadEmbedded&&historyAfter?initialPages?.history:null,failureMessage:'更早的类型记录暂时无法取得。',clearOnOffline:true});
   useEffect(()=>setInitialDetail(null),[]);
   const fresh=detailRead.value,detail=fresh?{...fresh,...(linksAfter?{linkedIds:linksRead.value??{items:[],nextAfter:null}}:{}),...(historyAfter?{typeHistory:historyRead.value?.items??[],typeHistoryNextAfter:historyRead.value?.nextAfter??null}:{})}:null,sameProvided=providedDetail?.account.accountId===requestedAccountId;
-  const embeddedAudit=useOperationsRead<AuditPage>({path:embedded&&canReadEmbedded&&embedded.tab==='history'&&hasOperatorPermission({businessAuthorization},'audit.read')?'/v1/operations/users/'+requestedAccountId+'/audit?'+new URLSearchParams({limit:'30',...(search.get('auditAfter')?{after:search.get('auditAfter')!}:{})}):null,failureMessage:'处理记录暂时无法取得。',clearOnOffline:true});
-  const audit=embedded?embeddedAudit.value:sameProvided&&detail?providedAudit:null,error=requestedAccountId?detailRead.error||linksRead.error||historyRead.error||(sameProvided?providedError:''):providedError,auditError=embedded?hasOperatorPermission({businessAuthorization},'audit.read')?embeddedAudit.error:'当前没有读取业务审计的权限。':sameProvided?providedAuditError:'';
+  const embeddedAudit=useOperationsRead<AuditPage>({path:requestedAccountId&&canReadEmbedded&&(!embedded||embedded.tab==='history')&&hasOperatorPermission({businessAuthorization},'audit.read')?'/v1/operations/users/'+requestedAccountId+'/audit?'+new URLSearchParams({limit:'30',...(search.get('auditAfter')?{after:search.get('auditAfter')!}:{})}):null,initial:!embedded&&sameProvided?providedAudit:null,initialError:!embedded&&sameProvided?providedAuditError:'',failureMessage:'处理记录暂时无法取得。',clearOnOffline:true});
+  const audit=embeddedAudit.value,error=requestedAccountId?detailRead.error||linksRead.error||historyRead.error||(sameProvided?providedError:''):providedError,auditError=hasOperatorPermission({businessAuthorization},'audit.read')?embeddedAudit.error:'当前没有读取业务审计的权限。';
   const [picked,setPicked]=useState<string|null>(null),[drafts,setDrafts]=useState<Record<string,AccountDraft>>({}),operationAccount=useRef('');
   const period=summaryDays(search.get('days')),account=detail?.account??list?.items.find(item=>item.accountId===(picked??search.get('selected')))??list?.items[0]??null;
   const draftKey=requestedAccountId||account?.accountId||'',emptyDraft:AccountDraft=detail?businessUserEmptyDraft(detail):{restrictionReason:'',typeReason:'',basis:'',nextType:null,typeBase:null,days:'1',profileRevision:0,restrictionRevision:0,restrictionActive:false},draft=drafts[draftKey]??emptyDraft;
@@ -88,7 +88,8 @@ function BusinessUsersContent({list,detail:providedDetail,audit:providedAudit,qu
   const requestedTab=pendingLocation?.tab??embedded?.tab??search.get('tab'),tab:AccountTab=tabs.some(item=>item.id===requestedTab)?requestedTab as AccountTab:'overview';
   const subjectType=['person','agent','organization','unknown'].includes(search.get('subjectType')??'')?search.get('subjectType')??'':'';
   const restriction=['restricted','normal'].includes(search.get('restriction')??'')?search.get('restriction')??'':'';
-  const refresh=()=>{if(requestedAccountId)void detailRead.read();if(linksAfter)void linksRead.read();if(historyAfter)void historyRead.read();startRefresh(()=>router.refresh());};
+  const refreshing=detailRead.refreshing||linksRead.refreshing||historyRead.refreshing||embeddedAudit.refreshing;
+  const refresh=()=>{if(requestedAccountId)void detailRead.read();if(linksAfter)void linksRead.read();if(historyAfter)void historyRead.read();void embeddedAudit.read();};
   function pageLink(values:Record<string,string|null|undefined>={}){
     if(embedded)return embedded.href(values);
     const params=new URLSearchParams(search.toString());
@@ -102,7 +103,7 @@ function BusinessUsersContent({list,detail:providedDetail,audit:providedAudit,qu
   const overview=useOperationsRead<AccountDirectorySummary>({path:!detail&&canReadAnalytics?'/v1/operations/users/summary?days='+period:null,failureMessage:'账户统计暂时无法取得。'});
   const summary=useOperationsRead<AccountSummaryWithUsage>({path:account&&canReadAnalytics?'/v1/operations/users/'+account.accountId+'/summary?days='+period:null,failureMessage:'画像与使用数据暂时无法取得。',clearOnOffline:true});
   const current=detail??preview.value,canChangeType=allowed('accounts.type.change')&&detail?.permissions.canChangeType===true,canRestrict=allowed('accounts.restriction.apply')&&detail?.permissions.canRestrict===true,canRelease=allowed('accounts.restriction.release')&&detail?.permissions.canRelease===true,canManage=canChangeType||canRestrict||canRelease;
-  function refreshCurrent(){void detailRead.read();if(embedded&&tab==='history')void embeddedAudit.read();}
+  function refreshCurrent(){void detailRead.read();if(!embedded||tab==='history')void embeddedAudit.read();}
   function clearAuthored(original:BusinessUserPendingReceipt,value:BusinessUserWriteResult){
     setDrafts(previous=>{const old=previous[original.accountId];if(!old)return previous;const next=original.kind==='type-change'&&'subjectType'in value?{...old,typeReason:'',basis:'',nextType:value.subjectType,typeBase:value.subjectType,profileRevision:value.revision}
       :'restriction'in value?{...old,restrictionReason:'',days:'1' as const,restrictionRevision:value.restriction.revision,restrictionActive:value.restriction.active}:old;

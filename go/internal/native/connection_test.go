@@ -1,23 +1,28 @@
 package native
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/devicefixture"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type connectionFixtureMetadata struct {
@@ -63,77 +68,79 @@ func (t *connectionTestTransport) setHook(hook func(*http.Response, *http.Reques
 }
 func connectionServiceFixture(t *testing.T) (*Store, connectionFixtureMetadata, *connectionTestTransport) {
 	t.Helper()
-	_, file, _, _ := runtime.Caller(0)
-	root := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(file), "../../..")))
+	pool, _ := testsupport.PostgreSQL(t)
+	store, meta, transport, _ := connectionServiceFixtureWithPool(t, pool)
+	return store, meta, transport
+}
+func connectionServiceFixtureWithPool(t *testing.T, pool *pgxpool.Pool) (*Store, connectionFixtureMetadata, *connectionTestTransport, deviceauthfixture.Fixture) {
+	t.Helper()
+	ctx := context.Background()
 	dir := t.TempDir()
-	script := `
-import {receiptStatusFixture} from 'file:///` + root + `/packages/galaxy-official/test/receipt-status-workflow.mjs';
-import {createNativeRuntime} from 'file:///` + root + `/packages/galaxy-edge-mcp/src/native-v2/runtime.mjs';
-import {createHelpSearchClient} from 'file:///` + root + `/packages/galaxy-web/src/features/help-search/help-search-client.mjs';
-import {createChoiceSyncClient} from 'file:///` + root + `/packages/galaxy-web/src/features/choice-sync/choice-sync-client.mjs';
-import {choicePutIntent} from 'file:///` + root + `/packages/galaxy-official/src/shared/choice-snapshot-schema-v2.mjs';
-import {digest} from 'file:///` + root + `/packages/galaxy-official/src/shared/digest.mjs';
-import {trustCanonical as canonicalize} from 'file:///` + root + `/packages/galaxy-official/src/shared/trust-package-crypto.mjs';
-import {randomUUID} from 'node:crypto';import {writeFile} from 'node:fs/promises';
-const t=await receiptStatusFixture(),dir=process.argv[1];let drop=false;
-const transport=async(url,options)=>{const response=await t.transport(url,options);if(drop&&new URL(url).pathname==='/v2/choice-snapshots/put'){drop=false;throw Error('isolated lost ACK');}return response;};
-const config={dataDirectory:dir,endpoint:t.f.access.endpoint,website:'https://galaxy.example.org',trustedKeys:t.trustedKeys,fetch:transport,now:t.now,autoResumePrivateSync:false};
-const native=await createNativeRuntime(config);await native.initialize({profile:'minimal'},{confirmed:true});await native.connect({confirmed:true});
-const subjectId=(await native.status()).identity,facade={api:native.api,status:async()=>{const s=await native.status();return {...s,identity:{subjectId:s.identity}};},getLocal:name=>native.store.get('test-choice:'+subjectId+':'+name),putLocal:(name,value)=>native.store.put('test-choice:'+subjectId+':'+name,value)};
-const search=createHelpSearchClient(facade,{authenticated:true,subjectId}),cloud=createChoiceSyncClient(facade,{subjectId}),page=await search.query({type:'history',query:{query:'Retained receipt source'}}),candidate=search.candidateKey(page.items[0]),snapshotId=randomUUID();
-await search.saveChoice({id:snapshotId,expectedVersion:0,localTaskRef:'Isolated original operation',visibleRationale:'Isolated retained receipt',rationaleAuthor:'user',candidateKeys:[candidate],selectedKeys:[candidate],resultRefs:[]});await cloud.savePreference({endpoint:config.endpoint,expectedRevision:0,enabled:true,snapshotIds:[snapshotId]});drop=true;try{await cloud.sync(snapshotId);throw Error('expected lost ACK');}catch(e){if(!String(e.message).includes('lost ACK'))throw e;}
-const pending=(await cloud.localState()).pending[snapshotId],operation={kind:'choice-snapshot',snapshotId,versionId:pending.versionId,requestHash:digest(canonicalize(choicePutIntent(pending)))};
-search.close();cloud.close();await native.close();
-await writeFile(dir+'/connection-fixture.json',JSON.stringify({configuration:{version:2,endpoint:config.endpoint,website:config.website,dataDirectory:dir,trustedKeys:Object.fromEntries(t.trustedKeys)},origin:'http://127.0.0.1:'+t.api.address().port,now:t.now(),operation}));
-process.stdout.write('ready\n');process.stdin.resume();process.stdin.on('end',async()=>{await t.close();});
-`
-	cmd := exec.Command("node", "--input-type=module", "-e", script, dir)
-	cmd.Dir = root
-	stdin, e := cmd.StdinPipe()
-	if e != nil {
-		t.Fatal(e)
+	prepared := deviceauthfixture.Prepare(t, pool, dir, connectionBrowserScopes)
+	material := prepared.Materials
+	endpoint := devicefixture.Endpoint
+	var proof map[string]any
+	if err := protocol.Decode(material.Genesis.GenesisProof, &proof); err != nil {
+		t.Fatal(err)
 	}
-	stdout, e := cmd.StdoutPipe()
-	if e != nil {
-		t.Fatal(e)
-	}
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	if e = cmd.Start(); e != nil {
-		t.Fatal(e)
-	}
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
-	t.Cleanup(func() {
-		stdin.Close()
-		select {
-		case <-done:
-		case <-time.After(10 * time.Second):
-			cmd.Process.Kill()
-			<-done
+	write := func(name string, value any) {
+		t.Helper()
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
 		}
-	})
-	line, e := bufio.NewReader(stdout).ReadString('\n')
-	if e != nil || line != "ready\n" {
-		t.Fatalf("original service fixture failed: %v %s %s", e, line, stderr.String())
+		if err := writeJSON(path, value); err != nil {
+			t.Fatal(err)
+		}
 	}
-	raw, e := os.ReadFile(filepath.Join(dir, "connection-fixture.json"))
-	if e != nil {
-		t.Fatal(e)
+	write("galaxy-id.json", map[string]any{"id": material.Genesis.ID, "genesisProof": proof})
+	if err := os.WriteFile(filepath.Join(dir, "galaxy-id-private-key.pem"), []byte(material.OwnerPrivate), 0600); err != nil {
+		t.Fatal(err)
 	}
-	var metadata connectionFixtureMetadata
-	if e = json.Unmarshal(raw, &metadata); e != nil {
-		t.Fatal(e)
+	active := map[string]any{"subjectId": material.Genesis.ID, "deviceId": material.DeviceID, "installationId": material.InstallationID, "genesisProof": proof}
+	permission := map[string]any{"enabled": true, "subjectId": material.Genesis.ID, "deviceId": material.DeviceID, "scopes": connectionBrowserScopes}
+	selectionPath := connectionRecordPath(dir, "native-selection:"+endpoint)
+	if err := os.MkdirAll(filepath.Dir(selectionPath), 0700); err != nil {
+		t.Fatal(err)
 	}
-	store, e := NewStore(dir, metadata.Configuration.Endpoint)
-	if e != nil {
-		t.Fatal(e)
+	if err := writeJSON(selectionPath, map[string]any{"version": 1, "revision": 1, "active": active, "permission": permission}); err != nil {
+		t.Fatal(err)
 	}
-	origin, _ := url.Parse(metadata.Origin)
-	return store, metadata, &connectionTestTransport{origin: origin}
+	if err := writeJSON(connectionRecordPath(dir, "device:"+material.Genesis.ID+":"+material.DeviceID), map[string]any{"nativeDeviceKey": material.DeviceID, "nativeGenesis": true, "publicKeyPem": material.PublicKeyPEM}); err != nil {
+		t.Fatal(err)
+	}
+	state, err := prepared.Service.ControlPublicState(ctx, material.Genesis.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = writeJSON(connectionRecordPath(dir, "native-trust-identity:"+endpoint+":"+material.Genesis.ID), state); err != nil {
+		t.Fatal(err)
+	}
+	// A synthetic retained operation, as in the deviceauth receipt regression; this
+	// tests receipt access and response privacy, not an invented upload/ACK event.
+	operation := ReceiptOperation{Kind: "choice-snapshot", SnapshotID: uuid.NewString(), VersionID: uuid.NewString(), RequestHash: strings.Repeat("a", 64)}
+	at := time.Unix(devicefixture.Now, 0)
+	if _, err = pool.Exec(ctx, "INSERT INTO choice_snapshot_heads(subject_id,snapshot_id,created_at,updated_at) VALUES($1,$2,$3,$3)", material.Genesis.ID, operation.SnapshotID, at); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = pool.Exec(ctx, `INSERT INTO choice_snapshot_versions(subject_id,snapshot_id,version_id,base_revision,revision,request_hash,state,content,dependencies,created_at,expires_at) VALUES($1,$2,$3,0,1,$4,'current','{"privateBody":"must never appear"}','[]',$5,$6)`, material.Genesis.ID, operation.SnapshotID, operation.VersionID, operation.RequestHash, at, at.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(deviceauth.Handler{Service: prepared.Service})
+	t.Cleanup(server.Close)
+	origin, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(dir, endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := connectionFixtureMetadata{Configuration: Configuration{Version: 2, Endpoint: endpoint, Website: "https://galaxy.example.org", DataDirectory: dir, TrustedKeys: map[string]Pin{"fixture": {KID: "fixture", PublicKeyPEM: material.HubPublic, NotBefore: devicefixture.Now - 100, NotAfter: devicefixture.Now + 100000}}}, Origin: server.URL, Now: devicefixture.Now, Operation: operation}
+	return store, metadata, &connectionTestTransport{origin: origin}, prepared
 }
 
-func TestConnectionRestoresOriginalJSChoiceAndRetainedReceipt(t *testing.T) {
+func TestConnectionRestoresSavedChoiceAndRetainedReceipt(t *testing.T) {
 	store, meta, transport := connectionServiceFixture(t)
 	ctx := context.Background()
 	now := time.Unix(meta.Now, 0)
@@ -158,6 +165,10 @@ func TestConnectionRestoresOriginalJSChoiceAndRetainedReceipt(t *testing.T) {
 	if receipt["state"] != "acknowledged" || receipt["currentAccessGranted"] != false || receipt["contentReturned"] != false {
 		t.Fatal("original receipt not retained")
 	}
+	encodedReceipt, err := json.Marshal(receipt)
+	if err != nil || strings.Contains(string(encodedReceipt), "must never appear") {
+		t.Fatal("retained receipt exposed content", err)
+	}
 	if transport.count() != 2 {
 		t.Fatalf("receipt created ordinary connection: %v", transport.paths)
 	}
@@ -165,6 +176,12 @@ func TestConnectionRestoresOriginalJSChoiceAndRetainedReceipt(t *testing.T) {
 		if auth {
 			t.Fatal("receipt used ordinary credential")
 		}
+	}
+	unknownOperation := meta.Operation
+	unknownOperation.VersionID = uuid.NewString()
+	unknownReceipt, err := connection.QueryReceipt(ctx, unknownOperation)
+	if err != nil || unknownReceipt["state"] != "absent" || unknownReceipt["contentReturned"] != false {
+		t.Fatal("absent receipt changed", unknownReceipt, err)
 	}
 	snapshot, e = connection.Restore(ctx)
 	if e != nil {

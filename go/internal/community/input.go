@@ -268,3 +268,32 @@ func assertIDs(kind, account string, p Object) error {
 	}
 	return nil
 }
+
+// BindCreatePostIDs prepares the deterministic locators for a new account post.
+// The submitted payload still passes the ordinary validation and authorization.
+func BindCreatePostIDs(account string, p Object) {
+	p["postId"] = deriveID("post", "create-post", account, p, "postId", "versionId")
+	p["versionId"] = deriveID("post-version", "create-post", account, p, "versionId")
+}
+
+// BindForumIDs derives the stable locators for a new, already-formed forum
+// operation. Ordinary request validation and authorization still run on write.
+func BindForumIDs(kind, actor string, p Object) bool {
+	switch kind {
+	case "create-post":
+		BindCreatePostIDs(actor, p)
+	case "publish-version":
+		p["versionId"] = deriveID("post-version", kind, actor, p, "versionId")
+	case "create-reply":
+		p["replyId"] = deriveID("reply", kind, actor, p, "replyId")
+	case "create-report":
+		p["reportId"] = deriveID("report", kind, actor, p, "reportId")
+	case "create-section":
+		p["sectionId"] = deriveID("section", kind, actor, p, "sectionId")
+	case "supplement", "withdraw-report", "appeal", "resolve":
+		p["governanceEventId"] = deriveID("governance-event", kind, actor, p, "governanceEventId")
+	default:
+		return false
+	}
+	return true
+}

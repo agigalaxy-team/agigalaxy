@@ -29,7 +29,6 @@ export function createGalaxyAdapter(
     nativeTools = null,
     readWorkContext = null,
     recordWork = true,
-    readLocalIdentity,
     onWorkSessionComplete,
     hostPersistence,
     connectionUnavailable = false,
@@ -43,7 +42,6 @@ export function createGalaxyAdapter(
     } | null;
     readWorkContext?: (() => Promise<HostWorkContext | null>) | null;
     recordWork?: boolean;
-    readLocalIdentity?: (directory: string) => Promise<{ id: string } | null>;
     onWorkSessionComplete?: (input: {
       galaxyId: string;
       host: string;
@@ -128,7 +126,6 @@ export function createGalaxyAdapter(
         if (recordWork)
           workRecorder = createOpenCodeWorkRecorder(api, {
             dataDirectory,
-            getIdentity: readLocalIdentity,
             onSessionComplete: onWorkSessionComplete,
             history: persistence.history,
             archive: persistence.archive,

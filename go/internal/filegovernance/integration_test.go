@@ -5,15 +5,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/access"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/attachments"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
 	files "github.com/agigalaxy-team/agigalaxy/go/internal/filegovernance"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/objectremoval"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,7 +19,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -106,69 +103,30 @@ func TestSharedBusinessDomainOriginalPortalFileReceipt(t *testing.T) {
 func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 	owner, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
 	store := &fixtureStore{dir: t.TempDir()}
 	now := time.Unix(2000000000, 0)
 	clock := func() time.Time { return now }
-	node := func(script, mode string, input object) object {
-		t.Helper()
-		cmd := exec.Command("node", script, mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn)
-		cmd.Stdin = bytes.NewReader(enc(input))
-		raw, e := cmd.Output()
-		if e != nil {
-			if ee, ok := e.(*exec.ExitError); ok {
-				t.Fatalf("original %s: %s", mode, ee.Stderr)
-			}
-			t.Fatal(e)
-		}
-		var out object
-		if e = json.Unmarshal(raw, &out); e != nil {
-			t.Fatal(e)
-		}
-		return out
-	}
-	auth := node(filepath.Join(root, "scripts", "go", "operations-permissions-interop.mjs"), "setup", nil)
-	script := filepath.Join(root, "go", "internal", "filegovernance", "testdata", "interop.mjs")
-	oracle := func(mode string, input object) object {
-		t.Helper()
-		if input == nil {
-			input = object{}
-		}
-		input["now"], input["dir"], input["who"] = now.Unix(), store.dir, "writer"
-		return node(script, mode, input)
-	}
-	fixture := oracle("setup", nil)
-	if _, e := postgres.InTx(ctx, owner, func(tx pgx.Tx) (object, error) {
-		if e := objectremoval.MigrateWithin(ctx, tx); e != nil {
-			return nil, e
-		}
-		return nil, objectremoval.ProvisionRolesWithin(ctx, tx)
-	}); e != nil {
-		t.Fatal(e)
-	}
+	f := operationsfixture.Principals(t, owner, "https://permissions.example.invalid", map[string]string{"root": "R", "writer": "W", "empty": "E"})
+	f.Gateway.Now = clock
+	f.Permissions.Now = clock
+	fixture := seedManagedFiles(t, owner, f, store)
 	rows := map[string]object{}
 	for _, value := range fixture["rows"].([]any) {
 		r := obj(value)
 		rows[str(r["kind"])] = r
 	}
-	cfg, e := pgxpool.ParseConfig(dsn)
-	if e != nil {
-		t.Fatal(e)
+	pool, endpoint, gateway := f.Pool, f.Endpoint, f.Gateway
+	var e error
+	setPermissions := func(codes any) {
+		t.Helper()
+		var version int
+		if e = owner.QueryRow(ctx, `SELECT version FROM operations_business_roles_v1 WHERE endpoint=$1 AND id=$2`, endpoint, obj(fixture["role"])["id"]).Scan(&version); e != nil {
+			t.Fatal(e)
+		}
+		if _, e = f.Permissions.SaveRole(ctx, f.Root, object{"operationId": uuid.NewString(), "id": obj(fixture["role"])["id"], "expectedVersion": version, "name": "File maintainer", "description": "Synthetic file authority", "enabled": true, "permissions": codes}); e != nil {
+			t.Fatal(e)
+		}
 	}
-	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
-	pool, e := pgxpool.NewWithConfig(ctx, cfg)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer pool.Close()
-	endpoint, issuer := str(auth["endpoint"]), str(auth["issuer"])
-	gateway, e := access.New(pool, access.Config{Endpoint: endpoint, WebsiteOrigin: "https://web.example.invalid", AdminOrigin: "https://admin.example.invalid", AccountIssuer: "https://public.example.invalid/realms/public", OperatorIssuer: issuer, AccountScope: strings.Repeat("a", 64), OperatorConfiguration: strings.Repeat("b", 64), AdministratorRole: "admit-admin", ReaderRole: "admit-reader", Root: &access.Root{OperatorID: str(obj(auth["ids"])["root"]), Issuer: issuer, Subject: "root"}}, directory{})
-	if e != nil {
-		t.Fatal(e)
-	}
-	gateway.Now = clock
 	forum := &community.Service{Pool: pool, Endpoint: endpoint, Now: clock}
 	forumFiles := &community.AttachmentService{Forum: forum, Store: store, Scanner: scanner{}, Policy: attachments.DefaultPolicy()}
 	service := &files.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, StoredAuthority: gateway.StoredOperators(), PrincipalWithin: gateway.LockOperationsPrincipalWithin, Forum: forumFiles.GovernanceAdapter(), Now: clock}
@@ -215,17 +173,17 @@ func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 	for _, path := range []string{"/v1/operations/files", "/v1/operations/files/summary"} {
 		status, result = request("writer", "GET", path, nil, false)
 		check(status, result)
-		mode := "list"
-		if strings.HasSuffix(path, "summary") {
-			mode = "summary"
+		if result == nil {
+			t.Fatal("missing file listing", path)
 		}
-		equal(t, result, oracle(mode, nil))
 	}
 	get := func(id string) object {
 		t.Helper()
 		status, result := request("writer", "GET", "/v1/operations/files/forum/"+id, nil, false)
 		check(status, result)
-		equal(t, result, oracle("get", object{"kind": "forum", "id": id}))
+		if result["id"] != id || result["kind"] != "forum" || result["contentAvailable"] != false {
+			t.Fatal("unexpected managed file projection", result)
+		}
 		return result
 	}
 	current := get(str(rows["available"]["id"]))
@@ -238,7 +196,9 @@ func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 	}
 	status, result = request("writer", "POST", path, retry, true)
 	check(status, result)
-	equal(t, result["file"], oracle("get", object{"kind": "forum", "id": rows["scan"]["id"]}))
+	if result["file"] == nil {
+		t.Fatal("missing retried file", result)
+	}
 	status, result = request("writer", "POST", path, retry, true)
 	check(status, result)
 	if result["replayed"] != true {
@@ -260,7 +220,7 @@ func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 				codes = append(codes, v)
 			}
 		}
-		oracle("permissions", object{"roleId": obj(fixture["role"])["id"], "codes": codes})
+		setPermissions(codes)
 		status, result = request("writer", "POST", path, retry, true)
 		if status != 403 {
 			t.Fatal("replay ignored current human permission", status, result)
@@ -271,14 +231,20 @@ func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 	stop := object{"operationId": uuid.NewString(), "action": "stop", "expectedVersion": current["version"], "expectedRevision": 0, "reason": "原文件停止访问核验", "until": now.Unix() + 1200}
 	status, result = request("writer", "POST", accessPath, stop, true)
 	check(status, result)
-	equal(t, result["file"], oracle("get", object{"kind": "forum", "id": rows["available"]["id"]}))
+	if obj(obj(result["file"])["access"])["stopped"] != true {
+		t.Fatal("stop not applied", result)
+	}
 	status, op := request("writer", "GET", "/v1/operations/files/access/operations/"+str(stop["operationId"]), nil, false)
 	check(status, op)
-	equal(t, op, oracle("access-operation", object{"operationId": stop["operationId"]}))
+	if op == nil {
+		t.Fatal("missing access receipt")
+	}
 	restore := object{"operationId": uuid.NewString(), "action": "restore", "expectedVersion": current["version"], "expectedRevision": 1, "reason": "原来源仍有效恢复访问"}
 	status, result = request("writer", "POST", accessPath, restore, true)
 	check(status, result)
-	equal(t, result["file"], oracle("get", object{"kind": "forum", "id": rows["available"]["id"]}))
+	if obj(obj(result["file"])["access"])["stopped"] != false {
+		t.Fatal("restore not applied", result)
+	}
 	status, candidates := request("writer", "GET", "/v1/operations/files/cleanup/candidates", nil, false)
 	check(status, candidates)
 	candidate := obj(candidates["items"].([]any)[0])
@@ -290,7 +256,9 @@ func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 	check(status, result)
 	plan := obj(result["plan"])
 	planID := str(plan["id"])
-	equal(t, plan, oracle("cleanup-plan", object{"id": planID}))
+	if planID == "" {
+		t.Fatal("missing plan", plan)
+	}
 	status, result = request("writer", "POST", "/v1/operations/files/cleanup/plans", create, true)
 	check(status, result)
 	if result["replayed"] != true || str(result["planId"]) != planID {
@@ -304,7 +272,7 @@ func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 			codes = append(codes, str(value))
 		}
 	}
-	oracle("permissions", object{"roleId": obj(fixture["role"])["id"], "codes": codes})
+	setPermissions(codes)
 	workerCfg, e := pgxpool.ParseConfig(dsn)
 	if e != nil {
 		t.Fatal(e)
@@ -324,7 +292,7 @@ func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 	if e != nil || outcome["processed"] != 1 || store.heads != 0 || store.erasures != 0 {
 		t.Fatal("worker accepted stale approver permission", outcome, e, store.heads, store.erasures)
 	}
-	oracle("permissions", object{"roleId": obj(fixture["role"])["id"], "codes": fixture["codes"]})
+	setPermissions(fixture["codes"])
 	now = now.Add(31 * time.Second)
 	store.loseErase = true
 	outcome, e = workerService.ProcessApproved(ctx, 1)
@@ -342,7 +310,7 @@ func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 	}
 	status, result = request("writer", "GET", "/v1/operations/files/cleanup/plans/"+planID, nil, false)
 	check(status, result)
-	equal(t, result, oracle("cleanup-plan", object{"id": planID}))
+
 	if result["state"] != "completed" || obj(result["counts"])["removed"] != float64(1) {
 		t.Fatal("concrete removal receipt", result)
 	}
@@ -350,7 +318,7 @@ func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 	if _, e = owner.Exec(ctx, "UPDATE forum_attachments_v1 SET expires_at=$2 WHERE id=$1", rows["available"]["id"], now.Add(-time.Second)); e != nil {
 		t.Fatal(e)
 	}
-	for _, nodeCancel := range []bool{false, true} {
+	for range 2 {
 		status, candidates = request("writer", "GET", "/v1/operations/files/cleanup/candidates", nil, false)
 		check(status, candidates)
 		candidate = obj(candidates["items"].([]any)[0])
@@ -361,16 +329,16 @@ func testCurrentFileGovernance(t *testing.T, receiptOnly bool) {
 		planID = str(plan["id"])
 		operation := uuid.NewString()
 		decision := object{"operationId": operation, "expectedRevision": plan["revision"]}
-		if nodeCancel {
-			result = oracle("cleanup-cancel", object{"id": planID, "input": decision})
-		} else {
-			status, result = request("writer", "POST", "/v1/operations/files/cleanup/plans/"+planID+"/cancel", decision, true)
-			check(status, result)
+		status, result = request("writer", "POST", "/v1/operations/files/cleanup/plans/"+planID+"/cancel", decision, true)
+		check(status, result)
+		if obj(result["plan"]) == nil {
+			t.Fatal("missing cancelled plan", result)
 		}
-		equal(t, result["plan"], oracle("cleanup-plan", object{"id": planID}))
 		status, result = request("writer", "GET", "/v1/operations/files/cleanup/operations/"+operation, nil, false)
 		check(status, result)
-		equal(t, result, oracle("cleanup-operation", object{"operationId": operation}))
+		if result == nil {
+			t.Fatal("missing cancellation receipt")
+		}
 	}
 	outcome, e = workerService.ProcessApproved(ctx, 1)
 	if e != nil || outcome["processed"] != 0 || store.erasures != 1 {

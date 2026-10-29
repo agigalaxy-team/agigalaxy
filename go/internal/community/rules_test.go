@@ -21,9 +21,9 @@ func TestRulesUseOriginalThreeValuedPredicate(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	js := object(t, node(t, "postgres://127.0.0.1/galaxy_go_test_rules", "rules", string(encode(config)), string(encode(input))))
-	equal(t, got.Outcome, js["outcome"])
-	equal(t, got.Matched, js["matchedRuleIds"])
+	if got.Outcome != "reject" || len(got.Matched) != 1 || got.Matched[0] != rule {
+		t.Fatal("matching rejection changed", got)
+	}
 	exception := uuid.NewString()
 	rr := config["rules"].([]Object)
 	rr[0]["exceptions"] = []Object{{"id": exception, "name": "账户例外", "enabled": true, "accountIds": []string{account}}}
@@ -32,9 +32,9 @@ func TestRulesUseOriginalThreeValuedPredicate(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	js = object(t, node(t, "postgres://127.0.0.1/galaxy_go_test_rules", "rules", string(encode(config)), string(encode(input))))
-	equal(t, got.Outcome, js["outcome"])
-	equal(t, got.Exceptions, js["exceptionIds"])
+	if got.Outcome != "allow" || len(got.Exceptions) != 1 || got.Exceptions[0] != exception {
+		t.Fatal("account exception changed", got)
+	}
 	rr[0]["conditions"] = Object{"combinator": "and", "rules": []Object{{"field": "subjectType", "operator": "eq", "value": "person"}}}
 	rr[0]["exceptions"] = []Object{}
 	delete(input, "subjectType")
@@ -44,6 +44,7 @@ func TestRulesUseOriginalThreeValuedPredicate(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	js = object(t, node(t, "postgres://127.0.0.1/galaxy_go_test_rules", "rules", string(encode(config)), string(encode(input))))
-	equal(t, got.Outcome, js["outcome"])
+	if got.Outcome != "unknown" {
+		t.Fatal("missing subject fact was treated as known", got)
+	}
 }

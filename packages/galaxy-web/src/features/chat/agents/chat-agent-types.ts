@@ -1,5 +1,5 @@
 import type {z} from 'zod/v4';
-import type {managedBindingSchema} from "../../../../../galaxy-official/src/shared/binding-management-schema.mjs";
+import type {managedBindingSchema} from "../../../../../galaxy-contracts/src/binding-management-schema.mjs";
 export type AgentBinding=z.infer<typeof managedBindingSchema>;
 export type AgentMode='read'|'draft'|'respond';
 export type AgentGrantInput={bindingId:string;mode:AgentMode;primaryResponder:boolean;expiresAt:number};

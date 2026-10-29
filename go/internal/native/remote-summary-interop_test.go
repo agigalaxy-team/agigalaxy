@@ -37,7 +37,7 @@ func (f *summaryNoticeArchive) Command(_ context.Context, action string, input c
 func TestRemoteSummaryGoNoticeReceiptAndReviewedInbox(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	store, meta, transport := workUploadServiceFixtureDatabase(t, dsn)
+	store, meta, transport := nativeGoUploadFixtureDatabase(t, dsn)
 	now := func() time.Time { return time.Unix(meta.Now, 0) }
 	devices := &deviceauth.Service{Pool: pool, Endpoint: meta.Configuration.Endpoint, Now: now}
 	owner, e := store.Owner(ctx)

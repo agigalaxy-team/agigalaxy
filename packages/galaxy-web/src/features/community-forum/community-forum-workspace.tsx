@@ -14,7 +14,7 @@ import { SaveForLaterButton } from "../bookmarks/controls";
 import {AgentWorkContinuation} from "../local-galaxy/agent-work-continuation";
 import {chatErrorCode,type ChatRuntime} from "../chat/chat-workspace-types";
 import {forumBodyExcerpt,forumBrowseFocus,forumBrowsePath,forumBrowseSelection,readForumBrowsePosition,saveForumBrowsePosition,readForumPages as readPages} from './community-forum-browse.mjs';
-import {forumTopics,forumReadTopicSchema} from "../../../../galaxy-official/src/shared/community-forum-topics-v1.mjs";
+import {forumTopics,forumReadTopicSchema} from "../../../../galaxy-contracts/src/community-forum-topics-v1.mjs";
 import {ContentCover,contentCoverFromLinks} from './community-content-visuals';
 import {CommunityExternalWorkspace,CommunityReadingSidebar} from './community-highlights';
 import {communityBrowsePath,communitySelection} from './community-navigation';

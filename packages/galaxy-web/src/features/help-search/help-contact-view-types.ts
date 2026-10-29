@@ -1,8 +1,8 @@
 import type * as z from "zod/v4";
-import type {discoveryQueryV2Schema} from "../../../../galaxy-official/src/shared/discovery-schema-v2.mjs";
+import type {discoveryQueryV2Schema} from "../../../../galaxy-contracts/src/discovery-schema-v2.mjs";
 import type {GovernanceDraftRuntime} from "../governance/governance-draft-state";
-import type {capsuleVersionSchema} from "../../../../galaxy-official/src/shared/capsule-schema.mjs";
-import type {taskEventV2Schema} from "../../../../galaxy-official/src/shared/task-schema-v2.mjs";
+import type {capsuleVersionSchema} from "../../../../galaxy-contracts/src/capsule-schema.mjs";
+import type {taskEventV2Schema} from "../../../../galaxy-contracts/src/task-schema-v2.mjs";
 import type {createTaskContactClient} from "../tasks/contact/task-contact-client.mjs";
 import type {ProjectRuntime,ProjectViewClient,ContactView,Opportunity,VisibleOpportunity,ProjectOperationReview,ProjectContinuation,ContactWriteReceipt,RecruitmentView,DiscoveryQuery,DiscoveryPurpose,OpportunityRef} from "../projects/contracts";
 import {object,projectErrorText} from "../projects/contracts";

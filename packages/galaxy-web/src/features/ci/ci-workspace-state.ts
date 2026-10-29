@@ -1,6 +1,6 @@
 import * as z from 'zod/v4';
-import {ciRequestV2Schema,ciProofV2Schema} from "../../../../galaxy-official/src/shared/ci-observation-v2-schema.mjs";
-import {evidenceReferenceRecordSchema} from "../../../../galaxy-official/src/shared/verification-record-schema.mjs";
+import {ciRequestV2Schema,ciProofV2Schema} from "../../../../galaxy-contracts/src/ci-observation-v2-schema.mjs";
+import {evidenceReferenceRecordSchema} from "../../../../galaxy-contracts/src/verification-record-schema.mjs";
 import {errorField} from "../tasks/operations/task-operation-state";
 
 export type CiRequest=z.infer<typeof ciRequestV2Schema>;

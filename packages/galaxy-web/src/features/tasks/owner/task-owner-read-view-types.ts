@@ -1,6 +1,6 @@
 import type {z} from 'zod/v4';
 import type {createWebRuntime} from "../../../runtime.mjs";
-import type {taskOwnerReadPreviewV2Schema,taskOwnerReadResultV2Schema} from "../../../../../galaxy-official/src/shared/task-owner-read-v2-schema.mjs";
+import type {taskOwnerReadPreviewV2Schema,taskOwnerReadResultV2Schema} from "../../../../../galaxy-contracts/src/task-owner-read-v2-schema.mjs";
 
 export type OwnerReadRuntime=Pick<Awaited<ReturnType<typeof createWebRuntime>>,'api'|'getLocal'|'putLocal'|'updateLocal'|'receiptStatus'|'reviewTaskStop'|'stopTaskOperation'>;
 export type OwnerReadScope=z.infer<typeof taskOwnerReadPreviewV2Schema>&{authorizationState?:'authorized'|'awaiting-receipt'|'expired';readExpiresAt?:number};

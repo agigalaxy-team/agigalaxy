@@ -42,9 +42,6 @@
 
 失败按数据库和原操作事实接续。完整 schema 列表仍与旧包相容时才恢复对应旧程序及配置；schema 已推进时使用兼容修复或明确的数据恢复，不能修改 `schema_migrations` 假降级。迁移、任务提交或主机操作结果未知时保留原 ID 和失败记录，只查询／接续原操作，不因重试部署而再次迁移、改 UUID 或重投业务写入。
 
-## 旧 Node 发行兼容定位
-
-原 [`prepare-linux.mjs`](../../packages/galaxy-official/scripts/prepare-linux.mjs)、[`linux-plan.mjs`](../../packages/galaxy-official/deploy/linux-plan.mjs) 与 [`service-release.mjs`](../../packages/galaxy-official/scripts/service-release.mjs) 的 capture／compare／attempt，仅用于读取旧 `galaxy-official-service-release` 包、理解存量主机材料及接续其原 operation 回执。它们不接受 Go artifact，也不是本轮 Go 部署入口；旧 Node 的环境限制保留在 [`runtime-environment.mjs`](../../packages/galaxy-official/src/infrastructure/runtime-environment.mjs)，不拿旧约束替代 Go loader 的现行配置。
 ## 系统设置与 AI 接续
 
 [接口说明](../technical/interfaces.md#系统设置与消费者采用)集中root/operator、管理writer、System元数据文件和采用判定。部署时保证Worker只读自身文件、不加入管理组以绕过目录限制，原UDS/HMAC控制文件与API/Admin/迁移/SQL角色同批；Payload共享Zod解析也取同发行。不要覆写 `/run/credentials` 运行副本。
@@ -75,7 +72,7 @@ Runner只获得完成可信CI所需的独立低权限系统账号；无sudo、�
 
 前台部署运行包的 `start.mjs`，不再将公开数据目录当成现行网站根。运行配置与 unit 示例位于 Official deploy 的 `galaxy-website.*.example`；网站反代使用独立 loopback 端口，保留现有 HTTPS/域名边界。旧静态站脚本/CSP配置须按 Next.js 实际资源与连接方式适配，不能把动态页面当作 HTML 文件服务。
 
-部署代理先读取目标实际配置：选定 Hub 产物及其二进制／manifest、网站所需 Node 路径、前台端口、公开配置文件、软件内容根、CMS 指针、身份/业务数据库版本和原服务账户。Go 部署按上述正式发行说明，存量 Node 维护按其服务包；两类 manifest 不互换。秘密由保护文件/进程注入，不从示例推断可用凭据，不借部署扩大数据库或用户权限。
+部署代理先读取目标实际配置：选定 Hub 产物及其二进制／manifest、网站所需 Node 路径、前台端口、公开配置文件、软件内容根、CMS 指针、身份/业务数据库版本和原服务账户。Go 部署按上述正式发行说明；历史 Node 发行记录仅作原回执追溯，不作为现行构建或执行入口。秘密由保护文件/进程注入，不从示例推断可用凭据，不借部署扩大数据库或用户权限。
 
 本轮技术迁移 132/133 涉及原会话字段和网页事件表/触发器；不能只更新网页就宣称续期与变化推送可用。应用迁移、API role、API 服务及网站配置后，集中检查实际登录续期、一个真实提交到页面的事件、内容发布及原 operation 恢复。部署执行和实际业务回读结果记录在本次操作记录，不从网页或构建单独推断整站切换完成。
 

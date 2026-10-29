@@ -1,6 +1,6 @@
 import type {ManagementAccount,ManagementAccountDetail,ManagementAccountTab,ManagementAccountsLocation,ManagementAccountsPage,ManagementAiDomain,ManagementAssignment,ManagementCommandKind,ManagementCommandReceipt,ManagementPhaseKind,ManagementProfileDraft} from "../../components/management-accounts/management-accounts-types";
 import type {AssignmentSave,PermissionOperationRead} from "../../components/permissions/permissions-types";
-import {requiresManagementMaintainer} from "../../../../../packages/galaxy-official/src/shared/operations-management-maintainer-actions.mjs";
+import {requiresManagementMaintainer} from "../../../../../packages/galaxy-contracts/src/operations-management-maintainer-actions.mjs";
 
 export const managementAccountsRoute='/admin/operations/management-accounts';
 export const managementAccountsBase='/v1/operations/management-accounts';
