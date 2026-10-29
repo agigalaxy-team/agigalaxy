@@ -10,7 +10,9 @@ import (
 	"sync"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -56,6 +58,8 @@ type Frame struct {
 	ObjectID    string   `json:"objectId,omitempty"`
 	ParentID    string   `json:"parentId,omitempty"`
 	Version     any      `json:"version,omitempty"`
+	Entity      string   `json:"entity,omitempty"`
+	TurnID      string   `json:"turnId,omitempty"`
 	Reason      string   `json:"reason,omitempty"`
 }
 
@@ -220,6 +224,13 @@ func (s *Service) Read(ctx context.Context, c *Connection, cursor *string) ([]Fr
 	if invalid || len(events) > maximumReplay {
 		return append(frames, Frame{Type: "reset", Cursor: high, Modules: c.Modules, Reason: "replay-gap"}, Frame{Type: "snapshot", Cursor: high, Modules: c.Modules}), nil
 	}
+	locators := map[agentOSKey]agentOSLocation{}
+	if c.Principal.Surface == "admin" && slices.Contains(c.Modules, "agentos") {
+		locators, e = s.agentOSLocators(ctx, events)
+		if e != nil {
+			return nil, e
+		}
+	}
 	resets := []string{}
 	addReset := func(m string) {
 		if slices.Contains(c.Modules, m) && !slices.Contains(resets, m) {
@@ -255,12 +266,34 @@ func (s *Service) Read(ctx context.Context, c *Connection, cursor *string) ([]Fr
 			return nil, e
 		}
 		if decision == Reset || decision == Allowed && str(event.Ref, "_operation") == "DELETE" {
+			// A missing or deleted source row has no trustworthy current locator.
+			// Request a snapshot without disclosing its former ID. Module and
+			// session authority changes still take the separate reset path.
+			if c.Principal.Surface == "admin" && event.Module == "agentos" && agentOSEntity(event.SourceTable) != "" {
+				frames = append(frames, Frame{Type: "change", Cursor: event.Cursor, Module: event.Module})
+				continue
+			}
 			addReset(event.Module)
 			continue
 		}
 		if decision == Allowed {
 			f := Frame{Type: "change", Cursor: event.Cursor, Module: event.Module, OperationID: event.OperationID, Version: event.Ref["_version"]}
 			f.ObjectID = objectID(event)
+			if c.Principal.Surface == "admin" && event.Module == "agentos" {
+				entity := agentOSEntity(event.SourceTable)
+				if entity == "" {
+					f.Entity = "configuration"
+				} else {
+					location := locators[agentOSLocatorKey(event.SourceTable, str(event.Ref, "id"))]
+					if location.owner != "" && location.owner != c.Principal.Identity {
+						continue
+					}
+					f.Entity, f.ParentID, f.TurnID = location.entity, location.parent, location.turn
+					if location.entity == "" {
+						f.ObjectID, f.OperationID = "", nil
+					}
+				}
+			}
 			for _, key := range []string{"room_id", "task_id", "post_id"} {
 				if p := str(event.Ref, key); p != "" && p != f.ObjectID {
 					f.ParentID = p
@@ -274,6 +307,91 @@ func (s *Service) Read(ctx context.Context, c *Connection, cursor *string) ([]Fr
 		frames = append(frames, Frame{Type: "reset", Cursor: high, Modules: resets, Reason: "access-changed"})
 	}
 	return append(frames, Frame{Type: "snapshot", Cursor: high, Modules: c.Modules}), nil
+}
+
+// Only these four catalog tables contain the conversation identifiers needed
+// by the workbench. Captured refs deliberately exclude conversation_id and
+// turn_id, so read the live source rows instead of inferring from operation_id.
+type agentOSKey struct{ table, id string }
+type agentOSLocation struct{ entity, parent, turn, owner string }
+
+func agentOSLocatorKey(table, id string) agentOSKey {
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return agentOSKey{table, ""}
+	}
+	return agentOSKey{table, parsed.String()}
+}
+
+func agentOSEntity(table string) string {
+	switch table {
+	case "operations_agentos_conversation_commands_v1":
+		return "conversation-operation"
+	case "operations_agentos_conversation_cards_v1":
+		return "conversation-card"
+	case "operations_agentos_conversation_tool_calls_v1":
+		return "conversation-tool"
+	case "operations_agentos_conversations_v1":
+		return "conversation-context"
+	default:
+		return ""
+	}
+}
+
+func (s *Service) agentOSLocators(ctx context.Context, events []Event) (map[agentOSKey]agentOSLocation, error) {
+	byTable := map[string][]pgtype.UUID{}
+	seen := map[agentOSKey]bool{}
+	for _, event := range events {
+		id := str(event.Ref, "id")
+		key := agentOSLocatorKey(event.SourceTable, id)
+		if event.Module != "agentos" || agentOSEntity(event.SourceTable) == "" || key.id == "" || seen[key] || event.Endpoint != "" && event.Endpoint != s.Endpoint {
+			continue
+		}
+		parsed, _ := uuid.Parse(key.id)
+		seen[key] = true
+		byTable[event.SourceTable] = append(byTable[event.SourceTable], pgtype.UUID{Bytes: parsed, Valid: true})
+	}
+	result := map[agentOSKey]agentOSLocation{}
+	for table, ids := range byTable {
+		// table comes exclusively from agentOSEntity's fixed table whitelist.
+		query := `SELECT source.id::text,to_jsonb(source)->>'conversation_id',to_jsonb(source)->>'turn_id',
+		 (SELECT c.operator_id FROM operations_agentos_conversations_v1 c WHERE c.id=COALESCE((to_jsonb(source)->>'conversation_id')::uuid,source.id) AND c.endpoint=$2)
+		 FROM ` + pgx.Identifier{table}.Sanitize() + ` source WHERE source.id=ANY($1::uuid[]) AND source.endpoint=$2`
+		rows, err := s.Pool.Query(ctx, query, ids, s.Endpoint)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var id string
+			var conversation, turn, owner *string
+			if err = rows.Scan(&id, &conversation, &turn, &owner); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			if owner == nil {
+				continue
+			}
+			location := agentOSLocation{entity: agentOSEntity(table), owner: *owner}
+			if conversation != nil {
+				location.parent = *conversation
+			}
+			if turn != nil {
+				location.turn = *turn
+			}
+			if location.entity == "conversation-operation" {
+				location.turn = id
+			}
+			if location.entity == "conversation-context" {
+				location.parent = id
+			}
+			result[agentOSKey{table, id}] = location
+		}
+		rows.Close()
+		if err = rows.Err(); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
 }
 func validSource(e Event) bool {
 	module, known := catalog.Sources[e.SourceTable]

@@ -5,10 +5,10 @@ import { createGalaxyEventDispatcher, type GalaxyWebEvent } from './event-dispat
 export function createGalaxyEventClient(options: {
   scope: GalaxyQueryScope; queryClient: QueryClient; url?: string; topics?: string[];
   headers?: HeadersInit | (() => HeadersInit | Promise<HeadersInit>);
-  fetch?: typeof fetch; onReset?: (modules: string[]) => void; onError?: (error: unknown) => void;
+  fetch?: typeof fetch; onReset?: (modules: string[]) => void; onChange?: (event:GalaxyWebEvent)=>void; onResync?: (modules:string[])=>void; onError?: (error: unknown) => void;
   initialCursor?: string;
 }) {
-  const dispatch = createGalaxyEventDispatcher(options.queryClient, options.scope, options.onReset, options.initialCursor);
+  const dispatch = createGalaxyEventDispatcher(options.queryClient, options.scope, options.onReset, options.initialCursor, {onChange:options.onChange,onResync:options.onResync});
   let controller: AbortController | undefined;
   let stopped = true;
   let timer: ReturnType<typeof setTimeout> | undefined;

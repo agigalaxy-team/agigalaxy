@@ -106,3 +106,10 @@ func (g *Gateway) PersonWithin(ctx context.Context, tx pgx.Tx, id string, includ
 	}
 	return actor, nil
 }
+
+// ReadHumanSnapshotWithin returns one freshly authenticated human projection for
+// an explicitly read-only caller. The caller must perform a separate fresh
+// authorization barrier before publishing its read result.
+func (g *Gateway) ReadHumanSnapshotWithin(ctx context.Context, tx pgx.Tx, actor operationspermissions.Actor) (operationspermissions.Actor, error) {
+	return g.RequireWithin(ctx, tx, actor, "workbench.read")
+}

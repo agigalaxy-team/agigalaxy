@@ -60,3 +60,13 @@ test('conversation qualification is an exact read-only route',()=>{
  const publicOrigin='https://admin.example.invalid';const check=(suffix='',method='GET')=>operationsProxyPolicy({url:publicOrigin+'/v1/operations/agentos/conversations/overview/qualification'+suffix,method,headers:new Headers({'sec-fetch-site':'same-origin'}),publicOrigin});
  assert.equal(check().allowed,true);assert.equal(check('?all=1').allowed,false);assert.equal(check('','POST').allowed,false);
 });
+
+
+test('workbench resources have independent exact read-only proxy routes',()=>{
+ const publicOrigin='https://admin.example.invalid';
+ for(const domain of ['overview','governance','messaging','discovery','maintenance'])for(const resource of ['history','cards','context','management-capabilities']){
+  const path='/v1/operations/agentos/conversations/'+domain+'/'+resource;
+  const check=(suffix='',method='GET')=>operationsProxyPolicy({url:publicOrigin+path+suffix,method,headers:new Headers({'sec-fetch-site':'same-origin'}),publicOrigin});
+  assert.equal(check().allowed,true,path);assert.equal(check('?all=1').allowed,false,path);assert.equal(check('','POST').allowed,false,path);
+ }
+});

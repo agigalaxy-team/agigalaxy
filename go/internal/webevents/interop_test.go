@@ -279,3 +279,98 @@ func TestCurrentSchemaInteropAndHTTP(t *testing.T) {
 		t.Fatal("unconnected public domain was allowed")
 	}
 }
+
+func TestAgentOSChangesIdentifyOwnedRows(t *testing.T) {
+	pool, _ := testsupport.PostgreSQL(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Second)
+	defer cancel()
+	if _, err := databaseschema.Migrate(ctx, pool, nil); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{Pool: pool, Endpoint: "https://events.invalid", Authority: &fixtureAuthority{}}
+	defer s.Stop()
+	const conversation = "11111111-1111-4111-8111-111111111111"
+	const foreignConversation = "22222222-2222-4222-8222-222222222222"
+	const turn = "33333333-3333-4333-8333-333333333333"
+	const foreignTurn = "44444444-4444-4444-8444-444444444444"
+	const tool = "55555555-5555-4555-8555-555555555555"
+	const card = "66666666-6666-4666-8666-666666666666"
+	const cardOperation = "77777777-7777-4777-8777-777777777777"
+	execSQL := func(query string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, query, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	execSQL(`INSERT INTO operations_agentos_conversations_v1(id,endpoint,operator_id,domain,permission_key,session_id,created_at) VALUES ($1,$2,'fixture','overview','workbench.read','88888888-8888-4888-8888-888888888888',now()),($3,$2,'other','overview','workbench.read','99999999-9999-4999-8999-999999999999',now())`, conversation, s.Endpoint, foreignConversation)
+	execSQL(`INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,result,created_at) VALUES ($1,$2,$3,'fixture','digest','dispatching','{}',now()),($4,$2,$5,'other','digest','dispatching','{}',now())`, turn, s.Endpoint, conversation, foreignTurn, foreignConversation)
+	execSQL(`INSERT INTO operations_agentos_conversation_tool_calls_v1(id,endpoint,conversation_id,turn_id,native_run_id,call_id,tool,arguments_digest,state,created_at,updated_at) VALUES($1,$2,$3,$4,'run','call','prepare-operation','digest','started',now(),now())`, tool, s.Endpoint, conversation, turn)
+	execSQL(`INSERT INTO operations_agentos_conversation_cards_v1(id,endpoint,conversation_id,turn_id,tool_call_id,operator_id,domain,operation_id,request_digest,proposal,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,'fixture','overview',$6,'digest','{}','prepared',now(),now())`, card, s.Endpoint, conversation, turn, tool, cardOperation)
+	cursor, err := s.Position(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection, err := s.Connect(ctx, httptest.NewRequest("GET", "/v1/operations/web-events", nil), "admin", []string{"agentos"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	execSQL(`UPDATE operations_agentos_conversation_commands_v1 SET state='accepted' WHERE id IN ($1,$2)`, turn, foreignTurn)
+	execSQL(`UPDATE operations_agentos_conversation_tool_calls_v1 SET state='completed' WHERE id=$1`, tool)
+	execSQL(`UPDATE operations_agentos_conversation_cards_v1 SET state='processing' WHERE id=$1`, card)
+	frames, err := s.Read(ctx, connection, &cursor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]Frame{}
+	for _, frame := range frames {
+		if frame.Type == "change" {
+			if frame.ObjectID == foreignTurn {
+				t.Fatal("foreign operator locator leaked")
+			}
+			got[frame.Entity] = frame
+		}
+	}
+	if len(got) != 3 {
+		t.Fatalf("unexpected frames: %+v", frames)
+	}
+	for _, want := range []struct{ entity, id string }{{"conversation-operation", turn}, {"conversation-tool", tool}, {"conversation-card", card}} {
+		f := got[want.entity]
+		if f.ObjectID != want.id || f.ParentID != conversation || f.TurnID != turn {
+			t.Fatalf("bad %s locator: %+v", want.entity, f)
+		}
+	}
+	if f := got["conversation-operation"]; f.OperationID != nil {
+		t.Fatalf("command event must use its row id, not an invented operation_id: %+v", f)
+	}
+	if f := got["conversation-card"]; f.OperationID == nil || *f.OperationID != cardOperation {
+		t.Fatalf("card receipt id differs from its turn: %+v", f)
+	}
+	// A disappeared source cannot provide a current owner or locator. It should
+	// request background resync without disclosing its old ID or clearing scope.
+	const removedTurn = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	execSQL(`INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,result,created_at) VALUES($1,$2,$3,'fixture','digest','dispatching','{}',now())`, removedTurn, s.Endpoint, conversation)
+	cursor, err = s.Position(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	execSQL(`DELETE FROM operations_agentos_conversation_commands_v1 WHERE id=$1`, removedTurn)
+	frames, err = s.Read(ctx, connection, &cursor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resync bool
+	for _, f := range frames {
+		if f.Type == "reset" {
+			t.Fatalf("missing source cleared scope: %+v", f)
+		}
+		if f.Type == "change" {
+			if f.Entity != "" || f.ObjectID != "" || f.ParentID != "" || f.TurnID != "" {
+				t.Fatalf("missing source leaked locator: %+v", f)
+			}
+			resync = true
+		}
+	}
+	if !resync {
+		t.Fatalf("missing source did not request resync: %+v", frames)
+	}
+}

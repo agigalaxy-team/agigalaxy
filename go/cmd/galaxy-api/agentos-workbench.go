@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"reflect"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
@@ -138,19 +139,22 @@ func connectWorkbench(conversations *agentos.Conversations, autonomy *operations
 			if len(ids) == 0 {
 				return true, nil
 			}
-			rows, err := tx.Query(ctx, `SELECT id::text,COALESCE(native_run_id,result->>'runId') FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND id=ANY($4::uuid[]) AND result->>'cancelledOperationId' IS NULL`, autonomy.Endpoint, row.ID, row.OperatorID, ids)
+			rows, err := tx.Query(ctx, `SELECT c.id::text,COALESCE(c.native_run_id,c.result->>'runId'),jsonb_build_object('nativeRunId',r.native_run_id,'modelState',r.model_state,'status',r.state,'usage',r.usage) FROM operations_agentos_conversation_commands_v1 c LEFT JOIN operations_autonomy_workbench_runs_v1 r ON r.endpoint=c.endpoint AND r.turn_operation_id=c.id AND (r.task_id=c.id OR r.task_id::text=c.result->>'taskId') WHERE c.endpoint=$1 AND c.conversation_id=$2 AND c.operator_id=$3 AND c.id=ANY($4::uuid[]) AND c.result->>'cancelledOperationId' IS NULL`, autonomy.Endpoint, row.ID, row.OperatorID, ids)
 			if err != nil {
 				return false, err
 			}
 			known := map[string]*string{}
+			observed := map[string]agentos.Object{}
 			for rows.Next() {
 				var id string
 				var nativeID *string
-				if err = rows.Scan(&id, &nativeID); err != nil {
+				var fact agentos.Object
+				if err = rows.Scan(&id, &nativeID, &fact); err != nil {
 					rows.Close()
 					return false, err
 				}
 				known[id] = nativeID
+				observed[id] = fact
 			}
 			err = rows.Err()
 			rows.Close()
@@ -163,10 +167,16 @@ func connectWorkbench(conversations *agentos.Conversations, autonomy *operations
 				if runID, ok := run["runId"].(string); !ok || runID == "" || !found || run["status"] == "REGENERATED" || nativeID != nil && *nativeID != runID {
 					continue
 				}
+				// Repeated history reads are observations, not new work. Compare the
+				// existing projection in this same bounded batch before taking row locks.
+				fact := operationsautonomy.WorkbenchRunFact(run)
+				if reflect.DeepEqual(observed[id], fact) {
+					continue
+				}
 				if _, err = tx.Exec(ctx, "SAVEPOINT galaxy_workbench_projection"); err != nil {
 					return false, err
 				}
-				if err = conversations.UpdateWorkbenchWithin(ctx, tx, id, operationsautonomy.WorkbenchRunFact(run)); err != nil {
+				if err = conversations.UpdateWorkbenchWithin(ctx, tx, id, fact); err != nil {
 					if _, rollback := tx.Exec(ctx, "ROLLBACK TO SAVEPOINT galaxy_workbench_projection"); rollback != nil {
 						return false, rollback
 					}

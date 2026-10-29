@@ -21,9 +21,13 @@ type conversationCard struct {
 
 const conversationCardColumns = "id::text,conversation_id::text,turn_id::text,operator_id,domain,operation_id::text,state,proposal,result,created_at,updated_at"
 
+func cardScanFields(value *conversationCard) []any {
+	return []any{&value.ID, &value.ConversationID, &value.TurnID, &value.OperatorID, &value.Domain, &value.OperationID, &value.State, &value.Proposal, &value.Result, &value.CreatedAt, &value.UpdatedAt}
+}
+
 func readConversationCard(row pgx.Row) (*conversationCard, error) {
 	var value conversationCard
-	err := row.Scan(&value.ID, &value.ConversationID, &value.TurnID, &value.OperatorID, &value.Domain, &value.OperationID, &value.State, &value.Proposal, &value.Result, &value.CreatedAt, &value.UpdatedAt)
+	err := row.Scan(cardScanFields(&value)...)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -204,8 +208,16 @@ func cardPublicResult(value Object) any {
 	return copy
 }
 
+type cardActorReader func(context.Context, *conversationCard) (operationspermissions.Actor, error)
+
 func (t *ConversationTools) cardView(ctx context.Context, human operationspermissions.Actor, row *conversationCard) (Object, error) {
-	actor, err := t.cardActor(ctx, human, row)
+	return t.cardReadView(ctx, row, func(ctx context.Context, row *conversationCard) (operationspermissions.Actor, error) {
+		return t.cardActor(ctx, human, row)
+	}, true)
+}
+
+func (t *ConversationTools) cardReadView(ctx context.Context, row *conversationCard, reader cardActorReader, syncProjection bool) (Object, error) {
+	actor, err := reader(ctx, row)
 	if err != nil {
 		return nil, err
 	}
@@ -278,11 +290,11 @@ func (t *ConversationTools) cardView(ctx context.Context, human operationspermis
 		}
 	}
 	capability["canDismiss"] = row.State == "prepared" && p["dismissalAllowed"] == true && !cardAttempted(row)
-	if _, err = t.cardActor(ctx, human, row); err != nil {
+	if _, err = reader(ctx, row); err != nil {
 		return nil, err
 	}
 	out["checkedAt"], out["readExpiresAt"] = s.now().Unix(), deadline
-	if t.SyncCardWithin != nil {
+	if syncProjection && t.SyncCardWithin != nil {
 		_, err = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) { return true, t.SyncCardWithin(ctx, tx, row.ID) })
 		if err != nil {
 			return nil, err
@@ -296,8 +308,14 @@ func (t *ConversationTools) Card(ctx context.Context, human operationspermission
 	if err != nil {
 		return nil, err
 	}
+	return t.readCard(ctx, human, row, func(ctx context.Context, row *conversationCard) (operationspermissions.Actor, error) {
+		return t.cardActor(ctx, human, row)
+	}, true)
+}
+
+func (t *ConversationTools) readCard(ctx context.Context, human operationspermissions.Actor, row *conversationCard, reader cardActorReader, syncProjection bool) (Object, error) {
 	if row.State == "processing" || row.State == "unknown" {
-		actor, err := t.cardActor(ctx, human, row)
+		actor, err := reader(ctx, row)
 		if err != nil {
 			return nil, err
 		}
@@ -322,65 +340,39 @@ func (t *ConversationTools) Card(ctx context.Context, human operationspermission
 			if attempt, ok := row.Result["confirmationAttemptedAt"]; ok {
 				recovered["confirmationAttemptedAt"] = attempt
 			}
+			// An unchanged observed receipt needs neither a CAS write nor a second
+			// per-card row/IAM read. A concurrent later receipt remains authoritative.
+			if state == row.State && sameConversationJSON(row.Result, recovered) {
+				break
+			}
 			s := t.Conversations
 			// A receipt read may observe the same unknown/processing result.
 			// Preserve CAS, but do not turn that observation into a new agentos
 			// event just by advancing updated_at.
-			changed, err := readConversationCard(s.Pool.QueryRow(ctx, `UPDATE operations_agentos_conversation_cards_v1 SET state=$3,result=$4,updated_at=$5 WHERE endpoint=$1 AND id=$2 AND state=$6 AND updated_at=$7 AND (state IS DISTINCT FROM $3 OR result IS DISTINCT FROM $4::jsonb) RETURNING `+conversationCardColumns, s.Endpoint, row.ID, state, recovered, s.now(), row.State, row.UpdatedAt))
+			changed, err := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (*conversationCard, error) {
+				changed, e := readConversationCard(tx.QueryRow(ctx, `UPDATE operations_agentos_conversation_cards_v1 SET state=$3,result=$4,updated_at=$5 WHERE endpoint=$1 AND id=$2 AND state=$6 AND updated_at=$7 AND (state IS DISTINCT FROM $3 OR result IS DISTINCT FROM $4::jsonb) RETURNING `+conversationCardColumns, s.Endpoint, row.ID, state, recovered, s.now(), row.State, row.UpdatedAt))
+				if e == nil && changed != nil && t.SyncCardWithin != nil {
+					e = t.SyncCardWithin(ctx, tx, row.ID)
+				}
+				return changed, e
+			})
 			if err != nil {
 				return nil, err
 			}
 			if changed != nil {
 				row = changed
+				syncProjection = false
 			} else {
-				row, err = t.ownedCard(ctx, human, domain, id)
+				row, err = t.ownedCard(ctx, human, row.Domain, row.ID)
 				if err != nil {
 					return nil, err
 				}
 			}
 		}
 	}
-	return t.cardView(ctx, human, row)
+	return t.cardReadView(ctx, row, reader, syncProjection)
 }
 
 func (t *ConversationTools) Cards(ctx context.Context, human operationspermissions.Actor, domain string) ([]Object, error) {
-	s := t.Conversations
-	if !validConversationDomain(domain) {
-		return nil, fail("invalid_operations_agentos_request", 400)
-	}
-	if _, err := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (operationspermissions.Actor, error) {
-		return s.Permissions.HumanAIWithin(ctx, tx, human, domain, "conversation", "workbench.read")
-	}); err != nil {
-		return nil, err
-	}
-	rows, err := s.Pool.Query(ctx, `SELECT id::text FROM operations_agentos_conversation_cards_v1 WHERE endpoint=$1 AND domain=$2 AND operator_id=$3 ORDER BY created_at DESC LIMIT 30`, s.Endpoint, domain, human.ID)
-	if err != nil {
-		return nil, err
-	}
-	ids := []string{}
-	for rows.Next() {
-		var id string
-		if err = rows.Scan(&id); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return nil, err
-	}
-	out := []Object{}
-	for i := len(ids) - 1; i >= 0; i-- {
-		card, err := t.Card(ctx, human, domain, ids[i])
-		if err != nil {
-			if fault.Status(err) == 403 {
-				continue
-			}
-			return nil, err
-		}
-		out = append(out, card)
-	}
-	return out, nil
+	return t.readCardBatch(ctx, human, domain)
 }

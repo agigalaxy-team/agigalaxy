@@ -18,37 +18,37 @@
       "code": "operations_ai_work_unassigned",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 37
+      "line": 38
     },
     {
       "code": "operations_ai_work_unassigned",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 50
+      "line": 51
     },
     {
       "code": "operations_autonomy_workbench_scope_denied",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 67
+      "line": 68
     },
     {
       "code": "operations_autonomy_workbench_scope_denied",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 71
+      "line": 72
     },
     {
       "code": "operations_autonomy_workbench_scope_denied",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 76
+      "line": 77
     },
     {
       "code": "operations_ai_work_unassigned",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 96
+      "line": 97
     },
     {
       "code": "governance_configuration_invalid",
@@ -13524,37 +13524,37 @@
       "code": "web_events_authority_unavailable",
       "status": 503,
       "source": "go/internal/webevents/service.go",
-      "line": 100
+      "line": 104
     },
     {
       "code": "web_events_access_denied",
       "status": 403,
       "source": "go/internal/webevents/service.go",
-      "line": 107
+      "line": 111
     },
     {
       "code": "invalid_web_events_topics",
       "status": 400,
       "source": "go/internal/webevents/service.go",
-      "line": 115
+      "line": 119
     },
     {
       "code": "invalid_web_events_topics",
       "status": 400,
       "source": "go/internal/webevents/service.go",
-      "line": 120
+      "line": 124
     },
     {
       "code": "invalid_web_events_cursor",
       "status": 400,
       "source": "go/internal/webevents/service.go",
-      "line": 146
+      "line": 150
     },
     {
       "code": "web_events_identity_changed",
       "status": 409,
       "source": "go/internal/webevents/service.go",
-      "line": 156
+      "line": 160
     },
     {
       "code": "operations_job_adoption_source_changed",

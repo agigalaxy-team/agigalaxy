@@ -83,11 +83,23 @@ func conversationRow(row pgx.Row) (*Conversation, error) {
 const conversationColumns = "id::text,operator_id,domain,permission_key,session_id::text,ai_account_id::text,retired_at"
 
 func (s *Conversations) Session(ctx context.Context, actor operationspermissions.Actor, domain string, create bool) (CurrentConversation, error) {
+	return s.session(ctx, actor, domain, create, false)
+}
+
+func (s *Conversations) readSession(ctx context.Context, actor operationspermissions.Actor, domain string) (CurrentConversation, error) {
+	return s.session(ctx, actor, domain, false, true)
+}
+
+func (s *Conversations) session(ctx context.Context, actor operationspermissions.Actor, domain string, create, readSnapshot bool) (CurrentConversation, error) {
 	if s == nil || s.Pool == nil || s.Permissions == nil {
 		return CurrentConversation{}, fail("operations_authorization_unavailable", 503)
 	}
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (CurrentConversation, error) {
-		current, err := s.Permissions.HumanAIWithin(ctx, tx, actor, domain, "conversation", "workbench.read")
+		require := s.Permissions.HumanAIWithin
+		if readSnapshot {
+			require = s.Permissions.HumanAIReadWithin
+		}
+		current, err := require(ctx, tx, actor, domain, "conversation", "workbench.read")
 		if err != nil {
 			return CurrentConversation{}, err
 		}

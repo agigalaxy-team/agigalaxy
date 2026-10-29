@@ -2,10 +2,11 @@ import type { QueryClient } from '@tanstack/react-query';
 import { galaxyQueryKey, type GalaxyQueryScope } from './query-client';
 
 export type GalaxyWebEvent = { type: 'change' | 'reset' | 'snapshot'; cursor: string;
-  modules?: string[]; module?: string; operationId?: string | null; objectId?: string; parentId?: string; version?: string | number; reason?: 'replay-gap' | 'access-changed' };
+  modules?: string[]; module?: string; operationId?: string | null; objectId?: string; parentId?: string; turnId?: string; entity?: 'conversation-operation'|'conversation-card'|'conversation-context'|'conversation-tool'|'configuration'; version?: string | number; reason?: 'replay-gap' | 'access-changed' };
+export type GalaxyEventCallbacks={onChange?:(event:GalaxyWebEvent)=>void;onResync?:(modules:string[])=>void};
 
 export function createGalaxyEventDispatcher(queryClient: QueryClient, scope: GalaxyQueryScope,
-  onReset?: (modules: string[]) => void, initialCursor = '0') {
+  onReset?: (modules: string[]) => void, initialCursor = '0', callbacks:GalaxyEventCallbacks = {}) {
   let cursor = /^\d+$/.test(initialCursor) ? initialCursor : '0';
   const resets = new Set<string>();
   const invalidate = (module: string) => queryClient.invalidateQueries({ queryKey: galaxyQueryKey(scope, module), refetchType: 'active' });
@@ -26,7 +27,8 @@ export function createGalaxyEventDispatcher(queryClient: QueryClient, scope: Gal
         // revoke the material already on screen. Explicit authority resets and
         // older servers without a reason retain the conservative clear path.
         if(event.reason==='replay-gap'){
-          for(const module of modules)await invalidate(module);
+          callbacks.onResync?.(modules);
+          for(const module of modules)void invalidate(module).catch(()=>{});
           return;
         }
         // Remove revoked/stale projections before any recovery read can fail.
@@ -36,7 +38,7 @@ export function createGalaxyEventDispatcher(queryClient: QueryClient, scope: Gal
         }
         onReset?.(modules); return;
       }
-      if (event.module) await invalidate(event.module);
+      if (event.module) {callbacks.onChange?.(event);void invalidate(event.module).catch(()=>{});}
     },
   };
 }

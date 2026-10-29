@@ -4,8 +4,23 @@ import {QueryClientProvider} from '@tanstack/react-query';
 import {useAuth} from '@payloadcms/ui';
 import {createGalaxyQueryClient,galaxyQueryKey} from '../../../../packages/galaxy-web/src/shared/runtime/query-client';
 import {createGalaxyEventClient} from '../../../../packages/galaxy-web/src/shared/runtime/event-stream';
+import type {GalaxyWebEvent} from '../../../../packages/galaxy-web/src/shared/runtime/event-dispatcher';
 import {observeUserActivity,userActivityVersion} from '../../../../packages/galaxy-web/src/shared/runtime/activity';
 import {settingsOperatorId} from '../lib/settings-draft-memory';
+export type AdminAgentOSChange={kind:'conversation-operation'|'conversation-card'|'conversation-context'|'conversation-tool'|'configuration';objectId?:string;parentId?:string;turnId?:string};
+export type AdminAgentOSResync={reason:'replay-gap'|'unknown-change'};
+const eventId=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+function agentOSChange(event:GalaxyWebEvent){
+ if(event.module!=='agentos')return;
+ const kind=event.entity;
+ if(!kind||!['conversation-operation','conversation-card','conversation-context','conversation-tool','configuration'].includes(kind)
+  ||kind!=='configuration'&&(!eventId(event.objectId)||!eventId(event.parentId))
+  ||(kind==='conversation-operation'||kind==='conversation-card'||kind==='conversation-tool')&&!eventId(event.turnId)){
+  window.dispatchEvent(new CustomEvent<AdminAgentOSResync>('galaxy:admin-agentos-resync',{detail:{reason:'unknown-change'}}));return;
+ }
+ const detail:AdminAgentOSChange={kind,...(event.objectId&&eventId(event.objectId)?{objectId:event.objectId}:{}),...(event.parentId&&eventId(event.parentId)?{parentId:event.parentId}:{}),...(event.turnId&&eventId(event.turnId)?{turnId:event.turnId}:{})};
+ window.dispatchEvent(new CustomEvent<AdminAgentOSChange>('galaxy:admin-agentos-change',{detail}));
+}
 const Cursor=createContext<{current:string|undefined}>({current:undefined});
 export function useAdminEventCursorSeed(cursor:string|null|undefined){const target=useContext(Cursor);useLayoutEffect(()=>{if(cursor&&/^[0-9]{1,20}$/.test(cursor)&&(target.current===undefined||BigInt(cursor)<BigInt(target.current)))target.current=cursor;},[cursor,target]);}
 export function AdminEventCursorSeed({cursor}:{cursor:string|null|undefined}){useAdminEventCursorSeed(cursor);return null;}
@@ -25,7 +40,7 @@ function IdentityQueries({children,scope}:{children:ReactNode;scope:{endpoint:st
   if(!scope.identity||!scope.endpoint)return;
   const stopActivity=observeUserActivity();
   const reset=(modules:string[])=>window.dispatchEvent(new CustomEvent('galaxy:admin-reset',{detail:modules}));
-  const stream=createGalaxyEventClient({scope,queryClient:client,url:'/v1/operations/web-events',onReset:reset,initialCursor:cursor.current});stream.start();
+  const stream=createGalaxyEventClient({scope,queryClient:client,url:'/v1/operations/web-events',onReset:reset,onChange:agentOSChange,onResync:modules=>{if(modules.includes('agentos'))window.dispatchEvent(new CustomEvent<AdminAgentOSResync>('galaxy:admin-agentos-resync',{detail:{reason:'replay-gap'}}));},initialCursor:cursor.current});stream.start();
   let csrf='',expiresAt=0,lastUsed=0,active=true;const controller=new AbortController();
   const check=async()=>{
    const version=userActivityVersion();if(csrf&&(version<=lastUsed||Date.now()-version>60000))return;

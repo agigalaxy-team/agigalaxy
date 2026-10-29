@@ -14,6 +14,7 @@ function expiresAt(value:unknown,checkedAt:number|null){
   if(value&&typeof value==='object'&&'readExpiresAt' in value&&typeof value.readExpiresAt==='number'&&Number.isFinite(value.readExpiresAt))return value.readExpiresAt*1000;
   return checkedAt===null?0:checkedAt+30000;
 }
+const conversationReadPath=/^\/v1\/operations\/agentos\/conversations\/(overview|governance|messaging|discovery|maintenance)(?:\/history)?$/;
 const readRetryDelays=[1000,3000] as const;
 function waitForReadRetry(delay:number,signal:AbortSignal):Promise<void>{
   return new Promise((resolve,reject)=>{
@@ -23,7 +24,7 @@ function waitForReadRetry(delay:number,signal:AbortSignal):Promise<void>{
     signal.addEventListener('abort',abort,{once:true});
   });
 }
-export function useOperationsRead<T>({path,initial=null,initialError='',failureMessage,clearOnOffline=false,retryUnavailable=false,renewBeforeMs}:{path:string|null;initial?:T|null;initialError?:string;failureMessage:string;clearOnOffline?:boolean;retryUnavailable?:boolean;renewBeforeMs?:number}){
+export function useOperationsRead<T>({path,initial=null,initialError='',failureMessage,clearOnOffline=false,retryUnavailable=false,renewBeforeMs,invalidateMode='automatic'}:{path:string|null;initial?:T|null;initialError?:string;failureMessage:string;clearOnOffline?:boolean;retryUnavailable?:boolean;renewBeforeMs?:number;invalidateMode?:'automatic'|'external'}){
   // Hydration must render the exact server snapshot, even when downloading JS
   // outlives its lease. Only the mounted client can validate or renew that lease.
   const ready=useClientReady();
@@ -42,7 +43,7 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
   const [state,setState]=useState<ReadState<T>>(()=>({path,value:seed,loading:!!path&&!seed&&!initialError,refreshing:false,error:initialError,checkedAt:seedCheckedAt,attemptedAt:null}));
   const latestState=useRef(state);latestState.current=state;
   const pendingInvalidation=useRef(false);
-  const rejection=useRef<{path:string|null;rejected:boolean}>({path,rejected:false});
+  const rejection=useRef<{path:string|null;rejected:boolean;status:number|null}>({path,rejected:false,status:null});
   const qualificationFlight=useRef<{path:string;controller:AbortController;promise:Promise<T|undefined>}|null>(null);
   const retryable=useRef(false),active=useRef<AbortController|null>(null),inFlight=useRef<{path:string;controller:AbortController;promise:Promise<T|undefined>}|null>(null),generation=useRef(0),alive=useRef(false);
   const performRead=useCallback((background=false):Promise<T|undefined>=>{
@@ -82,11 +83,11 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
           return undefined;
         }
         const now=Date.now();
-        rejection.current={path,rejected:false};setState({path,value,loading:false,refreshing:false,error:'',checkedAt:now,attemptedAt:now});return value;
+        rejection.current={path,rejected:false,status:null};setState({path,value,loading:false,refreshing:false,error:'',checkedAt:now,attemptedAt:now});return value;
       }catch(error){
         if(!alive.current||controller.signal.aborted||operationsReadsSuspended()||version!==generation.current)return undefined;
         const invalidated=error instanceof OperationsRequestError&&error.status>=400&&error.status<500&&![408,429].includes(error.status);
-        if(invalidated){rejection.current={path,rejected:true};queryClient.removeQueries({queryKey,exact:true});}
+        if(invalidated){rejection.current={path,rejected:true,status:error.status};queryClient.removeQueries({queryKey,exact:true});}
         retryable.current=!invalidated;
         setState(previous=>{
           const keep=!invalidated&&previous.path===path;
@@ -106,17 +107,17 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
     const previous=latestState.current;if(previous.path!==path||previous.value===null)return;
     const value=change(previous.value),next={...previous,value};generation.current++;latestState.current=next;queryClient.setQueryData(queryKey,value);setState(next);
   },[path,queryClient,queryKey]);
-  const clear=useCallback(()=>{rejection.current={path,rejected:true};qualificationFlight.current?.controller.abort();qualificationFlight.current=null;queryClient.removeQueries({queryKey,exact:true});generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState({path,value:null,loading:false,refreshing:false,error:'',checkedAt:null,attemptedAt:null});},[path,queryClient,queryKey]);
+  const clear=useCallback((status:number|null=null)=>{rejection.current={path,rejected:true,status};qualificationFlight.current?.controller.abort();qualificationFlight.current=null;queryClient.removeQueries({queryKey,exact:true});generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState({path,value:null,loading:false,refreshing:false,error:'',checkedAt:null,attemptedAt:null});},[path,queryClient,queryKey]);
   const renew=useCallback(():Promise<T|undefined>=>{
     const current=latestState.current;
-    if(!path||!/^\/v1\/operations\/agentos\/conversations\/(overview|governance|messaging|discovery|maintenance)$/.test(path)||current.path!==path||!current.value||typeof current.value!=='object'||!('conversationId' in current.value))return performRead(true);
+    if(!path||!conversationReadPath.test(path)||current.path!==path||!current.value||typeof current.value!=='object'||!('conversationId' in current.value))return performRead(true);
     if(qualificationFlight.current?.path===path)return qualificationFlight.current.promise;
     if(!alive.current||operationsReadsSuspended()||!navigator.onLine)return Promise.resolve(undefined);
     // Eligibility has its own single-flight lane: a slow history read or a
     // burst of invalidations must not starve the live stream's qualification.
     const controller=new AbortController();
     const promise=(async()=>{try{
-      const lease=await operationsRequest<{kind:string;metadataOnly:boolean;domain:string;conversationId:string|null;contextChanged:boolean;checkedAt:number;readExpiresAt:number}>(path+'/qualification',{signal:controller.signal});
+      const lease=await operationsRequest<{kind:string;metadataOnly:boolean;domain:string;conversationId:string|null;contextChanged:boolean;checkedAt:number;readExpiresAt:number}>(path.replace(/\/history$/,'')+'/qualification',{signal:controller.signal});
       if(!alive.current||controller.signal.aborted||operationsReadsSuspended())return;
       const latest=latestState.current;
       if(latest.path!==path||!latest.value||typeof latest.value!=='object'||!('conversationId' in latest.value))return;
@@ -126,7 +127,7 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
       latestState.current=next;queryClient.setQueryData(queryKey,value);setState(next);return value;
     }catch(error){
       if(!alive.current||controller.signal.aborted||operationsReadsSuspended())return;
-      const denied=error instanceof OperationsRequestError&&[401,403,404,409,410].includes(error.status);if(denied)clear();
+      const denied=error instanceof OperationsRequestError&&[401,403,404,409,410].includes(error.status);if(denied)clear(error.status);
       retryable.current=!denied;setState(previous=>previous.path===path?{...previous,error:operationsFailure(error,failureMessage)}:previous);return undefined;
     }finally{if(qualificationFlight.current?.controller===controller)qualificationFlight.current=null;}})();
     qualificationFlight.current={path,controller,promise};return promise;
@@ -170,7 +171,7 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
     return()=>clearTimeout(timer);
   },[ready,clearOnOffline,state.value,state.checkedAt,path,renew,logoutPending]);
   useEffect(()=>{
-    const independentQualification=!!path&&/^\/v1\/operations\/agentos\/conversations\/(overview|governance|messaging|discovery|maintenance)$/.test(path);
+    const independentQualification=!!path&&conversationReadPath.test(path);
     if(!ready||logoutPending||!clearOnOffline||state.value===null||state.checkedAt===null||state.refreshing&&!independentQualification)return;
     const end=expiresAt(state.value,state.checkedAt);if(end<=Date.now())return;
     const usualLead=Math.min(5000,Math.max(250,(end-state.checkedAt)*.2));
@@ -190,11 +191,11 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
     return()=>clearTimeout(timer);
   },[retryUnavailable,path,state.path,state.value,state.loading,state.refreshing,state.error,state.attemptedAt,renew,logoutPending]);
   useEffect(()=>queryClient.getQueryCache().subscribe(event=>{
-    if(event.type==='updated'&&event.action.type==='invalidate'&&event.query.queryHash===queryClient.getQueryCache().find({queryKey,exact:true})?.queryHash){if(inFlight.current){pendingInvalidation.current=true;generation.current++;}else void performRead(true);}
-  }),[queryClient,queryKey,performRead]);
+    if(invalidateMode!=='external'&&event.type==='updated'&&event.action.type==='invalidate'&&event.query.queryHash===queryClient.getQueryCache().find({queryKey,exact:true})?.queryHash){if(inFlight.current){pendingInvalidation.current=true;generation.current++;}else void performRead(true);}
+  }),[queryClient,queryKey,performRead,invalidateMode]);
   useEffect(()=>{const reset=(event:Event)=>{const modules=(event as CustomEvent<string[]>).detail;if(!modules.length||modules.includes(module)){clear();if(modules.length&&navigator.onLine&&document.visibilityState==='visible')void performRead(true);}};window.addEventListener('galaxy:admin-reset',reset);return()=>window.removeEventListener('galaxy:admin-reset',reset);},[module,clear,performRead]);
   const current=state.path===path?state:{path,value:null,loading:!!path,refreshing:false,error:'',checkedAt:null,attemptedAt:null};
   const valid=!ready||!clearOnOffline||expiresAt(current.value,current.checkedAt)>Date.now();
   const available=!logoutPending&&current.value!==null&&current.checkedAt!==null;
-  return{...current,value:!logoutPending?current.value:null,loading:!logoutPending&&current.loading,refreshing:!logoutPending&&current.refreshing,error:logoutPending?'':current.error,read,renew,refresh,update,clear,ready,available,rejected:rejection.current.path===path&&rejection.current.rejected,verified:available&&ready&&valid};
+  return{...current,value:!logoutPending?current.value:null,loading:!logoutPending&&current.loading,refreshing:!logoutPending&&current.refreshing,error:logoutPending?'':current.error,read,renew,refresh,update,clear,ready,available,rejected:rejection.current.path===path&&rejection.current.rejected,rejectionStatus:rejection.current.path===path?rejection.current.status:null,verified:available&&ready&&valid};
 }

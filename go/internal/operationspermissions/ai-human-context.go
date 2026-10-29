@@ -101,6 +101,12 @@ func (s *Service) requireHumanAI(ctx context.Context, tx pgx.Tx, actor Actor, ac
 	if !current.Enabled {
 		return Actor{}, fail("operations_ai_work_disabled", 403)
 	}
+	return s.projectHumanAI(ctx, tx, fresh, c, current, action)
+}
+
+// projectHumanAI applies the existing fixed-AI intersection to a verified human
+// and current account authorization. Both must come from the same transaction.
+func (s *Service) projectHumanAI(ctx context.Context, tx pgx.Tx, fresh Actor, c *aiContext, current operationsai.Authorization, action string) (Actor, error) {
 	work := operationsai.WorkPermissions(c.purpose, current.Permissions)
 	permissions := []string{}
 	for _, p := range fresh.Permissions {
