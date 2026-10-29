@@ -141,6 +141,9 @@ class CurrentReadConcurrencyTest(unittest.IsolatedAsyncioTestCase):
                 jobs = Table("synthetic_original_jobs", metadata, *(Column(name, Text, primary_key=name == "id") for name in
                     ["id", "idempotency_key", "user_id", "session_id", "component_type", "component_id", "status"]))
                 metadata.create_all(db.db_engine)
+                # A missing ticket now also checks one exact owned operation
+                # in the native run table. Use Agno's real empty JSON schema.
+                runs = db._get_table(table_type="runs", create_table_if_not_found=True)
                 entered, release = threading.Event(), threading.Event()
                 threads, contexts = [], []
 
@@ -154,7 +157,7 @@ class CurrentReadConcurrencyTest(unittest.IsolatedAsyncioTestCase):
                             entered.set()
                             if not release.wait(3):
                                 raise AssertionError("blocked original SQL was not released")
-                        return jobs if table_type == "jobs" else None
+                        return jobs if table_type == "jobs" else runs if table_type == "runs" else None
 
                 if blocked != "database":
                     reader.block_call = {"middleware": 1, "before": 2, "after": 3}[blocked]
@@ -175,12 +178,14 @@ class CurrentReadConcurrencyTest(unittest.IsolatedAsyncioTestCase):
                             release.set()
                         response = await original
                     self.assertEqual(response.status_code, 200, response.text)
-                    self.assertEqual(response.json()["state"], "not-recorded")
+                    self.assertEqual(response.json()["state"], "unknown")
+                    self.assertIsNone(response.json()["runId"])
+                    self.assertIsNone(response.json()["native"])
                     self.assertEqual(response.json()["readExpiresAt"], reader.lease)
                     self.assertEqual(reader.calls, 3)
                     self.assertEqual(reader.contexts, ["trusted-original-request"] * 3)
                     self.assertTrue(all(ident != main_thread for ident in reader.threads + threads))
-                    self.assertEqual(contexts, ["trusted-original-request"])
+                    self.assertEqual(contexts, ["trusted-original-request"] * 2)
                 finally:
                     release.set()
                     REQUEST_CONTEXT.reset(marker)
