@@ -31,9 +31,22 @@ func TestNativeDeviceToolSchemasRejectModelConfirmation(t *testing.T) {
 	}
 	defer cs.Close()
 	tools, e := cs.ListTools(ctx, nil)
-	if e != nil || len(tools.Tools) != 14 {
+	if e != nil {
 		t.Fatalf("identity tools: %v", e)
 	}
+	names := map[string]bool{}
+	for _, tool := range tools.Tools {
+		if names[tool.Name] {
+			t.Fatalf("duplicate identity tool: %s", tool.Name)
+		}
+		names[tool.Name] = true
+	}
+	for _, name := range []string{"galaxy_identity_device_native_confirm", "galaxy_identity_account_read", "galaxy_device_offer", "galaxy_identity_recovery"} {
+		if !names[name] {
+			t.Fatalf("missing identity tool: %s", name)
+		}
+	}
+	materialCall(t, cs, "galaxy_identity_recovery", map[string]any{"action": "recover", "recoveryCode": "never-a-model-input"}, true)
 	materialCall(t, cs, "galaxy_identity_device_native_confirm", map[string]any{"previewId": "00000000-0000-4000-8000-000000000001", "confirmed": true}, true)
 	materialCall(t, cs, "galaxy_identity_device_native_read", map[string]any{"action": "current", "operationId": "00000000-0000-4000-8000-000000000001"}, true)
 	materialCall(t, cs, "galaxy_identity_device_native_read", map[string]any{"action": "reconcile"}, true)

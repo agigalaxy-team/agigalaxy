@@ -1,13 +1,18 @@
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {fileURLToPath} from 'node:url';
+import {isAbsolute} from 'node:path';
 
 // This adapter starts the current Go Cases/Task handlers against a disposable
 // PostgreSQL cluster. Only fixture signing, controlled content removal and
 // inspection use private fixture routes; business calls use real HTTP handlers.
 export async function goDomainFixture(t) {
   if (!process.env.GALAXY_GO_TEST_PG_BIN) throw Error('A2A domain integration requires GALAXY_GO_TEST_PG_BIN for isolated PostgreSQL');
-  const child = spawn(process.env.GALAXY_BUILD_GO ?? 'go', ['test', '-count=1', '-tags', 'galaxy_a2a_fixture',
+  const binary=process.env.GALAXY_A2A_FIXTURE_BINARY;
+  if(binary&&!isAbsolute(binary))throw Error('An absolute current Go fixture binary is required');
+  const child = spawn(binary ?? process.env.GALAXY_BUILD_GO ?? 'go', binary
+    ? ['-test.run=^TestServeCurrentDomains$', '-test.v', '-test.timeout=4m']
+    : ['test', '-count=1', '-tags', 'galaxy_a2a_fixture',
     './internal/testsupport/a2afixture', '-run', '^TestServeCurrentDomains$', '-v', '-timeout=4m'],
     {cwd: fileURLToPath(new URL('../../../go/', import.meta.url)), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: process.env});
   let ready, output = '', errors = '';

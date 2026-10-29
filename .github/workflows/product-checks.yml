@@ -72,9 +72,17 @@ jobs:
           echo "GALAXY_GO_TEST_PG_BIN=$PG_BIN" >> "$GITHUB_ENV"
       - if: matrix.component == 'admin'
         run: npm ci --ignore-scripts --no-audit --no-fund --prefix apps/galaxy-admin
-      - if: matrix.component == 'admin'
-        name: Prepare isolated Chromium for the existing Admin browser test
+      - if: matrix.component == 'admin' || matrix.component == 'native-client'
+        name: Prepare isolated Chromium for current browser tests
         run: node node_modules/playwright/cli.js install --with-deps chromium
+      - if: matrix.component == 'native-client'
+        name: Build the current compact interface used by Native checks
+        run: node integrations/native-v2/compact-app/build.mjs
+      - if: matrix.component == 'a2a'
+        name: Compile the current Go peer before its HTTP startup timeout
+        run: |
+          go -C go test -c -tags galaxy_a2a_fixture -o "$RUNNER_TEMP/galaxy-a2a-fixture" ./internal/testsupport/a2afixture
+          echo "GALAXY_A2A_FIXTURE_BINARY=$RUNNER_TEMP/galaxy-a2a-fixture" >> "$GITHUB_ENV"
       - if: matrix.component == 'a2a'
         name: Prepare the locked Python peer for current Go HTTP integration
         run: |
