@@ -32,6 +32,8 @@ class ConversationAgent(Agent):
         # the failed row, and leaves the tool RunContext bound to the parent.
         # The native checkpoint retains any surviving tool exchanges rather
         # than turning regenerate into a second copy of the user's question.
+        # Its event reset also drops this parent's authorization observations;
+        # the new attempt still passes through the current authority wrappers.
         selected = _fork_run(original, _find_regenerate_checkpoint(original))
         selected.regenerated_from = original.run_id
         selected.metadata = deepcopy({**{key:value for key,value in (original.metadata or {}).items()

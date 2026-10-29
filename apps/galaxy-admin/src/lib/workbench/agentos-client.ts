@@ -46,11 +46,11 @@ export function nativeConversationFailure(run:AgentOsNativeRun){
  const failure=category&&messages[category]?messages[category]:run.errorCode==='operations_agentos_authority_changed'
   ?{title:'回复因权限变化而中断',detail:'',retryable:false}
   :run.errorCode==='operations_authorization_unavailable'
-   ?{title:'权限检查失败',detail:'回复已中断',retryable:false}
+   ?{title:'连接中断',detail:'',retryable:run.failure==null}
    :{title:'回复失败',detail:'',retryable:run.errorCode==='operations_agentos_model_request_failed'};
  const knownActivity=run.businessActivity?.basis==='same-owner-turn-tool-and-card-ledger'?run.businessActivity.state:'unknown';
  const processingNotice=knownActivity==='not-started'?'未执行操作':knownActivity==='check-records'?'已有处理记录':'处理结果待确认';
- const bound=typeof run.operationId==='string'&&/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(run.operationId)&&typeof run.runId==='string'&&!!run.runId;
+ const bound=typeof run.operationId==='string'&&/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(run.operationId)&&typeof run.runId==='string'&&/^[-A-Za-z0-9_]{1,128}$/.test(run.runId);
  const canRetry=run.status==='ERROR'&&failure.retryable&&knownActivity==='not-started'&&bound&&typeof run.userInput==='string'&&!!run.userInput.trim()&&run.userInput.length<=12000;
  return{...failure,processingNotice,canRetry};
 }

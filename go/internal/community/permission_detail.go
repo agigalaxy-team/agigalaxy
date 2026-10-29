@@ -33,7 +33,10 @@ func (s *Service) PermissionDetail(ctx context.Context, account, id string) (Obj
 	})
 }
 
-type permissionDetailState struct{ Detail, Evidence Object }
+type permissionDetailState struct {
+	Detail, Evidence        Object
+	accountEndpointVerified bool
+}
 type permissionSelector struct {
 	Visibility, PayloadHash, Action, ObjectID string
 	SkipAudience                              bool
@@ -57,6 +60,7 @@ func (s *Service) permissionDetailWithin(ctx context.Context, tx pgx.Tx, p Objec
 		}
 	}
 	var evidence Object
+	accountEndpointVerified := false
 	selectorMismatch := selector != nil && (selector.PayloadHash != "" && selector.PayloadHash != str(p, "payload_hash") || selector.Action != "" && selector.Action != str(p, "action") || selector.ObjectID != "" && selector.ObjectID != str(p, "object_id"))
 	if kind == "official-account" {
 		if p["erased_at"] != nil || p["account_id"] == nil {
@@ -74,18 +78,16 @@ func (s *Service) permissionDetailWithin(ctx context.Context, tx pgx.Tx, p Objec
 		if selectorMismatch {
 			add("permission-evidence-mismatch")
 		}
-		var valid bool
-		e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM community_accounts a JOIN (SELECT id,account_id,actor_kind,subject_id,consent_id,payload_hash,erased_at FROM forum_events_v1 UNION ALL SELECT id,account_id,actor_kind,subject_id,consent_id,payload_hash,erased_at FROM forum_governance_events_v1)e ON e.id=$1 AND e.account_id=a.id WHERE a.id=$2 AND a.endpoint=$3 AND e.actor_kind='official-account' AND e.subject_id IS NULL AND e.consent_id IS NULL AND e.payload_hash=$4)`, p["event_id"], p["account_id"], s.Endpoint, p["payload_hash"]).Scan(&valid)
+		var valid, erased bool
+		e = tx.QueryRow(ctx, `SELECT
+		 EXISTS(SELECT 1 FROM community_accounts a JOIN (SELECT id,account_id,actor_kind,subject_id,consent_id,payload_hash,erased_at FROM forum_events_v1 UNION ALL SELECT id,account_id,actor_kind,subject_id,consent_id,payload_hash,erased_at FROM forum_governance_events_v1)e ON e.id=$1 AND e.account_id=a.id WHERE a.id=$2 AND a.endpoint=$3 AND e.actor_kind='official-account' AND e.subject_id IS NULL AND e.consent_id IS NULL AND e.payload_hash=$4),
+		 EXISTS(SELECT 1 FROM forum_events_v1 WHERE id=$1 AND erased_at IS NOT NULL UNION ALL SELECT 1 FROM forum_governance_events_v1 WHERE id=$1 AND erased_at IS NOT NULL)`, p["event_id"], p["account_id"], s.Endpoint, p["payload_hash"]).Scan(&valid, &erased)
 		if e != nil {
 			return nil, e
 		}
+		accountEndpointVerified = valid
 		if !valid {
 			add("permission-evidence-mismatch")
-		}
-		var erased bool
-		e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM forum_events_v1 WHERE id=$1 AND erased_at IS NOT NULL UNION ALL SELECT 1 FROM forum_governance_events_v1 WHERE id=$1 AND erased_at IS NOT NULL)", p["event_id"]).Scan(&erased)
-		if e != nil {
-			return nil, e
 		}
 		if erased {
 			add("content-erased")
@@ -209,5 +211,5 @@ func (s *Service) permissionDetailWithin(ctx context.Context, tx pgx.Tx, p Objec
 			}
 		}
 	}
-	return &permissionDetailState{Detail: Object{"permissionId": id, "eventId": p["event_id"], "objectId": p["object_id"], "visibility": p["visibility"], "publishedUntil": seconds(p["published_until"]), "authorizationKind": kind, "accountId": p["account_id"], "originBindingExpiresAt": bindingExpires, "revokedAt": revokedAt, "revocationKind": revocationKind, "revocationEventId": revocationEvent, "revocationRequestId": revocationRequest, "stoppedReasons": reasons, "checkedAt": s.clock(), "authority": "current-forum-permission-only"}, Evidence: evidence}, nil
+	return &permissionDetailState{Detail: Object{"permissionId": id, "eventId": p["event_id"], "objectId": p["object_id"], "visibility": p["visibility"], "publishedUntil": seconds(p["published_until"]), "authorizationKind": kind, "accountId": p["account_id"], "originBindingExpiresAt": bindingExpires, "revokedAt": revokedAt, "revocationKind": revocationKind, "revocationEventId": revocationEvent, "revocationRequestId": revocationRequest, "stoppedReasons": reasons, "checkedAt": s.clock(), "authority": "current-forum-permission-only"}, Evidence: evidence, accountEndpointVerified: accountEndpointVerified}, nil
 }

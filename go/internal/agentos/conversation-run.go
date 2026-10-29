@@ -72,6 +72,24 @@ func includesString(value any, wanted string) bool {
 	return false
 }
 
+// A retry is a new explicitly requested turn. It is only eligible when the
+// original failure and the same-owner business ledger establish no effect.
+func retryableOriginalConversationRun(run Object, message string) bool {
+	activity := object(run["businessActivity"])
+	if run["status"] != "ERROR" || !nativeRunID.MatchString(text(run, "runId")) || run["userInput"] != message || activity["state"] != "not-started" || activity["basis"] != "same-owner-turn-tool-and-card-ledger" {
+		return false
+	}
+	switch run["errorCode"] {
+	case "operations_authorization_unavailable":
+		return run["failure"] == nil
+	case "operations_agentos_model_request_failed":
+		category := text(object(run["failure"]), "category")
+		return category == "" || category == "rate-limit" || category == "timeout" || category == "connection" || category == "service-unavailable" || category == "unknown"
+	default:
+		return false
+	}
+}
+
 func (s *Conversations) Run(ctx context.Context, operator operationspermissions.Actor, domain string, input Object, authorize AuthorizeConversation) (Object, error) {
 	turn, err := parseConversationTurn(input)
 	if err != nil || !validConversationDomain(domain) {
@@ -143,8 +161,7 @@ func (s *Conversations) Run(ctx context.Context, operator operationspermissions.
 			return nil, err
 		}
 		checked := runs[0]
-		category := text(object(checked["failure"]), "category")
-		if checked["status"] != "ERROR" || checked["errorCode"] != "operations_agentos_model_request_failed" || object(checked["businessActivity"])["state"] != "not-started" || checked["userInput"] != turn.Message || (category != "" && category != "rate-limit" && category != "timeout" && category != "connection" && category != "service-unavailable" && category != "unknown") {
+		if !retryableOriginalConversationRun(checked, turn.Message) {
 			return nil, fail("operations_agentos_retry_unavailable", 409)
 		}
 		retryRun = text(checked, "runId")

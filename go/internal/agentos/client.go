@@ -238,18 +238,19 @@ type ConversationOperationLocator struct {
 
 func (c *Client) ReadConversationOperation(ctx context.Context, e Execution, id string, locator ConversationOperationLocator) (any, error) {
 	path := "/galaxy/conversations/" + url.PathEscape(e.ID) + "/operations/" + url.PathEscape(id)
-	if locator.RunID != "" {
-		if !nativeRunID.MatchString(locator.RunID) || (locator.RetryOfOperationID == "") != (locator.RetryOfRunID == "") || locator.RetryOfOperationID != "" && (!validOperationID(locator.RetryOfOperationID) || locator.RetryOfOperationID == id || !nativeRunID.MatchString(locator.RetryOfRunID)) {
-			return nil, streamInvalid()
-		}
-		query := url.Values{"runId": {locator.RunID}}
-		if locator.RetryOfOperationID != "" {
-			query.Set("retryOfOperationId", locator.RetryOfOperationID)
-			query.Set("retryOfRunId", locator.RetryOfRunID)
-		}
-		path += "?" + query.Encode()
-	} else if locator.RetryOfOperationID != "" || locator.RetryOfRunID != "" {
+	if locator.RunID != "" && !nativeRunID.MatchString(locator.RunID) || (locator.RetryOfOperationID == "") != (locator.RetryOfRunID == "") || locator.RetryOfOperationID != "" && (!validOperationID(locator.RetryOfOperationID) || locator.RetryOfOperationID == id || !nativeRunID.MatchString(locator.RetryOfRunID)) {
 		return nil, streamInvalid()
+	}
+	query := url.Values{}
+	if locator.RunID != "" {
+		query.Set("runId", locator.RunID)
+	}
+	if locator.RetryOfOperationID != "" {
+		query.Set("retryOfOperationId", locator.RetryOfOperationID)
+		query.Set("retryOfRunId", locator.RetryOfRunID)
+	}
+	if len(query) != 0 {
+		path += "?" + query.Encode()
 	}
 	return c.request(ctx, e, path, nil, "")
 }

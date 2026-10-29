@@ -20,7 +20,7 @@ def operation_read_locator(query):
     fields = {key: items[0] for key, items in values.items()}
     if not fields:
         return fields
-    if not re.fullmatch(r"[-A-Za-z0-9_]{1,128}", fields.get("runId", "")):
+    if "runId" in fields and not re.fullmatch(r"[-A-Za-z0-9_]{1,128}", fields["runId"]):
         raise ValueError("agentos_query_invalid")
     if ("retryOfOperationId" in fields) != ("retryOfRunId" in fields):
         raise ValueError("agentos_query_invalid")
@@ -54,14 +54,15 @@ def install_conversation_transport_read(app, runtime, run_view):
             raise AuthorityDenied()
         db = runtime["db"]
         run_id, state, ticket = locator.get("runId"), "unknown", None
+        strict_binding = bool(locator)
+        discovered = False
         if run_id is None:
             table = db._get_table(table_type="jobs", create_table_if_not_found=False)
             required = {"id", "idempotency_key", "user_id", "session_id", "component_type", "component_id", "status"}
             if table is None or not required.issubset(table.c.keys()):
                 raise AuthorityUnavailable("agentos_queue_lookup_unavailable")
-            # No acknowledged run locator: use only the exact original queue
-            # ticket. Regenerate in fixed Agno forks outside this queue; absence
-            # never grants permission to scan the session or submit again.
+            # Prefer the exact original queue ticket. A detached regenerate
+            # has no ticket, and its SSE acknowledgement may also be lost.
             with db.Session() as session:
                 found = session.execute(select(table.c.id, table.c.status).where(
                     table.c.idempotency_key == operation_id,
@@ -80,7 +81,26 @@ def install_conversation_transport_read(app, runtime, run_view):
                 if state not in {"PENDING", "RUNNING", "COMPLETED", "CANCELLED", "ERROR"}:
                     state = "unknown"
             else:
-                state = "not-recorded"
+                runs = db._get_table(table_type="runs", create_table_if_not_found=False)
+                required = {"run_id", "user_id", "session_id", "agent_id", "run_data"}
+                if runs is None or not required.issubset(runs.c.keys()):
+                    raise AuthorityUnavailable("agentos_operation_lookup_unavailable")
+                # Fetch at most two primary keys for this one owned operation,
+                # never session history or bodies. A lost acknowledgement does
+                # not authorize choosing among duplicate attempts or resending.
+                with db.Session() as session:
+                    candidates = session.execute(select(runs.c.run_id).where(
+                        runs.c.user_id == user_id,
+                        runs.c.session_id == row["sessionId"],
+                        runs.c.agent_id == "galaxy-conversation-" + row["domain"],
+                        runs.c.run_data["metadata"]["operationId"].as_string() == operation_id,
+                    ).limit(2)).fetchall()
+                if len(candidates) > 1:
+                    raise AuthorityUnavailable("agentos_operation_lookup_ambiguous")
+                if candidates:
+                    run_id = candidates[0]._mapping["run_id"]
+                    strict_binding = True
+                    discovered = True
         native = None
         if run_id is not None:
             stored = db.get_run(run_id=run_id, deserialize=False)
@@ -93,10 +113,10 @@ def install_conversation_transport_read(app, runtime, run_view):
                 metadata = original.metadata or {}
                 operation = metadata.get("operationId")
                 if (original.run_id != run_id
-                        or locator and operation != operation_id
-                        or not locator and operation not in {None, operation_id}):
+                        or strict_binding and operation != operation_id
+                        or not strict_binding and operation not in {None, operation_id}):
                     raise AuthorityDenied()
-                if locator:
+                if strict_binding:
                     if (original.user_id != user_id or original.session_id != row["sessionId"]
                             or original.agent_id != "galaxy-conversation-" + row["domain"]):
                         raise AuthorityDenied()
@@ -114,6 +134,10 @@ def install_conversation_transport_read(app, runtime, run_view):
                 native["operationId"] = operation_id
                 observed = str(getattr(original.status, "value", original.status)).upper()
                 state = observed if observed in {"PENDING", "RUNNING", "COMPLETED", "CANCELLED", "ERROR"} else "unknown"
+            elif discovered:
+                # A candidate that disappeared before its PK/lineage check is
+                # not a verified new locator. Keep the caller's ACK unresolved.
+                run_id = None
         current = runtime["gateway"].authorize(user_id, operation="read")
         if current.get("execution", {}).get("sessionId") != row["sessionId"]:
             raise AuthorityDenied()

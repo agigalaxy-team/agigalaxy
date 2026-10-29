@@ -38,8 +38,8 @@ func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, c
 		known = *command.NativeRunID
 	}
 	// An uncertain original result is never recovered by scanning history or
-	// issuing the command again. Only the stored native locator can address a
-	// detached run; without it the original operation retains its job lookup.
+	// issuing the command again. The optional locator and parent lineage come
+	// only from the original command's durable record.
 	status := s.Client.Status(ctx)
 	if object(status["conversationTransport"])["originalRunLookup"] != true {
 		return nil, nil
@@ -50,18 +50,18 @@ func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, c
 			return nil, streamInvalid()
 		}
 		locator.RunID = *command.NativeRunID
-		parentOperation, hasParentOperation := command.Result["retryOfOperationId"]
-		parentRun, hasParentRun := command.Result["retryOfRunId"]
-		if hasParentOperation != hasParentRun {
+	}
+	parentOperation, hasParentOperation := command.Result["retryOfOperationId"]
+	parentRun, hasParentRun := command.Result["retryOfRunId"]
+	if hasParentOperation != hasParentRun {
+		return nil, streamInvalid()
+	}
+	if hasParentOperation {
+		var operationOK, runOK bool
+		locator.RetryOfOperationID, operationOK = parentOperation.(string)
+		locator.RetryOfRunID, runOK = parentRun.(string)
+		if !operationOK || !runOK || !validOperationID(locator.RetryOfOperationID) || locator.RetryOfOperationID == command.ID || !nativeRunID.MatchString(locator.RetryOfRunID) {
 			return nil, streamInvalid()
-		}
-		if hasParentOperation {
-			var operationOK, runOK bool
-			locator.RetryOfOperationID, operationOK = parentOperation.(string)
-			locator.RetryOfRunID, runOK = parentRun.(string)
-			if !operationOK || !runOK || !validOperationID(locator.RetryOfOperationID) || locator.RetryOfOperationID == command.ID || !nativeRunID.MatchString(locator.RetryOfRunID) {
-				return nil, streamInvalid()
-			}
 		}
 	}
 	value, err := s.Client.ReadConversationOperation(ctx, row.Execution(), command.ID, locator)
@@ -85,10 +85,15 @@ func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, c
 		return nil, nil
 	}
 	if native := object(original["native"]); native != nil {
-		if native["runId"] != runID || native["operationId"] != command.ID {
+		if native["runId"] != runID || native["operationId"] != command.ID || locator.RetryOfRunID != "" && native["regeneratedFrom"] != locator.RetryOfRunID {
 			return nil, streamInvalid()
 		}
 		return native, nil
+	}
+	// A run discovered without an ACK must include native lineage proof before
+	// the new run ID can be admitted as this retry's original result.
+	if command.NativeRunID == nil && locator.RetryOfRunID != "" {
+		return nil, streamInvalid()
 	}
 	state := text(original, "state")
 	if state != "PENDING" && state != "RUNNING" && state != "CANCELLED" && state != "ERROR" {

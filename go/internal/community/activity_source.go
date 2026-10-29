@@ -38,7 +38,9 @@ func (s *Service) ActivityAllowedWithin(ctx context.Context, tx pgx.Tx, kind, po
 	if len(state.Detail["stoppedReasons"].([]string)) > 0 {
 		return false, nil
 	}
-	if p["account_id"] != nil {
+	// An official-account permission's verified event already proved the
+	// same account belongs to this endpoint in the current transaction.
+	if p["account_id"] != nil && !state.accountEndpointVerified {
 		var belongs bool
 		e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM community_accounts WHERE id=$1 AND endpoint=$2)", p["account_id"], s.Endpoint).Scan(&belongs)
 		if e != nil || !belongs {

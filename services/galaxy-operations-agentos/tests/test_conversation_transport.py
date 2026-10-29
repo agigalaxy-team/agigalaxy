@@ -143,7 +143,9 @@ class ConversationTransportTest(unittest.TestCase):
                 self.assertEqual(original.json()['state'], 'COMPLETED')
                 self.assertEqual(original.json()['native']['content'], '完整的本地回复 🌌。')
                 missing = client.get('/galaxy/conversations/' + row['id'] + '/operations/' + str(uuid4()), headers=headers)
-                self.assertEqual(missing.json()['state'], 'not-recorded')
+                self.assertEqual(missing.json()['state'], 'unknown')
+                self.assertIsNone(missing.json()['runId'])
+                self.assertIsNone(missing.json()['native'])
                 resumed = client.post('/agents/' + agent.id + '/runs/' + run_id + '/resume', headers=headers,
                     data={'session_id': row['sessionId'], 'last_event_index': '1'})
                 self.assertEqual(resumed.status_code, 200)

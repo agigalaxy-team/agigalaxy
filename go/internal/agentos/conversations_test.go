@@ -100,7 +100,8 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 	// An accepted native request with a lost response is recovered through the
 	// same durable turn before checking model readiness, never submitted twice.
 	var writes atomic.Int32
-	operationID := uuid.NewString()
+	var retryMode atomic.Bool
+	operationID, retryID := uuid.NewString(), uuid.NewString()
 	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/health" {
@@ -120,12 +121,35 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 			_ = connection.Close()
 			return
 		}
+		if r.Method == "POST" && r.URL.Path == "/agents/galaxy-conversation-overview/runs/original-native-run/continue" {
+			writes.Add(1)
+			_ = r.ParseForm()
+			if r.Header.Get("Idempotency-Key") != retryID || r.Form.Get("retry_of_operation_id") != operationID || r.Form.Get("regenerate") != "true" || r.Form.Get("session_id") != current.Row.SessionID {
+				t.Error("retry did not preserve its original identity and session")
+			}
+			_ = json.NewEncoder(w).Encode(Object{"run_id": "retry-native-run"})
+			return
+		}
+		if r.Method == "GET" && r.URL.Path == "/galaxy/conversations/"+id+"/operations/"+retryID {
+			if r.URL.Query().Get("runId") != "retry-native-run" || r.URL.Query().Get("retryOfOperationId") != operationID || r.URL.Query().Get("retryOfRunId") != "original-native-run" {
+				t.Error("retry original lookup lost its stored lineage")
+			}
+			_ = json.NewEncoder(w).Encode(Object{"conversationId": id, "sessionId": current.Row.SessionID, "operationId": retryID, "runId": "retry-native-run", "state": "RUNNING", "native": Object{"runId": "retry-native-run", "operationId": retryID, "status": "RUNNING", "regeneratedFrom": "original-native-run"}})
+			return
+		}
 		if r.Method == "GET" && r.URL.Path == "/galaxy/conversations/"+id {
 			_ = json.NewEncoder(w).Encode(Object{"runs": []Object{{"runId": "original-native-run", "operationId": operationID, "status": "RUNNING", "content": nil}}})
 			return
 		}
 		if r.Method == "GET" && r.URL.Path == "/galaxy/conversations/"+id+"/operations/"+operationID {
-			_ = json.NewEncoder(w).Encode(Object{"conversationId": id, "sessionId": current.Row.SessionID, "operationId": operationID, "runId": "original-native-run", "state": "RUNNING", "native": Object{"runId": "original-native-run", "operationId": operationID, "status": "RUNNING", "content": nil}})
+			native := Object{"runId": "original-native-run", "operationId": operationID, "status": "RUNNING", "content": nil}
+			if retryMode.Load() {
+				if r.URL.Query().Get("runId") != "original-native-run" {
+					t.Error("retry lookup omitted the stored original native run")
+				}
+				native["status"], native["userInput"], native["errorCode"], native["failure"] = "ERROR", "查询当前处理状态", "operations_authorization_unavailable", nil
+			}
+			_ = json.NewEncoder(w).Encode(Object{"conversationId": id, "sessionId": current.Row.SessionID, "operationId": operationID, "runId": "original-native-run", "state": native["status"], "native": native})
 			return
 		}
 		http.NotFound(w, r)
@@ -168,6 +192,31 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 	if _, err = service.Run(ctx, human, "overview", Object{"operationId": operationID, "message": "different"}, authorize); fault.Code(err) != "operations_agentos_operation_conflict" {
 		t.Fatal("operation identity accepted changed input", err)
 	}
+	// The explicit retry uses the same owner, question and failed original. A
+	// transient authorization-service failure is not a durable permission grant.
+	if _, err = owner.Exec(ctx, `UPDATE operations_agentos_conversation_commands_v1 SET native_run_id=$3 WHERE endpoint=$1 AND id=$2`, endpoint, operationID, "original-native-run"); err != nil {
+		t.Fatal(err)
+	}
+	retryMode.Store(true)
+	retryTurn := Object{"operationId": retryID, "retryOfOperationId": operationID, "message": "查询当前处理状态"}
+	denied := func(context.Context) (operationspermissions.Actor, error) {
+		return operationspermissions.Actor{}, fail("operations_permission_denied", 403)
+	}
+	if _, err = service.Run(ctx, human, "overview", retryTurn, denied); fault.Status(err) != 403 || writes.Load() != 1 {
+		t.Fatal("revoked current authority must stop retry before dispatch", err, writes.Load())
+	}
+	if _, err = service.Run(ctx, human, "overview", Object{"operationId": retryID, "retryOfOperationId": operationID, "message": "不同问题"}, authorize); fault.Code(err) != "operations_agentos_retry_unavailable" || writes.Load() != 1 {
+		t.Fatal("retry must remain bound to the original question", err, writes.Load())
+	}
+	retryResult, err := service.Run(ctx, human, "overview", retryTurn, authorize)
+	if err != nil || retryResult["operationId"] != retryID || retryResult["retryOfOperationId"] != operationID || retryResult["state"] != "accepted" || writes.Load() != 2 {
+		t.Fatal("authorized explicit retry did not preserve the original binding", retryResult, err, writes.Load())
+	}
+	recoveredRetry, err := service.Run(ctx, human, "overview", retryTurn, authorize)
+	if err != nil || recoveredRetry["operationId"] != retryID || recoveredRetry["replayed"] != true || writes.Load() != 2 {
+		t.Fatal("retry recovery must read the same operation without a second POST", recoveredRetry, err, writes.Load())
+	}
+	retryMode.Store(false)
 	service.Tools = &ConversationTools{Conversations: service}
 	toolInput := Object{"conversationId": id, "sessionId": current.Row.SessionID, "turnId": operationID, "runId": "original-native-run", "callId": "provider:opaque/call+01", "tool": "read-ai-delegation", "arguments": Object{}}
 	invokeTool := func(input Object) *httptest.ResponseRecorder {

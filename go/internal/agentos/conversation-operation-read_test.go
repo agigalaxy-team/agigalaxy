@@ -51,6 +51,12 @@ func TestNativeOperationExactLookupPrecedesHistory(t *testing.T) {
 					switch mode {
 					case "not-recorded":
 						value["runId"], value["state"], value["native"] = nil, "not-recorded", nil
+					case "unknown-no-run":
+						value["runId"], value["state"], value["native"] = nil, "unknown", nil
+					case "wrong-parent":
+						native["regeneratedFrom"] = "foreign-parent-run"
+					case "missing-parent":
+						delete(native, "regeneratedFrom")
 					case "unknown":
 						value["state"], value["native"] = "unknown", nil
 					case "wrong-conversation":
@@ -125,7 +131,14 @@ func TestNativeOperationStoredLocatorAndRetryBinding(t *testing.T) {
 	}{
 		{name: "detached retry", nativeRunID: &runID, result: Object{"retryOfOperationId": parentID, "retryOfRunId": parentRunID}, query: "retryOfOperationId=" + parentID + "&retryOfRunId=" + parentRunID + "&runId=" + runID, wantOriginal: 1},
 		{name: "ordinary stored run", nativeRunID: &runID, result: Object{}, query: "runId=" + runID, wantOriginal: 1},
-		{name: "unacknowledged retry uses original job", result: Object{"retryOfOperationId": parentID, "retryOfRunId": parentRunID}, responseMode: "not-recorded", wantOriginal: 1},
+		{name: "unacknowledged retry lookup unknown", result: Object{"retryOfOperationId": parentID, "retryOfRunId": parentRunID}, query: "retryOfOperationId=" + parentID + "&retryOfRunId=" + parentRunID, responseMode: "unknown-no-run", wantOriginal: 1},
+		{name: "unacknowledged retry recovers detached run", result: Object{"retryOfOperationId": parentID, "retryOfRunId": parentRunID}, query: "retryOfOperationId=" + parentID + "&retryOfRunId=" + parentRunID, wantOriginal: 1},
+		{name: "unacknowledged retry wrong parent rejected", result: Object{"retryOfOperationId": parentID, "retryOfRunId": parentRunID}, query: "retryOfOperationId=" + parentID + "&retryOfRunId=" + parentRunID, responseMode: "wrong-parent", wantOriginal: 1, wantError: true},
+		{name: "unacknowledged retry missing parent rejected", result: Object{"retryOfOperationId": parentID, "retryOfRunId": parentRunID}, query: "retryOfOperationId=" + parentID + "&retryOfRunId=" + parentRunID, responseMode: "missing-parent", wantOriginal: 1, wantError: true},
+		{name: "unacknowledged retry lacks native proof", result: Object{"retryOfOperationId": parentID, "retryOfRunId": parentRunID}, query: "retryOfOperationId=" + parentID + "&retryOfRunId=" + parentRunID, responseMode: "unknown", wantOriginal: 1, wantError: true},
+		{name: "ordinary unacknowledged lookup has no locator", responseMode: "unknown-no-run", wantOriginal: 1},
+		{name: "unacknowledged retry incomplete lineage rejected", result: Object{"retryOfOperationId": parentID}, wantError: true},
+		{name: "unacknowledged self retry rejected", result: Object{"retryOfOperationId": operationID, "retryOfRunId": parentRunID}, wantError: true},
 		{name: "result run alone is not a native locator", result: Object{"runId": runID}, wantOriginal: 1},
 		{name: "known but unavailable remains unknown", nativeRunID: &runID, responseMode: "unknown", query: "runId=" + runID, wantOriginal: 1},
 		{name: "known run mismatch rejected", nativeRunID: &runID, responseMode: "wrong-run", query: "runId=" + runID, wantOriginal: 1, wantError: true},
@@ -161,10 +174,19 @@ func TestNativeOperationStoredLocatorAndRetryBinding(t *testing.T) {
 						t.Errorf("stored locator query mismatch: got %q want %q", r.URL.RawQuery, tc.query)
 					}
 					native := Object{"runId": runID, "operationId": operationID, "status": "ERROR", "content": "native retry result"}
+					if parent, ok := tc.result["retryOfRunId"].(string); ok {
+						native["regeneratedFrom"] = parent
+					}
 					value := Object{"conversationId": row.ID, "sessionId": row.SessionID, "operationId": operationID, "runId": runID, "state": "ERROR", "native": native}
 					switch tc.responseMode {
 					case "not-recorded":
 						value["runId"], value["state"], value["native"] = nil, "not-recorded", nil
+					case "unknown-no-run":
+						value["runId"], value["state"], value["native"] = nil, "unknown", nil
+					case "wrong-parent":
+						native["regeneratedFrom"] = "foreign-parent-run"
+					case "missing-parent":
+						delete(native, "regeneratedFrom")
 					case "unknown":
 						value["state"], value["native"] = "unknown", nil
 					case "wrong-run":
@@ -193,7 +215,7 @@ func TestNativeOperationStoredLocatorAndRetryBinding(t *testing.T) {
 			if (err != nil) != tc.wantError {
 				t.Fatalf("unexpected locator result: value=%v error=%v", value, err)
 			}
-			if !tc.wantError && tc.responseMode == "not-recorded" && value != nil {
+			if !tc.wantError && (tc.responseMode == "not-recorded" || tc.responseMode == "unknown-no-run") && value != nil {
 				t.Fatal("unacknowledged job was not preserved as unknown", value)
 			}
 			if !tc.wantError && tc.responseMode == "unknown" && (value == nil || value["status"] != "unknown") {

@@ -4,25 +4,33 @@ import tempfile
 import time
 import unittest
 from contextlib import ExitStack
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import uuid4
 import jwt
 from fastapi.testclient import TestClient
+from sqlalchemy import Column, MetaData, Table, Text
 from agno.agent import Agent
 from agno.db.sqlite import SqliteDb
 from agno.models.base import Model
+from agno.models.message import Message
 from agno.models.response import ModelResponse
 from agno.exceptions import ModelProviderError
 from agno.os import AgentOS, Authorization
 from agno.os.authz.provider import AuthorizationContext
 from agno.run.authorization import RunAuthorization, authorization_scope
+from agno.run.agent import RunErrorEvent, RunOutput
+from agno.run.base import RunStatus
 from galaxy_agentos.app import PrivateSurface, run_view
 from galaxy_agentos.authorization import GalaxyAuthorization
 from galaxy_agentos.config import Settings
 from galaxy_agentos.conversations import conversation_agents
 from galaxy_agentos.conversation_failures import failure_view
+from galaxy_agentos.conversation_retry import ConversationAgent
 from galaxy_agentos.conversation_transport import install_conversation_transport_read
+from galaxy_agentos.gateway import AuthorityDenied, AuthorityUnavailable
+from galaxy_agentos.model_gate import with_current_authority
 
 @dataclass
 class RecoveryModel(Model):
@@ -50,10 +58,66 @@ class RecoveryModel(Model):
     def _parse_provider_response_delta(self, value): return value
 
 class ConversationRetry(unittest.TestCase):
+    def test_retry_discards_prior_authority_events_without_bypassing_current_authority(self):
+        user, session, old_op, new_op, old_run = (str(uuid4()) for _ in range(5))
+        user = 'conversation:' + user
+        agent = ConversationAgent(id='galaxy-conversation-overview')
+        for kind, code in [('AuthorityUnavailable', 'operations_authorization_unavailable'),
+                ('AuthorityDenied', 'operations_agentos_authority_changed')]:
+            with self.subTest(kind=kind):
+                original = RunOutput(run_id=old_run, user_id=user, session_id=session, agent_id=agent.id,
+                    status=RunStatus.error, content='galaxy_conversation_model_failure:service-unavailable:502',
+                    messages=[Message(role='user', content='合成原提问。')],
+                    metadata={'operationId':old_op, 'domain':'overview',
+                        'userPublicReferences':{'items':[], 'complete':True}},
+                    events=[RunErrorEvent(run_id=old_run, session_id=session, agent_id=agent.id, error_type=kind)])
+                before = original.to_dict()
+                self.assertEqual(run_view(original)['errorCode'], code)
+                self.assertIsNone(run_view(original)['failure'])
+                self.assertEqual(failure_view(original.content)['reportedStatus'], 502)
+                selected = agent._retry_source(original, {'regenerate':True, 'run_id':old_run,
+                    'user_id':user, 'session_id':session, 'metadata':{'operationId':new_op,
+                        'retryOfOperationId':old_op, 'retryOfRunId':old_run}})
+                self.assertIsNone(selected.events, 'Prior attempt authorization observations must not enter the new attempt')
+                self.assertEqual(original.to_dict(), before)
+                self.assertEqual(selected.metadata['userPublicReferences'], original.metadata['userPublicReferences'])
+                self.assertNotEqual(selected.run_id, old_run)
+
+        class Gateway:
+            checks = 0
+            error = None
+            def authorize(self, principal, **kwargs):
+                self.checks += 1
+                raise self.error
+        gateway, model = Gateway(), RecoveryModel(failures=0)
+        guarded = with_current_authority(model, gateway)
+        auth = RunAuthorization(provider=GalaxyAuthorization(gateway),
+            context=AuthorizationContext(principal_id=user), enforce_tools=False)
+        for error in [AuthorityUnavailable('agentos_authority_unavailable'), AuthorityDenied('agentos_current_authority_denied')]:
+            gateway.error = error
+            with authorization_scope(lambda:auth), self.assertRaises(type(error)) as caught:
+                guarded.invoke(messages=[])
+            self.assertIs(caught.exception, error)
+        self.assertEqual(gateway.checks, 2)
+        self.assertEqual(model.calls, 0, 'Discarding old observations must not bypass a current authority failure')
+
     def test_native_http_retry_reuses_question_checks_owner_and_preserves_failure(self):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as cleanup:
             db = SqliteDb(db_file=str(Path(directory)/"retry.db"), id="local-retry")
             cleanup.callback(db.db_engine.dispose)
+            # SQLite has no native jobs table. Supply the existing seven-field
+            # queue metadata fixture; detached retries leave it genuinely empty.
+            queue_metadata = MetaData()
+            jobs = Table('synthetic_queue_metadata', queue_metadata, *(Column(name, Text, primary_key=name == 'id') for name in
+                ['id', 'idempotency_key', 'user_id', 'session_id', 'component_type', 'component_id', 'status']))
+            with db.Session() as connection:
+                queue_metadata.create_all(bind=connection.get_bind())
+            class AckLostLookup:
+                Session = db.Session
+                def _get_table(self, table_type, create_table_if_not_found=False):
+                    return jobs if table_type == 'jobs' else db._get_table(table_type, create_table_if_not_found)
+                def get_run(self, **kwargs): return db.get_run(**kwargs)
+                def get_runs(self, **kwargs): raise AssertionError('ACK recovery must not read session history')
             ident, session, old_op, new_op = (str(uuid4()) for _ in range(4))
             user = "conversation:"+ident
             tool_bindings = []
@@ -135,6 +199,71 @@ class ConversationRetry(unittest.TestCase):
                 self.assertEqual(pending.json()['runId'],pending_id)
                 self.assertIsNone(pending.json()['native'])
                 self.assertEqual(model.calls,3,'Exact lookup must not dispatch or repeat the model')
+
+                # Lose the SSE acknowledgement: no command NativeRunID and no
+                # job ticket, but the native detached attempt already exists.
+                runtime['db'] = AckLostLookup()
+                parent_locator = {key:value for key,value in locator.items() if key != 'runId'}
+                recovered = client.get(original_path, headers=headers, params=parent_locator)
+                self.assertEqual(recovered.status_code, 200, recovered.text)
+                self.assertEqual(recovered.json()['runId'], result['run_id'])
+                self.assertEqual(recovered.json()['state'], 'COMPLETED')
+                self.assertEqual(recovered.json()['native']['operationId'], new_op)
+                self.assertEqual(recovered.json()['native']['regeneratedFrom'], failed_id)
+                for patch in [{'retryOfOperationId':str(uuid4())}, {'retryOfRunId':str(uuid4())}]:
+                    refused = client.get(original_path, headers=headers, params={**parent_locator, **patch})
+                    self.assertEqual(refused.status_code, 403, refused.text)
+                self.assertEqual(client.get(original_path, headers=headers).status_code, 403,
+                    'An operation match alone must not bypass retry lineage')
+                self.assertEqual(client.get(original_path, headers=headers,
+                    params={'retryOfOperationId':old_op}).status_code, 400)
+                absent = client.get('/galaxy/conversations/'+ident+'/operations/'+str(uuid4()),
+                    headers=headers, params=parent_locator)
+                self.assertEqual(absent.status_code, 200, absent.text)
+                self.assertEqual(absent.json()['state'], 'unknown')
+                self.assertIsNone(absent.json()['runId'])
+                self.assertIsNone(absent.json()['native'])
+
+                # The SQL candidate is not authority. Recheck the stored inner
+                # identity, and never select one of two matching owned runs.
+                temporary_runs = []
+                def add_candidate(operation, *, outer_user=user, inner_user=user):
+                    candidate = deepcopy(db.get_run(run_id=result['run_id']))
+                    candidate.run_id = str(uuid4())
+                    candidate.user_id = inner_user
+                    candidate.metadata['operationId'] = operation
+                    db.upsert_run(run=candidate, session_id=session, user_id=outer_user)
+                    temporary_runs.append(candidate.run_id)
+                foreign_op, inconsistent_op = str(uuid4()), str(uuid4())
+                foreign_user = 'conversation:' + str(uuid4())
+                add_candidate(foreign_op, outer_user=foreign_user, inner_user=foreign_user)
+                foreign = client.get('/galaxy/conversations/'+ident+'/operations/'+foreign_op,
+                    headers=headers, params=parent_locator)
+                self.assertEqual(foreign.status_code, 200, foreign.text)
+                self.assertEqual(foreign.json()['state'], 'unknown')
+                self.assertIsNone(foreign.json()['runId'], 'Another owner must not reveal a candidate locator')
+                add_candidate(inconsistent_op, inner_user=foreign_user)
+                inconsistent = client.get('/galaxy/conversations/'+ident+'/operations/'+inconsistent_op,
+                    headers=headers, params=parent_locator)
+                self.assertEqual(inconsistent.status_code, 403, inconsistent.text)
+                add_candidate(new_op)
+                ambiguous = client.get(original_path, headers=headers, params=parent_locator)
+                self.assertEqual(ambiguous.status_code, 503, ambiguous.text)
+                self.assertEqual(client.get(original_path, headers=headers, params=locator).status_code, 200,
+                    'An acknowledged exact run must not consult other operation candidates')
+                with db.Session() as connection:
+                    runs = db._get_table(table_type='runs', create_table_if_not_found=False)
+                    connection.execute(runs.delete().where(runs.c.run_id.in_(temporary_runs)))
+                    connection.commit()
+                class MissingNative(AckLostLookup):
+                    def get_run(self, **kwargs): return None
+                runtime['db'] = MissingNative()
+                disappeared = client.get(original_path, headers=headers, params=parent_locator)
+                self.assertEqual(disappeared.status_code, 200, disappeared.text)
+                self.assertEqual(disappeared.json()['state'], 'unknown')
+                self.assertIsNone(disappeared.json()['runId'], 'Do not publish an unverified candidate that disappeared')
+                self.assertIsNone(disappeared.json()['native'])
+                self.assertEqual(model.calls, 3, 'No ACK recovery path may submit or repeat a model call')
 
                 # A detached regeneration can itself fail before any tool call.
                 # Its exact owned run remains a readable terminal, without a
