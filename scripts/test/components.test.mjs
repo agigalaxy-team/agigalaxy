@@ -24,6 +24,7 @@ test('shared check and setup entrypoints select the complete component set',()=>
 });
 test('declared configuration inputs participate in ownership and propagation',()=>{
  assert.equal(ownerOf(catalog,'scripts/web-runtime.mjs'),'site');assert(plan('scripts/web-runtime.mjs').affected.includes('site'));
+ assert.equal(ownerOf(catalog,'scripts/generate-p13-agent-schema.mjs'),'agentos');assert(plan('scripts/generate-p13-agent-schema.mjs').affected.includes('agentos'));assert.deepEqual(plan('scripts/generate-p13-agent-schema.mjs').unclassified,[]);
  assert.equal(ownerOf(catalog,'scripts/test/capsule-lease-independent-review.test.mjs'),'web');
  for(const file of ['opencode.json','.opencode/tui.json']){
   assert.equal(ownerOf(catalog,file),'native-client');assert.deepEqual(plan(file).unclassified,[]);

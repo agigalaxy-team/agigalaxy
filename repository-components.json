@@ -518,7 +518,8 @@
       "dataOwner": "Native run/session tables are separate from Node business facts and command receipts.",
       "files": [
         "deploy/model-gateway/agentos.env.example",
-        "scripts/ci/run-agentos-tests.py"
+        "scripts/ci/run-agentos-tests.py",
+        "scripts/generate-p13-agent-schema.mjs"
       ]
     },
     {
