@@ -108,7 +108,7 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 		if e != nil {
 			return nil, e
 		}
-		if candidate["source"] != "workbench" && str(candidate["native_run_id"]) != "" && candidate["state"] == "waiting-human" && obj(candidate["human_decision"])["kind"] != "takeover" {
+		if candidate["source"] != "workbench" && str(candidate["native_run_id"]) != "" && (candidate["state"] == "waiting-human" && obj(candidate["human_decision"])["kind"] != "takeover" || candidate["state"] == "paused" && obj(candidate["control_state"])["phase"] == "paused") {
 			if s.Native == nil {
 				return nil, fault.New("operations_agentos_not_configured", 503)
 			}
@@ -166,6 +166,27 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 		if has(terminal, str(row["state"])) {
 			return nil, fail("operations_autonomy_task_terminal")
 		}
+		if x["kind"] == "pause" {
+			if row["source"] == "workbench" {
+				return nil, fail("operations_autonomy_workbench_continuation_required")
+			}
+			if has([]string{"paused", "waiting-human"}, str(row["state"])) {
+				return nil, fail("operations_autonomy_invalid_control_state")
+			}
+			if has([]string{"requested", "paused", "resuming"}, str(obj(row["control_state"])["phase"])) {
+				return nil, fail("operations_autonomy_pause_requested")
+			}
+			phase, nextState := "requested", str(row["state"])
+			if row["dispatch_started_at"] == nil {
+				phase, nextState = "paused", "paused"
+			}
+			control := Object{"kind": "manual-pause", "phase": phase, "pauseOperationId": x["operationId"], "operatorId": actor.ID, "nativeRunId": row["native_run_id"], "checkpointCallIds": []string{}}
+			saved, err := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3,state=$4,revision=revision+1,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, jsonText(control), nextState, s.now())
+			if err != nil {
+				return nil, err
+			}
+			return finish(saved)
+		}
 		state := map[string]string{"stop": "stopped", "takeover": "waiting-human", "pause": "paused", "resume": "queued"}[str(x["kind"])]
 		if x["kind"] == "resume" {
 			if !has([]string{"paused", "waiting-human", "unknown"}, str(row["state"])) {
@@ -185,6 +206,13 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 				if nativeBefore["status"] != "PAUSED" || nativeBefore["continuable"] != true || nativeBefore["nativeRunId"] != row["native_run_id"] || continuation["allowed"] != true {
 					return nil, fail("operations_autonomy_original_run_not_resumable")
 				}
+				if control := obj(row["control_state"]); control["kind"] == "manual-pause" && control["phase"] == "paused" {
+					marker := obj(nativeBefore["manualPause"])
+					if continuation["manualPause"] != true || marker["pauseOperationId"] != control["pauseOperationId"] || !sameValue(marker["checkpointCallIds"], control["checkpointCallIds"]) {
+						return nil, fail("operations_autonomy_original_run_not_resumable")
+					}
+				}
+
 				settings, e := s.RuntimeSettingsWithin(ctx, tx)
 				if e != nil {
 					return nil, e
@@ -210,6 +238,21 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 		} else if x["kind"] == "resume" {
 			decision = nil
 		}
+		var controlJSON any
+		if control := obj(row["control_state"]); control != nil {
+			control = obj(clone(control))
+			if x["kind"] == "resume" && control["phase"] == "paused" {
+				if state == "running" {
+					control["phase"] = "resuming"
+					control["resumeOperationId"] = x["operationId"]
+				} else {
+					control["phase"], control["outcome"] = "ended", "resumed-before-dispatch"
+				}
+			} else if has([]string{"stop", "takeover"}, str(x["kind"])) && has([]string{"requested", "paused", "resuming"}, str(control["phase"])) {
+				control["phase"], control["outcome"] = "ended", x["kind"]
+			}
+			controlJSON = jsonText(control)
+		}
 		var decisionJSON, lease any
 		if decision != nil {
 			decisionJSON = jsonText(decision)
@@ -225,7 +268,7 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 			}
 			lease = s.now().Add(time.Duration(num(round)) * time.Second)
 		}
-		saved, e := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET state=$3,human_decision=$4,native_continuable=false,lease_owner=NULL,lease_until=$6,revision=revision+1,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, state, decisionJSON, s.now(), lease)
+		saved, e := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET state=$3,human_decision=$4,native_continuable=false,lease_owner=NULL,lease_until=$6,control_state=$7,revision=revision+1,updated_at=$5 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, state, decisionJSON, s.now(), lease, controlJSON)
 		if e != nil {
 			return nil, e
 		}
@@ -245,7 +288,7 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 	if e != nil {
 		return nil, e
 	}
-	if has([]string{"stop", "pause", "takeover"}, str(x["kind"])) && str(obj(result["task"])["nativeRunId"]) != "" && s.Native != nil {
+	if has([]string{"stop", "takeover"}, str(x["kind"])) && str(obj(result["task"])["nativeRunId"]) != "" && s.Native != nil {
 		row, e := s.readTask(ctx, id)
 		if e != nil {
 			return nil, e

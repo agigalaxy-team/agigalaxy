@@ -351,6 +351,39 @@ func (s *Service) TaskContinuationWithin(ctx context.Context, tx pgx.Tx, id stri
 			decisions = append(decisions, Object{"callId": c["call_id"], "operationId": c["operation_id"], "state": c["decision"], "basis": "persisted-human-decision"})
 		}
 	}
+	control := obj(row["control_state"])
+	if control["kind"] == "manual-pause" && has([]string{"paused", "resuming"}, str(control["phase"])) && len(calls) == len(decisions) {
+		ids := texts(control["checkpointCallIds"])
+		if len(ids) == 1 && str(row["native_run_id"]) != "" && row["native_run_id"] == control["nativeRunId"] {
+			completion, err := s.completionWithin(ctx, tx, row, row["mode"] != "code")
+			if err != nil {
+				return nil, err
+			}
+			blocked, err := s.manualPauseBlockedWithin(ctx, tx, row, completion)
+			if err != nil {
+				return nil, err
+			}
+			anchor, err := optional(ctx, tx, `SELECT to_jsonb(c) FROM operations_autonomy_tool_calls_v1 c WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, id, ids[0])
+			if err != nil {
+				return nil, err
+			}
+			if anchor != nil && !blocked {
+				fact := Object{"callId": anchor["call_id"], "operationId": anchor["operation_id"], "state": "no-action", "basis": "manual-pause-read-again"}
+				if has(dutyWriters, str(anchor["tool"])) && !manualWriterSettled(anchor, nil) {
+					receipt, err := optional(ctx, tx, `SELECT to_jsonb(r) FROM operations_autonomy_receipts_v1 r WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, s.Endpoint, id, anchor["operation_id"])
+					if err != nil {
+						return nil, err
+					}
+					if !manualWriterSettled(anchor, receipt) {
+						return Object{"allowed": false, "decisions": decisions}, nil
+					}
+					fact["state"], fact["basis"] = receipt["state"], receipt["basis"]
+				}
+				return Object{"allowed": true, "manualPause": true, "pauseOperationId": control["pauseOperationId"], "decisions": []Object{fact}}, nil
+			}
+		}
+		return Object{"allowed": false, "decisions": decisions}, nil
+	}
 	allowed := row["source"] != "workbench" && str(row["native_run_id"]) != "" && !has([]string{"stopped", "failed", "blocked"}, str(row["state"])) && obj(row["human_decision"])["kind"] != "takeover" && len(calls) > 0 && len(decisions) == len(calls)
 	return Object{"allowed": allowed, "decisions": decisions}, nil
 }

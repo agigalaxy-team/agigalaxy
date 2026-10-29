@@ -238,7 +238,7 @@ def duty_factory(*, settings, db, gateway, model_factory=None):
                 else domain_model(settings, task["domain"], gateway))
             from .duty_completion import with_duty_completion
             selected = with_duty_completion(selected, gateway)
-            selected = with_duty_pauses(selected)
+            selected = with_duty_pauses(selected, gateway)
             selected._galaxy_usage_database = projected
             model_version = getattr(selected, "_galaxy_settings_version", "explicit-test-model")
             metadata = {key: task.get(key) for key in ("taskId", "operationId", "planId", "planVersion", "promptVersion",

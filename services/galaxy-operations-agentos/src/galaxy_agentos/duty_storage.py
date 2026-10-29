@@ -9,12 +9,41 @@ from uuid import UUID
 from agno.run.status_persist import RunPersistOutcome
 
 from .conversation_storage import conversation_storage_fields
-from .duty_continuation import WRITE_TOOLS
+from .duty_continuation import WRITE_TOOLS, call_reference
 from .gateway import AuthorityDenied, AuthorityUnavailable
 
 
 MODEL_STATES = {"PENDING": "accepted", "RUNNING": "running", "COMPLETED": "completed",
     "PAUSED": "running", "ERROR": "failed", "CANCELLED": "cancelled"}
+
+
+def manual_pause_marker(value):
+    if not isinstance(value, dict) or set(value) != {"pauseOperationId", "checkpointCallIds"}:
+        return None
+    ids = value.get("checkpointCallIds")
+    try:
+        if not isinstance(ids, list) or len(ids) != 1:
+            return None
+        op = str(UUID(value["pauseOperationId"]))
+        call = str(UUID(ids[0]))
+        if op != value["pauseOperationId"] or call != ids[0]:
+            return None
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return None
+    return {"pauseOperationId": op, "checkpointCallIds": [call]}
+
+
+def manual_resume_consumed(value):
+    if not isinstance(value, dict) or set(value) != {"pauseOperationId", "resumeOperationId", "checkpointCallIds"}:
+        return None
+    marker = manual_pause_marker({key: value[key] for key in ("pauseOperationId", "checkpointCallIds")})
+    try:
+        operation = str(UUID(value["resumeOperationId"]))
+        if marker is None or operation != value["resumeOperationId"]:
+            return None
+    except (ValueError, TypeError, AttributeError):
+        return None
+    return {**marker, "resumeOperationId": operation}
 
 
 def duty_report_fields(run):
@@ -28,7 +57,9 @@ def duty_report_fields(run):
         "modelState": MODEL_STATES.get(status, "unknown"),
         "status": "waiting-human" if status == "PAUSED" else "completed" if status == "COMPLETED"
             else "failed" if status in {"ERROR", "CANCELLED"} else "running" if status in {"PENDING", "RUNNING"} else "unknown",
-        **({"code": code} if status == "ERROR" else {})}
+        **({"code": code} if status == "ERROR" else {}),
+        **({"manualPause": marker} if status == "PAUSED" and (marker := manual_pause_marker((metadata or {}).get("manualPause"))) else {}),
+        **({"manualResumeConsumed": consumed} if status == "RUNNING" and (consumed := manual_resume_consumed((metadata or {}).get("manualResumeConsumed"))) else {})}
 
 
 def duty_storage_fields(fields):
@@ -36,8 +67,15 @@ def duty_storage_fields(fields):
     if "tools" in result:
         # Preserve only the native pause coordinate. Arguments, result bodies
         # and approvals cannot become an alternate business authority.
+        metadata = fields.get("metadata") if isinstance(fields.get("metadata"), dict) else {}
+        marker = manual_pause_marker(metadata.get("manualPause"))
+        task_id, run_id = metadata.get("taskId"), fields.get("run_id")
+        def manual_anchor(tool):
+            return (marker is not None and isinstance(task_id, str) and isinstance(run_id, str)
+                and isinstance(tool.get("tool_call_id"), str)
+                and call_reference(task_id, run_id, tool["tool_call_id"]) in marker["checkpointCallIds"])
         paused = {tool.get("tool_call_id") for tool in fields.get("tools") or []
-            if isinstance(tool, dict) and tool.get("tool_name") in WRITE_TOOLS
+            if isinstance(tool, dict) and (tool.get("tool_name") in WRITE_TOOLS or manual_anchor(tool))
             and tool.get("external_execution_required") is True}
         for tool in result["tools"]:
             if tool.get("tool_call_id") in paused:
@@ -64,6 +102,12 @@ def duty_storage_fields(fields):
             and (key != "completionFailureCode" or isinstance(value, str) and value in {"operations_autonomy_completion_incomplete", "operations_autonomy_validation_ledger_unavailable"})
             and (value is None or type(value) in {str, int, bool}
                 or key == "activeDurationBefore" and type(value) is float and math.isfinite(value) and value >= 0)}
+        marker = manual_pause_marker(metadata.get("manualPause"))
+        if marker is not None:
+            result["metadata"]["manualPause"] = marker
+        consumed = manual_resume_consumed(metadata.get("manualResumeConsumed"))
+        if consumed is not None:
+            result["metadata"]["manualResumeConsumed"] = consumed
         versions = metadata.get("modelSettingsVersions")
         if isinstance(versions, list) and len(versions) <= 32 and all(isinstance(value, str) and len(value) <= 128 for value in versions):
             result["metadata"]["modelSettingsVersions"] = list(versions)

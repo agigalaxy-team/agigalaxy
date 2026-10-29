@@ -103,7 +103,10 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 	if has(a.Permissions, "autonomy.control") {
 		if !has(terminal, state) {
 			if !has([]string{"paused", "waiting-human"}, state) {
-				controls = append(controls, "pause", "takeover")
+				if !has([]string{"requested", "resuming"}, str(obj(row["control_state"])["phase"])) {
+					controls = append(controls, "pause")
+				}
+				controls = append(controls, "takeover")
 			} else if row["source"] != "workbench" && decision["kind"] != "takeover" {
 				controls = append(controls, "takeover")
 			}
@@ -131,6 +134,9 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 		out[result] = row[k]
 	}
 	out["strategyVersionId"] = obj(obj(row["configuration"])["versionBindings"])["strategyVersionId"]
+	if control := obj(row["control_state"]); control["kind"] == "manual-pause" && has([]string{"requested", "paused", "resuming", "ended"}, str(control["phase"])) {
+		out["manualPause"] = Object{"phase": control["phase"], "pauseOperationId": control["pauseOperationId"], "nativeRunId": control["nativeRunId"]}
+	}
 	out["effects"], out["businessReceipts"], out["pendingCalls"], out["continuation"], out["workbenchHref"], out["availableControls"] = receipts, receipts, pending, continuation, href, controls
 	if includeReceipts && checkTarget {
 		report, err := s.taskReportWithin(ctx, tx, row, a)

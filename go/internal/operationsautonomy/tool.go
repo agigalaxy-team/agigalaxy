@@ -37,6 +37,7 @@ type toolBinding struct {
 	actor         Actor
 	operationID   string
 	localRecorded bool
+	pauseRejected bool
 }
 
 func errorCode(e error) string {
@@ -148,6 +149,16 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		if prior != nil && (prior["tool"] != x["tool"] || !sameValue(prior["arguments"], x["arguments"])) {
 			return toolBinding{}, fail("operations_autonomy_operation_conflict")
 		}
+		if prior != nil && prior["state"] == "not-admitted" && prior["code"] == "operations_autonomy_pause_requested" {
+			return toolBinding{row: row, prior: prior, operationID: str(prior["operation_id"]), pauseRejected: true}, nil
+		}
+		if prior == nil && has(dutyWriters, str(x["tool"])) && obj(row["control_state"])["kind"] == "manual-pause" && obj(row["control_state"])["phase"] == "requested" {
+			operationID := uuid.NewString()
+			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'not-admitted','operations_autonomy_pause_requested',$7,$7)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(x["arguments"]), operationID, s.now()); e != nil {
+				return toolBinding{}, e
+			}
+			return toolBinding{row: row, operationID: operationID, pauseRejected: true}, nil
+		}
 		operationID := str(prior["operation_id"])
 		if prior == nil {
 			if x["tool"] != "assess-task" {
@@ -170,6 +181,9 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 	}
 	if binding.localRecorded {
 		return Object{"state": "recorded"}, nil
+	}
+	if binding.pauseRejected {
+		return Object{"operationId": binding.operationID, "state": "not-admitted", "effectState": "not-started", "code": "operations_autonomy_pause_requested"}, nil
 	}
 	result, e := func() (Object, error) {
 		row, actor, operationID := binding.row, binding.actor, binding.operationID

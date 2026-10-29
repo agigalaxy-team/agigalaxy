@@ -15,7 +15,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from .duties import task_context, BOUNDARY_VERSION
-from .duty_storage import MODEL_STATES, duty_report_fields
+from .duty_storage import MODEL_STATES, duty_report_fields, manual_pause_marker, manual_resume_consumed
 from .gateway import AuthorityDenied, AuthorityUnavailable, autonomy_id
 from .duty_continuation import continuation_tools, pending_tools
 from .read_model import metadata as run_metadata
@@ -35,6 +35,8 @@ def duty_view(task_id, run=None, *, read_expires_at=None):
     return {"taskId": task_id, "operationId": task_id, "nativeRunId": ident, "runId": ident,
         "status": status, "modelState": MODEL_STATES.get(status, "not-started" if status == "NOT_RECORDED" else "unknown"),
         "awaitingHuman": status == "PAUSED", "continuable": status == "PAUSED" and bool(pending_tools(raw)), "readExpiresAt": read_expires_at,
+        **({"manualPause": marker} if status == "PAUSED" and (marker := manual_pause_marker(metadata.get("manualPause"))) else {}),
+        **({"manualResumeConsumed": consumed} if status == "RUNNING" and (consumed := manual_resume_consumed(metadata.get("manualResumeConsumed"))) else {}),
         "boundaryVersion": BOUNDARY_VERSION,
         "run": {"runId": ident, "createdAt": raw.get("created_at"),
             "promptVersion": metadata.get("promptVersion"), "planVersion": metadata.get("planVersion"),

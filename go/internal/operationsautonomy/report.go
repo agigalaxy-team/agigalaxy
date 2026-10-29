@@ -16,7 +16,7 @@ var nativeRunPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 var modelStates = []string{"not-started", "dispatching", "accepted", "running", "completed", "failed", "cancelled", "unknown", "not-required"}
 
 func parseReport(input Object) (Object, error) {
-	if !closed(input, []string{"taskId", "modelState", "status"}, []string{"nativeRunId", "code", "summary", "finalAnalysis"}) || !schemaUUID.MatchString(str(input["taskId"])) || !has(modelStates, str(input["modelState"])) || !has([]string{"running", "waiting-human", "completed", "failed", "unknown"}, str(input["status"])) {
+	if !closed(input, []string{"taskId", "modelState", "status"}, []string{"nativeRunId", "code", "summary", "finalAnalysis", "manualPause", "manualResumeConsumed"}) || !schemaUUID.MatchString(str(input["taskId"])) || !has(modelStates, str(input["modelState"])) || !has([]string{"running", "waiting-human", "completed", "failed", "unknown"}, str(input["status"])) {
 		return nil, invalid()
 	}
 	if v, ok := input["nativeRunId"]; ok && !nativeRunPattern.MatchString(str(v)) {
@@ -27,6 +27,20 @@ func parseReport(input Object) (Object, error) {
 	}
 	if v, ok := input["summary"]; ok {
 		if _, ok := text(v, 0, 4000, false); !ok {
+			return nil, invalid()
+		}
+	}
+	if v, ok := input["manualPause"]; ok {
+		m := obj(v)
+		ids := texts(m["checkpointCallIds"])
+		if !closed(m, []string{"pauseOperationId", "checkpointCallIds"}, nil) || !schemaUUID.MatchString(str(m["pauseOperationId"])) || len(ids) != 1 || !schemaUUID.MatchString(ids[0]) || input["status"] != "waiting-human" {
+			return nil, invalid()
+		}
+	}
+	if v, ok := input["manualResumeConsumed"]; ok {
+		m := obj(v)
+		ids := texts(m["checkpointCallIds"])
+		if !closed(m, []string{"pauseOperationId", "resumeOperationId", "checkpointCallIds"}, nil) || !schemaUUID.MatchString(str(m["pauseOperationId"])) || !schemaUUID.MatchString(str(m["resumeOperationId"])) || len(ids) != 1 || !schemaUUID.MatchString(ids[0]) || input["status"] != "running" {
 			return nil, invalid()
 		}
 	}
@@ -86,6 +100,37 @@ func (s *Service) Report(ctx context.Context, input Object) (Object, error) {
 		if e != nil {
 			return nil, e
 		}
+		if marker := obj(x["manualResumeConsumed"]); marker != nil {
+			control := obj(row["control_state"])
+			if control["kind"] != "manual-pause" || !(control["phase"] == "resuming" || control["phase"] == "ended" && control["outcome"] == "resumed") || control["pauseOperationId"] != marker["pauseOperationId"] || control["resumeOperationId"] != marker["resumeOperationId"] || row["native_run_id"] != x["nativeRunId"] || !sameValue(control["checkpointCallIds"], marker["checkpointCallIds"]) {
+				return nil, fail("operations_autonomy_operation_conflict")
+			}
+			if control["phase"] == "ended" {
+				return s.stamp(Object{"taskId": row["id"], "state": row["state"]}), nil
+			}
+			control = obj(clone(control))
+			control["phase"], control["outcome"] = "ended", "resumed"
+			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(control)); e != nil {
+				return nil, e
+			}
+		}
+		if x["manualPause"] != nil {
+			control, marker := obj(row["control_state"]), obj(x["manualPause"])
+			if control["kind"] != "manual-pause" || control["pauseOperationId"] != marker["pauseOperationId"] || control["phase"] != "requested" && !sameValue(control["checkpointCallIds"], marker["checkpointCallIds"]) {
+				return nil, fail("operations_autonomy_operation_conflict")
+			}
+			if control["kind"] == "manual-pause" && has([]string{"paused", "resuming", "ended"}, str(control["phase"])) && (control["phase"] != "ended" || control["outcome"] == "resumed") && control["pauseOperationId"] == marker["pauseOperationId"] && row["native_run_id"] == x["nativeRunId"] && control["nativeRunId"] == x["nativeRunId"] && sameValue(control["checkpointCallIds"], marker["checkpointCallIds"]) {
+				return s.stamp(Object{"taskId": row["id"], "state": row["state"]}), nil
+			}
+			paused, err := s.settleManualPauseWithin(ctx, tx, row, x, completion)
+			if err != nil {
+				return nil, err
+			}
+			if paused {
+				return s.stamp(Object{"taskId": row["id"], "state": "paused"}), nil
+			}
+			x["status"] = "unknown"
+		}
 		business := str(completion["businessState"])
 		state := str(x["status"])
 		if state == "failed" && completion["disposition"] == "unknown" {
@@ -99,6 +144,18 @@ func (s *Service) Report(ctx context.Context, input Object) (Object, error) {
 				state = "failed"
 			case "unknown", "continue":
 				state = "unknown"
+			}
+		}
+		if control := obj(row["control_state"]); control["kind"] == "manual-pause" && has([]string{"requested", "resuming"}, str(control["phase"])) && (has([]string{"completed", "failed"}, str(x["status"])) || state == "waiting-human" && x["manualPause"] == nil) {
+			control = obj(clone(control))
+			control["phase"] = "ended"
+			if state == "waiting-human" {
+				control["outcome"] = "natural-human-review"
+			} else {
+				control["outcome"] = "native-ended"
+			}
+			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET control_state=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(control)); e != nil {
+				return nil, e
 			}
 		}
 		done := state == "completed" || state == "failed"

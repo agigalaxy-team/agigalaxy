@@ -273,6 +273,117 @@ class DutyContracts(unittest.TestCase):
             terminal = continued.to_dict(); terminal["status"] = "CANCELLED"
             with self.assertRaises(AuthorityDenied): continuation_tools(task, terminal)
 
+    def test_manual_pause_uses_real_tool_and_resumes_same_native_run(self):
+        class TwoPauses(CurrentTask):
+            second_pause = None
+            def duty_report(self, user_id, value):
+                result = super().duty_report(user_id, value)
+                if value.get("manualResumeConsumed"):
+                    self.task["manualPause"]["phase"] = "ended"
+                return result
+            def duty_tool(self, user_id, tool, arguments, **binding):
+                result = super().duty_tool(user_id, tool, arguments, **binding)
+                if tool == "assess-task" and self.second_pause:
+                    self.task["manualPause"] = {"phase": "requested", "pauseOperationId": self.second_pause, "nativeRunId": binding["run_id"], "checkpointCallIds": []}
+                if self.task.get("manualPause", {}).get("phase") == "requested":
+                    self.task["manualPause"].setdefault("eligibleCallIds", []).append(binding["call_id"])
+                return result
+        gateway, selected = TwoPauses(), settings()
+        task = gateway.task
+        pause_id, source_operation = str(uuid4()), str(uuid4())
+        task["manualPause"] = {"phase": "requested", "pauseOperationId": pause_id, "nativeRunId": None, "checkpointCallIds": []}
+        task["tools"] = ["current-summary", "assess-task"]
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as resources:
+            db = SqliteDb(db_file=str(Path(directory) / "manual.db"), id="manual-pause-contract")
+            resources.callback(db.db_engine.dispose)
+            ctx = RequestContext(user_id="autonomy:" + task["taskId"], session_id=task["sessionId"], input={"taskId": task["taskId"]}, trusted=TrustedContext(claims=claims(task, selected)))
+            model = LocalModel(); model._galaxy_settings_version = "manual-v1"
+            agent = duty_factory(settings=selected, db=db, gateway=gateway, model_factory=lambda: model).resolve(ctx, Agent)
+            authority = RunAuthorization(provider=GalaxyAuthorization(gateway), context=AuthorizationContext(principal_id=ctx.user_id), enforce_tools=False)
+            with authorization_scope(lambda: authority):
+                paused = asyncio.run(agent.arun("PRIVATE_TRANSIENT_INPUT", session_id=task["sessionId"], user_id=ctx.user_id))
+                self.assertEqual(paused.status, RunStatus.paused)
+                self.assertEqual(model.calls, 1)
+                stored = db.get_run(run_id=paused.run_id, deserialize=False)
+                self.assertNotIn("PRIVATE_", json.dumps(stored))
+                raw = stored.get("run_data", stored)
+                self.assertEqual(raw["metadata"]["manualPause"]["pauseOperationId"], pause_id)
+                self.assertEqual(raw["metadata"]["manualPause"]["checkpointCallIds"], [gateway.calls[0]["call_id"]])
+                self.assertTrue(raw["tools"][0]["external_execution_required"])
+                self.assertEqual(raw["tools"][0]["tool_args"], {})
+                resume_id = str(uuid4())
+                task["manualPause"] = {"phase": "resuming", "pauseOperationId": pause_id, "resumeOperationId": resume_id, "nativeRunId": paused.run_id, "checkpointCallIds": [gateway.calls[0]["call_id"]]}
+                task["continuation"] = {"allowed": True, "manualPause": True, "pauseOperationId": pause_id, "decisions": [{"callId": gateway.calls[0]["call_id"], "operationId": source_operation, "state": "no-action", "basis": "manual-pause-read-again"}]}
+                gateway.second_pause = str(uuid4())
+                resumed_model = LocalModel(); resumed_model.calls = 1; resumed_model._galaxy_settings_version = "manual-v1"
+                agent = duty_factory(settings=selected, db=db, gateway=gateway, model_factory=lambda: resumed_model).resolve(ctx, Agent)
+                continued = asyncio.run(agent.acontinue_run(run_id=paused.run_id, session_id=task["sessionId"], user_id=ctx.user_id))
+                self.assertEqual(continued.run_id, paused.run_id)
+                self.assertEqual(continued.status, RunStatus.paused)
+                self.assertTrue(any(r.get("manualResumeConsumed", {}).get("resumeOperationId") == resume_id for r in gateway.reports))
+                second_call = gateway.calls[1]["call_id"]
+                task["manualPause"] = {"phase": "resuming", "pauseOperationId": gateway.second_pause, "resumeOperationId": str(uuid4()), "nativeRunId": paused.run_id, "checkpointCallIds": [second_call]}
+                task["continuation"] = {"allowed": True, "manualPause": True, "pauseOperationId": gateway.second_pause, "decisions": [{"callId": second_call, "operationId": str(uuid4()), "state": "no-action", "basis": "manual-pause-read-again"}]}
+                final_model = LocalModel(); final_model.calls = 2; final_model._galaxy_settings_version = "manual-v1"
+                agent = duty_factory(settings=selected, db=db, gateway=gateway, model_factory=lambda: final_model).resolve(ctx, Agent)
+                final = asyncio.run(agent.acontinue_run(run_id=paused.run_id, session_id=task["sessionId"], user_id=ctx.user_id))
+                self.assertEqual(final.run_id, paused.run_id)
+                self.assertEqual(final.status, RunStatus.completed)
+            self.assertEqual([call["tool"] for call in gateway.calls], ["current-summary", "assess-task"])
+
+    def test_manual_pause_ignores_local_unrecorded_tool_result(self):
+        class Gateway(CurrentTask):
+            def duty_tool(self, user_id, tool, arguments, **binding):
+                value = super().duty_tool(user_id, tool, arguments, **binding)
+                self.task["manualPause"].setdefault("eligibleCallIds", []).append(binding["call_id"])
+                return value
+        @dataclass
+        class BadThenGood(LocalModel):
+            def invoke(self, *args, **kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    return ModelResponse(role="assistant", tool_calls=[{"id": "local-invalid", "type": "function", "function": {"name": "current_summary", "arguments": '{"unexpected":1}'}}])
+                return ModelResponse(role="assistant", tool_calls=[{"id": "recorded-read", "type": "function", "function": {"name": "current_summary", "arguments": "{}"}}])
+        gateway, selected = Gateway(), settings()
+        task = gateway.task
+        task["manualPause"] = {"phase": "requested", "pauseOperationId": str(uuid4()), "nativeRunId": None, "eligibleCallIds": []}
+        task["tools"] = ["current-summary"]
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as resources:
+            db = SqliteDb(db_file=str(Path(directory) / "local-invalid.db"), id="manual-invalid-contract")
+            resources.callback(db.db_engine.dispose)
+            ctx = RequestContext(user_id="autonomy:" + task["taskId"], session_id=task["sessionId"], input={"taskId": task["taskId"]}, trusted=TrustedContext(claims=claims(task, selected)))
+            model = BadThenGood(); model._galaxy_settings_version = "manual-v1"
+            agent = duty_factory(settings=selected, db=db, gateway=gateway, model_factory=lambda: model).resolve(ctx, Agent)
+            authority = RunAuthorization(provider=GalaxyAuthorization(gateway), context=AuthorizationContext(principal_id=ctx.user_id), enforce_tools=False)
+            with authorization_scope(lambda: authority):
+                result = asyncio.run(agent.arun("check", session_id=task["sessionId"], user_id=ctx.user_id))
+            self.assertEqual(result.status, RunStatus.paused)
+            self.assertEqual(model.calls, 2)
+            self.assertEqual(len(gateway.calls), 1)
+            self.assertEqual(result.metadata["manualPause"]["checkpointCallIds"], [gateway.calls[0]["call_id"]])
+
+    def test_natural_human_requirement_supersedes_old_manual_marker(self):
+        from galaxy_agentos.duty_continuation import with_duty_pauses
+        from galaxy_agentos.duty_storage import duty_report_fields
+        from agno.models.response import ToolExecution
+        pause_id, resume_id, call_id = str(uuid4()), str(uuid4()), str(uuid4())
+        operation = str(uuid4())
+        run = RunOutput(run_id=str(uuid4()), status=RunStatus.running,
+            metadata={"manualPause": {"pauseOperationId": pause_id, "checkpointCallIds": [call_id]},
+                "manualResumeConsumed": {"pauseOperationId": pause_id, "resumeOperationId": resume_id, "checkpointCallIds": [call_id]}})
+        tool = ToolExecution(tool_name="execute_operation", tool_call_id="new-human", result=json.dumps({"state": "waiting-human", "operationId": operation}))
+        class ModelDouble:
+            def response(self, **kwargs):
+                kwargs["after_tool_results"](SimpleNamespace(tool_executions=[tool]))
+            async def aresponse(self, **kwargs):
+                await kwargs["after_tool_results"](SimpleNamespace(tool_executions=[tool]))
+        with_duty_pauses(ModelDouble()).response(run_response=run)
+        self.assertTrue(run.requirements[0].tool_execution.external_execution_required)
+        self.assertNotIn("manualPause", run.metadata)
+        self.assertNotIn("manualResumeConsumed", run.metadata)
+        run.status = RunStatus.paused
+        self.assertNotIn("manualPause", duty_report_fields(run.to_dict()))
+
     def test_private_continuation_uses_native_ticket_cas_and_closed_original_decisions(self):
         gateway, selected = CurrentTask(), settings(); task = gateway.task
         run_id, provider_call, original_operation = str(uuid4()), "provider-waiting-action", str(uuid4())

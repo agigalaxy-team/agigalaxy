@@ -106,6 +106,16 @@ func (s *Service) Authorize(ctx context.Context, input Object) (Object, error) {
 			return nil, e
 		}
 		task := Object{"completion": completion, "taskId": row["id"], "operationId": row["id"], "planId": row["config_id"], "planVersion": row["plan_version"], "promptVersion": row["prompt_version"], "delegationVersion": row["delegation_version"], "domain": row["domain"], "aiAccountId": row["ai_account_id"], "mode": row["mode"], "source": row["source"], "purpose": cfg["purpose"], "sessionId": row["session_id"], "roleVersion": roleVersion, "scopeVersion": row["plan_version"], "state": row["state"], "businessState": row["business_state"], "effectiveCheck": row["effective_check"], "roundSeconds": round, "continuation": continuation, "prompt": Object{"boundary": BoundaryPrompt, "role": cfg["prompt"], "context": Object{"title": row["title"], "source": row["source"], "sourceTargets": sources["sourceTargets"], "sourceCoverage": sources["sourceCoverage"], "sourceBasis": sources["basis"], "goal": cfg["goal"]}}, "plan": plan, "scope": Object{"actions": plan["actions"], "resourceIds": plan["resourceIds"]}, "modelBinding": Object{"domain": row["domain"], "source": "current-manual-model-settings"}, "tools": tools}
+		if control := obj(row["control_state"]); control["kind"] == "manual-pause" && has([]string{"requested", "paused", "resuming", "ended"}, str(control["phase"])) {
+			task["manualPause"] = Object{"phase": control["phase"], "pauseOperationId": control["pauseOperationId"], "resumeOperationId": control["resumeOperationId"], "nativeRunId": control["nativeRunId"], "checkpointCallIds": control["checkpointCallIds"]}
+			if control["phase"] == "requested" {
+				anchors, err := s.manualPauseAnchorsWithin(ctx, tx, row, completion)
+				if err != nil {
+					return nil, err
+				}
+				obj(task["manualPause"])["eligibleCallIds"] = anchors
+			}
+		}
 		if currentInspectionPlan(plan) {
 			context := obj(obj(task["prompt"])["context"])
 			context["inspectionProfile"] = "current-operations-v1"

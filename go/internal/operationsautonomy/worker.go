@@ -234,6 +234,13 @@ func (w *Worker) Reconcile(ctx context.Context, row Object) (Object, error) {
 	if report["modelState"] == nil {
 		report["modelState"] = "unknown"
 	}
+	if value["status"] == "PAUSED" && value["manualPause"] != nil {
+		report["manualPause"] = value["manualPause"]
+	}
+	if value["status"] == "RUNNING" && value["manualResumeConsumed"] != nil {
+		report["manualResumeConsumed"] = value["manualResumeConsumed"]
+	}
+
 	if str(runID) != "" {
 		report["nativeRunId"] = runID
 	}

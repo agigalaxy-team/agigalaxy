@@ -134,6 +134,15 @@ func (s *Service) RequireDutyAction(ctx context.Context, tx pgx.Tx, a Actor, act
 	if e != nil {
 		return Actor{}, e
 	}
+	if copy.input.AccessPurpose == "execution" && action != "workbench.read" {
+		row, err := s.taskWithin(ctx, tx, copy.input.TaskID, "")
+		if err != nil {
+			return Actor{}, err
+		}
+		if obj(row["control_state"])["kind"] == "manual-pause" && obj(row["control_state"])["phase"] == "requested" {
+			return Actor{}, fault.New("operations_autonomy_pause_requested", 409)
+		}
+	}
 	if action != "workbench.read" && !has(fresh.Permissions, action) {
 		return Actor{}, fault.New("operations_permission_denied", 403)
 	}

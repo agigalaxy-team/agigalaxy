@@ -58,6 +58,9 @@ func (s *Service) authorizeOperationWithin(ctx context.Context, tx pgx.Tx, a Act
 	if e != nil {
 		return nil, e
 	}
+	if obj(row["control_state"])["kind"] == "manual-pause" && obj(row["control_state"])["phase"] == "requested" {
+		return nil, fault.New("operations_autonomy_pause_requested", 409)
+	}
 	cfg := obj(row["configuration"])
 	plan := obj(cfg["plan"])
 	if persisted {

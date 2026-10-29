@@ -100,6 +100,9 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, r
 			continue
 		}
 		state := str(c["state"])
+		if state == "not-admitted" && c["code"] == "operations_autonomy_pause_requested" {
+			continue
+		}
 		receipt := byID[str(c["operation_id"])]
 		if state == "waiting-human" {
 			if c["decision"] == nil && !has([]string{"completed", "failed", "no-action"}, receipt) {
