@@ -107,13 +107,6 @@ func (s *Service) recoverDiscovery(ctx context.Context, a Actor, x, command Obje
 	if e != nil {
 		return nil, e
 	}
-	row, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) { return service.CommandRecordWithin(ctx, tx, operationID) })
-	if e != nil {
-		return nil, e
-	}
-	if row == nil {
-		return nil, nil
-	}
 	method := "apply"
 	if x["kind"] == "search-draft-save" {
 		method = "draft"
@@ -121,14 +114,73 @@ func (s *Service) recoverDiscovery(ctx context.Context, a Actor, x, command Obje
 	if x["kind"] == "search-restore" {
 		method = "restore"
 	}
-	if row["operator_id"] != a.ID || row["kind"] != method || !same(row["input"], command) || method != "draft" && row["version_id"] != command["versionId"] {
-		return conflict()
+	row, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
+		row, e := service.CommandRecordWithin(ctx, tx, operationID)
+		if e != nil || row == nil {
+			return row, e
+		}
+		if row["operator_id"] != a.ID || row["kind"] != method || !same(row["input"], command) {
+			return nil, fail("operations_agentos_operation_conflict", 409)
+		}
+		canonical, e := identity.Canonical(Object{"kind": method, "input": command})
+		if e != nil {
+			return nil, e
+		}
+		digest := sha256.Sum256(canonical)
+		if row["request_hash"] != hex.EncodeToString(digest[:]) {
+			return nil, fail("operations_agentos_operation_conflict", 409)
+		}
+		outputID := str(row["version_id"])
+		if !validID(outputID) {
+			return nil, fail("operations_agentos_operation_conflict", 409)
+		}
+		output, e := service.CommandVersionWithin(ctx, tx, outputID)
+		if e != nil {
+			return nil, e
+		}
+		if output == nil || output["id"] != outputID {
+			return nil, fail("operations_agentos_operation_conflict", 409)
+		}
+		switch method {
+		case "draft":
+			if output["kind"] != "draft" || !same(output["settings"], command["settings"]) {
+				return nil, fail("operations_agentos_operation_conflict", 409)
+			}
+		case "apply":
+			if outputID != command["versionId"] {
+				return nil, fail("operations_agentos_operation_conflict", 409)
+			}
+		case "restore":
+			if output["kind"] != "restore" || output["restored_from"] != command["versionId"] {
+				return nil, fail("operations_agentos_operation_conflict", 409)
+			}
+			source, e := service.CommandVersionWithin(ctx, tx, str(command["versionId"]))
+			if e != nil {
+				return nil, e
+			}
+			if source == nil || !same(output["settings"], source["settings"]) || !same(output["native_settings"], source["native_settings"]) {
+				return nil, fail("operations_agentos_operation_conflict", 409)
+			}
+		}
+		return row, nil
+	})
+	if e != nil {
+		return nil, e
+	}
+	if row == nil {
+		return nil, nil
 	}
 	result, e := service.Operation(ctx, a, operationID)
 	if fault.Code(e) == "search_quality_operation_unavailable" && fault.Status(e) == 404 {
 		return nil, nil
 	}
-	return result, e
+	if e != nil {
+		return nil, e
+	}
+	if result["operationId"] != operationID || result["kind"] != method || result["versionId"] != row["version_id"] || !slices.Contains([]string{"prepared", "submitting", "task-pending", "result-unknown", "failed", "applied"}, str(result["phase"])) {
+		return nil, fail("operations_agentos_operation_conflict", 409)
+	}
+	return result, nil
 }
 func (s *Service) qualifyDiscoveryWithin(ctx context.Context, tx pgx.Tx, a Actor, request, command Object, grantID string) error {
 	if request["kind"] == "recommendation-direction" {

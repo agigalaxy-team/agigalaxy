@@ -71,7 +71,7 @@ func (s *Recommendations) CommandRecordWithin(ctx context.Context, tx pgx.Tx, id
 	return rowObject(ctx, tx, `SELECT to_jsonb(r) FROM (SELECT operator_id,kind,revision,theme_key,request_hash,result FROM operations_recommendation_events_v1 WHERE endpoint=$1 AND operation_id=$2)r`, s.Endpoint, id)
 }
 func (q *SearchQuality) CommandRecordWithin(ctx context.Context, tx pgx.Tx, id string) (Object, error) {
-	return rowObject(ctx, tx, `SELECT to_jsonb(r) FROM (SELECT operator_id,kind,version_id,input FROM operations_search_quality_operations_v1 WHERE endpoint=$1 AND operation_id=$2)r`, q.Endpoint, id)
+	return rowObject(ctx, tx, `SELECT to_jsonb(r) FROM (SELECT operator_id,kind,version_id,input,request_hash FROM operations_search_quality_operations_v1 WHERE endpoint=$1 AND operation_id=$2)r`, q.Endpoint, id)
 }
 
 // WithAuthority shares the original reconciliation coordinator while preserving
@@ -98,4 +98,13 @@ func (s *Recommendations) WithAuthorize(authority *operationspermissions.Busines
 		return nil
 	}
 	return &Recommendations{Pool: s.Pool, Endpoint: s.Endpoint, Authority: authority, Source: s.Source, OpenPanel: s.OpenPanel, Now: s.Now, preparedAuthorize: fresh}
+}
+
+// CommandVersionWithin is an internal, non-mutating original-command check.
+// Its caller already owns current authorization; raw configuration is not a public receipt.
+func (q *SearchQuality) CommandVersionWithin(ctx context.Context, tx pgx.Tx, id string) (Object, error) {
+	if !validID(id) {
+		return nil, settingsInvalid()
+	}
+	return q.version(ctx, tx, id)
 }
