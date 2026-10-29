@@ -21,6 +21,14 @@ type EffectsAdapter struct {
 	PriorPreparedEffect func(context.Context, string, string) (Object, error)
 }
 
+func (e *EffectsAdapter) ValidateRehearsalSampleWithin(ctx context.Context, tx pgx.Tx, id, owner string) error {
+	if e == nil || e.Executions == nil {
+		return fail("p13_effects_not_configured", 503)
+	}
+	_, _, err := e.Executions.CurrentPreparedWithin(ctx, tx, id, &owner)
+	return err
+}
+
 func (e *EffectsAdapter) Inspect(ctx context.Context, id, owner string, conditions []Object) (Object, error) {
 	if e == nil || e.PoolReader == nil {
 		return nil, fail("p13_effects_not_configured", 503)

@@ -332,9 +332,23 @@ class StrategyDraft(ClosedArguments):
 
 
 class StrategyRehearsal(ClosedArguments):
+    """Rehearse the selected strategy configuration version without running effects or a model.
+
+    executionIds are current authorized execution sample IDs owned by the current
+    person, never conversation, turn, native run, task, card or operation IDs.
+    An empty list supplies no external execution samples. The service still checks
+    enabled configured consumers and marks selected strategies requiring samples
+    uncovered when applicable. list_authorized_work is a current-domain directory,
+    not an exhaustive cross-domain sample directory; an empty directory alone does
+    not establish that the selected configuration needs no samples.
+    """
     kind: Literal["strategy-rehearsal"]
-    versionId: UUID
-    executionIds: Annotated[list[UUID], Field(max_length=200)]
+    versionId: UUID = Field(description="The actual selected strategy configuration version ID.")
+    executionIds: Annotated[list[UUID], Field(max_length=200, description=(
+        "Current authorized, current-person-owned execution sample IDs, not conversation, turn, "
+        "native run, task, card or operation IDs. Empty supplies no external samples; the service "
+        "still checks configured consumers and reports strategies requiring samples as uncovered."
+    ))]
 
 
 class StrategyPublish(ClosedArguments):

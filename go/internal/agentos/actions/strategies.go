@@ -135,8 +135,32 @@ func (s *Service) prepareStrategy(ctx context.Context, a Actor, x Object, p *pre
 			}
 			p.target["id"] = x["versionId"]
 			if kind == "strategy-rehearsal" {
+				ids := []string{}
+				switch samples := x["executionIds"].(type) {
+				case []string:
+					ids = append(ids, samples...)
+				default:
+					for _, v := range items(samples) {
+						ids = append(ids, str(v))
+					}
+				}
+				if e = source.ValidateRehearsalSamples(ctx, a, ids); e != nil {
+					return e
+				}
 				p.title = "预演已保存策略草稿"
 				p.impact = append(p.impact, "检查所选样本及当前消费者资格；不执行策略动作，也不调用模型。")
+				if len(ids) == 0 {
+					p.impact = append(p.impact, "未选择外部执行样本；实际覆盖情况由预演结果确定。")
+				} else {
+					raw, err := json.Marshal(ids)
+					if err != nil {
+						return err
+					}
+					parts := strategyReviewChunks(string(raw), 4000)
+					for i, part := range parts {
+						p.impact = append(p.impact, fmt.Sprintf("执行样本（%d/%d）：%s", i+1, len(parts), part))
+					}
+				}
 			} else {
 				if e = capability(obj(item["capabilities"])["canPublish"]); e != nil {
 					return e
