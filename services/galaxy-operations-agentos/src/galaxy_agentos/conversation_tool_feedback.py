@@ -8,6 +8,8 @@ from .conversation_tool_contracts import FeedbackMetadataFilters
 # Exact affected Node read schemas. These are argument diagnostics only;
 # Node still owns current permissions, defaults, page caps and period/basis.
 _QUERY_FILTER_CONTRACTS = {
+    ("messaging", "notices"): {"allowedFilters": ["after", "limit"]},
+    ("recommendations", "policy"): {"allowedFilters": []},
     ("recommendations", "overview"): {
         "allowedFilters": ["days", "query"], "allowedDays": [7, 30, 90],
         "defaultDays": 30,

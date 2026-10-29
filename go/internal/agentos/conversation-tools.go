@@ -8,6 +8,7 @@ import (
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsqueries"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -212,6 +213,9 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 		if view, _ := result["view"].(string); toolRoute.MatchString(view) {
 			metadata["view"] = view
 		}
+	}
+	if err != nil && (bound.tool == "query-operations" || bound.tool == "read-operation-object") {
+		metadata["module"], metadata["view"] = operationsqueries.ReceiptRoute(bound.tool, bound.args)
 	}
 	if bound.tool == "read-ai-delegation" && (len(bound.args) == 0 || len(bound.args) == 1 && validOperationID(text(bound.args, "aiAccountId"))) {
 		metadata["module"], metadata["view"] = "permissions", "ai-delegation"

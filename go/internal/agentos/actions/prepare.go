@@ -69,6 +69,10 @@ func (s *Service) PrepareWithReference(ctx context.Context, a Actor, domain stri
 	}
 	p := preparation{impact: []any{}, basis: []any{}, expires: s.now() + 30}
 	switch kind {
+	case "notice-draft-create", "notice-draft-save", "notice-state":
+		e = s.prepareNotice(ctx, actor, x, operationID, &p)
+	case "recommendation-policy-save", "recommendation-theme-update":
+		e = s.prepareRecommendationExtended(ctx, actor, x, &p)
 	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue":
 		e = s.prepareStrategy(ctx, actor, x, &p)
 	case "rule-publish", "rule-restore":

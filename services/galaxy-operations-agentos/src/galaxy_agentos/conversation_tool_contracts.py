@@ -18,19 +18,19 @@ Module = Literal["accounts", "content", "cases", "chat-reports", "feedback", "fi
     "resources", "analytics", "recommendations", "search", "messaging", "strategies",
     "rules", "maintenance", "audit", "runs", "jobs", "permissions", "registered-users", "system-settings"]
 View = Literal["list", "summary", "sections", "tags", "projects", "methods", "overview",
-    "business", "retention", "paths", "account", "history", "plans", "runs", "recipients",
+    "business", "retention", "paths", "account", "history", "plans", "runs", "recipients", "notices", "policy",
     "versions", "records", "backups", "logs", "roles", "personnel", "automation",
     "cleanup-candidates", "cleanup-plans", "general", "mail", "service-connections", "advanced"]
 ReadKind = Literal["account", "account-summary", "post", "reply", "section", "case",
     "chat-report", "feedback", "chat-file", "forum-file", "project", "method",
-    "message-plan", "message-run", "rule", "strategy-run", "strategy-version", "search-version", "ai-run", "backup-point",
+    "message-plan", "message-run", "notice", "recommendation-theme", "rule", "strategy-run", "strategy-version", "search-version", "ai-run", "backup-point",
     "restore-plan", "role", "file-cleanup-plan", "file-cleanup-operation", "registered-user"]
 VIEWS = {"accounts": {"list", "summary"}, "content": {"list", "sections", "tags"},
     "cases": {"list"}, "chat-reports": {"list"}, "feedback": {"list"},
     "files": {"list", "summary", "cleanup-candidates", "cleanup-plans"}, "resources": {"projects", "methods"},
     "analytics": {"overview", "business", "retention", "paths", "account"},
-    "recommendations": {"overview", "history"}, "search": {"overview", "history"},
-    "messaging": {"plans", "runs", "recipients", "history"},
+    "recommendations": {"overview", "history", "policy"}, "search": {"overview", "history"},
+    "messaging": {"notices", "plans", "runs", "recipients", "history"},
     "strategies": {"overview", "versions", "records"}, "rules": {"overview", "versions"},
     "maintenance": {"overview", "backups", "plans", "logs"}, "audit": {"list"},
     "runs": {"list"}, "jobs": {"list"}, "permissions": {"roles", "personnel", "automation"},
@@ -424,15 +424,44 @@ class RuleRestore(ClosedArguments):
     reason: RuleReason
 
 
-from .conversation_message_drafts import MessageDraftCreate, MessageDraftSave
+class RecommendationControls(ClosedArguments):
+    avoidRepetition: bool
+    avoidConcentration: bool
+
+
+class RecommendationPolicySave(ClosedArguments):
+    kind: Literal["recommendation-policy-save"]
+    expectedVersion: Annotated[int, Field(strict=True, ge=0, le=2147483646)]
+    enabled: bool
+    controls: RecommendationControls
+    reason: SearchReason
+
+
+class RecommendationMapping(ClosedArguments):
+    categories: Annotated[list[Topic], Field(max_length=6)]
+    tagIds: Annotated[list[UUID], Field(max_length=32)]
+    queryTerms: Annotated[list[Annotated[str, Field(min_length=1, max_length=80)]], Field(max_length=24)]
+
+
+class RecommendationThemeUpdate(ClosedArguments):
+    kind: Literal["recommendation-theme-update"]
+    themeId: UUID
+    expectedVersion: Annotated[int, Field(strict=True, ge=1, le=2147483646)]
+    label: Annotated[str, Field(min_length=1, max_length=80)]
+    enabled: bool
+    mapping: RecommendationMapping
+    reason: SearchReason
+
+
+from .conversation_message_drafts import MessageDraftCreate, MessageDraftSave, NoticeDraftCreate, NoticeDraftSave, NoticeState
 from .conversation_ai_management import AiWorkPromptSave, AiRoleCommand
 
 
-_BusinessOperation = Union[JobCancel, JobRetry, SearchRetry, ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave,
+_BusinessOperation = Union[JobCancel, JobRetry, SearchRetry, ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave, NoticeDraftCreate, NoticeDraftSave, NoticeState,
     SectionClassification, SectionVisibility, ResourceVisibility, FeedbackUpdate,
     FileScanRetry, FileCleanupApprove, AccountRestriction, FileAccess, CaseResolve, MessagingState, StrategyControl, StrategyContinue,
     OrdinaryStrategyDraft, OrdinaryStrategyPublish, StrategyDraft, StrategyRehearsal, StrategyPublish,
-    SearchDraftSave, SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection]
+    SearchDraftSave, SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection, RecommendationPolicySave, RecommendationThemeUpdate]
 DutyPreparedOperation = Annotated[_BusinessOperation, Field(discriminator="kind")]
 PreparedOperation = Annotated[Union[_BusinessOperation, AiWorkPromptSave, AiRoleCommand], Field(discriminator="kind")]
 

@@ -64,6 +64,7 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
                 "从任务页接续时，先用current_summary读取本轮boundedTask。该上下文只绑定原任务目标、版本和对象范围，不授予自主执行权；只在返回范围内读取当前对象并prepare_operation形成具体人工确认卡。没有本轮boundedTask时不能从上一轮历史沿用任务绑定。卡准备、模型结束不代表任务业务完成；以原卡实际回执为准。",
                 "摘要未取得、没有权限或没有记录时直接说明当前限制，不猜数字、原因或完成情况。",
                 "摘要availability只描述对应待办计数块。特别是counts.search只表示索引恢复待办，不代表搜索质量。queryAccess.allowedViews按当前人和AI岗位的真实交集列出允许查询的视图，dataRead:false不证明已读取或服务可用；未查询、查询失败和明确无权分别说明，不将局部缺口扩大到整个业务。",
+                "询问本轮读取或前次运行失败时，以currentReadOutcomes和turnOutcomes的原记录为准；运行阶段与读取授权分别说明，原因未记录时如实说尚未查明，不将旧授权拒绝归因为其他轮的模型错误。",
                 "追问上一轮做过哪些读取或查询为何失败时，先用current_summary核对priorReadReceipts；它只证明过去的工具调用状态，不是当前业务数值。已拒绝的真实回执是已发生事实，不能因历史未保留结果正文就撤回；模块或视图缺失时不能猜对应对象。旧回执缺失也不能断言从未调用，需要当前数值时重新查询。",
                 "用户要恢复刚才处理的内容时，先用current_summary的priorActionReceipts核对同一管理者和当前AI岗位已完成处理的最小对象引用。引用不含旧标题正文，不代表当前仍可处理，也不是新授权；只按明确的原处理对象使用read_operation_object核对当前来源及状态，再prepare_operation生成新的人工卡，仍等人点击。不能通过扩大审计权限、猜内部编号或编造列表筛选定位；多个引用不能唯一对应时不要猜对象。不要把内部引用编号作为用户要填写的步骤。",
                 "需要数据时使用query_operations跨模块查询，read_operation_object读取选中对象；分页、统计和关联依据程序真实结果，不以本页冒充全量。",

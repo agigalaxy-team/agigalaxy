@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"slices"
 	"time"
+
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsquerycontract"
 )
 
 var receiptCode = regexp.MustCompile(`^(?:operations|business_admin|invalid_operations|p13|search_quality|feedback|messaging|content|file|forum)_[a-z0-9_]{1,100}$`)
@@ -32,4 +34,23 @@ func PriorReadReceipt(tool, state string, metadata Object, observed time.Time) O
 		at = observed.UTC().Format("2006-01-02T15:04:05.000Z")
 	}
 	return Object{"tool": tool, "module": module, "view": view, "state": state, "resultState": result, "code": code, "observedAt": at}
+}
+
+// ReceiptRoute extracts only schema-defined locators, including when a read
+// failed. Invalid route or object identifiers are not inferred.
+func ReceiptRoute(tool string, arguments Object) (any, any) {
+	scope := operationsquerycontract.QueryCoverageScope(tool, arguments)
+	if scope["invalidRoute"] == true {
+		return nil, nil
+	}
+	if tool == "query-operations" {
+		return scope["module"], scope["view"]
+	}
+	if tool == "read-operation-object" {
+		kind := str(scope["kind"])
+		if module := kinds[kind]; module != "" {
+			return module, kind
+		}
+	}
+	return nil, nil
 }

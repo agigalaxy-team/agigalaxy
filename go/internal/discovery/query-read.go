@@ -26,6 +26,10 @@ func (r *Runtime) QueryRead(ctx context.Context, a Actor, authority p.Authority,
 func (s *Recommendations) QueryRead(ctx context.Context, a Actor, authority p.Authority, view, id string, input Object) (Object, error) {
 	reader := &Recommendations{Pool: s.Pool, Endpoint: s.Endpoint, Authority: queryAuthority(s.Authority, authority), Source: s.Source, OpenPanel: s.OpenPanel, Now: s.Now}
 	switch view {
+	case "recommendation-theme":
+		return reader.ReadTheme(ctx, a, id)
+	case "policy":
+		return reader.ReadPolicy(ctx, a)
 	case "overview":
 		return reader.Overview(ctx, a, input)
 	case "history":

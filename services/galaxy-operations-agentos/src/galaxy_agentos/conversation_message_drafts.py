@@ -113,3 +113,29 @@ class MessageDraftSave(Closed):
     kind: Literal["message-draft-save"]
     targetId: UUID
     config: MessageDraftConfig
+
+
+class NoticeContent(DraftContent):
+    # Notice content intentionally retains whitespace, unlike plan drafts.
+    title: Annotated[str, Field(min_length=1, max_length=160)]
+    body: Annotated[str, Field(min_length=1, max_length=8000)]
+    audience: Annotated[Union[AllAccounts, SelectedAccounts], Field(discriminator="kind")]
+
+
+class NoticeDraftCreate(Closed):
+    kind: Literal["notice-draft-create"]
+    content: NoticeContent
+
+
+class NoticeDraftSave(Closed):
+    kind: Literal["notice-draft-save"]
+    targetId: UUID
+    expectedVersion: Annotated[int, Field(strict=True, ge=1, le=2147483646)]
+    content: NoticeContent
+
+
+class NoticeState(Closed):
+    kind: Literal["notice-state"]
+    targetId: UUID
+    expectedVersion: Annotated[int, Field(strict=True, ge=1, le=2147483646)]
+    action: Literal["publish", "withdraw"]

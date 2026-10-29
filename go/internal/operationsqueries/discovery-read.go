@@ -94,7 +94,7 @@ func (s *Service) discoveryRead(ctx context.Context, a Actor, args arguments) (q
 		return queryResult{}, fail("operations_query_not_configured", 503)
 	}
 	view := args.view
-	if args.kind == "search-version" {
+	if args.kind == "search-version" || args.kind == "recommendation-theme" {
 		view = args.kind
 	}
 	value, e := reader.QueryRead(ctx, a, s.reader(a), view, args.id, args.filters)
@@ -104,6 +104,16 @@ func (s *Service) discoveryRead(ctx context.Context, a Actor, args arguments) (q
 	value, e = queryWireSource(value)
 	if e != nil {
 		return queryResult{}, e
+	}
+	if args.kind == "recommendation-theme" {
+		theme := object(value["theme"])
+		if theme == nil {
+			return queryResult{}, fail("operations_query_response_invalid", 503)
+		}
+		return queryResult{source: value, data: Object{"theme": theme, "contentTrust": "configuration-data", "instructionAuthority": "none"}}, nil
+	}
+	if args.view == "policy" && args.module == "recommendations" {
+		return queryResult{source: value, data: Object{"policy": value["policy"]}}, nil
 	}
 	if args.kind == "search-version" {
 		version := object(value["version"])

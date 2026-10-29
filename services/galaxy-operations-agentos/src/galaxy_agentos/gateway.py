@@ -13,6 +13,37 @@ _LOGGER = logging.getLogger("galaxy_agentos.gateway")
 _DIAGNOSTIC_CODE = re.compile(r"^(?:agentos|operations|business_admin|invalid_operations|p13|search_quality|feedback|messaging|content|file|forum)_[a-z0-9_]{1,100}$")
 
 
+def is_internal_diagnostic(value):
+    return isinstance(value, str) and _DIAGNOSTIC_CODE.fullmatch(value) is not None
+
+
+def closed_failure_fact(*, state=None, status=None, code=None):
+    """Map observed failures to closed facts, never infer a missing cause."""
+    code = code if isinstance(code, str) else None
+    state = state if isinstance(state, str) else None
+    status = status if type(status) is int else None
+    if status in {408, 504} or code in {"agentos_authority_timeout", "operations_agentos_tool_request_timeout"}:
+        return {"state": "unavailable", "failureCategory": "timeout", "causeKnown": False, "message": "本次读取超时，具体原因尚未查明。"}
+    if status == 429 or isinstance(status, int) and status >= 500:
+        return {"state": "unavailable", "failureCategory": "source-unavailable", "causeKnown": False, "message": "本次读取暂不可用，具体原因尚未查明。"}
+    if status in {400, 422}:
+        return {"state": "invalid-request", "failureCategory": "invalid-request", "causeKnown": True, "message": "本次请求参数不符。"}
+    if status in {404, 410} or status is None and code == "agentos_object_unavailable":
+        return {"state": "unavailable", "failureCategory": "object-unavailable", "causeKnown": False, "message": "本次对象暂不可读取。"}
+    if status == 409 or status is None and code in {"agentos_tool_state_changed", "agentos_public_reference_version_changed"}:
+        return {"state": "changed", "failureCategory": "source-changed", "causeKnown": False, "message": "该项状态已变化。"}
+    if status is None and code in {"agentos_tool_arguments_invalid", "agentos_tool_call_id_invalid", "agentos_native_tool_call_id_invalid", "agentos_native_tool_call_required", "agentos_conversation_context_required", "agentos_injected_arguments_forbidden"}:
+        return {"state": "invalid-request", "failureCategory": "invalid-request", "causeKnown": True, "message": "工具调用参数不符。"}
+    if status in {401, 403} or code in {"business_admin_denied", "operations_permission_denied", "operations_ai_work_permission_denied", "operations_agentos_authority_changed"} or state == "denied":
+        return {"state": "denied", "failureCategory": "authorization-check-rejected", "causeKnown": False,
+            "message": "本次认证或授权校验未通过，具体原因尚未查明。"}
+    if state == "invalid-request":
+        return {"state": "invalid-request", "failureCategory": "invalid-request", "causeKnown": True, "message": "本次请求参数不符。"}
+    if state == "changed":
+        return {"state": "changed", "failureCategory": "source-changed", "causeKnown": False, "message": "该项状态已变化。"}
+    return {"state": "unavailable", "failureCategory": "source-unavailable", "causeKnown": False, "message": "本次读取暂不可用，具体原因尚未查明。"}
+
+
 class AuthorityDenied(PermissionError):
     pass
 

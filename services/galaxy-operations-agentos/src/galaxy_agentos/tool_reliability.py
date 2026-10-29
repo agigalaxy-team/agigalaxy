@@ -13,7 +13,7 @@ from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from pydantic import ValidationError
 
-from .gateway import AuthorityDenied, AuthorityUnavailable, failure_diagnostic
+from .gateway import AuthorityDenied, AuthorityUnavailable, failure_diagnostic, is_internal_diagnostic, closed_failure_fact
 from .conversation_tool_feedback import _preparation_feedback
 from .tool_schema_feedback import operation_schema_feedback, repair_operation_alias
 
@@ -26,70 +26,54 @@ READ_TOOLS = frozenset({"current_summary", "query_operations", "read_operation_o
 
 
 def _closed_failure(name, error):
-    """Describe the actual failure category without handing the model raw codes."""
     diagnostic = failure_diagnostic(error)
-    code, status = diagnostic.get("code"), diagnostic.get("status")
-    state, message = "denied", "本次读取未获允许，旧记录不代表本次结果。"
-    if isinstance(error, AuthorityUnavailable):
-        state, message = "unavailable", "本次读取暂时失败，旧记录不代表本次结果。"
-        if code in {"operations_agentos_conversation_not_ready", "operations_agentos_action_not_connected"}:
-            message = "本次读取暂未就绪，旧记录不代表本次结果。"
-        elif code == "agentos_authority_timeout":
-            message = "本次读取超时，旧记录不代表本次结果。"
-    elif status in {400, 422} or code in {"agentos_tool_arguments_invalid", "agentos_tool_call_id_invalid",
-            "agentos_native_tool_call_id_invalid", "agentos_native_tool_call_required",
-            "agentos_conversation_context_required", "agentos_injected_arguments_forbidden"}:
-        state, message = "invalid-request", "工具调用参数不符。"
-    elif status in {404, 410}:
-        state, message = "unavailable", "本次对象不可读取，旧记录不代表本次结果。"
-    elif status == 409 or code == "agentos_conversation_context_changed":
-        state, message = "changed", "该项状态已变化。"
-    elif status == 401:
-        message = "本次会话认证未通过，旧记录不代表本次结果。"
+    fact = closed_failure_fact(status=diagnostic.get("status"), code=diagnostic.get("code"),
+        state="denied" if isinstance(error, AuthorityDenied) else "unavailable")
     uncertain = name in EFFECT_TOOLS
-    result = {"state": state, "message": message, "dataRead": False, "valuesCurrent": False, "effectExecuted": None if uncertain else False,
-        "cardPrepared": False, "retryable": False}
-    if uncertain:
-        result["nextStep"] = "read-original-operation"
-    return result
+    return {**fact, "dataRead": False, "valuesCurrent": False,
+        "effectExecuted": None if uncertain else False, "cardPrepared": False, "retryable": False,
+        **({"nextStep": "read-original-operation"} if uncertain else {})}
 
 
 def _model_feedback(value):
-    """Keep detailed schema feedback, but leave internal failure codes in logs."""
+    """Project only known failure fields; never traverse arbitrary user data."""
     if not isinstance(value, dict):
         return value, {}
-    result = dict(value)
-    diagnostic = {}
-    internal_code = r"(?:agentos|operations_agentos|business_admin)_[a-z0-9_]{1,100}"
-    if result.get("state") in {"denied", "unavailable", "invalid-request", "changed"}:
+    result, diagnostic = dict(value), {}
+    state = result.get("state")
+    state = state if isinstance(state, str) else None
+    availability = result.get("availability")
+    if state is None and isinstance(availability, str) and availability in {"unavailable", "not-configured", "not-connected", "invalid-request", "denied", "changed"}:
+        state = "unavailable" if availability in {"not-configured", "not-connected"} else availability
+    if state in {"denied", "unavailable", "invalid-request", "changed"}:
+        code = result.get("code") or result.get("reason")
         for key in ("reason", "code"):
-            raw = result.get(key)
-            if isinstance(raw, str) and re.fullmatch(internal_code, raw):
-                diagnostic["code"] = raw
-                del result[key]
-        if diagnostic:
-            result.setdefault("message", {"denied": "该项读取未获允许。", "unavailable": "该项当前不可读取。",
-                "invalid-request": "工具调用参数不符。", "changed": "该项状态已变化。"}[result["state"]])
-            result["dataRead"], result["valuesCurrent"] = False, False
-            if result["state"] in {"denied", "unavailable"}:
-                result["message"] = "本次读取未成功，旧记录不代表本次结果。"
-    # These are historical read outcomes, not a new denial in this turn. Keep
-    # the recorded state and route; an old internal code must not become the
-    # explanation for an ordinary current reply.
-    prior = result.get("priorReadReceipts")
-    if isinstance(prior, dict) and isinstance(prior.get("items"), list):
+            if is_internal_diagnostic(result.get(key)):
+                diagnostic["code"] = result.pop(key)
+        if isinstance(result.get("reason"), str) and result["reason"] in {"summary-not-connected", "summary-unavailable"}:
+            result.pop("reason", None)
+        result.update(closed_failure_fact(state=state, code=code))
+        result["dataRead"], result["valuesCurrent"] = False, False
+    for key in ("priorReadReceipts", "currentReadOutcomes"):
+        section = result.get(key)
+        if not isinstance(section, dict) or not isinstance(section.get("items"), list):
+            continue
         items, codes = [], set()
-        for item in prior["items"]:
-            entry = dict(item) if isinstance(item, dict) else item
-            code = entry.get("code") if isinstance(entry, dict) else None
-            if isinstance(code, str) and re.fullmatch(internal_code, code):
-                codes.add(code)
-                del entry["code"]
-                entry["message"] = "该次读取未成功。"
-            items.append(entry)
-        if codes:
-            diagnostic["priorReadCodes"] = sorted(codes)[:8]
-            result["priorReadReceipts"] = {**prior, "items": items}
+        for value in section["items"]:
+            item = dict(value) if isinstance(value, dict) else value
+            if isinstance(item, dict):
+                code = item.pop("code", None)
+                if is_internal_diagnostic(code): codes.add(code)
+                state = item.get("resultState") or item.get("state")
+                state = state if isinstance(state, str) else None
+                if state in {"denied", "unavailable", "invalid-request", "changed"} or is_internal_diagnostic(code):
+                    fact = closed_failure_fact(state=state, code=code)
+                    item["state"] = fact["state"]
+                    item["resultState"] = fact["state"]
+                    item["outcome"] = {k: fact[k] for k in ("state", "failureCategory", "causeKnown", "message")}
+            items.append(item)
+        if codes: diagnostic[key + "Codes"] = sorted(codes)[:8]
+        result[key] = {**section, "items": items}
     return result, diagnostic
 
 
@@ -249,7 +233,7 @@ def reliable_function(fn, *, on_read_validation_failure=None):
                             return PREPARED_CARD_MESSAGE
                     feedback, diagnostic = _model_feedback(value)
                     _event(native.name, run_context, state if isinstance(state, str) and state in {"available", "prepared", "completed", "invalid-request", "changed", "unknown", "unavailable", "processing", "denied"} else "returned", diagnostic=diagnostic)
-                    if diagnostic:
+                    if diagnostic or feedback != value:
                         return json.dumps(feedback, ensure_ascii=False)
                     return result
                 except AuthorityUnavailable as error:

@@ -90,6 +90,9 @@ func (s *Service) execute(ctx context.Context, a Actor, args arguments) (queryRe
 	// A read-only facade shares the running service's actual source/clock/mail
 	// instance and uses the owning query authority; no mutable sender is copied.
 	source := &messaging.Service{Pool: s.Messaging.Pool, Endpoint: s.Messaging.Endpoint, Authority: s.reader(a), Now: s.Messaging.Now, Mail: s.Messaging.Mail}
+	if args.kind == "notice" || args.view == "notices" {
+		return s.noticeRead(ctx, source, a, args)
+	}
 	if args.kind != "" {
 		return s.readMessage(ctx, source, a, args)
 	}

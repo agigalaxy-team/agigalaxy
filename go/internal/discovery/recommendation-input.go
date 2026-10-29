@@ -116,3 +116,8 @@ type ThemeExpectation struct {
 	ExpectedVersion int64
 	Enabled         bool
 }
+
+// ParseRecommendationCommand exposes the owning closed command contract.
+func ParseRecommendationCommand(kind string, input Object) (Object, error) {
+	return parseRecommendationCommand(kind, input)
+}

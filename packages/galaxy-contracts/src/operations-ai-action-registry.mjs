@@ -39,6 +39,11 @@ const definitions=[
  ['rule-publish','overview','发布已保存规则草稿','rules.read',['rules.write'],'rules',['publish'],[],true],
  ['rule-restore','overview','恢复已发布规则版本','rules.read',['rules.write'],'rules',['restore'],[],true],
  ['recommendation-direction','discovery','调整主题推荐方向','recommendations.read',['recommendations.configure'],'recommendations',['savePolicy'],['ordinary','soft-direction-only','prior-automatic-decision']],
+ ['notice-draft-create','messaging','生成独立站内通知草稿','notices.read',['notices.create'],'messaging',['noticeCreate'],['draft-only']],
+ ['notice-draft-save','messaging','保存独立站内通知草稿','notices.read',['notices.update'],'messaging',['noticeSave'],['draft-only']],
+ ['notice-state','messaging','发布或撤回独立站内通知','notices.read',['notices.publish','notices.withdraw'],'messaging',['noticeGet','noticeAction'],['human-confirmation'],true],
+ ['recommendation-policy-save','discovery','调整推荐策略开关与控制','recommendations.read',['recommendations.configure'],'recommendations',['savePolicy'],['human-confirmation'],true],
+ ['recommendation-theme-update','discovery','调整已有推荐主题映射','recommendations.read',['recommendations.configure'],'recommendations',['saveTheme'],['human-confirmation'],true],
 ];
 export const aiWorkPreparationRegistry=Object.freeze(definitions.map(([kind,domain,label,read,actions,service,methods,conditions,humanOnly=false])=>Object.freeze({kind,domain,label,read,actions:Object.freeze(actions),handler:Object.freeze({service,methods:Object.freeze(methods)}),humanOnly,conditions:Object.freeze(conditions)})));
 const extra=[
@@ -49,7 +54,7 @@ const extra=[
  ['ai.roles.revoke','ai.roles.read','ai-role-delegation','permissions',['delegatedAssignment'],['delegated-ai-only']],
 ];
 const byPermission=new Map();
-const implementedAdapters=new Set(['job-cancel','job-retry','search-retry','content-visibility','content-curation','public-content-batch','private-case-message','section-classification','section-visibility','resource-visibility','account-restriction','case-resolve','feedback-update','file-scan-retry','file-access','recommendation-direction','search-draft-save','search-apply','search-restore','ordinary-strategy-draft','ordinary-strategy-publish','message-draft-create','message-draft-save','messaging-state','ai-role-delegation','ai-prompt-delegation','strategy-draft','strategy-rehearsal','strategy-publish','strategy-control','strategy-continue','rule-publish','rule-restore','file-cleanup-approve']);
+const implementedAdapters=new Set(['notice-draft-create','notice-draft-save','notice-state','recommendation-policy-save','recommendation-theme-update','job-cancel','job-retry','search-retry','content-visibility','content-curation','public-content-batch','private-case-message','section-classification','section-visibility','resource-visibility','account-restriction','case-resolve','feedback-update','file-scan-retry','file-access','recommendation-direction','search-draft-save','search-apply','search-restore','ordinary-strategy-draft','ordinary-strategy-publish','message-draft-create','message-draft-save','messaging-state','ai-role-delegation','ai-prompt-delegation','strategy-draft','strategy-rehearsal','strategy-publish','strategy-control','strategy-continue','rule-publish','rule-restore','file-cleanup-approve']);
 for(const entry of aiWorkPreparationRegistry)for(const permission of entry.actions)if(!byPermission.has(permission))byPermission.set(permission,{kind:entry.kind,read:entry.read,handler:entry.handler,conditions:entry.conditions,humanOnly:entry.humanOnly});
 for(const [permission,read,kind,service,methods,conditions] of extra)byPermission.set(permission,{kind,read,handler:{service,methods},conditions,humanOnly:false});
 byPermission.set('chat-reports.materials.read',{kind:'private-case-materials',read:'chat-reports.materials.read',handler:{service:'chatReports',methods:['operatorGet','assertDutyCaseWithin']},conditions:['triggered-case','purpose-bound-materials'],humanOnly:false,purposeBoundRead:true});

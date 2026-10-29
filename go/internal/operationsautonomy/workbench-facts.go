@@ -124,6 +124,7 @@ func WorkbenchCardFact(card Object) Object {
 		if result["state"] == "cancelled" {
 			return Object{"status": "stopped"}
 		}
+		return Object{"status": "waiting-human"}
 	}
 	if str(operationID) == "" || result["operationId"] != operationID {
 		return nil

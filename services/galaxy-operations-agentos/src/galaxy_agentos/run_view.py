@@ -3,6 +3,7 @@ import math
 
 from .model_failover import failover_view
 from .conversation_failures import failure_view
+from .tool_reliability import PREPARED_CARD_IDS
 
 
 def _completed_conversation_content(run, status, fallback):
@@ -10,6 +11,9 @@ def _completed_conversation_content(run, status, fallback):
             "galaxy-conversation-overview", "galaxy-conversation-governance",
             "galaxy-conversation-messaging", "galaxy-conversation-discovery",
             "galaxy-conversation-maintenance"}:
+        return fallback
+    metadata = getattr(run, "metadata", None) or {}
+    if isinstance(metadata.get(PREPARED_CARD_IDS), list) and metadata[PREPARED_CARD_IDS]:
         return fallback
     messages = getattr(run, "messages", None)
     if not isinstance(messages, (list, tuple)):

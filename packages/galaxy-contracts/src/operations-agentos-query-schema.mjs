@@ -34,9 +34,9 @@ add('resources','projects',operationsResourcesQuerySchema);add('resources','meth
 for(const kind of ['overview','business'])add('analytics',kind,analyticsFilters.omit({scope:true,accountId:true}));
 for(const kind of ['retention','paths'])add('analytics',kind,analyticsFilters.refine(q=>!q.accountId||q.scope==='accounts'));
 add('analytics','account',analyticsFilters.omit({scope:true}).extend({accountId:uuid}));
-add('recommendations','overview',recommendationOverviewSchema);add('recommendations','history',recommendationHistorySchema);
+add('recommendations','overview',recommendationOverviewSchema);add('recommendations','policy');add('recommendations','history',recommendationHistorySchema);
 add('search','overview',searchQualityOverviewSchema);add('search','history',searchQualityHistorySchema);
-add('messaging','plans',messagingPlansQuerySchema);add('messaging','runs',messagingRunsQuerySchema);
+add('messaging','notices',messagingPageSchema);add('messaging','plans',messagingPlansQuerySchema);add('messaging','runs',messagingRunsQuerySchema);
 add('messaging','recipients',messagingRecipientsQuerySchema.extend({runId:uuid}));add('messaging','history',messagingPageSchema.extend({planId:uuid}));
 add('strategies','overview');add('strategies','versions',p13PageSchema);add('strategies','records',p13PageSchema);
 add('rules','overview');add('rules','versions',p14PageSchema.extend({key:p14KeySchema}));
@@ -46,7 +46,7 @@ for(const view of ['roles','personnel','automation'])add('permissions',view);
 // Choose the declared route before parsing its cursor. Other modules may use
 // numeric sequences and must never evaluate a file's opaque cursor as BigInt.
 export const agentOsQueryArgumentsSchema=z.discriminatedUnion('module',Object.values(options).map(views=>views.length===1?views[0]:z.discriminatedUnion('view',views)));
-export const agentOsReadKinds=['account','account-summary','registered-user','post','reply','section','case','chat-report','feedback','chat-file','forum-file','file-cleanup-plan','file-cleanup-operation','project','method','message-plan','message-run','rule','strategy-run','strategy-version','search-version','ai-run','backup-point','restore-plan','role'];
+export const agentOsReadKinds=['account','account-summary','registered-user','post','reply','section','case','chat-report','feedback','chat-file','forum-file','file-cleanup-plan','file-cleanup-operation','project','method','message-plan','message-run','notice','recommendation-theme','rule','strategy-run','strategy-version','search-version','ai-run','backup-point','restore-plan','role'];
 export const agentOsReadArgumentsSchema=z.discriminatedUnion('kind',agentOsReadKinds.map(kind=>z.strictObject({kind:z.literal(kind),id:kind==='rule'?p14KeySchema:kind==='backup-point'?z.string().regex(/^[a-f0-9]{64}$/):kind==='ai-run'?opaque:uuid,filters:(kind==='account-summary'?businessSummaryQuerySchema:empty).default({})})));
 export const agentOsQueryToolSchema=z.enum(['query-operations','read-operation-object']);
 export const agentOsQueryContract={tools:['query-operations','read-operation-object'],modules:agentOsQueryViews,readKinds:agentOsReadKinds};

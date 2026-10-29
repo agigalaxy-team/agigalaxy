@@ -59,6 +59,14 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 	if e != nil {
 		return nil, e
 	}
+	currentReads, e := t.currentSummaryReads(ctx, a, row, command)
+	if e != nil {
+		return nil, e
+	}
+	turns, e := t.summaryTurnOutcomes(ctx, row, command)
+	if e != nil {
+		return nil, e
+	}
 	var task Object
 	if id := text(command.Result, "taskId"); id != "" {
 		if !validOperationID(id) {
@@ -101,7 +109,7 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 	if e = t.RecheckContext(ctx, a, domain, bound); e != nil {
 		return nil, e
 	}
-	return Object{"priorReadReceipts": prior, "boundedTask": task, "priorActionReceipts": actions, "priorOperationReceipts": operations}, nil
+	return Object{"priorReadReceipts": prior, "currentReadOutcomes": currentReads, "turnOutcomes": turns, "boundedTask": task, "priorActionReceipts": actions, "priorOperationReceipts": operations}, nil
 }
 
 func (t *ConversationTools) priorSummaryReads(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand) (Object, error) {
@@ -131,6 +139,35 @@ func (t *ConversationTools) priorSummaryReads(ctx context.Context, a operationsp
 	}
 	slices.Reverse(items)
 	return Object{"basis": "current-conversation-prior-read-ledger", "valuesCurrent": false, "items": items}, nil
+}
+
+// Current-turn tool receipts are independent of historical turn receipts.
+func (t *ConversationTools) currentSummaryReads(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand) (Object, error) {
+	rows, e := t.Conversations.Pool.Query(ctx, `SELECT tool,state,metadata,created_at,updated_at FROM operations_agentos_conversation_tool_calls_v1 WHERE endpoint=$1 AND conversation_id=$2 AND turn_id=$3 AND tool IN ('workbench-summary','query-operations','read-operation-object','read-ai-delegation') AND NOT (tool='workbench-summary' AND state='started') ORDER BY created_at,id LIMIT 80`, t.Conversations.Endpoint, row.ID, command.ID)
+	if e != nil {
+		return nil, e
+	}
+	defer rows.Close()
+	items := []any{}
+	for rows.Next() {
+		var tool, state string
+		var metadata Object
+		var created time.Time
+		var updated *time.Time
+		if e = rows.Scan(&tool, &state, &metadata, &created, &updated); e != nil {
+			return nil, e
+		}
+		if updated != nil {
+			created = *updated
+		}
+		if item := operationsqueries.PriorReadReceipt(tool, state, metadata, created); item != nil {
+			items = append(items, item)
+		}
+	}
+	if e = rows.Err(); e != nil {
+		return nil, e
+	}
+	return Object{"basis": "same-owner-current-turn-tool-ledger", "valuesCurrent": false, "items": items}, nil
 }
 
 func (t *ConversationTools) summaryCards(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand, actions bool) ([]*conversationCard, error) {

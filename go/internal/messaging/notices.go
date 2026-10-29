@@ -340,3 +340,6 @@ func (s *Service) NoticeAccountMarkRead(ctx context.Context, accountID string, a
 		return Object{"noticeId": input["noticeId"], "read": true, "checkedAt": s.now().Unix()}, nil
 	})
 }
+
+// ParseNoticeContent preserves the independent notice surface validation.
+func ParseNoticeContent(value any) (Object, error) { return noticeContent(value) }

@@ -76,6 +76,9 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
+	if _, e = pool.Exec(ctx, `INSERT INTO operations_agentos_conversation_tool_calls_v1(id,endpoint,conversation_id,turn_id,native_run_id,call_id,tool,arguments_digest,state,metadata,created_at,updated_at) VALUES($1,$2,$3,$4,'native-current','current-failed','query-operations',$5,'unavailable',$6,$7,$7),($8,$2,$3,$4,'native-current','summary-active','workbench-summary',$5,'started','{}',$7,$7)`, uuid.NewString(), endpoint, current.Row.ID, turn, strings.Repeat("e", 64), Object{"module": "feedback", "view": "list", "code": "business_admin_denied"}, now(), uuid.NewString()); e != nil {
+		t.Fatal(e)
+	}
 	tools := &ConversationTools{Conversations: c}
 	q := &operationsqueries.Service{Pool: pool, Permissions: p, Now: now}
 	q.SummaryContext = func(ctx context.Context, a operationspermissions.Actor, d string, b Object) (Object, error) {
@@ -90,6 +93,14 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 	if result["reason"] != "summary-not-connected" {
 		t.Fatalf("missing source was fabricated %v", result)
 	}
+	currentItems := object(result["currentReadOutcomes"])["items"].([]any)
+	if len(currentItems) != 1 || object(currentItems[0])["view"] != "list" || object(currentItems[0])["code"] != "business_admin_denied" {
+		t.Fatalf("current turn receipt %#v", currentItems)
+	}
+	turnItems := object(result["turnOutcomes"])["items"].([]Object)
+	if len(turnItems) != 2 || turnItems[0]["failure"] != nil {
+		t.Fatalf("original turn unknown cause %#v", turnItems)
+	}
 	receipts := object(result["priorReadReceipts"])["items"].([]any)
 	if len(receipts) != 2 || object(receipts[0])["view"] != "plans" || object(receipts[1])["module"] != nil || object(receipts[1])["code"] != nil {
 		t.Fatalf("closed receipt mismatch %v", receipts)
@@ -98,6 +109,37 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 	if strings.Contains(string(raw), "synthetic private prose") {
 		t.Fatal("private ledger prose leaked")
 	}
+	if _, e = pool.Exec(ctx, `UPDATE operations_agentos_conversation_commands_v1 SET native_run_id='original-native' WHERE endpoint=$1 AND id=$2`, endpoint, prior); e != nil {
+		t.Fatal(e)
+	}
+	native := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(Object{"runs": []any{Object{"runId": "original-native", "operationId": prior, "status": "ERROR", "content": "PRIVATE_NATIVE_PROSE", "failure": Object{"stage": "model-request", "category": "service-unavailable", "reportedStatus": 502}}}})
+	}))
+	defer native.Close()
+	c.Client, e = New(Configuration{URL: native.URL, SigningKey: strings.Repeat("s", 32)}, Options{Now: now})
+	if e != nil {
+		t.Fatal(e)
+	}
+	observed, e := q.Summary(ctx, human, "overview", bound)
+	if e != nil {
+		t.Fatal(e)
+	}
+	outcomes := object(observed["turnOutcomes"])["items"].([]Object)
+	var failure Object
+	for _, item := range outcomes {
+		if item["operationId"] == prior {
+			failure = object(item["failure"])
+		}
+	}
+	if failure["stage"] != "model-request" || failure["category"] != "service-unavailable" || failure["reportedStatus"] != int64(502) {
+		t.Fatalf("original failure %#v", outcomes)
+	}
+	encoded, _ := json.Marshal(observed)
+	if strings.Contains(string(encoded), "PRIVATE_NATIVE_PROSE") {
+		t.Fatal("native private content leaked")
+	}
+
 	if _, e = q.Summary(ctx, operationspermissions.Actor{ID: human.ID, Role: human.Role}, "overview", bound); fault.Status(e) != 403 {
 		t.Fatalf("forged actor accepted %v", e)
 	}

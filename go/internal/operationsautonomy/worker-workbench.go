@@ -8,6 +8,27 @@ import (
 
 func (w *Worker) ReconcileWorkbench(ctx context.Context) error {
 	s := w.Service
+	// Reconcile persisted card facts even when a worker has no native run reader.
+	// The run and operation IDs remain the original ones; no operation is sent.
+	pending, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) ([]Object, error) {
+		return many(ctx, tx, `SELECT to_jsonb(q) FROM (SELECT t.id,r.turn_operation_id FROM operations_autonomy_tasks_v1 t JOIN operations_autonomy_workbench_runs_v1 r ON r.endpoint=t.endpoint AND r.task_id=t.id CROSS JOIN LATERAL public.galaxy_autonomy_workbench_card_states_v1(t.endpoint,t.id) c WHERE t.endpoint=$1 AND t.state='waiting-human' AND r.model_state='completed' AND r.turn_operation_id::text=COALESCE(NULLIF(t.configuration#>>'{externalWorkbench,turnOperationId}',''),t.id::text) AND (c.processing OR c.unknown OR c.binding_invalid OR EXISTS(SELECT 1 FROM operations_autonomy_receipts_v1 u WHERE u.endpoint=t.endpoint AND u.task_id=t.id AND u.state='unknown') OR (NOT c.prepared AND (c.unavailable OR c.cancelled) AND NOT EXISTS(SELECT 1 FROM operations_autonomy_tool_calls_v1 x WHERE x.endpoint=t.endpoint AND x.task_id=t.id AND x.state='waiting-human' AND NOT EXISTS(SELECT 1 FROM operations_autonomy_decisions_v1 d WHERE d.endpoint=x.endpoint AND d.task_id=x.task_id AND d.call_id=x.call_id AND d.operation_id=x.operation_id) AND NOT EXISTS(SELECT 1 FROM operations_autonomy_receipts_v1 z WHERE z.endpoint=x.endpoint AND z.task_id=x.task_id AND z.operation_id=x.operation_id AND z.state IN ('completed','failed','no-action') AND z.basis IN ('persisted-domain-operation-receipt','original-operation-query','persisted-ai-role-delegation-event'))))) ORDER BY t.updated_at LIMIT 10) q`, s.Endpoint)
+	})
+	if e != nil {
+		return e
+	}
+	for _, row := range pending {
+		_, e = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
+			current, err := optional(ctx, tx, `SELECT to_jsonb(t) FROM operations_autonomy_tasks_v1 t JOIN operations_autonomy_workbench_runs_v1 r ON r.endpoint=t.endpoint AND r.task_id=t.id WHERE t.endpoint=$1 AND t.id=$2 AND t.state='waiting-human' AND r.turn_operation_id=$3 AND r.turn_operation_id::text=COALESCE(NULLIF(t.configuration#>>'{externalWorkbench,turnOperationId}',''),t.id::text) AND r.model_state='completed' FOR UPDATE OF t`, s.Endpoint, row["id"], row["turn_operation_id"])
+			if err != nil || current == nil {
+				return current, err
+			}
+			status, model := "completed", "completed"
+			return s.UpdateWorkbenchWithin(ctx, tx, WorkbenchUpdate{OperationID: str(row["id"]), TurnOperationID: ptr(row["turn_operation_id"]), Status: &status, ModelState: &model})
+		})
+		if e != nil {
+			s.log(Object{"event": "autonomy_workbench_card_reconcile_deferred", "taskId": row["id"], "code": errorCode(e)})
+		}
+	}
 	if s.WorkbenchRunDetail == nil {
 		return nil
 	}

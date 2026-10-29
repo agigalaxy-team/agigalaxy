@@ -159,6 +159,12 @@ var cardReadOnce sync.Once
 var cardReads map[string]string
 
 func CardReadPermission(kind string) (string, error) {
+	if kind == "notice-draft-create" || kind == "notice-draft-save" || kind == "notice-state" {
+		return "notices.read", nil
+	}
+	if kind == "recommendation-policy-save" || kind == "recommendation-theme-update" {
+		return "recommendations.read", nil
+	}
 	if kind == "strategy-rehearsal" {
 		return "strategies.read", nil
 	}
@@ -272,7 +278,7 @@ func required(x Object) string {
 		return "search-quality.configure"
 	case "search-restore":
 		return "search-quality.restore"
-	case "recommendation-direction":
+	case "recommendation-direction", "recommendation-policy-save", "recommendation-theme-update":
 		return "recommendations.configure"
 	case "job-cancel":
 		return "jobs.cancel"
@@ -304,12 +310,17 @@ func required(x Object) string {
 		return "chat-messages." + str(x["action"])
 	case "account-restriction":
 		return "accounts.restriction." + str(x["action"])
-	case "message-draft-create":
+	case "message-draft-create", "notice-draft-create":
 		return "notices.create"
-	case "message-draft-save":
+	case "message-draft-save", "notice-draft-save":
 		return "notices.update"
 	case "feedback-update":
 		return "feedback.update"
+	case "notice-state":
+		if x["action"] == "publish" {
+			return "notices.publish"
+		}
+		return "notices.withdraw"
 	case "messaging-state":
 		if x["action"] == "activate" || x["action"] == "resume" {
 			return "notices.publish"

@@ -35,7 +35,29 @@ func (s *Service) RecoverPrepared(ctx context.Context, a Actor, proposal Object,
 	}
 	var result Object
 	var finalCard Object
-	if strategyRuleKind(kind) {
+	if recommendationExtended(kind) {
+		result, e = s.recoverRecommendationExtended(ctx, actor, x, command, operationID)
+		if e != nil {
+			return nil, e
+		}
+		if result == nil {
+			return missing(operationID), nil
+		}
+		if result["state"] == "unknown" {
+			return result, nil
+		}
+	} else if noticeKind(kind) {
+		result, e = s.recoverNotice(ctx, actor, x, command, operationID)
+		if e != nil {
+			return nil, e
+		}
+		if result == nil {
+			return missing(operationID), nil
+		}
+		if result["state"] == "unknown" {
+			return result, nil
+		}
+	} else if strategyRuleKind(kind) {
 		result, finalCard, e = s.recoverStrategyRule(ctx, actor, x, command, operationID)
 		if e != nil {
 			return nil, e

@@ -39,6 +39,10 @@ func ParseRequest(input Object) (Object, error) {
 	required := []string{"kind"}
 	optional := []string{}
 	switch kind {
+	case "notice-draft-create", "notice-draft-save", "notice-state":
+		return parseNoticeRequest(x)
+	case "recommendation-policy-save", "recommendation-theme-update":
+		return parseRecommendationExtended(x)
 	case "strategy-draft":
 		required = append(required, "configuration", "reason")
 		optional = append(optional, "expectedDraftId")

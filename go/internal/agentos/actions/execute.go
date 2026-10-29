@@ -8,7 +8,9 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/messaging"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsaccounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsjobs"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
+	"github.com/jackc/pgx/v5"
 	"slices"
 	"time"
 )
@@ -33,6 +35,18 @@ func (s *Service) proposal(proposal Object, operationID string) (Object, Object,
 	}
 	kind := str(x["kind"])
 	switch kind {
+	case "recommendation-policy-save", "recommendation-theme-update":
+		var err error
+		command, err = normalizeRecommendationExtended(x, command, proposal)
+		if err != nil {
+			return nil, nil, err
+		}
+	case "notice-draft-create", "notice-draft-save", "notice-state":
+		var err error
+		command, err = normalizeNoticeCommand(x, command, proposal, operationID)
+		if err != nil {
+			return nil, nil, err
+		}
 	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
 		var err error
 		command, err = normalizeStrategyRuleCommand(x, command)
@@ -227,7 +241,72 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 	if e != nil {
 		return nil, e
 	}
+	// The card callback revalidates a query-purpose proof. Owning writers need
+	// a fresh prepare projection, pinned to the exact same fixed AI account.
+	// Duty proofs keep their own operation-bound authorization path.
+	if !s.isDuty(actor) {
+		contextInfo, err := s.Permissions.AIWorkContext(actor)
+		if err != nil {
+			return nil, err
+		}
+		accountID := str(contextInfo["accountId"])
+		domain := str(proposal["domain"])
+		action := required(x)
+		prior := authorize
+		authorize = func(ctx context.Context, tx pgx.Tx) (Actor, error) {
+			current, err := prior(ctx, tx)
+			if err != nil {
+				return Actor{}, err
+			}
+			if current.ID != actor.ID || current.Endpoint != actor.Endpoint {
+				return Actor{}, fail("business_admin_denied", 403)
+			}
+			project := func(tx pgx.Tx) (Actor, error) {
+				return s.Permissions.HumanAIAccountWithin(ctx, tx, current, domain, accountID, "prepare", action)
+			}
+			if tx != nil {
+				return project(tx)
+			}
+			return postgres.InTx(ctx, s.Pool, project)
+		}
+	}
 	kind := str(x["kind"])
+	if recommendationExtended(kind) {
+		var exists bool
+		if e = s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations_recommendation_events_v1 WHERE endpoint=$1 AND operation_id=$2)`, s.Endpoint, operationID).Scan(&exists); e != nil {
+			return nil, e
+		}
+		if exists {
+			return s.RecoverPrepared(ctx, a, proposal, operationID)
+		}
+		review := preparation{impact: []any{}, basis: []any{}, expires: s.now() + 30}
+		if e = s.prepareRecommendationExtended(ctx, actor, x, &review); e != nil {
+			return nil, e
+		}
+		frozen := clone(command)
+		delete(frozen, "operationId")
+		if !same(review.command, frozen) || !same(review.impact, proposal["impact"]) || !same(review.basis, proposal["basis"]) {
+			return nil, fail("operations_agentos_review_changed", 409)
+		}
+	}
+	if noticeKind(kind) {
+		var exists bool
+		if e = s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations_product_commands_v1 WHERE endpoint=$1 AND operation_id=$2)`, s.Endpoint, operationID).Scan(&exists); e != nil {
+			return nil, e
+		}
+		if exists {
+			return s.RecoverPrepared(ctx, a, proposal, operationID)
+		}
+		review := preparation{impact: []any{}, basis: []any{}, expires: s.now() + 30}
+		if e = s.prepareNotice(ctx, actor, x, operationID, &review); e != nil {
+			return nil, e
+		}
+		frozen := clone(command)
+		delete(frozen, "operationId")
+		if !same(review.command, frozen) || !same(review.impact, proposal["impact"]) || !same(review.basis, proposal["basis"]) {
+			return nil, fail("operations_agentos_review_changed", 409)
+		}
+	}
 	if kind == "search-apply" || kind == "search-restore" || kind == "search-draft-save" || kind == "messaging-state" && (x["action"] == "activate" || x["action"] == "resume") {
 		var exists bool
 		query := `SELECT EXISTS(SELECT 1 FROM operations_search_quality_operations_v1 WHERE endpoint=$1 AND operation_id=$2)`
@@ -257,6 +336,16 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 	}
 	var result Object
 	switch kind {
+	case "recommendation-policy-save", "recommendation-theme-update":
+		result, e = s.executeRecommendationExtended(ctx, actor, x, command, authorize)
+		if e != nil && fault.Status(e) >= 500 {
+			return unknown(operationID), nil
+		}
+	case "notice-draft-create", "notice-draft-save", "notice-state":
+		result, e = s.executeNotice(ctx, actor, x, command)
+		if e != nil && fault.Status(e) >= 500 {
+			return unknown(operationID), nil
+		}
 	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
 		result, e = s.executeStrategyRule(ctx, actor, x, command, authorize)
 	case "search-draft-save", "search-apply", "search-restore", "recommendation-direction":
@@ -410,6 +499,12 @@ func safeReceipt(result Object) Object {
 	return Object{"operationId": op, "publishedVersion": count(result["publishedVersion"]), "version": count(coalesce(result["version"], content["version"], plan["version"])), "revision": count(coalesce(result["revision"], obj(result["visibility"])["version"], obj(content["visibility"])["version"], plan["revision"])), "hidden": hidden, "state": state, "phase": phase, "replayed": result["replayed"] == true}
 }
 func actionResult(kind string, result Object, operationID string, x, command Object) (Object, error) {
+	if recommendationExtended(kind) {
+		return recommendationExtendedResult(kind, result, operationID, x, command)
+	}
+	if noticeKind(kind) {
+		return noticeResult(kind, result, operationID, x)
+	}
 	if strategyRuleKind(kind) {
 		return strategyRuleResult(kind, result, operationID, x)
 	}

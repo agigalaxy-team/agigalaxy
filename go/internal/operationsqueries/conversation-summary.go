@@ -80,7 +80,7 @@ func (s *Service) Summary(ctx context.Context, a Actor, domain string, bound Obj
 		return nil, e
 	}
 	result["queryAccess"], result["managementCapabilities"] = operationsai.QueryAccess(fresh.Permissions), capabilities
-	for _, key := range []string{"priorReadReceipts", "priorActionReceipts", "priorOperationReceipts", "boundedTask"} {
+	for _, key := range []string{"priorReadReceipts", "currentReadOutcomes", "turnOutcomes", "priorActionReceipts", "priorOperationReceipts", "boundedTask"} {
 		result[key] = receipts[key]
 	}
 	return result, nil

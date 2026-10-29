@@ -8,7 +8,7 @@ import httpx
 from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
 from pydantic import BaseModel, ConfigDict, Field
-from galaxy_agentos.tool_reliability import reliable_function, repair, tool_call_key
+from galaxy_agentos.tool_reliability import reliable_function, repair, tool_call_key, _model_feedback, _closed_failure
 from galaxy_agentos.conversation_tools import conversation_tools
 from galaxy_agentos.gateway import AuthorityDenied, AuthorityUnavailable, GalaxyGateway
 
@@ -93,14 +93,39 @@ class ToolReliability(unittest.TestCase):
                 self.assertNotIn('agentos_', call.result)
                 self.assertNotIn('business_admin_', call.result)
                 self.assertNotIn('UPSTREAM_PRIVATE_PROSE', output.getvalue() + call.result)
-                self.assertNotIn('授权', result['message'])
+                if status == 403:
+                    self.assertEqual(result['failureCategory'], 'authorization-check-rejected')
+                    self.assertFalse(result['causeKnown'])
+                if status == 503:
+                    self.assertEqual(result['failureCategory'], 'source-unavailable')
                 self.assertNotEqual(result.get('nextStep'), 'read-original-operation')
                 self.assertFalse(result['dataRead'])
                 self.assertFalse(result['valuesCurrent'])
-                if state in {'denied', 'unavailable'}:
-                    self.assertIn('旧记录不代表本次结果', result['message'])
+                if status in {403, 503}:
+                    self.assertIn('尚未查明', result['message'])
                 if status in {403, 503}:
                     self.assertIn(code, output.getvalue())
+
+    def test_current_failures_and_model_failure_are_distinct_closed_facts(self):
+        value = {"priorReadReceipts":{"items":[{"state":"unavailable","code":"business_admin_denied"}]},
+            "currentReadOutcomes":{"items":[{"state":"unavailable","code":"operations_agentos_tool_request_timeout"},
+                {"state":"completed","resultState":"invalid-request","code":"invalid_operations_agentos_query"}]},
+            "turnOutcomes":{"items":[{"nativeStatus":"ERROR","failure":{"stage":"model-request","category":"service-unavailable","reportedStatus":502}}]}}
+        output, diagnostic = _model_feedback(value)
+        self.assertNotIn("business_admin_denied", json.dumps(output))
+        self.assertNotIn("invalid_operations_agentos_query", json.dumps(output))
+        self.assertEqual(output["priorReadReceipts"]["items"][0]["outcome"]["failureCategory"], "authorization-check-rejected")
+        self.assertFalse(output["priorReadReceipts"]["items"][0]["outcome"]["causeKnown"])
+        self.assertEqual(output["currentReadOutcomes"]["items"][0]["outcome"]["failureCategory"], "timeout")
+        self.assertEqual(output["currentReadOutcomes"]["items"][1]["outcome"]["failureCategory"], "invalid-request")
+        self.assertEqual(output["turnOutcomes"]["items"][0]["failure"]["stage"], "model-request")
+        self.assertIn("business_admin_denied", json.dumps(diagnostic))
+        unavailable = AuthorityUnavailable("agentos_authority_unavailable"); unavailable.status_code = 502
+        self.assertEqual(_closed_failure("current_summary", unavailable)["failureCategory"], "source-unavailable")
+        self.assertNotEqual(_closed_failure("current_summary", unavailable)["state"], "denied")
+        summary, _ = _model_feedback({"availability":"unavailable","reason":"summary-not-connected"})
+        self.assertEqual(summary["failureCategory"], "source-unavailable")
+        self.assertNotIn("summary-not-connected", json.dumps(summary))
 
     def test_slow_read_timeouts_do_not_repeat_the_same_entire_call(self):
         for error_type in (httpx.ReadTimeout, httpx.PoolTimeout):
@@ -127,7 +152,7 @@ class ToolReliability(unittest.TestCase):
                 self.assertEqual(len(requests), 1)
                 self.assertEqual(result['state'], 'unavailable')
                 self.assertIn('本次读取超时', result['message'])
-                self.assertIn('旧记录不代表本次结果', result['message'])
+                self.assertIn('尚未查明', result['message'])
                 self.assertFalse(result['dataRead'])
                 self.assertFalse(result['valuesCurrent'])
                 self.assertNotIn('UPSTREAM_PRIVATE_PROSE', output.getvalue() + call.result)

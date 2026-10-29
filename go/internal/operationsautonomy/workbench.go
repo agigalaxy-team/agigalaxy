@@ -189,15 +189,37 @@ func (s *Service) UpdateWorkbenchWithin(ctx context.Context, tx pgx.Tx, in Workb
 			return nil, e
 		}
 	}
-	var pending bool
-	if e = tx.QueryRow(ctx, `SELECT public.galaxy_autonomy_workbench_pending_v1($1,$2)`, s.Endpoint, row["id"]).Scan(&pending); e != nil {
+	var prepared, processing, unknown, unavailable, cancelled, completed, bindingInvalid bool
+	if e = tx.QueryRow(ctx, `SELECT * FROM public.galaxy_autonomy_workbench_card_states_v1($1,$2)`, s.Endpoint, row["id"]).Scan(&prepared, &processing, &unknown, &unavailable, &cancelled, &completed, &bindingInvalid); e != nil {
 		return nil, e
 	}
-	if state == "completed" && (pending || row["state"] == "waiting-human" && in.Receipt == nil) {
+	var unknownReceipt bool
+	if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations_autonomy_receipts_v1 WHERE endpoint=$1 AND task_id=$2 AND state='unknown')`, s.Endpoint, row["id"]).Scan(&unknownReceipt); e != nil {
+		return nil, e
+	}
+	var pendingDecision bool
+	if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations_autonomy_tool_calls_v1 c WHERE c.endpoint=$1 AND c.task_id=$2 AND c.state='waiting-human' AND NOT EXISTS(SELECT 1 FROM operations_autonomy_decisions_v1 d WHERE d.endpoint=c.endpoint AND d.task_id=c.task_id AND d.call_id=c.call_id AND d.operation_id=c.operation_id) AND NOT EXISTS(SELECT 1 FROM operations_autonomy_receipts_v1 r WHERE r.endpoint=c.endpoint AND r.task_id=c.task_id AND r.operation_id=c.operation_id AND r.state IN ('completed','failed','no-action') AND r.basis IN ('persisted-domain-operation-receipt','original-operation-query','persisted-ai-role-delegation-event')))`, s.Endpoint, row["id"]).Scan(&pendingDecision); e != nil {
+		return nil, e
+	}
+	var cardFailureCode any
+	// Current persisted facts take precedence over the previous derived task state.
+	switch {
+	case unknown || processing || unknownReceipt || bindingInvalid:
+		state = "unknown"
+	case prepared || pendingDecision:
 		state = "waiting-human"
+	case model == "completed" && unavailable:
+		state = "failed"
+		cardFailureCode = "operations_autonomy_card_confirmation_unavailable"
+		if completed {
+			cardFailureCode = "operations_autonomy_partial_card_confirmation_unavailable"
+		}
+	case model == "completed" && cancelled && !completed && !unavailable:
+		state = "stopped"
 	}
 	if has(terminal, str(row["state"])) {
 		state = str(row["state"])
+		cardFailureCode = nil
 	}
 	combined, e := s.refreshUsageWithin(ctx, tx, str(row["id"]))
 	if e != nil {
@@ -208,7 +230,7 @@ func (s *Service) UpdateWorkbenchWithin(ctx context.Context, tx pgx.Tx, in Workb
 		latestTurn = str(row["id"])
 	}
 	latest := row["source"] == "workbench" && turnID == latestTurn
-	if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state=$3,model_state=CASE WHEN $9 THEN COALESCE($4,model_state) ELSE model_state END,native_run_id=CASE WHEN $9 THEN COALESCE($5,native_run_id) ELSE native_run_id END,model_usage=$6,completed_at=CASE WHEN $7 THEN COALESCE(completed_at,$8) ELSE completed_at END,revision=revision+1,updated_at=$8 WHERE endpoint=$1 AND id=$2`, s.Endpoint, in.OperationID, state, in.ModelState, in.NativeRunID, jsonText(combined), has([]string{"completed", "failed", "stopped"}, state), s.now(), latest); e != nil {
+	if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state=$3,code=COALESCE($10,code),model_state=CASE WHEN $9 THEN COALESCE($4,model_state) ELSE model_state END,native_run_id=CASE WHEN $9 THEN COALESCE($5,native_run_id) ELSE native_run_id END,model_usage=$6,completed_at=CASE WHEN $7 THEN COALESCE(completed_at,$8) ELSE completed_at END,revision=revision+1,updated_at=$8 WHERE endpoint=$1 AND id=$2`, s.Endpoint, in.OperationID, state, in.ModelState, in.NativeRunID, jsonText(combined), has([]string{"completed", "failed", "stopped"}, state), s.now(), latest, cardFailureCode); e != nil {
 		return nil, e
 	}
 	return s.taskWithin(ctx, tx, str(row["id"]), "")

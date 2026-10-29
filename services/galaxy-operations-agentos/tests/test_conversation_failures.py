@@ -70,7 +70,8 @@ class ConversationFailureTest(unittest.TestCase):
         projection = ast.Module(body=[n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in {'run_view','_completed_conversation_content'}], type_ignores=[])
         import math
         from galaxy_agentos.model_failover import failover_view
-        namespace = {'math':math,'failure_view':failure_view,'failover_view':failover_view}
+        from galaxy_agentos.tool_reliability import PREPARED_CARD_IDS
+        namespace = {'math':math,'failure_view':failure_view,'failover_view':failover_view, 'PREPARED_CARD_IDS': PREPARED_CARD_IDS}
         exec(compile(projection, str(source), 'exec'), namespace)
         raw = SimpleNamespace(status='ERROR', content='galaxy_conversation_model_failure:rate-limit:429', agent_id='galaxy-conversation-governance', events=[], metrics=None, run_id='bound-run', metadata={'operationId':'bound-turn'}, input=None, created_at=1)
         visible = namespace['run_view'](raw)
@@ -86,6 +87,12 @@ class ConversationFailureTest(unittest.TestCase):
         raw.status = 'COMPLETED'
         self.assertEqual(namespace['run_view'](raw)['content'], raw.content)
         self.assertIsNone(namespace['run_view'](raw)['failure'])
+        raw.content = '请确认操作。'
+        raw.messages = [{'role':'assistant','content':'先前回复'}, {'role':'assistant','tool_calls':[{'id':'prepare'}]}]
+        raw.metadata[PREPARED_CARD_IDS] = ['prepared-card-id']
+        self.assertEqual(namespace['run_view'](raw)['content'], '请确认操作。')
+        raw.metadata.pop(PREPARED_CARD_IDS)
+        self.assertEqual(namespace['run_view'](raw)['content'], '先前回复')
 
 
 if __name__ == '__main__':
