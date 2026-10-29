@@ -76,7 +76,7 @@
 
 ## 其他发现的处理状态
 
-Native 信任缓存更新、RPC 超时/关闭、验证后设备投影，以及构建目录残留公开等线索已完成分域源码追踪，仍在主审复核和统一影响分级，不在本页提前列为最终验收结论。其余资源预算、上游依赖与运行环境风险继续审阅。
+其余资源预算、上游依赖与运行环境风险继续审阅；本页新增条目均保留前置条件及未动态验证限制。
 
 
 ## IDENTITY-001 成果文字的个人数据导出未复核当前来源许可
@@ -98,3 +98,42 @@ Native 信任缓存更新、RPC 超时/关闭、验证后设备投影，以及�
 文字与附件导出都经过所属领域的当前授权读取器；不可用时仅保留允许导出的元数据回执，移除正文，不依赖异步擦除及时性。保留原 requester 范围和 cutoff 限制，但不要把 requester 等同作者或永久复制许可。
 
 隔离回归以合成作者 A、请求者 B 和有限期限许可覆盖撤销材料、到期、撤销批准 consent、撤销绑定四条路径；在暂停清理的条件下，普通读取和所有导出/MCP 页均不得返回正文。另测有效许可、不同请求者与真正本人创作的正例。未执行该回归。
+
+
+## NATIVE-003 信任缓存反回滚比较与写入不是一个原子操作
+
+- 优先级：中；本机缓存一致性及离线身份判断风险。静态确认，未执行并发测试。
+- [trust-identity.go 281–327](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/native/trust-identity.go#L281-L327) 先读取旧缓存并比较 sequence/head，然后另调 putKey 写入；[116–146](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/native/trust-identity.go#L116-L146) 读与写分别取得 Store.With 锁，写入没有再次比较缓存版本。
+- 同身份共享目录的两个进程均读到 N-1，分别取得合法 N 和 N+1 历史；若 N+1 先写，N 后写，会覆盖成旧缓存。身份选择/generation 检查不等于缓存 sequence 的单调性。
+- 影响限本机缓存和依赖该缓存的离线判断；不证明当前服务端撤销被绕过。Discovery keyring 使用同一锁内比较写入，不在本项范围。
+
+修复：把旧值解析验证、sequence/head 比较和替换放进同一排他临界区，保留 subject/genesis 一致性。隔离回归用两个合成签名快照和确定性屏障，让新版本先完成，再释放旧版本写入，最终缓存不得降级。未执行。
+
+## NATIVE-004 子进程管道阻塞可绕过请求计时器并卡住清理
+
+- 优先级：中；本机可用性与生命周期可靠性。前提是已配置的本机驱动停止读取标准输入，且管道被填满。不是任意模型参数执行。
+- [watch-driver-rpc.go 91–108](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/native/watch-driver-rpc.go#L91-L108) 在 writeMu 内同步 stdin.Write；[167–197](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/native/watch-driver-rpc.go#L167-L197) 在 send 返回后才建立 30 秒计时器和取消等待。
+- [202–243](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/native/watch-driver-rpc.go#L202-L243) 清理 goroutine 又先等待同一 writeMu，之后才关闭输入并终止进程，无法可靠解开已阻塞写入。
+- 重要限定：close(ctx) 的调用者可因 ctx.Done 返回 shutdown_unconfirmed；卡住的是后台清理、写入及可能仍存活的子进程，不是每个 close 调用必然永久不返回。JS host bridge 的 SIGTERM 后无强制终止兜底属于同类补充，不重复计数。
+
+修复：截止时间覆盖发送与等待全生命周期；关闭管道/终止子进程不能依赖可能被阻塞写者持有的锁。隔离假驱动测试停止消费输入、取消、退出及忽略 SIGTERM 的有界清理，禁止使用真实模型/业务服务验证。未执行。
+
+## NATIVE-005 验证控制历史后仍使用未经该验证绑定的设备投影
+
+- 优先级：中；真实性信任边界。前提是已配置的 HTTPS 权威服务返回恶意或不一致投影，并持有可通过验证的历史。不是任意公网流量攻击。
+- [identity-handoff-material.go 39–51](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/native/identity-handoff-material.go#L39-L51) 调用 verifyConnectionControl 后返回原始响应 map。
+- [connection-control.go 85–119](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/native/connection-control.go#L85-L119) 已从签名事件重建有效设备、epoch、sequence 和 head，但没有将原响应顶层设备投影与它逐项绑定。
+- [identity-handoff-approval.go 119–150](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/native/identity-handoff-approval.go#L119-L150) 从原 state.devices 选 signer，并用其 public_key 验证批准签名。因此合法历史外附的伪造设备投影可影响本机批准检查。
+- 本机原 offer/设备钥、期限、用户批准仍有检查；诚实服务端提交验证仍可拒绝。不得据此声称远程账户接管或服务端任意提权。
+
+修复：安全字段全部由已验证控制链重建结果派生，或严格拒绝原响应与其不一致；当前权威新鲜度另行检查。合成假 transport 回归只改变 unsigned projection 的 key/status/scopes/epoch/head，保持原签名历史合法，本机检查必须拒绝或忽略伪造字段。未执行。
+
+## WEB-L002 复用内容构建目录会把残留文件纳入公开资产清单
+
+- 优先级：中；发布保密性风险。前提是内容输出目录存在不应公开的普通残留文件；未证实现网有敏感残留。
+- [build.py 113](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/apps/galaxy-site/build.py#L113) 允许复用输出目录；[215–216](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/apps/galaxy-site/build.py#L215-L216) 将目录内所有已有文件收入 public-assets.json，未知扩展名使用 application/octet-stream。
+- [build-product.mjs 13–23](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/scripts/build-product.mjs#L13-L23) 只要求运行产物目录为空，未要求内容目录为空；标准 site 构建默认复用 apps/galaxy-site/dist。
+- [website-artifact.mjs 34–36](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/scripts/website-artifact.mjs#L34-L36) 复制整棵内容目录并设为公开根；[public-resources.ts 18–27](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/apps/galaxy-site/src/lib/public-resources.ts#L18-L27) 允许清单中的普通路径与 octet-stream。
+- 路径穿越、隐藏路径和若干内部 JSON 已被拒绝，本项不是任意服务器文件读取。普通命名的笔记、配置或备份残留仍可能被打包公开。
+
+修复：使用全新隔离内容暂存目录，清单仅由明确生成或允许复制的公开文件构成，再原子发布。用无秘密的 private-note.txt 放在预存输出目录做隔离回归，要求不进入清单、不被公开服务；勿用真实秘密测试。未执行。
