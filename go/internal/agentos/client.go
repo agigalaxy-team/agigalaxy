@@ -231,8 +231,27 @@ func (c *Client) Read(ctx context.Context, e Execution) (any, error) {
 func (c *Client) ReadConversation(ctx context.Context, e Execution) (any, error) {
 	return c.request(ctx, e, "/galaxy/conversations/"+url.PathEscape(e.ID), nil, "")
 }
-func (c *Client) ReadConversationOperation(ctx context.Context, e Execution, id string) (any, error) {
-	return c.request(ctx, e, "/galaxy/conversations/"+url.PathEscape(e.ID)+"/operations/"+url.PathEscape(id), nil, "")
+
+type ConversationOperationLocator struct {
+	RunID, RetryOfOperationID, RetryOfRunID string
+}
+
+func (c *Client) ReadConversationOperation(ctx context.Context, e Execution, id string, locator ConversationOperationLocator) (any, error) {
+	path := "/galaxy/conversations/" + url.PathEscape(e.ID) + "/operations/" + url.PathEscape(id)
+	if locator.RunID != "" {
+		if !nativeRunID.MatchString(locator.RunID) || (locator.RetryOfOperationID == "") != (locator.RetryOfRunID == "") || locator.RetryOfOperationID != "" && (!validOperationID(locator.RetryOfOperationID) || locator.RetryOfOperationID == id || !nativeRunID.MatchString(locator.RetryOfRunID)) {
+			return nil, streamInvalid()
+		}
+		query := url.Values{"runId": {locator.RunID}}
+		if locator.RetryOfOperationID != "" {
+			query.Set("retryOfOperationId", locator.RetryOfOperationID)
+			query.Set("retryOfRunId", locator.RetryOfRunID)
+		}
+		path += "?" + query.Encode()
+	} else if locator.RetryOfOperationID != "" || locator.RetryOfRunID != "" {
+		return nil, streamInvalid()
+	}
+	return c.request(ctx, e, path, nil, "")
 }
 func (c *Client) CancelConversation(ctx context.Context, e Execution, id string) (any, error) {
 	return c.request(ctx, e, "/agents/galaxy-conversation-"+url.PathEscape(e.Domain)+"/runs/"+url.PathEscape(id)+"/cancel?"+url.Values{"session_id": {e.SessionID}}.Encode(), url.Values{}, "")

@@ -12,6 +12,7 @@ from .gateway import AuthorityDenied, AuthorityUnavailable, execution_id, conver
 from .conversation_references import user_public_references
 from .model_settings import model_settings_view, configured_domains
 from .p13_strategies import p13_health
+from .conversation_transport import operation_read_locator
 
 
 class PrivateSurface:
@@ -74,8 +75,11 @@ class PrivateSurface:
             native = re.fullmatch(r"/(agents|workflows)/([A-Za-z0-9_-]+)/runs(?:/([A-Za-z0-9_-]+)/(continue|cancel|resume))?", path)
             if not (read_path and method == "GET" or operation_read_path and method == "GET" or continue_path and method == "POST" or native and method in {"GET", "POST"}):
                 raise AuthorityDenied()
-            if operation_read_path and scope.get("query_string"):
-                raise AuthorityDenied()
+            if operation_read_path:
+                try:
+                    operation_read_locator(scope.get("query_string", b""))
+                except (ValueError, UnicodeError):
+                    return await JSONResponse({"error": "agentos_query_invalid"}, status_code=400)(scope, receive, send)
             if native:
                 kind, component, _, action = native.groups()
                 if conversation and (kind != "agents" or action not in {None, "cancel", "resume", "continue"}):
@@ -135,8 +139,8 @@ class PrivateSurface:
                                 or getattr(original, "agent_id", None) != component
                                 or (getattr(original, "metadata", None) or {}).get("operationId") != parent_operation):
                             raise AuthorityDenied()
-                        # Native regenerate truncates at the existing question/tool
-                        # boundary. Never append the question as a second message.
+                        # Retry keeps the native regeneration checkpoint on an
+                        # independent attempt, without appending the question.
                         fields["metadata"] = [json.dumps({"domain": row["domain"], "operationId": operation_id,
                             "retryOfOperationId": parent_operation, "retryOfRunId": original.run_id,
                             "modelCalls": 0, "modelFallbacks": [], "activeModelFallbackAlias": None,

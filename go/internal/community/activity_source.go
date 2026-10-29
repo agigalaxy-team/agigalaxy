@@ -13,6 +13,11 @@ func (s *Service) ActivityAllowedWithin(ctx context.Context, tx pgx.Tx, kind, po
 	if !hasString([]string{"post", "reply"}, kind) {
 		return false, fail("invalid_operations_request", 400)
 	}
+	// The publication's permission reference can be cleared by source
+	// deletion. Such content cannot qualify as current public activity.
+	if permissionID == "" {
+		return false, nil
+	}
 	current := *s
 	current.actor = nil
 	current.Authority = nil
@@ -42,7 +47,7 @@ func (s *Service) ActivityAllowedWithin(ctx context.Context, tx pgx.Tx, kind, po
 	}
 	target := Object{"kind": "post-version", "postId": postID, "versionId": sourceID}
 	if kind == "reply" {
-		target = Object{"kind": "reply", "replyId": sourceID, "contentRevision": 1}
+		target = Object{"kind": "reply", "postId": postID, "replyId": sourceID, "contentRevision": 1}
 	}
 	hidden, e := current.hidden(ctx, tx, target)
 	return !hidden, e

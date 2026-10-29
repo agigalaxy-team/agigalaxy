@@ -116,8 +116,15 @@ func TestActualMessagingQueriesCurrentHumanAIAndOriginalProjection(t *testing.T)
 	// permission/audience/governance reader, without external identity calls.
 	publicFixture := seedQueryPublication(t, f)
 	forum := &community.Service{Pool: pool, Endpoint: endpoint, Authority: publicationFixtureAuthority{}, Now: now, OperationsHandling: true}
-	if _, e = forum.Publish(ctx, str(publicFixture["accounts"].([]any)[0]), encoded(publicFixture["payload"])); e != nil {
+	account := str(publicFixture["accounts"].([]any)[0])
+	post := object(publicFixture["payload"])
+	if _, e = forum.Publish(ctx, account, encoded(post)); e != nil {
 		t.Fatal("public activity fixture publication", e)
+	}
+	reply := community.Object{"schemaVersion": 1, "operationId": uuid.NewString(), "accountId": account, "replyId": uuid.NewString(), "postId": post["postId"], "postVersionId": post["versionId"], "expectedRevision": 0, "body": "Synthetic public reply.", "publishedUntil": now().Add(time.Hour).Unix(), "replyTo": nil}
+	community.BindForumIDs("create-reply", account, reply)
+	if _, e = forum.CreateReply(ctx, account, encoded(reply)); e != nil {
+		t.Fatal("public activity fixture reply", e)
 	}
 	workbench := &Workbench{Domain: &businessadmin.Domain{Pool: pool, Endpoint: endpoint, Authority: gateway, PrincipalWithin: gateway.LockOperationsPrincipalWithin, Now: now}, Forum: forum}
 	queries.Workbench = workbench
@@ -135,10 +142,28 @@ func TestActualMessagingQueriesCurrentHumanAIAndOriginalProjection(t *testing.T)
 		}
 		if len(options) == 0 {
 			posts, _ := number(object(object(result["businessActivity"])["totals"])["posts"])
-			if posts != 1 {
-				t.Fatalf("qualified current publication was not counted %s", encoded(result))
+			replies, _ := number(object(object(result["businessActivity"])["totals"])["replies"])
+			if posts != 1 || replies != 1 {
+				t.Fatalf("qualified current publication and reply were not counted %s", encoded(result))
 			}
 		}
+	}
+	// Hiding the parent must exclude both it and its still-published reply.
+	if _, e = owner.Exec(ctx, `INSERT INTO operations_content_visibility_v1(endpoint,target_kind,target_id,revision,hidden_until,operation_id,updated_at) VALUES($1,'forum-post',$2,1,$3,$4,$5)`, endpoint, post["postId"], now().Add(time.Hour), uuid.NewString(), now()); e != nil {
+		t.Fatal(e)
+	}
+	hidden, e := workbench.SummaryWithAuthority(ctx, queryActor, Object{}, permissions.QueryReader())
+	if e != nil {
+		t.Fatal("hidden parent public activity", e)
+	}
+	hiddenTotals := object(object(hidden["businessActivity"])["totals"])
+	hiddenPosts, _ := number(hiddenTotals["posts"])
+	hiddenReplies, _ := number(hiddenTotals["replies"])
+	if hiddenPosts != 0 || hiddenReplies != 0 {
+		t.Fatalf("hidden parent or reply was counted: %s", encoded(hiddenTotals))
+	}
+	if _, e = owner.Exec(ctx, `DELETE FROM operations_content_visibility_v1 WHERE endpoint=$1 AND target_kind='forum-post' AND target_id=$2`, endpoint, post["postId"]); e != nil {
+		t.Fatal(e)
 	}
 	var permissionID string
 	if e = owner.QueryRow(ctx, "SELECT permission_id::text FROM forum_versions_v1 WHERE id=$1", object(publicFixture["payload"])["versionId"]).Scan(&permissionID); e != nil {

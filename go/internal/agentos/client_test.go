@@ -153,7 +153,7 @@ func TestActualHTTPSubmissionStreamResumeAndUnknownRecovery(t *testing.T) {
 	if len(events) != 2 || events[0]["text"] != "流式内容" || events[1]["kind"] != "terminal" {
 		t.Fatal("stream replay or reasoning leaked")
 	}
-	if _, e = client.ReadConversationOperation(context, conversation, "operation-1"); e != nil {
+	if _, e = client.ReadConversationOperation(context, conversation, "operation-1", ConversationOperationLocator{}); e != nil {
 		t.Fatal(e)
 	}
 	if submits.Load() != 1 || resumes.Load() != 1 || lookups.Load() != 1 {
