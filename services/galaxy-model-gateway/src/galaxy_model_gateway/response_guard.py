@@ -7,6 +7,15 @@ ERROR = {"error": {"code": "model_gateway_response_invalid",
     "type": "api_error"}}
 
 
+def http_error_status(value):
+    """Closed HTTP status metadata; never parse provider message text."""
+    if type(value) is int and 400 <= value <= 599:
+        return value
+    if type(value) is str and len(value) == 3 and value[0] in '45' and all('0' <= c <= '9' for c in value):
+        return int(value)
+    return None
+
+
 def useful_message(value):
     if not isinstance(value, dict):
         return False
@@ -70,10 +79,10 @@ class ResponseGuard:
             self.error_type = error_type
         if isinstance(status, str) and status in allowed_status:
             self.error_status = status
-        elif type(status) is int and status in {400, 401, 402, 403, 404, 408, 409, 413, 422, 429, 500, 502, 503, 504, 529}:
-            self.error_status = status
-        if type(code) is int and 400 <= code <= 599:
-            self.error_code = code
+        elif http_error_status(status) is not None:
+            self.error_status = http_error_status(status)
+        if http_error_status(code) is not None:
+            self.error_code = http_error_status(code)
 
     def diagnostic(self, event, **extra):
         from .output import emit
@@ -97,6 +106,9 @@ class ResponseGuard:
         self.diagnostic('model-response-rejected', reason=reason, status=status)
         await self.rejected()
         body = {"error": {"code": code}} if code else ERROR
+        if reason == 'gateway-transient-error':
+            body = {'error': {'code': 'model_gateway_transient_failure', 'source': 'model-gateway',
+                'status': 503, 'category': 'service-unavailable', 'outputStarted': False}}
         if reason in {'upstream-http-error','native-provider-error'}:
             from .metadata import provider_failure_for
             origin=provider_failure_for(self.call_id)
@@ -193,7 +205,24 @@ class ResponseGuard:
                 self.json_state = 'ok'
                 self.inspect_error(value)
                 if isinstance(value, dict) and (value.get('error') or self.responses and value.get('type') in {'error','response.failed','response.incomplete'}):
-                    from .metadata import provider_failure_for
+                    from .metadata import provider_failure_for, gateway_failure_for
+                    observed = gateway_failure_for(self.call_id)
+                    statuses = [observed.get('httpStatus'), observed.get('reportedStatus')]
+                    failure_consistent = not observed or (observed.get('category') == 'service-unavailable'
+                        and all(status is None or status == 503 for status in statuses))
+                    frame_status = self.error_code if self.error_code != 'unknown' else self.error_status
+                    status_conflict = (type(self.error_code) is int and type(self.error_status) is int
+                        and self.error_code != self.error_status)
+                    raw_error = value.get('error') if isinstance(value.get('error'), dict) else {}
+                    raw_status, raw_type, raw_code = raw_error.get('status'), raw_error.get('type'), raw_error.get('code')
+                    compatible_status = raw_status is None or raw_status == 'UNAVAILABLE' or http_error_status(raw_status) == 503
+                    compatible_code = raw_code is None or http_error_status(raw_code) == 503
+                    compatible_type = raw_type is None or (isinstance(raw_type, str)
+                        and raw_type in {'api_error', 'server_error', 'overloaded_error'})
+                    if (isinstance(value.get('error'), dict) and frame_status == 503 and not status_conflict
+                            and compatible_status and compatible_code and compatible_type and failure_consistent
+                            and not self.started and not self.useful and self.tool_delta_count == 0):
+                        return await self.reject(status=503, reason='gateway-transient-error')
                     origin=provider_failure_for(self.call_id)
                     reported=origin.get('httpStatus') or origin.get('reportedStatus')
                     if type(reported) is int and 400<=reported<=599:
@@ -202,6 +231,8 @@ class ResponseGuard:
                     return await self.reject(reason="invalid-stream-event")
                 if self.responses:
                     kind = value.get("type", "")
+                    if kind in {'response.function_call_arguments.delta', 'response.function_call_arguments.done'} or (kind == 'response.output_item.added' and isinstance(value.get('item'), dict) and value['item'].get('type') == 'function_call'):
+                        self.tool_delta_count += 1
                     if kind in {'response.completed', 'response.failed', 'response.incomplete', 'error'}:
                         self.responses_terminal = kind
                     if kind in {"error", "response.failed", "response.incomplete"}:

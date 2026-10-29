@@ -9,10 +9,14 @@ from .policy import ALIAS, CONFIG_VERSION, SCENARIOS
 
 _usage_store = None
 _failures=OrderedDict()
+_gateway_failures=OrderedDict()
 _failure_lock=Lock()
 
 def provider_failure_for(call_id):
     with _failure_lock:return dict(_failures.get(call_id,{}))
+
+def gateway_failure_for(call_id):
+    with _failure_lock:return dict(_gateway_failures.get(call_id,{}))
 
 
 def configure_usage(store):
@@ -137,6 +141,9 @@ class MetadataLogger(CustomLogger):
         # errors never enter the provider SDK callback. No provider prose.
         if row.get('state')=='failed' and isinstance(row.get('failure'),dict):
             failure=row['failure']
+            with _failure_lock:
+                _gateway_failures[row['callId']]={key:failure.get(key) for key in ['httpStatus','reportedStatus','category']}
+                while len(_gateway_failures)>512:_gateway_failures.popitem(last=False)
             if failure.get('providerConfirmed') is True:
                 with _failure_lock:
                     _failures[row['callId']]={key:failure.get(key) for key in ['httpStatus','reportedStatus','category']}

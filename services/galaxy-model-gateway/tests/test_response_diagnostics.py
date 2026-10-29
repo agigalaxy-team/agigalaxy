@@ -65,10 +65,48 @@ class ResponseDiagnostics(unittest.TestCase):
         self.assertEqual((logs[0]['errorPresent'], logs[0]['errorShape'], logs[0]['errorType'],
             logs[0]['errorStatus'], logs[0]['errorCode']), (True, 'object', 'rate_limit_error', 'RESOURCE_EXHAUSTED', 429))
         self.assertNotIn('PRIVATE_CANARY', repr(logs))
+
+    def test_http_status_normalization_remains_closed_and_rejects_error_frame(self):
+        for value, expected in [('503', 503), ('429', 429), (599, 599),
+                (True, 'unknown'), (503.0, 'unknown'), (' 503', 'unknown'),
+                ('５０３', 'unknown'), ('0503', 'unknown'), ('+503', 'unknown'),
+                ('503 PRIVATE_CANARY', 'unknown'), (None, 'unknown')]:
+            with self.subTest(value=value):
+                logs, _, rejected = self.inspect(event({'error': {'code': value, 'status': value,
+                    'message': 'PRIVATE_CANARY'}}))
+                self.assertTrue(rejected)
+                self.assertEqual(logs[0]['event'], 'model-response-rejected')
+                self.assertEqual((logs[0]['errorCode'], logs[0]['errorStatus']), (expected, expected))
+                self.assertNotIn('PRIVATE_CANARY', repr(logs))
         logs, _, rejected = self.inspect(event({'error': {'type': 'PRIVATE_CANARY', 'status': 'PRIVATE_CANARY', 'code': 'PRIVATE_CANARY'}}))
         self.assertTrue(rejected)
         self.assertEqual((logs[0]['errorType'], logs[0]['errorStatus'], logs[0]['errorCode']), ('unknown', 'unknown', 'unknown'))
         self.assertNotIn('PRIVATE_CANARY', repr(logs))
+
+    def test_only_empty_503_frame_becomes_gateway_transient(self):
+        role = event({'choices':[{'delta':{'role':'assistant'},'finish_reason':None}]})
+        failed = event({'error':{'code':'503','message':'PRIVATE_CANARY'}})
+        with patch('galaxy_model_gateway.metadata.gateway_failure_for', return_value={'category':'service-unavailable','httpStatus':503,'reportedStatus':503}), patch('galaxy_model_gateway.metadata.provider_failure_for', return_value={}):
+            logs, sent, rejected = self.inspect(role + failed)
+        self.assertTrue(rejected)
+        self.assertEqual(sent[0]['status'], 503)
+        body = json.loads(sent[-1]['body'])['error']
+        self.assertEqual(body, {'code':'model_gateway_transient_failure','source':'model-gateway','status':503,'category':'service-unavailable','outputStarted':False})
+        self.assertNotIn('PRIVATE_CANARY', repr(logs)+repr(sent))
+        with patch('galaxy_model_gateway.metadata.gateway_failure_for', return_value={'category':'context-limit','httpStatus':503}), patch('galaxy_model_gateway.metadata.provider_failure_for', return_value={}):
+            _, sent, _ = self.inspect(failed)
+        self.assertEqual(sent[0]['status'], 502)
+        for extra in ({'status':'RESOURCE_EXHAUSTED'}, {'status':'INVALID_ARGUMENT'},
+                {'type':'invalid_request_error'}, {'type':'authentication_error'}, {'status':'429'}):
+            with patch('galaxy_model_gateway.metadata.gateway_failure_for', return_value={}), patch('galaxy_model_gateway.metadata.provider_failure_for', return_value={}):
+                _, sent, _ = self.inspect(event({'error':{'code':'503', **extra}}))
+            self.assertEqual(sent[0]['status'], 502)
+        for first in [event({'choices':[{'delta':{'content':'PRIVATE_CONTENT'},'finish_reason':None}]}),
+                event({'choices':[{'delta':{'tool_calls':[{'index':0}]},'finish_reason':None}]})]:
+            with patch('galaxy_model_gateway.metadata.gateway_failure_for', return_value={}), patch('galaxy_model_gateway.metadata.provider_failure_for', return_value={}):
+                _, sent, _ = self.inspect(first + failed)
+            self.assertEqual(sent[0]['status'], 200)
+            self.assertNotIn(b'model_gateway_transient_failure', b''.join(x.get('body',b'') for x in sent))
 
 
 if __name__ == '__main__':

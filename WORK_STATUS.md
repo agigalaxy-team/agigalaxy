@@ -44,6 +44,8 @@ Gateway 诊断 `ca09091` 已通过 CI 并上线；新策略准备轮 `80b8c7fe-3
 
 `ec475a9` 的 Go、Admin、AgentOS 已通过 CI 并激活，139 迁移已记账，保护配置保持；旧意图 profile d009a700 已完成，Task GET 八段完整、finalAnalysis available，AiRuns 与绑定工作台两处均展示事实、分析和评估；但 AI 正文仍称全平台队列，同轮事实明确并非全平台，汇报准确性未通过。配置已恢复 disabled v16。站内消息草稿轮 `08ad1f68` 在两次读后发生 Gateway error frame 拒绝，原轮无卡无写；原失败保留，待定方案继续。
 
+`1ea1914` Go 日期上下文修复已上线。新目标 PROFILE-RIVER-REPORT-01 任务 `50219151` 自然完成，读取/结束与分析交付通过，River 范围表述正确；AI 把包含零结果的 resultKnownSearches 误称有结果搜索，指标解释仍未全通过。临时配置已恢复 disabled v18，原任务与输出保留。
+
 首批 `f65434e` 已通过 CI `40838654493`、`40838654443` 并部署 Go、Admin、AgentOS；官网保持 `8e919ac`。业务迁移 133→134，仅额外授予 Worker 角色对原操作命令表 SELECT。部署及无头结果均记入同一 canonical 操作日志。
 
 上轮工作台通信、独立读取、原失败接续与能力反馈已上线；以下记录可复用的已验证结果。本轮增加高级能力真实模型验收，不进行无关用户填充或压测。

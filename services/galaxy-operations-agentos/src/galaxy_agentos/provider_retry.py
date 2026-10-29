@@ -14,11 +14,34 @@ from .model_usage import _RUN
 _ACTIVE = ContextVar('galaxy_provider_retry_active', default=frozenset())
 
 
+def gateway_transient_failure(error):
+    if not isinstance(error, ModelProviderError):
+        return None
+    reported = getattr(error, 'status_code', None)
+    if reported is not None and (type(reported) is not int or reported != 503):
+        return None
+    current = error
+    for _ in range(5):
+        body = getattr(current, 'body', None)
+        if isinstance(body, dict):
+            info = body.get('error', body)
+            if (isinstance(info, dict) and set(info) == {'code', 'source', 'status', 'category', 'outputStarted'}
+                    and info.get('code') == 'model_gateway_transient_failure'
+                    and info.get('source') == 'model-gateway' and type(info.get('status')) is int
+                    and info['status'] == 503 and info.get('category') == 'service-unavailable'
+                    and info.get('outputStarted') is False):
+                return {'status': 503, 'source': 'model-gateway'}
+        current = getattr(current, '__cause__', None) or getattr(current, '__context__', None)
+        if current is None:
+            break
+    return None
+
+
 def _retryable(error):
     failure = provider_failure(error)
     if failure and (failure['status'] in (408, 429) or 500 <= failure['status'] <= 599):
         return failure
-    return None
+    return gateway_transient_failure(error)
 
 
 def _snapshot(args, kwargs):
@@ -53,8 +76,8 @@ def _event(model, failure, kwargs):
     run = kwargs.get('run_response') or _RUN.get()
     if run is not None:
         metadata = run.metadata if isinstance(run.metadata, dict) else {}
-        run.metadata = {**metadata, 'modelProviderRetry': {'attempts': 1, 'statuses': [failure['status']]}}
-    print(json.dumps({'event': 'model-provider-retry', 'source': 'provider', 'status': failure['status'],
+        run.metadata = {**metadata, 'modelProviderRetry': {'attempts': 1, 'statuses': [failure['status']], 'sources': [failure['source']]}}
+    print(json.dumps({'event': 'model-provider-retry', 'source': failure['source'], 'status': failure['status'],
         'attempt': 2, 'state': 'scheduled', 'runId': getattr(run, 'run_id', None), 'alias': model.id}), flush=True)
 
 
@@ -63,9 +86,10 @@ def _finished(kwargs, error=None):
     if run is not None and isinstance(run.metadata, dict):
         info = run.metadata.get('modelProviderRetry')
         if isinstance(info, dict):
-            failure = provider_failure(error) if error is not None else None
+            failure = _retryable(error) if error is not None else None
             run.metadata = {**run.metadata, 'modelProviderRetry': {
-                'attempts': 2, 'statuses': [*info['statuses'], *([failure['status'] if failure else None] if error is not None else [])]}}
+                'attempts': 2, 'statuses': [*info['statuses'], *([failure['status'] if failure else None] if error is not None else [])],
+                'sources': [*info['sources'], *([failure['source'] if failure else None] if error is not None else [])]}}
 
 
 def with_provider_retry(model):

@@ -21,6 +21,17 @@ def rejected(status, source='provider'):
     return error
 
 
+def gateway_rejected(**changes):
+    value = {'code':'model_gateway_transient_failure','source':'model-gateway','status':503,
+        'category':'service-unavailable','outputStarted':False}
+    value.update(changes)
+    cause = RuntimeError('private body')
+    cause.body = {'error':value}
+    error = ModelProviderError('closed', status_code=503, model_name='test', model_id='test')
+    error.__cause__ = cause
+    return error
+
+
 class Model:
     def __init__(self, results, name='galaxy-test'):
         self.id, self.results, self.calls = name, list(results), 0
@@ -54,6 +65,34 @@ class Model:
 
 class ProviderRetry(unittest.TestCase):
     @patch('galaxy_agentos.provider_retry.time.sleep')
+    def test_gateway_transient_is_one_same_model_retry_only(self, _sleep):
+        model = with_provider_retry(Model([gateway_rejected(), 'ok']))
+        run = SimpleNamespace(metadata={}, run_id='run')
+        self.assertEqual(model.invoke(messages=[], run_response=run), 'ok')
+        self.assertEqual(model.calls, 2)
+        self.assertEqual(run.metadata['modelProviderRetry']['sources'], ['model-gateway'])
+        direct = gateway_rejected()
+        direct.__cause__.body = direct.__cause__.body['error']
+        model = with_provider_retry(Model([direct, 'ok']))
+        self.assertEqual(model.invoke(messages=[]), 'ok')
+        self.assertEqual(model.calls, 2)
+        second = gateway_rejected()
+        model = with_provider_retry(Model([gateway_rejected(), second]))
+        with self.assertRaises(ModelProviderError) as caught: model.invoke(messages=[])
+        self.assertIs(caught.exception, second)
+        self.assertEqual(model.calls, 2)
+        for error in [gateway_rejected(category='context-limit'), gateway_rejected(outputStarted=True),
+                gateway_rejected(status=502), rejected(500, 'model-gateway')]:
+            model = with_provider_retry(Model([error]))
+            with self.assertRaises(ModelProviderError): model.invoke(messages=[])
+            self.assertEqual(model.calls, 1)
+        model = with_provider_retry(Model([['fragment', gateway_rejected()], ['unexpected']]))
+        stream = model.invoke_stream(messages=[])
+        self.assertEqual(next(stream), 'fragment')
+        with self.assertRaises(ModelProviderError): next(stream)
+        self.assertEqual(model.calls, 1)
+
+    @patch('galaxy_agentos.provider_retry.time.sleep')
     def test_retry_rechecks_authority_and_counts_real_calls(self, sleep):
         model = Model([rejected(500), 'ok'])
         gateway = SimpleNamespace(authorize=lambda *a, **k: {})
@@ -68,7 +107,7 @@ class ProviderRetry(unittest.TestCase):
                 _RUN.reset(token)
         self.assertEqual(model.calls, 2)
         self.assertEqual(run.metadata['modelCalls'], 2)
-        self.assertEqual(run.metadata['modelProviderRetry'], {'attempts': 2, 'statuses': [500]})
+        self.assertEqual(run.metadata['modelProviderRetry'], {'attempts': 2, 'statuses': [500], 'sources': ['provider']})
         sleep.assert_called_once_with(0.25)
 
     @patch('galaxy_agentos.provider_retry.time.sleep')
