@@ -1,6 +1,7 @@
 package operationsqueries
 
 func maintenanceProjection(x Object) Object {
+	evidenceMeaning := Object{"process": "observed-process-state", "health": "reported-health-checks-only", "configurationRationale": "not-reported", "runningImpliesHealthy": false, "unconfiguredImpliesHealthy": false}
 	availability := shape("state code", "s")
 	out := object(project(x, Object{"components": []any{merge(shape("id label processState processBasis health healthBasis checkedAt processCheckedAt healthCheckedAt code", "s"), Object{"processAvailability": availability, "healthAvailability": availability})}, "storage": []any{merge(shape("id kind observedAt", "s"), Object{"availability": availability}, shape("capacityBytes availableBytes usedBytes physicalReclaimedBytes", "n"))}, "queues": merge(shape("scope", "s"), Object{"includesAllPlatformQueues": "b", "availability": availability, "items": []any{Object{"name": "s", "counts": shape("created retry active completed cancelled failed", "n")}}}), "errors": merge(shape("window scope", "s"), Object{"availability": availability, "includesAllComponents": "b", "count": "n"}), "maintenanceMode": merge(shape("state source", "s"), Object{"businessWritesAccepted": "b", "revision": "n"}), "nativeAvailability": availability}))
 	items, ok := out["components"].([]any)
@@ -9,7 +10,7 @@ func maintenanceProjection(x Object) Object {
 		sourceTotal = len(original)
 	}
 	if !ok {
-		out["componentSummary"] = Object{"basis": "returned-component-list", "available": false, "total": nil, "sourceTotal": nil, "complete": false, "processByState": nil, "healthByBasis": nil}
+		out["componentSummary"] = Object{"basis": "returned-component-list", "available": false, "total": nil, "sourceTotal": nil, "complete": false, "processByState": nil, "healthByBasis": nil, "evidenceMeaning": evidenceMeaning}
 		return out
 	}
 	process := Object{"running": 0, "stopped": 0, "failed": 0, "not-applicable": 0, "unknown": 0}
@@ -53,6 +54,6 @@ func maintenanceProjection(x Object) Object {
 	for _, key := range order {
 		health = append(health, groups[key])
 	}
-	out["componentSummary"] = Object{"basis": "returned-component-list", "available": true, "total": len(items), "sourceTotal": sourceTotal, "complete": sourceTotal == len(items), "processByState": process, "healthByBasis": health}
+	out["componentSummary"] = Object{"basis": "returned-component-list", "available": true, "total": len(items), "sourceTotal": sourceTotal, "complete": sourceTotal == len(items), "processByState": process, "healthByBasis": health, "evidenceMeaning": evidenceMeaning}
 	return out
 }

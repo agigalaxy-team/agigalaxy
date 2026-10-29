@@ -67,6 +67,13 @@ func recommendationProjection(x Object) Object {
 }
 func searchProjection(x Object) Object {
 	data := object(project(x, Object{"period": merge(shape("from to", "s"), Object{"days": "n"}), "metrics": queryMetrics, "trend": Object{"availability": "s", "items": []any{merge(Object{"date": "s"}, queryMetrics)}}, "queries": Object{"items": []any{merge(shape("key label", "s"), queryMetrics, Object{"issueCodes": []any{"s"}})}}, "configuration": Object{"revision": "n", "active": Object{"id": "s", "version": "n"}, "draft": Object{"id": "s", "version": "n"}, "pending": shape("operationId phase errorCode", "s"), "native": Object{"state": "s"}}, "basis": merge(shape("source metricsSource unit rates bounds qualityCollection noResult", "s"), Object{"historicalBackfill": "b"})}))
+	data["resultOutcomeFacts"] = searchOutcomeFacts(object(data["metrics"]))
+	for _, key := range []string{"trend", "queries"} {
+		for _, item := range anyArray(object(data[key])["items"]) {
+			row := object(item)
+			row["resultOutcomeFacts"] = searchOutcomeFacts(row)
+		}
+	}
 	var settings any
 	if parsed, e := discovery.QuerySearchSettings(object(object(object(x["configuration"])["active"])["settings"])); e == nil {
 		settings = parsed
