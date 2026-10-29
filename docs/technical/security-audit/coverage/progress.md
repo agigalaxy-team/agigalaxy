@@ -1,3 +1,8 @@
+# 覆盖进度快照
+
+这是指定时点静态审阅进度，不是安全通过率。
+
+```json
 {
   "snapshot_at": "2026-10-29T02:54:40.566376+00:00",
   "baseline_commit": "9fa17ee2b74c621303c598fcd272f8c38f4b9b8f",
@@ -24,3 +29,5 @@
   },
   "note": "Full means matched-baseline static full-read assertion in reviewer ledger, not independently verified safe or runtime-tested. Hybrid and structural excluded from full. Partial/full records for same blob represent accumulated evidence, not conflicts. Main increment 6ab0e40 kept separate."
 }
+
+```
