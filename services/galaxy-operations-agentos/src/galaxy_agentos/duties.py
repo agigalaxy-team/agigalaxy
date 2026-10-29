@@ -49,19 +49,11 @@ class RemainingWork(BaseModel):
     description: str = Field(min_length=1, max_length=240)
 
 
-class ReadResolution(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    failedCallId: UUID
-    resolution: Literal["superseded", "not-applicable"]
-    evidenceCallIds: list[UUID] = Field(min_length=1, max_length=20)
-
-
 class TaskAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid")
     goalSatisfied: bool
     remainingWork: list[RemainingWork] = Field(max_length=8)
     summary: str = Field(max_length=1000)
-    readResolutions: list[ReadResolution] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def consistent(self):
@@ -124,15 +116,18 @@ def duty_tools(gateway, allowed):
     def assess_task(run_context: RunContext, fc: FunctionCall, assessment: TaskAssessment) -> str:
         """Assess the frozen goal; never treat an assessment as evidence of effects.
 
-        Use readResolutions only for original failed call IDs and completed
-        evidence call IDs returned by this task. The server verifies matching
-        scope or its supported empty-list condition; guesses cannot clear gaps.
+        The server checks original read and business evidence automatically;
+        no tool call IDs are required from the model.
         """
         return _call(gateway, run_context, fc, "assess-task", assessment.model_dump(mode="json"))
 
     def reconcile_task_operations(run_context: RunContext, fc: FunctionCall) -> str:
         """Query original uncertain write operations without resending them."""
         return _call(gateway, run_context, fc, "reconcile-task-operations", {})
+
+    def inspect_operations(run_context: RunContext, fc: FunctionCall) -> str:
+        """Read the fixed current operations inspection, with explicit coverage and source limits."""
+        return _call(gateway, run_context, fc, "inspect-operations", {})
 
     def current_summary(run_context: RunContext, fc: FunctionCall) -> str:
         """Read current permitted operational counts and this task's current scope."""
@@ -162,7 +157,7 @@ def duty_tools(gateway, allowed):
 
     reader = _DutyReadGateway(gateway)
     reads = conversation_tools(reader)[:2]
-    candidates = {"assess-task": assess_task, "reconcile-task-operations": reconcile_task_operations, "current-summary": current_summary, "query-operations": reads[0],
+    candidates = {"inspect-operations": inspect_operations, "assess-task": assess_task, "reconcile-task-operations": reconcile_task_operations, "current-summary": current_summary, "query-operations": reads[0],
         "read-operation-object": reads[1], "execute-operation": execute_operation,
         "read-ai-delegation": read_ai_delegation}
     # The delegated role writer is supplied below from the matching closed

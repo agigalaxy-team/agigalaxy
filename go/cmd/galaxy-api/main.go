@@ -508,6 +508,7 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	autonomy := &operationsautonomy.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, AIWork: permissionService.AIWork}
 	connectWorkbench(agentConversations, autonomy, logger)
 	queries := &operationsqueries.Service{Pool: pool, Permissions: permissionService, Messaging: messages}
+	queries.DutyCurrentInspection = autonomy.DutyCurrentInspection
 	agentConversations.ValidateSources = agentConversations.SourceValidator(queries.Revalidate)
 	operationsDomain := &businessadmin.Domain{Pool: pool, Endpoint: endpoint, Authority: &operationspermissions.BusinessAuthority{Human: gateway, Duty: autonomy}, Duty: autonomy, PrincipalWithin: gateway.LockOperationsPrincipalWithin}
 	businessAudit := &operationsaudit.Service{Domain: operationsDomain}

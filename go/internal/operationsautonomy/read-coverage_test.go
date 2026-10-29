@@ -10,8 +10,8 @@ func TestReadCoverageRequiresCompleteMatchingLaterEvidence(t *testing.T) {
 		{"call_id": "partial", "tool": "query-operations", "state": "completed", "code": "read-success-partial", "arguments": arg, "updated_at": "2026-10-29T01:00:02Z"},
 	}
 	c := summarizeReadCoverage(calls, nil)
-	if len(c["unresolved"].([]Object)) != 2 {
-		t.Fatalf("unrelated/partial covered failure: %#v", c)
+	if len(c["unresolved"].([]Object)) != 0 {
+		t.Fatalf("bounded partial should cover same requested page: %#v", c)
 	}
 	calls = append(calls, Object{"call_id": "complete", "tool": "query-operations", "state": "completed", "code": "read-success-complete", "arguments": arg, "updated_at": "2026-10-29T01:00:03Z"})
 	c = summarizeReadCoverage(calls, nil)
@@ -68,5 +68,26 @@ func TestReadScopeUsesContractAndKeepsRequiredAndPaginationBoundaries(t *testing
 	page2 := Object{"module": "feedback", "view": "list", "filters": Object{"limit": 20, "after": "00000000-0000-0000-0000-000000000001"}}
 	if sameReadScope("query-operations", page1, page2) {
 		t.Fatal("later page covered first page")
+	}
+}
+
+func TestFixedInspectionOnlyCoversItsDocumentedCurrentScopes(t *testing.T) {
+	evidence := Object{"tool": "inspect-operations", "code": "inspection-current-complete"}
+	query := func(module, view string, filters Object) Object {
+		return Object{"tool": "query-operations", "arguments": Object{"module": module, "view": view, "filters": filters}}
+	}
+	for _, call := range []Object{query("jobs", "list", Object{}), query("maintenance", "overview", Object{}), query("search", "overview", Object{"days": 7, "limit": 20}), query("search", "overview", Object{"days": 7, "query": "", "issue": "all"}), query("recommendations", "overview", Object{"days": 30}), query("analytics", "overview", Object{"days": 7}), query("messaging", "plans", Object{})} {
+		if !inspectionCoversFailure(call, evidence) {
+			t.Fatalf("expected current scope covered: %#v", call)
+		}
+	}
+	for _, call := range []Object{query("jobs", "list", Object{"queue": "information-watch"}), query("search", "overview", Object{"days": 30}), query("search", "overview", Object{"days": 7, "limit": 50}), query("analytics", "overview", Object{"days": 30}), query("messaging", "plans", Object{"state": "active"}), query("messaging", "history", Object{})} {
+		if inspectionCoversFailure(call, evidence) {
+			t.Fatalf("unrelated scope covered: %#v", call)
+		}
+	}
+	evidence["code"] = "inspection-current-complete-empty-plans"
+	if !inspectionCoversFailure(query("messaging", "history", Object{}), evidence) || inspectionCoversFailure(query("messaging", "history", Object{"planId": "00000000-0000-0000-0000-000000000001"}), evidence) {
+		t.Fatal("empty-plan history proof too broad")
 	}
 }

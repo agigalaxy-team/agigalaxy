@@ -73,6 +73,7 @@ def with_duty_completion(model, gateway):
                 if not isinstance(operations, list) or not any(isinstance(v, dict) and v.get("state") == "completed" for v in operations):
                     continue
             elif not (fact.get("availability") == "available" or
+                    name == "inspect_operations" and isinstance(fact.get("segments"), dict) and any(isinstance(segment, dict) and segment.get("availability") == "available" for segment in fact["segments"].values()) or
                     fact.get("state") == "completed" and fact.get("effectState") == "completed" or
                     name == "read_ai_delegation" and (isinstance(fact.get("prompt"), dict) or isinstance(fact.get("delegation"), dict))):
                 continue

@@ -229,6 +229,19 @@ func TestAssessmentBecomesStaleAfterBusinessTool(t *testing.T) {
 	if _, err := s.Tool(ctx, a.Object{"taskId": id, "callId": failed, "tool": "query-operations", "arguments": a.Object{"module": "maintenance", "view": "overview", "filters": a.Object{}}, "validationFailure": a.Object{"ambiguous": false}}, false); err == nil {
 		t.Fatal("local failure reused another scope's call ID")
 	}
+	s.QueryTool = func(_ context.Context, _ a.Actor, _ string, tool string, args a.Object) (a.Object, error) {
+		if tool != "inspect-operations" || len(args) != 0 {
+			t.Fatal("inspect escaped closed interface")
+		}
+		return a.Object{"profile": "current-operations-v1", "availability": "available", "inspectionChecked": true, "segments": a.Object{"messaging": a.Object{"data": a.Object{"plans": []any{}}}}}, nil
+	}
+	inspection := uuid.NewString()
+	if _, err := s.Tool(ctx, a.Object{"taskId": id, "callId": inspection, "tool": "inspect-operations", "arguments": a.Object{}}, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT code FROM operations_autonomy_tool_calls_v1 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, f.Endpoint, id, inspection).Scan(&code); err != nil || code != "inspection-current-complete-empty-plans" {
+		t.Fatalf("inspection evidence %s %v", code, err)
+	}
 	local := uuid.NewString()
 	if _, err := s.Tool(ctx, a.Object{"taskId": id, "callId": local, "tool": "query-operations", "arguments": a.Object{"module": "feedback", "view": "list", "filters": a.Object{"unknown-private": "DO_NOT_RETAIN"}}, "validationFailure": a.Object{"ambiguous": true}}, false); err != nil {
 		t.Fatal(err)
@@ -349,5 +362,60 @@ func TestDutyEventSourcesRespectTaskIDsAndCurrentReadPermissions(t *testing.T) {
 	}
 	if view["sourceCoverage"] != "partial" || len(view["sourceTargets"].([]a.Object)) != 1 {
 		t.Fatalf("summary source %#v", view)
+	}
+}
+
+func TestDutyCurrentInspectionWithholdsControlledOtherTaskAndKeepsOriginalReceipts(t *testing.T) {
+	pool, _ := testsupport.PostgreSQL(t)
+	ctx := context.Background()
+	f := operationsfixture.NewEndpoint(t, pool, "https://inspection.example.invalid")
+	base := autonomyfixture.Setup(t, f, f.Automation(t))
+	if _, err := pool.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=array_append(permissions,'autonomy.read') WHERE id=$1`, base["role"]); err != nil {
+		t.Fatal(err)
+	}
+	s := &a.Service{Pool: pool, Endpoint: f.Endpoint, AIWork: &operationsai.Service{Endpoint: f.Endpoint}, Now: time.Now}
+	self, other := uuid.NewString(), uuid.NewString()
+	for _, id := range []string{self, other} {
+		if _, err := postgres.InTx(ctx, pool, func(tx pgx.Tx) (a.Object, error) {
+			return s.LinkWorkbenchWithin(ctx, tx, a.WorkbenchLink{OperationID: id, Domain: "overview", AIAccountID: base["aiAccountId"].(string)})
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := pool.Exec(ctx, `UPDATE operations_autonomy_configs_v1 SET enabled=true WHERE endpoint=$1 AND domain='overview'`, f.Endpoint); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET source='routine',mode='ai',state='running',lease_until=now()+interval '10 minutes',dispatch_started_at=now() WHERE endpoint=$1 AND id=ANY($2::uuid[])`, f.Endpoint, []string{self, other}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET target_type='feedback',target_id=$3 WHERE endpoint=$1 AND id=$2`, f.Endpoint, other, uuid.NewString()); err != nil {
+		t.Fatal(err)
+	}
+	operation := uuid.NewString()
+	if _, err := pool.Exec(ctx, `INSERT INTO operations_autonomy_receipts_v1(id,endpoint,task_id,operation_id,action,state,basis,created_at) VALUES(gen_random_uuid(),$1,$2,$3,'fixture','unknown','original-operation-query',now())`, f.Endpoint, self, operation); err != nil {
+		t.Fatal(err)
+	}
+	actor, err := postgres.InTx(ctx, pool, func(tx pgx.Tx) (a.Actor, error) { return s.DutyForTaskWithin(ctx, tx, self, "query") })
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.DutyCurrentInspection(ctx, actor, "overview")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks := result["tasks"].([]a.Object)
+	if result["sourceWithheld"] != true || result["collectionComplete"] != false || result["taskCounts"] != nil || len(tasks) != 1 || tasks[0]["id"] != self || tasks[0]["self"] != true {
+		t.Fatalf("source coverage %#v", result)
+	}
+	receipts := tasks[0]["receipts"].([]a.Object)
+	if len(receipts) != 1 || receipts[0]["operationId"] != operation || receipts[0]["state"] != "unknown" {
+		t.Fatalf("original receipt %#v", tasks[0])
+	}
+	if _, err = pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET target_type=NULL,target_id=NULL,event_ids=$3 WHERE endpoint=$1 AND id=$2`, f.Endpoint, other, []string{uuid.NewString()}); err != nil {
+		t.Fatal(err)
+	}
+	result, err = s.DutyCurrentInspection(ctx, actor, "overview")
+	if err != nil || result["sourceWithheld"] != true || len(result["tasks"].([]a.Object)) != 1 {
+		t.Fatalf("coalesced event sources must be withheld %#v %v", result, err)
 	}
 }

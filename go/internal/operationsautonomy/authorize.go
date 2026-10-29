@@ -23,7 +23,7 @@ func (s *Service) toolsWithin(ctx context.Context, tx pgx.Tx, row Object, actor 
 	if len(texts(caps["queryPermissions"])) > 0 {
 		tools = append(tools, "current-summary")
 		if s.QueryTool != nil {
-			tools = append(tools, "query-operations", "read-operation-object")
+			tools = append(tools, "query-operations", "read-operation-object", "inspect-operations")
 		}
 	}
 	plan := obj(obj(row["configuration"])["plan"])

@@ -8,9 +8,13 @@
 
 本轮真实治理岗位提示词多轮：模型读取委派与原正文，生成操作卡；确认后 v4，再以新卡恢复精确原空正文至 v5。两个原操作回执 completed，最终回读 revision/promptVersion 5、正文为空；不以配置版本推断新任务已采用。追问回答在恢复卡仍待确认时提前称已恢复，后文虽提示需确认，表述矛盾，待修复及复测。
 
-总控值守已启用，基线 task `91ef2518-99b9-43f3-80bb-a2be9b720daf` 原失败为 `operations_agentos_not_configured`、unknown；精确 native GET 为 NOT_RECORDED，未重投。Worker 已通过 systemd credential 获得只读 AgentOS 配置并重启、实际 UID 可读；原任务经正式 reconcile 在同 task 下恢复，native run `24579867-ccc0-4619-8803-3d459c7f5250` 到 completed（6 次真实模型调用）；但 jobs/list 两次及 messaging/history 一次非法查询后无成功，assessment 仍声称全部核实，存在明确覆盖缺口，须修复并复测。
+总控值守曾启用，因真实巡检未收敛已正式暂停（配置 v3、nextDueAt=null）；基线 task `91ef2518-99b9-43f3-80bb-a2be9b720daf` 原失败为 `operations_agentos_not_configured`、unknown；精确 native GET 为 NOT_RECORDED，未重投。Worker 已通过 systemd credential 获得只读 AgentOS 配置并重启、实际 UID 可读；原任务经正式 reconcile 在同 task 下恢复，native run `24579867-ccc0-4619-8803-3d459c7f5250` 到 completed（6 次真实模型调用）；但 jobs/list 两次及 messaging/history 一次非法查询后无成功，assessment 仍声称全部核实，存在明确覆盖缺口，须修复并复测。
 
 真实策略草稿准备两轮均未生成卡，模型工具参数类型校验失败；拟议配置已通过共享 schema，原策略仍暂停、无草稿、未改写。后续需部署工具参数反馈修复后再测。自然定时 task `f19873b2-468a-4257-bd95-cf5e517cdd34` 失败，native 5 次调用、最后一次网关报告上游 HTTP 500；保留原任务，不自动重投。两个受控对象与选定授权已建并记账，验收后须恢复原状态及停用临时授权。
+
+第二批 `8179704` 已通过 CI `40843417830`、`40843417905` 并部署 Go、Admin、AgentOS；官网保持 `8e919ac`，未重复迁移。新巡检 task `c6fa2f32-7d04-45e5-9051-c425864bb026` 最终为 completion_incomplete：读失败和不完整分页未能被模型可靠解决，未错误宣称业务完成。策略草稿复测的原轮及一次正式接续均收到实际 token 后因流终态校验失败而终止，均未产生卡或业务写；具体终止原因待诊断，不能与另一次上游 HTTP 500 混同。
+
+聊天记录审查（五岗位现可读历史）：治理轮 `9a95f54f-67a8-42ee-abe2-3e2c8751d3b5` 与消息轮 `25936a95-11ff-4f75-a669-19e31190118c` 的普通问候回答暴露内部授权错误码；后续同岗位问候可正常回答，需核历史来源与当前修复覆盖。总控追问轮 `15718d5d-7ac9-4ef7-9b7b-0bebbf20c313` 将前次失败解释为权限或对象不可用，而相邻三轮原生记录为模型请求 502；指代与当时授权仍在核对，不先断言错拒权。已知提示词 prepared 被说成已恢复、策略类型校验和流终态失败保留上文记录。
 
 首批 `f65434e` 已通过 CI `40838654493`、`40838654443` 并部署 Go、Admin、AgentOS；官网保持 `8e919ac`。业务迁移 133→134，仅额外授予 Worker 角色对原操作命令表 SELECT。部署及无头结果均记入同一 canonical 操作日志。
 
@@ -28,7 +32,7 @@
 
 服务器由 `go/cmd/galaxy-api`、`galaxy-worker`、`galaxy-information-worker`、`galaxy-publisher`、`galaxy-migrate`、`galaxy-lifecycle` 承担；Native由 `go/cmd/galaxy` 的native、integration-mcp、host、integration-host承接。Next官网与Admin/Payload分别运行，共用浏览器运行机制。
 
-`packages/galaxy-contracts` 维护共同合同，`packages/galaxy-client` 维护浏览器／Node SDK，`go/internal/databaseschema/sql` 是132份迁移与四角色SQL的唯一现行来源，保留最高133与120空号。旧Core、Node CLI、Edge及Official业务树已移出整个项目，当前源码不保留替代内核或转发壳。
+`packages/galaxy-contracts` 维护共同合同，`packages/galaxy-client` 维护浏览器／Node SDK，`go/internal/databaseschema/sql` 是133份迁移与四角色SQL的唯一现行来源，最高134并保留120空号。旧Core、Node CLI、Edge及Official业务树已移出整个项目，当前源码不保留替代内核或转发壳。
 
 源码主库为公开的 `agigalaxy-team/agigalaxy`；银河自有代码Apache-2.0，第三方保留原许可。原公开仓库已整合并删除远端，原始Git历史及替代源码归档在项目外 `source-reviews/retired/`。现行产品、架构、开发、运维和公开说明集中在docs/；原始资料在originals/。
 

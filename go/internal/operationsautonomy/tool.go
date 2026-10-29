@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "manage-ai-prompt", "read-ai-delegation", "assess-task", "reconcile-task-operations"}
+var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "manage-ai-prompt", "read-ai-delegation", "assess-task", "reconcile-task-operations", "inspect-operations"}
 
 func parseTool(input Object) (Object, error) {
 	if !closed(input, []string{"taskId", "callId", "tool", "arguments"}, []string{"nativeRunId", "validationFailure"}) || !schemaUUID.MatchString(str(input["taskId"])) || !schemaUUID.MatchString(str(input["callId"])) || !has(toolNames, str(input["tool"])) || obj(input["arguments"]) == nil {
@@ -183,7 +183,10 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 			}
 			return s.reconcileTaskOperations(ctx, str(row["id"]), str(x["nativeRunId"]))
 		}
-		if tool == "query-operations" || tool == "read-operation-object" {
+		if tool == "query-operations" || tool == "read-operation-object" || tool == "inspect-operations" {
+			if tool == "inspect-operations" && len(args) != 0 {
+				return nil, invalid()
+			}
 			if s.QueryTool == nil {
 				return nil, fault.New("operations_autonomy_tool_not_configured", 503)
 			}
@@ -227,7 +230,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 				return false, e
 			}
 			tool := str(x["tool"])
-			if has([]string{"current-summary", "query-operations", "read-operation-object"}, tool) {
+			if has([]string{"current-summary", "query-operations", "read-operation-object", "inspect-operations"}, tool) {
 				if _, e = s.DutyForTaskWithin(ctx, tx, str(current["id"]), "query"); e != nil {
 					return false, e
 				}
@@ -258,6 +261,17 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 			if tool == "query-operations" || tool == "read-operation-object" {
 				state, code = readResultStatus(result)
 			}
+			if tool == "inspect-operations" {
+				if result["profile"] == "current-operations-v1" && result["inspectionChecked"] == true && result["availability"] == "available" {
+					code = "inspection-current-complete"
+					plans := obj(obj(obj(result["segments"])["messaging"])["data"])["plans"]
+					if items, ok := plans.([]any); ok && len(items) == 0 {
+						code = "inspection-current-complete-empty-plans"
+					}
+				} else {
+					code = "inspection-current-partial"
+				}
+			}
 			if tool == "read-ai-delegation" {
 				if obj(result["prompt"]) != nil || obj(result["delegation"]) != nil && result["targetAiAccounts"] != nil {
 					code = "read-success-complete"
@@ -278,7 +292,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state=$5,code=$6,updated_at=$4 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, x["taskId"], x["callId"], s.now(), state, code); e != nil {
 				return false, e
 			}
-			if result["availability"] == "available" && (has([]string{"query-operations", "read-operation-object"}, tool) || tool == "current-summary" && result["inspectionChecked"] == true) {
+			if result["availability"] == "available" && (has([]string{"query-operations", "read-operation-object"}, tool) || has([]string{"current-summary", "inspect-operations"}, tool) && result["inspectionChecked"] == true) {
 				if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET effective_check=true,updated_at=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, x["taskId"], s.now()); e != nil {
 					return false, e
 				}

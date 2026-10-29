@@ -35,31 +35,32 @@ import (
 type Object = map[string]any
 type Actor = operationspermissions.Actor
 type Service struct {
-	Pool            *pgxpool.Pool
-	Permissions     *operationspermissions.Service
-	Messaging       *messaging.Service
-	Accounts        StrategyReader
-	Feedback        *feedback.Operations
-	Community       *operationscommunity.Service
-	Resources       *operationsresources.Service
-	Files           *filegovernance.Service
-	ChatReports     *chat.ReportService
-	Strategies      StrategyReader
-	Analytics       StrategyReader
-	Recommendations StrategyReader
-	Search          StrategyReader
-	Runs            StrategyReader
-	Jobs            JobReader
-	Rules           *operationsrules.Service
-	Maintenance     *maintenance.Service
-	Audit           *operationsaudit.Service
-	Workbench       *Workbench
-	RegisteredUsers *registeredusers.Service
-	SystemSettings  *systemsettings.Service
-	SystemGeneral   *systemsettings.General
-	SummaryContext  func(context.Context, Actor, string, Object) (Object, error)
-	RecheckContext  func(context.Context, Actor, string, Object) error
-	Now             func() time.Time
+	Pool                  *pgxpool.Pool
+	Permissions           *operationspermissions.Service
+	Messaging             *messaging.Service
+	Accounts              StrategyReader
+	Feedback              *feedback.Operations
+	Community             *operationscommunity.Service
+	Resources             *operationsresources.Service
+	Files                 *filegovernance.Service
+	ChatReports           *chat.ReportService
+	Strategies            StrategyReader
+	Analytics             StrategyReader
+	Recommendations       StrategyReader
+	Search                StrategyReader
+	Runs                  StrategyReader
+	Jobs                  JobReader
+	Rules                 *operationsrules.Service
+	Maintenance           *maintenance.Service
+	Audit                 *operationsaudit.Service
+	Workbench             *Workbench
+	RegisteredUsers       *registeredusers.Service
+	SystemSettings        *systemsettings.Service
+	SystemGeneral         *systemsettings.General
+	SummaryContext        func(context.Context, Actor, string, Object) (Object, error)
+	RecheckContext        func(context.Context, Actor, string, Object) error
+	DutyCurrentInspection func(context.Context, Actor, string) (Object, error)
+	Now                   func() time.Time
 }
 type StrategyReader interface {
 	QueryRead(context.Context, Actor, operationspermissions.Authority, string, string, Object) (Object, error)
@@ -228,6 +229,12 @@ type arguments struct {
 func (s *Service) Query(ctx context.Context, actor Actor, domain, tool string, input Object) (Object, error) {
 	if !slices.Contains([]string{"overview", "governance", "messaging", "discovery", "maintenance"}, domain) {
 		return nil, invalid()
+	}
+	if tool == "inspect-operations" {
+		if len(input) != 0 {
+			return nil, invalid()
+		}
+		return s.InspectOperations(ctx, actor, domain)
 	}
 	if tool == "read-ai-delegation" {
 		if s.Permissions == nil {

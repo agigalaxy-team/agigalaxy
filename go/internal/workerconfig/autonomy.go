@@ -29,7 +29,8 @@ func autonomyWorker(pool *pgxpool.Pool, c Config, stored *access.StoredOperatorA
 	service.NativeConfigured = client.DutyConfigured
 	service.CodeRunner = service.RunWorkerCodeTask
 	permissions.Duty = service
-	service.QueryTool = (&operationsqueries.Service{Pool: pool, Permissions: permissions, Messaging: messages}).Query
+	queries := &operationsqueries.Service{Pool: pool, Permissions: permissions, Messaging: messages, DutyCurrentInspection: service.DutyCurrentInspection}
+	service.QueryTool = queries.Query
 	if messages != nil {
 		service.PersistedSourceWithin = messages.PersistedSourceWithin
 	}

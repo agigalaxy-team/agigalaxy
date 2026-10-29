@@ -49,57 +49,72 @@ func sameReadScope(tool string, failed, success Object) bool {
 
 // Later complete successes may cover an earlier read failure only for the same
 // original route and scope; the original failure remains in the ledger.
-func summarizeReadCoverage(calls []Object, assessment Object) Object {
+func summarizeReadCoverage(calls []Object, _ Object) Object {
 	successful, unresolved, unverified := []Object{}, []Object{}, []Object{}
 	for _, call := range calls {
 		tool := str(call["tool"])
-		if tool != "query-operations" && tool != "read-operation-object" && tool != "read-ai-delegation" {
+		if tool != "query-operations" && tool != "read-operation-object" && tool != "read-ai-delegation" && tool != "inspect-operations" {
 			continue
 		}
 		args := obj(call["arguments"])
 		fact := Object{"callId": call["call_id"], "tool": tool, "module": args["module"], "view": args["view"], "kind": args["kind"], "id": args["id"]}
 		code := str(call["code"])
+		if tool == "inspect-operations" {
+			if call["state"] == "completed" && has([]string{"inspection-current-complete", "inspection-current-complete-empty-plans"}, code) {
+				fact["coverage"] = "profile-complete"
+				fact["basis"] = "current-operations-v1"
+				successful = append(successful, fact)
+				continue
+			}
+			resolved := false
+			for _, later := range calls {
+				if later["tool"] == "inspect-operations" && later["state"] == "completed" && has([]string{"inspection-current-complete", "inspection-current-complete-empty-plans"}, str(later["code"])) && date(later["updated_at"]).After(date(call["updated_at"])) {
+					resolved = true
+					break
+				}
+			}
+			if !resolved {
+				fact["coverage"] = "profile-partial"
+				fact["basis"] = "current-operations-v1"
+				unresolved = append(unresolved, fact)
+			}
+			continue
+		}
 		fact["coverage"] = "failed"
 		if code == "read-success-partial" {
 			fact["coverage"] = "partial"
+			fact["collectionComplete"] = false
 		} else if has([]string{"read-success-complete", "read-success-empty-complete"}, code) {
 			fact["coverage"] = "complete"
+			fact["collectionComplete"] = true
 		} else if call["state"] == "completed" && code == "" {
 			fact["coverage"] = "unverified"
 		}
-		if call["state"] == "completed" && has([]string{"read-success-complete", "read-success-empty-complete"}, code) {
+		if call["state"] == "completed" && has([]string{"read-success-complete", "read-success-empty-complete", "read-success-partial"}, code) {
 			successful = append(successful, fact)
 			continue
 		}
 		legacyUnverified := call["state"] == "completed" && code == ""
 		resolved := false
 		for _, later := range calls {
-			if code != "local-validation-ambiguous" && later["tool"] == call["tool"] && later["state"] == "completed" && has([]string{"read-success-complete", "read-success-empty-complete"}, str(later["code"])) && date(later["updated_at"]).After(date(call["updated_at"])) && sameReadScope(tool, obj(call["arguments"]), obj(later["arguments"])) {
+			if code != "local-validation-ambiguous" && later["tool"] == call["tool"] && later["state"] == "completed" && has([]string{"read-success-complete", "read-success-empty-complete", "read-success-partial"}, str(later["code"])) && date(later["updated_at"]).After(date(call["updated_at"])) && sameReadScope(tool, obj(call["arguments"]), obj(later["arguments"])) {
 				resolved = true
 				break
 			}
 		}
-		if !resolved {
-			for _, value := range list(assessment["readResolutions"]) {
-				r := obj(value)
-				if r["failedCallId"] != call["call_id"] {
-					continue
+		if !resolved && code != "local-validation-ambiguous" {
+			for _, evidence := range calls {
+				if evidence["state"] == "completed" && date(evidence["updated_at"]).After(date(call["updated_at"])) && inspectionCoversFailure(call, evidence) {
+					resolved = true
+					break
 				}
-				for _, evidenceID := range texts(r["evidenceCallIds"]) {
-					for _, evidence := range calls {
-						if evidence["call_id"] != evidenceID || evidence["state"] != "completed" || !date(evidence["updated_at"]).After(date(call["updated_at"])) {
-							continue
-						}
-						if code != "local-validation-ambiguous" && r["resolution"] == "superseded" && evidence["tool"] == call["tool"] && has([]string{"read-success-complete", "read-success-empty-complete"}, str(evidence["code"])) && sameReadScope(tool, args, obj(evidence["arguments"])) {
-							resolved = true
-						}
-						if code != "local-validation-ambiguous" && r["resolution"] == "not-applicable" && emptyPlansProveNoHistory(call, evidence) {
-							resolved = true
-						}
-					}
+				if evidence["state"] == "completed" && date(evidence["updated_at"]).After(date(call["updated_at"])) && emptyPlansProveNoHistory(call, evidence) {
+					resolved = true
+					break
 				}
 			}
 		}
+
 		if !resolved {
 			if legacyUnverified {
 				unverified = append(unverified, fact)
@@ -127,4 +142,62 @@ func emptyPlansProveNoHistory(failed, evidence Object) bool {
 	}
 	scope := operationsquerycontract.QueryCoverageScope("query-operations", e)
 	return scope["valid"] == true && len(obj(scope["filters"])) == 0
+}
+
+// A fixed inspection covers only its documented overview scopes, never a
+// selected object, filtered queue, different window or requested later page.
+func inspectionCoversFailure(failed, evidence Object) bool {
+	if failed["tool"] != "query-operations" || evidence["tool"] != "inspect-operations" || !has([]string{"inspection-current-complete", "inspection-current-complete-empty-plans"}, str(evidence["code"])) {
+		return false
+	}
+	args := obj(failed["arguments"])
+	filters := obj(args["filters"])
+	if filters["after"] != nil || filters["page"] != nil || filters["pageSize"] != nil {
+		return false
+	}
+	module, view := str(args["module"]), str(args["view"])
+	if module == "jobs" && view == "list" {
+		return len(filters) == 0
+	}
+	if module == "messaging" && view == "history" {
+		return evidence["code"] == "inspection-current-complete-empty-plans" && len(filters) == 0
+	}
+	if module == "messaging" && view == "plans" {
+		for k := range filters {
+			if k != "limit" {
+				return false
+			}
+		}
+		return true
+	}
+	if view != "overview" {
+		return false
+	}
+	expected := map[string]int64{"search": 7, "recommendations": 30, "analytics": 7, "maintenance": 0}
+	days, ok := expected[module]
+	if !ok {
+		return false
+	}
+	for k := range filters {
+		allowed := k == "days" || module == "search" && has([]string{"limit", "query", "issue"}, k) || module == "recommendations" && k == "query"
+		if !allowed && module != "maintenance" {
+			return false
+		}
+	}
+	scope := operationsquerycontract.QueryCoverageScope("query-operations", obj(clone(args)))
+	if scope["invalidRoute"] == true || scope["invalidFilters"] == true || scope["unknownTopLevel"] == true || len(list(scope["invalidFilterKeys"])) > 0 || len(list(scope["missingRequired"])) > 0 {
+		return false
+	}
+	sf := obj(scope["filters"])
+	if days == 0 {
+		return len(sf) == 0
+	}
+	profileScope := operationsquerycontract.QueryCoverageScope("query-operations", obj(clone(Object{"module": module, "view": view, "filters": Object{"days": days}})))
+	if profileScope["valid"] != true || !sameValue(sf, profileScope["filters"]) {
+		return false
+	}
+	if module == "search" && filters["limit"] != nil && num(filters["limit"]) > 20 {
+		return false
+	}
+	return true
 }
