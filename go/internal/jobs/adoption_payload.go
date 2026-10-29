@@ -98,7 +98,7 @@ func ParseLegacyPendingTask(endpoint string, j LegacyPendingJob) (Task, string, 
 		t.SourceID = adoptionText(d["planId"])
 		t.PlanVersion = adoptionInteger(d["planVersion"])
 	case AutonomyTask:
-		if !adoptionFields(d, []string{"taskId"}, []string{"reconcile"}) {
+		if !validAutonomyPayload(d, adoptionText(d["taskId"])) {
 			return t, key, adoptionInvalid()
 		}
 		t.SourceID = adoptionText(d["taskId"])

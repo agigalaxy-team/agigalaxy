@@ -2,6 +2,7 @@ package operationsautonomy_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,10 +17,12 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	a "github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/autonomyfixture"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -83,11 +86,30 @@ func TestTickOriginalCatchUpAndRealRiverWorkerRole(t *testing.T) {
 		t.Fatal(e)
 	}
 	var posts, gets atomic.Int32
+	var retryReady atomic.Bool
+	var retryTask, retryRun, retrySession string
+	postClaims := make(chan a.Object, 4)
+	retryPayload := make(chan a.Object, 4)
 	native := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			posts.Add(1)
+			if retryReady.Load() {
+				parts := strings.Split(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), ".")
+				claims := a.Object{}
+				if len(parts) == 3 {
+					raw, _ := base64.RawURLEncoding.DecodeString(parts[1])
+					_ = json.Unmarshal(raw, &claims)
+				}
+				claims["idempotencyKey"] = r.Header.Get("Idempotency-Key")
+				postClaims <- claims
+			}
 		} else {
 			gets.Add(1)
+			if retryReady.Load() {
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(a.Object{"taskId": retryTask, "nativeRunId": retryRun, "sessionId": retrySession, "status": "ERROR"})
+				return
+			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(a.Object{"nativeRunId": "river-original-run", "status": "RUNNING", "modelState": "running"})
@@ -102,6 +124,9 @@ func TestTickOriginalCatchUpAndRealRiverWorkerRole(t *testing.T) {
 	var q *jobs.Queue
 	q, e = jobs.NewWithQueues(pool, func(ctx context.Context, task jobs.Task) (jobs.Outcome, error) {
 		if task.Action == jobs.AutonomyTask {
+			if retryReady.Load() {
+				retryPayload <- task.Payload
+			}
 			if task.Payload["taskId"] != task.SourceID {
 				t.Error("River ID replaced business task")
 			}
@@ -166,6 +191,61 @@ func TestTickOriginalCatchUpAndRealRiverWorkerRole(t *testing.T) {
 	var enabled int
 	if e = admin.QueryRow(ctx, `SELECT count(*) FROM operations_autonomy_configs_v1 WHERE endpoint=$1 AND domain<>'overview' AND enabled`, endpoint).Scan(&enabled); e != nil || enabled != 0 {
 		t.Fatalf("new plans enabled%d %v", enabled, e)
+	}
+	// Exercise the formal retry through the same River registration and transport.
+	retryTask, retryRun, retrySession = taskID, "river-original-run", uuid.NewString()
+	if _, e = admin.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='unknown',model_state='failed',session_id=$3,native_run_id=$4,dispatch_started_at=$5,lease_owner=NULL,lease_until=NULL WHERE endpoint=$1 AND id=$2`, endpoint, taskID, retrySession, retryRun, at); e != nil {
+		t.Fatal(e)
+	}
+	retryReady.Store(true)
+	control := &a.Service{Pool: f.Pool, Endpoint: endpoint, AIWork: s.AIWork, Authority: f.Gateway, Now: now, Native: s.Native, EnqueueWithin: s.EnqueueWithin}
+	control.Permissions = &operationspermissions.Service{Pool: f.Pool, Endpoint: endpoint, Authority: f.Gateway, StoredAuthority: f.Gateway, AIWork: s.AIWork, Duty: control, Now: now}
+	var rev int64
+	if e = admin.QueryRow(ctx, `SELECT revision FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, endpoint, taskID).Scan(&rev); e != nil {
+		t.Fatal(e)
+	}
+	attempt := uuid.NewString()
+	if _, e = control.Control(ctx, f.Root, taskID, a.Object{"kind": "retry", "operationId": attempt, "expectedRevision": rev}, nil); e != nil {
+		t.Fatal(e)
+	}
+	var nextSession string
+	if e = admin.QueryRow(ctx, `SELECT session_id FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, endpoint, taskID).Scan(&nextSession); e != nil || nextSession == retrySession {
+		t.Fatalf("retry session %s: %v", nextSession, e)
+	}
+	select {
+	case payload := <-retryPayload:
+		if payload["taskId"] != taskID || payload["nativeAttemptId"] != attempt || payload["sessionId"] != nextSession {
+			t.Fatalf("retry queue tuple: %v", payload)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	select {
+	case claims := <-postClaims:
+		if claims["taskId"] != taskID || claims["nativeAttemptId"] != attempt || claims["idempotencyKey"] != attempt {
+			t.Fatalf("retry transport: %v", claims)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	var currentState string
+	if e = admin.QueryRow(ctx, `SELECT state FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, endpoint, taskID).Scan(&currentState); e != nil {
+		t.Fatal(e)
+	}
+	postCount, getCount := posts.Load(), gets.Load()
+	for _, input := range []a.Object{{"taskId": taskID}, {"taskId": taskID, "nativeAttemptId": uuid.NewString(), "sessionId": nextSession}, {"taskId": taskID, "nativeAttemptId": attempt, "sessionId": retrySession}} {
+		out, err := worker.Execute(ctx, input)
+		if err != nil || out["state"] != currentState {
+			t.Fatalf("stale attempt: %v %v", out, err)
+		}
+	}
+	if posts.Load() != postCount || gets.Load() != getCount {
+		t.Fatal("stale tuple reached native transport")
+	}
+	select {
+	case claims := <-postClaims:
+		t.Fatalf("stale attempt dispatched: %v", claims)
+	default:
 	}
 }
 

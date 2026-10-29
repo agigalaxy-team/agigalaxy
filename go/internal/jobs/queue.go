@@ -71,22 +71,7 @@ func (t Task) valid() bool {
 		return t.PlanVersion >= 1 && t.PlanVersion <= 2147483646 && len(t.Payload) == 0
 	}
 	if t.Action == AutonomyTask {
-		id, ok := t.Payload["taskId"].(string)
-		if !ok || id != t.SourceID || len(t.Payload) < 1 || len(t.Payload) > 2 || t.PlanVersion != 0 {
-			return false
-		}
-		for key, value := range t.Payload {
-			if key == "taskId" {
-				continue
-			}
-			if key != "reconcile" {
-				return false
-			}
-			if _, ok := value.(bool); !ok {
-				return false
-			}
-		}
-		return true
+		return t.PlanVersion == 0 && validAutonomyPayload(t.Payload, t.SourceID)
 	}
 	if t.Action == AutonomyTick {
 		return len(t.Payload) == 0 && t.PlanVersion == 0 && t.SourceID == t.ID
