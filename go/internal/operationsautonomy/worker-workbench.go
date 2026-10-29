@@ -33,7 +33,7 @@ func (w *Worker) ReconcileWorkbench(ctx context.Context) error {
 		return nil
 	}
 	rows, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) ([]Object, error) {
-		return many(ctx, tx, `SELECT to_jsonb(t) FROM(SELECT t.id,t.domain,r.native_run_id,r.turn_operation_id FROM operations_autonomy_workbench_runs_v1 r JOIN operations_autonomy_tasks_v1 t ON t.endpoint=r.endpoint AND t.id=r.task_id WHERE r.endpoint=$1 AND r.native_run_id IS NOT NULL AND r.state IN ('running','unknown','waiting-human') AND t.state NOT IN ('stopped','blocked') ORDER BY r.updated_at LIMIT 10)t`, s.Endpoint)
+		return many(ctx, tx, `SELECT to_jsonb(t) FROM (SELECT task_id AS id,domain,native_run_id,turn_operation_id,conversation_id,session_id,operator_id,ai_account_id FROM public.galaxy_autonomy_workbench_observations_v1($1,NULL))t`, s.Endpoint)
 	})
 	if e != nil {
 		return e
@@ -45,7 +45,7 @@ func (w *Worker) ReconcileWorkbench(ctx context.Context) error {
 				return e
 			}
 			run := obj(value["run"])
-			if run == nil || run["runId"] != row["native_run_id"] || str(run["domain"]) != "" && run["domain"] != row["domain"] {
+			if run == nil || run["runId"] != row["native_run_id"] || run["domain"] != row["domain"] || run["componentType"] != "agent" || run["componentId"] != "galaxy-conversation-"+str(row["domain"]) || run["conversationId"] != row["conversation_id"] || run["sessionId"] != row["session_id"] {
 				return nil
 			}
 			model := map[string]string{"PENDING": "accepted", "RUNNING": "running", "COMPLETED": "completed", "PAUSED": "running", "CANCELLED": "cancelled", "ERROR": "failed"}[str(run["state"])]
@@ -66,6 +66,16 @@ func (w *Worker) ReconcileWorkbench(ctx context.Context) error {
 			tokens := obj(run["tokens"])
 			usage := Object{"calls": finite(run["calls"]), "inputTokens": finite(tokens["input"]), "outputTokens": finite(tokens["output"]), "totalTokens": finite(tokens["total"]), "durationMs": finite(run["durationMs"])}
 			_, e = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) {
+				// Lock the task before rechecking the durable original binding. The
+				// observer never transfers a result to a later retry turn.
+				current, e := s.taskWithin(ctx, tx, str(row["id"]), " FOR UPDATE")
+				if e != nil || current == nil {
+					return false, e
+				}
+				binding, e := optional(ctx, tx, `SELECT to_jsonb(t) FROM (SELECT task_id AS id,domain,native_run_id,turn_operation_id,conversation_id,session_id,operator_id,ai_account_id FROM public.galaxy_autonomy_workbench_observations_v1($1,$2))t`, s.Endpoint, row["id"])
+				if e != nil || binding == nil || !sameValue(binding, row) {
+					return false, e
+				}
 				if _, e := s.UpdateWorkbenchWithin(ctx, tx, WorkbenchUpdate{OperationID: str(row["id"]), TurnOperationID: ptr(row["turn_operation_id"]), NativeRunID: ptr(row["native_run_id"]), ModelState: &model, Status: &status, Usage: usage}); e != nil {
 					return false, e
 				}
