@@ -51,6 +51,7 @@
 - 优先级：中；完整性与来源归属风险。
 - 状态：confirmed_static，经两个审阅方向独立发现并由主审复读。SVC-002 与本项合并，不重复计数。
 - [verification/trust-package.mjs 103–112](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/packages/galaxy-contracts/src/verification/trust-package.mjs#L103-L112) 校验提供的 identity 控制链与其中设备签名，但只比较 consent.subjectId 与 source.authorId，没有把实际签名身份的 subjectId 绑定至这两个字段。
+- Go 实现存在同根遗漏：[trustpackages/portable.go 416–447](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/trustpackages/portable.go#L416-L447) 验证提供的身份链后，仅比较已签 consent.subjectId 与声称作者，没有比较该已验证身份本身。主审已复读该分支；本项同时覆盖 JS 与 Go，不重复计数。
 - 相邻 verifyTrustPermission 已有 grant.subjectId 与 proof.identity.subjectId/source.authorId 的等值要求，不能用复制许可的独立校验代替原作者签名校验。
 - 导入 verifyTrustPackage 对无效复制许可记录 invalid-or-expired 后继续计算 originalSignature，所以可出现“复制许可无效、原作者签名却有效”的错误归属结果。CLI verify-trust-package 输出保留该字段。
 
