@@ -77,3 +77,24 @@
 ## 其他发现的处理状态
 
 Native 信任缓存更新、RPC 超时/关闭、验证后设备投影，以及构建目录残留公开等线索已完成分域源码追踪，仍在主审复核和统一影响分级，不在本页提前列为最终验收结论。其余资源预算、上游依赖与运行环境风险继续审阅。
+
+
+## IDENTITY-001 成果文字的个人数据导出未复核当前来源许可
+
+- 优先级：中；当前授权撤回后的正文读取边界。
+- 状态：confirmed_static，经身份/数据生命周期审阅并由主审复读关键代码和产品合同；没有动态或生产验证。
+- [outcome.go 395–445](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/taskmaterials/outcome.go#L395-L445)：撤销先更新状态与 purge_pending，正文异步清除；普通 live 读取检查状态、请求许可和批准许可。
+- [subjectlifecycle/catalog.json 263–270](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/subjectlifecycle/catalog.json#L263-L270)：outcome-materials-v2 以请求者 subject_id 为导出归属，选择 body_text。
+- [export.go 327–371](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/subjectlifecycle/export.go#L327-L371)：通用 owner 查询得到该正文，只有 attachment 来源另调用 OutcomeMaterials 当前读取器；文字来源未走此检查。
+- [生产接线 subject-lifecycle.go 58–92](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/cmd/galaxy-api/subject-lifecycle.go#L58-L92)：没有该文字数据集的专用 OwnerReader 或转换覆盖。
+- [产品合同 data-and-files.md 28–30](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/docs/product/data-and-files.md#L28-L30) 明确受控派生正文撤回/到期后先停读再清理，导出按当前许可。导出票据 cutoff 是创建时间上界，不是权限快照。
+
+### 条件与影响
+
+请求者曾获作者批准取得消息型成果材料，并有当前有效 data-export 凭据和导出票据。作者之后撤销批准许可、材料撤销或到期，但正文仍在数据库时，新的导出页可能返回该正文，即使普通读取已判不可用。不是读取从未批准过的材料，不是任意跨主体访问，也不是撤销已经合法下载到外部的副本。只讨论撤回后再次向服务器取正文。
+
+### 修复与验证
+
+文字与附件导出都经过所属领域的当前授权读取器；不可用时仅保留允许导出的元数据回执，移除正文，不依赖异步擦除及时性。保留原 requester 范围和 cutoff 限制，但不要把 requester 等同作者或永久复制许可。
+
+隔离回归以合成作者 A、请求者 B 和有限期限许可覆盖撤销材料、到期、撤销批准 consent、撤销绑定四条路径；在暂停清理的条件下，普通读取和所有导出/MCP 页均不得返回正文。另测有效许可、不同请求者与真正本人创作的正例。未执行该回归。
