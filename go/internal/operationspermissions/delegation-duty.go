@@ -27,6 +27,44 @@ func (s *Service) delegatedIdentityWithin(ctx context.Context, tx pgx.Tx, a Acto
 	fresh, e := s.HumanAIWithin(ctx, tx, a, c.domain, purpose, permission)
 	return fresh, c.domain, c.accountID, nil, e
 }
+
+// delegatedReadIdentitiesWithin computes the two purpose projections once for
+// read-only capability discovery. Duty authorization stays on its own current
+// action checks; human actors use a single fresh snapshot for each purpose.
+type delegatedReadIdentities struct {
+	query, prepared   Actor
+	domain, accountID string
+	metadata          Object
+}
+
+func (s *Service) delegatedReadIdentitiesWithin(ctx context.Context, tx pgx.Tx, actor Actor) (delegatedReadIdentities, error) {
+	var out delegatedReadIdentities
+	if s.Duty != nil && s.Duty.AcceptsDuty(actor) {
+		query, domain, accountID, metadata, err := s.delegatedIdentityWithin(ctx, tx, actor, "workbench.read", "query")
+		if err != nil {
+			return out, err
+		}
+		prepared, _, _, _, err := s.delegatedIdentityWithin(ctx, tx, actor, "workbench.read", "prepare")
+		if err != nil {
+			return out, err
+		}
+		return delegatedReadIdentities{query, prepared, domain, accountID, metadata}, nil
+	}
+	c, err := s.humanContext(actor)
+	if err != nil {
+		return out, err
+	}
+	query, err := s.HumanAIReadWithin(ctx, tx, actor, c.domain, "query", "workbench.read")
+	if err != nil {
+		return out, err
+	}
+	prepared, err := s.HumanAIReadWithin(ctx, tx, actor, c.domain, "prepare", "workbench.read")
+	if err != nil {
+		return out, err
+	}
+	return delegatedReadIdentities{query, prepared, c.domain, c.accountID, nil}, nil
+}
+
 func (s *Service) delegatedActorKind(a Actor) string {
 	if s.Duty != nil && s.Duty.AcceptsDuty(a) {
 		return "operations-ai-service"

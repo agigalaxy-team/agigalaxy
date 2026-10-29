@@ -52,11 +52,19 @@ func (s *Service) Overview(ctx context.Context, a Actor, days int) (Object, erro
 		if e != nil {
 			return nil, e
 		}
+		idsForSources := make([]string, 0, len(current))
+		for _, row := range current {
+			idsForSources = append(idsForSources, str(row["id"]))
+		}
+		sources, e := s.taskSourceRefsForTasksWithin(ctx, tx, idsForSources)
+		if e != nil {
+			return nil, e
+		}
 		rows := []Object{}
 		withheld := []string{}
 		withheldDomains := map[string]bool{}
 		for _, r := range current {
-			if e = s.checkTargetWithin(ctx, tx, actor, r, true); e != nil {
+			if e = s.checkTargetWithRefsWithin(ctx, tx, actor, r, sources[str(r["id"])]); e != nil {
 				var f *fault.Error
 				if !errors.As(e, &f) || !hasStatus(f.Status) {
 					return nil, e

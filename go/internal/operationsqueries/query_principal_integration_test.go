@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
@@ -18,6 +20,99 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
+
+func TestSummaryIndependentSourcesAndFinalFreshBarrier(t *testing.T) {
+	owner, _ := testsupport.PostgreSQL(t)
+	f := operationsfixture.New(t, owner)
+	f.Automation(t)
+	seedQueryRole(t, f, "governance", []any{"jobs.read"})
+	f.Permissions.StoredAuthority = f.Gateway.StoredOperators()
+	domain := &businessadmin.Domain{Pool: f.Pool, Endpoint: f.Endpoint, Authority: f.Gateway, PrincipalWithin: f.Gateway.LockOperationsPrincipalWithin, Now: f.Now}
+	queries := &Service{Pool: f.Pool, Permissions: f.Permissions, Workbench: &Workbench{Domain: domain}, Now: f.Now}
+	bound := Object{"conversationId": uuid.NewString(), "turnId": uuid.NewString()}
+	for _, mode := range []string{"available", "source-unavailable", "revoked"} {
+		if !t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			contextEntered, businessEntered, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			var rechecked atomic.Bool
+			queries.SummaryContext = func(ctx context.Context, a Actor, d string, b Object) (Object, error) {
+				close(contextEntered)
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+				return Object{"priorReadReceipts": Object{"valuesCurrent": false}, "priorActionReceipts": Object{"valuesCurrent": false}, "priorOperationReceipts": Object{"valuesCurrent": false}, "boundedTask": nil}, nil
+			}
+			queries.Workbench.QueueSummary = func(ctx context.Context, _ pgx.Tx, _ string) (Object, error) {
+				close(businessEntered)
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+				if mode == "source-unavailable" {
+					return nil, fail("operations_summary_source_unavailable", 503)
+				}
+				return Object{"failed": 0}, nil
+			}
+			queries.RecheckContext = func(context.Context, Actor, string, Object) error {
+				select {
+				case <-release:
+					rechecked.Store(true)
+					return nil
+				default:
+					return fail("operations_agentos_scope_denied", 403)
+				}
+			}
+			type response struct {
+				value Object
+				err   error
+			}
+			finished := make(chan response, 1)
+			go func() {
+				value, err := queries.Summary(ctx, f.Root, "governance", bound)
+				finished <- response{value, err}
+			}()
+			for _, entered := range []chan struct{}{contextEntered, businessEntered} {
+				select {
+				case <-entered:
+				case early := <-finished:
+					t.Fatal("summary returned before both sources entered", early.value, early.err)
+				case <-time.After(3 * time.Second):
+					t.Fatal("independent summary sources remained serial")
+				}
+			}
+			select {
+			case early := <-finished:
+				t.Fatal("partial summary escaped before sources finished", early.value, early.err)
+			default:
+			}
+			if mode == "revoked" {
+				if _, err := owner.Exec(ctx, "UPDATE operations_ai_work_accounts_v1 SET enabled=false WHERE endpoint=$1 AND domain='governance'", f.Endpoint); err != nil {
+					t.Fatal(err)
+				}
+			}
+			close(release)
+			result := <-finished
+			if mode == "revoked" {
+				if fault.Status(result.err) != 403 || result.value != nil {
+					t.Fatal("parallel summary released data after fixed-AI withdrawal", result.value, result.err)
+				}
+				return
+			}
+			if result.err != nil || !rechecked.Load() || result.value["priorReadReceipts"] == nil || result.value["managementCapabilities"] == nil {
+				t.Fatal("parallel summary lost an independent source or final barrier", result.value, result.err)
+			}
+			if mode == "source-unavailable" && result.value["reason"] != "summary-unavailable" {
+				t.Fatal("temporary business source failure was not isolated", result.value)
+			}
+		}) {
+			return
+		}
+	}
+}
 
 func TestStoredHumanAIQueryPrincipalFeedbackAndSummary(t *testing.T) {
 	owner, _ := testsupport.PostgreSQL(t)

@@ -170,24 +170,29 @@ func (s *Service) delegatedRoleWithin(ctx context.Context, tx pgx.Tx, delegation
 	return role, nil
 }
 func (s *Service) delegatedAvailability(ctx context.Context, tx pgx.Tx, actor Actor) (Object, error) {
-	query, domain, accountID, metadata, e := s.delegatedIdentityWithin(ctx, tx, actor, "workbench.read", "query")
-	if e != nil {
-		return nil, e
+	identity, err := s.delegatedReadIdentitiesWithin(ctx, tx, actor)
+	if err != nil {
+		return nil, err
 	}
-	execution, _, _, _, e := s.delegatedIdentityWithin(ctx, tx, actor, "workbench.read", "prepare")
-	if e != nil {
-		return nil, e
-	}
+	availability, _, err := s.delegatedAvailabilityForIdentity(ctx, tx, identity)
+	return availability, err
+}
+
+// delegatedAvailabilityForIdentity consumes projections just verified in this
+// transaction and returns the delegation row for capability rendering too.
+func (s *Service) delegatedAvailabilityForIdentity(ctx context.Context, tx pgx.Tx, identity delegatedReadIdentities) (Object, Object, error) {
+	query, execution := identity.query, identity.prepared
+	domain, accountID, metadata := identity.domain, identity.accountID, identity.metadata
 	empty := Object{"canRead": false, "canReadRoles": false, "canReadPrompts": false, "managementActions": []any{}, "promptActions": []any{}, "targetAiAccountIds": []any{}, "delegationId": nil, "version": nil}
 	if domain != "overview" {
-		return empty, nil
+		return empty, nil, nil
 	}
 	row, e := s.delegationCurrent(ctx, tx, accountID)
 	if e != nil {
-		return nil, e
+		return nil, nil, e
 	}
 	if row == nil || row["enabled"] != true || metadata["delegationVersion"] != nil && num(metadata["delegationVersion"]) != num(row["version"]) || contains(stringsOf(row["target_ai_account_ids"]), accountID) || !safeCeiling(stringsOf(row["grantable_permissions"])) {
-		return empty, nil
+		return empty, row, nil
 	}
 	allowed := stringsOf(row["allowed_management_actions"])
 	canRoles := contains(allowed, "read") && contains(query.Permissions, "ai.roles.read")
@@ -204,7 +209,7 @@ func (s *Service) delegatedAvailability(ctx context.Context, tx pgx.Tx, actor Ac
 	if contains(allowed, "prompt-update") && contains(execution.Permissions, "ai.prompts.update") {
 		prompts = append(prompts, "update")
 	}
-	return Object{"canRead": canRoles, "canReadRoles": canRoles, "canReadPrompts": canPrompts, "managementActions": arrayOf(actions), "promptActions": arrayOf(prompts), "targetAiAccountIds": row["target_ai_account_ids"], "delegationId": row["id"], "version": row["version"]}, nil
+	return Object{"canRead": canRoles, "canReadRoles": canRoles, "canReadPrompts": canPrompts, "managementActions": arrayOf(actions), "promptActions": arrayOf(prompts), "targetAiAccountIds": row["target_ai_account_ids"], "delegationId": row["id"], "version": row["version"]}, row, nil
 }
 func (s *Service) DelegatedDirectory(ctx context.Context, actor Actor) (Object, error) {
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {

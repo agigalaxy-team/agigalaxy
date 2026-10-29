@@ -8,21 +8,22 @@ import (
 // ManagementCapabilitiesWithin exposes capability facts only. Prompt text,
 // credentials and policy bodies stay behind their separately checked readers.
 func (s *Service) ManagementCapabilitiesWithin(ctx context.Context, tx pgx.Tx, actor Actor) (Object, error) {
-	query, _, accountID, _, e := s.delegatedIdentityWithin(ctx, tx, actor, "workbench.read", "query")
+	identity, e := s.delegatedReadIdentitiesWithin(ctx, tx, actor)
 	if e != nil {
 		return nil, e
 	}
-	prepared, _, _, _, e := s.delegatedIdentityWithin(ctx, tx, actor, "workbench.read", "prepare")
+	query, prepared, accountID := identity.query, identity.prepared, identity.accountID
+	availability, row, e := s.delegatedAvailabilityForIdentity(ctx, tx, identity)
 	if e != nil {
 		return nil, e
 	}
-	availability, e := s.delegatedAvailability(ctx, tx, actor)
-	if e != nil {
-		return nil, e
-	}
-	row, e := s.delegationCurrent(ctx, tx, accountID)
-	if e != nil {
-		return nil, e
+	// The original capability view also looks up the current source delegation
+	// outside overview. Keep that lookup and its failure behavior unchanged.
+	if identity.domain != "overview" {
+		row, e = s.delegationCurrent(ctx, tx, accountID)
+		if e != nil {
+			return nil, e
+		}
 	}
 	targets := []any{}
 	if availability["canReadRoles"] == true || availability["canReadPrompts"] == true {

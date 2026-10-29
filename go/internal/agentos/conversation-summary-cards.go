@@ -61,9 +61,9 @@ func (t *ConversationTools) summaryCardBatch(ctx context.Context, human operatio
 	}
 	close(jobs)
 	workers.Wait()
-	// One final original authority check per actually used account/purpose/action
-	// follows all receipt/source I/O. The enclosing summary also rechecks the
-	// current conversation and every controlled source before releasing anything.
+	// One current read projection per actually used account/purpose/action follows
+	// all receipt/source I/O. The enclosing summary retains its separate final
+	// fresh authority/version, conversation and controlled-source barriers.
 	denied := map[cardReadPermission]bool{}
 	_, err := postgres.InTx(ctx, t.Conversations.Pool, func(tx pgx.Tx) (bool, error) {
 		for permission, entry := range batch.actors {
@@ -71,7 +71,7 @@ func (t *ConversationTools) summaryCardBatch(ctx context.Context, human operatio
 				denied[permission] = true
 				continue
 			}
-			if _, e := t.Conversations.Permissions.HumanAIAccountWithin(ctx, tx, human, row.Domain, permission.account, permission.purpose, permission.action); e != nil {
+			if _, e := t.Conversations.Permissions.HumanAIAccountReadWithin(ctx, tx, human, row.Domain, permission.account, permission.purpose, permission.action); e != nil {
 				if ctx.Err() != nil {
 					return false, ctx.Err()
 				}

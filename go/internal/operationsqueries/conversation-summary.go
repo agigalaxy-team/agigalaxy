@@ -2,6 +2,7 @@ package operationsqueries
 
 import (
 	"context"
+	"sync"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
@@ -22,9 +23,30 @@ func (s *Service) Summary(ctx context.Context, a Actor, domain string, bound Obj
 	if s.SummaryContext == nil || s.RecheckContext == nil {
 		return nil, fail("operations_agentos_conversation_not_ready", 503)
 	}
-	receipts, e := s.SummaryContext(ctx, current, domain, bound)
-	if e != nil {
-		return nil, e
+	// These readers share only the verified immutable actor, not a transaction
+	// or each other's result. Assemble them independently and publish only after
+	// all sources and the final current-authority/context barriers have finished.
+	var receipts, source, capabilities Object
+	var contextErr, sourceErr, capabilitiesErr error
+	var readers sync.WaitGroup
+	readers.Add(3)
+	go func() {
+		defer readers.Done()
+		receipts, contextErr = s.SummaryContext(ctx, current, domain, bound)
+	}()
+	go func() {
+		defer readers.Done()
+		if s.Workbench != nil {
+			source, sourceErr = s.WorkbenchSummary(ctx, current)
+		}
+	}()
+	go func() {
+		defer readers.Done()
+		capabilities, capabilitiesErr = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) { return s.Permissions.ManagementCapabilitiesWithin(ctx, tx, current) })
+	}()
+	readers.Wait()
+	if contextErr != nil {
+		return nil, contextErr
 	}
 	for _, key := range []string{"priorReadReceipts", "priorActionReceipts", "priorOperationReceipts", "boundedTask"} {
 		if _, ok := receipts[key]; !ok {
@@ -35,15 +57,17 @@ func (s *Service) Summary(ctx context.Context, a Actor, domain string, bound Obj
 	if s.Workbench == nil {
 		result = Object{"domain": domain, "availability": "unavailable", "reason": "summary-not-connected"}
 	} else {
-		source, err := s.WorkbenchSummary(ctx, current)
-		if err != nil {
-			if fault.Status(err) == 403 {
-				return nil, err
+		if sourceErr != nil {
+			if fault.Status(sourceErr) == 403 {
+				return nil, sourceErr
 			}
 			result = Object{"domain": domain, "availability": "unavailable", "reason": "summary-unavailable"}
 		} else {
 			result = ConversationSummary(source, domain, current.Permissions)
 		}
+	}
+	if capabilitiesErr != nil {
+		return nil, capabilitiesErr
 	}
 	fresh, e := s.human(ctx, current, domain, "workbench.read")
 	if e != nil {
@@ -53,13 +77,6 @@ func (s *Service) Summary(ctx context.Context, a Actor, domain string, bound Obj
 		return nil, fail("operations_agentos_authority_changed", 403)
 	}
 	if e = s.RecheckContext(ctx, fresh, domain, bound); e != nil {
-		return nil, e
-	}
-	capabilities, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) { return s.Permissions.ManagementCapabilitiesWithin(ctx, tx, fresh) })
-	if e != nil {
-		return nil, e
-	}
-	if _, e = s.human(ctx, fresh, domain, "workbench.read"); e != nil {
 		return nil, e
 	}
 	result["queryAccess"], result["managementCapabilities"] = operationsai.QueryAccess(fresh.Permissions), capabilities
