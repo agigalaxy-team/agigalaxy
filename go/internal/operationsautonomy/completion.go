@@ -8,7 +8,7 @@ import (
 var dutyWriters = []string{"execute-operation", "manage-ai-role", "manage-ai-prompt"}
 
 func parseAssessment(args Object) error {
-	if !closed(args, []string{"goalSatisfied", "remainingWork", "summary"}, nil) {
+	if !closed(args, []string{"goalSatisfied", "remainingWork", "summary"}, []string{"readResolutions"}) {
 		return invalid()
 	}
 	satisfied, ok := args["goalSatisfied"].(bool)
@@ -31,6 +31,27 @@ func parseAssessment(args Object) error {
 			return invalid()
 		}
 	}
+	if value, present := args["readResolutions"]; present {
+		resolutions, ok := value.([]any)
+		if !ok || len(resolutions) > 20 {
+			return invalid()
+		}
+		for _, item := range resolutions {
+			r := obj(item)
+			if !closed(r, []string{"failedCallId", "resolution", "evidenceCallIds"}, nil) || !schemaUUID.MatchString(str(r["failedCallId"])) || !has([]string{"superseded", "not-applicable"}, str(r["resolution"])) {
+				return invalid()
+			}
+			ids, ok := r["evidenceCallIds"].([]any)
+			if !ok || len(ids) < 1 || len(ids) > 20 {
+				return invalid()
+			}
+			for _, id := range ids {
+				if !schemaUUID.MatchString(str(id)) {
+					return invalid()
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -41,7 +62,7 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, r
 	if e != nil {
 		return nil, e
 	}
-	calls, e := many(ctx, tx, `SELECT to_jsonb(c) FROM (SELECT c.call_id,c.operation_id,c.tool,c.state,c.code,c.arguments,d.decision FROM operations_autonomy_tool_calls_v1 c LEFT JOIN operations_autonomy_decisions_v1 d ON d.endpoint=c.endpoint AND d.task_id=c.task_id AND d.call_id=c.call_id AND d.operation_id=c.operation_id WHERE c.endpoint=$1 AND c.task_id=$2) c`, s.Endpoint, row["id"])
+	calls, e := many(ctx, tx, `SELECT to_jsonb(c) FROM (SELECT c.call_id,c.operation_id,c.tool,c.state,c.code,c.arguments,c.updated_at,d.decision FROM operations_autonomy_tool_calls_v1 c LEFT JOIN operations_autonomy_decisions_v1 d ON d.endpoint=c.endpoint AND d.task_id=c.task_id AND d.call_id=c.call_id AND d.operation_id=c.operation_id WHERE c.endpoint=$1 AND c.task_id=$2) c`, s.Endpoint, row["id"])
 	if e != nil {
 		return nil, e
 	}
@@ -90,6 +111,7 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, r
 			unknown = true
 		}
 	}
+	readCoverage := summarizeReadCoverage(calls, assessment)
 	disposition, reason, next := "continue", "task-assessment-required", "继续当前任务并评估目标"
 	if assessment != nil {
 		reason = "task-work-remaining"
@@ -110,6 +132,9 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, r
 	if row["effective_check"] != true && business != "completed" && business != "no-action" && disposition == "completed" {
 		disposition, reason, next = "continue", "effective-check-required", "执行有效业务检查"
 	}
+	if (len(readCoverage["unresolved"].([]Object)) > 0 || len(readCoverage["unverified"].([]Object)) > 0) && disposition == "completed" {
+		disposition, reason, next = "continue", "read-coverage-incomplete", "处理未完成或未核实的原读取范围"
+	}
 	if pendingRead && disposition == "completed" {
 		disposition, reason, next = "continue", "read-in-progress", "等待原读取完成并重新评估"
 	}
@@ -124,5 +149,5 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, r
 		disposition, reason, next = "unknown", "original-operation-unknown", "核查原操作结果"
 		business = "unknown"
 	}
-	return Object{"modelAssessment": assessment, "businessState": business, "eligibleToComplete": disposition == "completed", "disposition": disposition, "reasonCode": reason, "nextAction": next}, nil
+	return Object{"modelAssessment": assessment, "readCoverage": readCoverage, "businessState": business, "eligibleToComplete": disposition == "completed", "disposition": disposition, "reasonCode": reason, "nextAction": next}, nil
 }

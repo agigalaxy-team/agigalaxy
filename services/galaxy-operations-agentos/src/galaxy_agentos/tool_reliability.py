@@ -14,6 +14,11 @@ from agno.tools.function import Function, FunctionCall
 from pydantic import ValidationError
 
 from .gateway import AuthorityDenied, AuthorityUnavailable, failure_diagnostic
+from .conversation_tool_feedback import _preparation_feedback
+from .tool_schema_feedback import operation_schema_feedback, repair_operation_alias
+
+PREPARED_CARD_MESSAGE = "请确认操作。"
+PREPARED_CARD_IDS = "_galaxyPreparedCardIds"
 
 EFFECT_TOOLS = frozenset({"run_authorized_work", "execute_operation", "manage_ai_role", "manage_ai_prompt"})
 
@@ -175,17 +180,12 @@ def _normalize(name, arguments, schema):
                 filters = {}
             if isinstance(filters, dict) and not any(key in filters and filters[key] != values[key] for key in misplaced):
                 values["filters"] = {**filters, **{key: values.pop(key) for key in sorted(misplaced)}}
-    if name == "prepare_operation" and isinstance(values.get("operation"), dict):
-        operation = values["operation"]
-        aliases = {definition.get("title"): definition.get("properties", {}).get("kind", {}).get("const")
-            for definition in schema.get("$defs", {}).values() if isinstance(definition, dict)}
-        alias = aliases.get(operation.get("kind"))
-        if alias:
-            operation["kind"] = alias
+    if name in {"prepare_operation", "execute_operation"}:
+        values = repair_operation_alias(values, schema)
     return repair(values, schema)
 
 
-def reliable_function(fn):
+def reliable_function(fn, *, on_read_validation_failure=None):
     native = Function.from_callable(fn)
     native.process_entrypoint()
     schema = deepcopy(native.parameters)
@@ -199,6 +199,20 @@ def reliable_function(fn):
         elif isinstance(value, list):
             for child in value:collect_fields(child)
     collect_fields(schema)
+
+    def record_local_failure(run_context, fc, values):
+        if on_read_validation_failure is None or native.name not in {"query_operations", "read_operation_object", "read_ai_delegation"}:
+            return
+        try:
+            on_read_validation_failure(run_context, fc, native.name, values, schema)
+        except Exception:
+            if run_context.metadata is None:
+                run_context.metadata = {}
+            run_context.metadata["_galaxyDutyValidationLedgerFailed"] = True
+            function = fc.function.model_copy()
+            function.stop_after_tool_call = True
+            fc.function = function
+            raise RuntimeError("agentos_autonomy_validation_ledger_unavailable") from None
 
     def invoke(run_context: RunContext, fc: FunctionCall, **arguments):
         if set(fc.arguments or {}).intersection({"run_context", "fc", "agent", "team"}):
@@ -214,6 +228,25 @@ def reliable_function(fn):
                     except (ValueError, TypeError):
                         value = {}
                     state = value.get("state", value.get("availability", "returned")) if isinstance(value, dict) else "returned"
+                    if isinstance(value, dict) and value.get("state") == "invalid-request":
+                        record_local_failure(run_context, fc, values)
+                    if native.name == "prepare_operation" and isinstance(value, dict):
+                        prepared = _preparation_feedback(value)
+                        if prepared["preparationFeedback"]["cardPrepared"] is True:
+                            card_id = value["card"]["cardId"]
+                            if run_context.metadata is None:
+                                run_context.metadata = {}
+                            ids = run_context.metadata.setdefault(PREPARED_CARD_IDS, [])
+                            if card_id not in ids:
+                                ids.append(card_id)
+                            # Only this provider call gets stop/show flags. Other
+                            # calls and other runs keep their original Function.
+                            function = fc.function.model_copy()
+                            function.stop_after_tool_call = True
+                            function.show_result = True
+                            fc.function = function
+                            _event(native.name, run_context, "prepared")
+                            return PREPARED_CARD_MESSAGE
                     feedback, diagnostic = _model_feedback(value)
                     _event(native.name, run_context, state if isinstance(state, str) and state in {"available", "prepared", "completed", "invalid-request", "changed", "unknown", "unavailable", "processing", "denied"} else "returned", diagnostic=diagnostic)
                     if diagnostic:
@@ -231,6 +264,7 @@ def reliable_function(fn):
             _event(native.name, run_context, feedback["state"], diagnostic=failure_diagnostic(error))
             return json.dumps(feedback, ensure_ascii=False)
         except ValidationError as error:
+            record_local_failure(run_context, fc, values)
             # Unknown dictionary keys and field names can themselves contain
             # private input. Log only schema-owned names and bounded indices.
             errors = [{"field": ".".join(str(x) if isinstance(x,int) and 0<=x<=1024 or isinstance(x,str) and x in known_fields else '<field>' for x in item['loc'][:8]),
@@ -242,6 +276,7 @@ def reliable_function(fn):
             _event(native.name, run_context, "invalid-request", errors=errors, exhausted=exhausted)
             return json.dumps({"state": "invalid-request", "message": "工具调用参数不符。", "dataRead": False, "valuesCurrent": False, "errors": errors,
                 "allowedFields": sorted(schema.get('properties',{})),
+                **(operation_schema_feedback(schema) if native.name in {"prepare_operation", "execute_operation"} else {}),
                 "effectExecuted": False, "cardPrepared": False, "retryable": not exhausted,
                 "nextStep": "report-blocked" if exhausted else "correct-arguments",
                 "instruction": "No card exists from this failed call. Correct the fields against this tool's schema and call again; never report success."}, ensure_ascii=False)

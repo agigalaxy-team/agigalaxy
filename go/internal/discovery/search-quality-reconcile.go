@@ -219,3 +219,18 @@ func (q *SearchQuality) Command(ctx context.Context, actor Actor, kind string, i
 	}
 	return merge(operationView(row, replayed), q.metadata()), nil
 }
+
+func (q *SearchQuality) CommandPreparedDraft(ctx context.Context, actor Actor, input Object) (Object, error) {
+	normalized, e := parseQualityInput("prepared-draft", input)
+	if e != nil {
+		return nil, e
+	}
+	row, replayed, e := q.prepare(ctx, actor, "draft", normalized)
+	if e != nil {
+		return nil, e
+	}
+	if _, e = q.authorize(ctx, actor, "search-quality.configure"); e != nil {
+		return nil, e
+	}
+	return merge(operationView(row, replayed), q.metadata()), nil
+}

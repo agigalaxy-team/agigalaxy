@@ -10,14 +10,18 @@ func parseDiscoveryRequest(input Object) (Object, error) {
 	x := clone(input)
 	kind := str(x["kind"])
 	fields := []string{"kind", "reason"}
-	if kind == "search-restore" {
+	optional := []string{}
+	if kind == "search-draft-save" {
+		fields = append(fields, "settings")
+		optional = append(optional, "expectedDraftId")
+	} else if kind == "search-restore" {
 		fields = append(fields, "versionId")
 	} else if kind == "recommendation-direction" {
 		fields = append(fields, "themeKey", "direction")
 	} else if kind != "search-apply" {
 		return nil, invalid()
 	}
-	if !exact(x, fields, nil) {
+	if !exact(x, fields, optional) {
 		return nil, invalid()
 	}
 	reason, ok := x["reason"].(string)
@@ -26,6 +30,19 @@ func parseDiscoveryRequest(input Object) (Object, error) {
 		return nil, invalid()
 	}
 	x["reason"] = reason
+	if kind == "search-draft-save" {
+		command := Object{"operationId": "00000000-0000-0000-0000-000000000000", "expectedRevision": 0, "reason": reason, "settings": x["settings"], "expectedDraftId": x["expectedDraftId"]}
+		parsed, e := discovery.ParseSearchCommand("prepared-draft", command)
+		if e != nil {
+			return nil, e
+		}
+		x["settings"] = parsed["settings"]
+		if parsed["expectedDraftId"] != nil {
+			x["expectedDraftId"] = parsed["expectedDraftId"]
+		} else {
+			delete(x, "expectedDraftId")
+		}
+	}
 	if kind == "search-restore" && !validID(x["versionId"]) {
 		return nil, invalid()
 	}
@@ -43,6 +60,13 @@ func recommendationPolicyBody(input Object) Object {
 }
 func normalizeDiscoveryCommand(x, command, proposal Object) (Object, error) {
 	kind := str(x["kind"])
+	if kind == "search-draft-save" {
+		out, e := discovery.ParseSearchCommand("prepared-draft", command)
+		if e != nil || !same(out["settings"], x["settings"]) || out["reason"] != x["reason"] || !same(out["expectedDraftId"], x["expectedDraftId"]) {
+			return nil, invalid()
+		}
+		return out, nil
+	}
 	if kind != "recommendation-direction" {
 		if !exact(command, []string{"operationId", "expectedRevision", "versionId", "reason"}, nil) {
 			return nil, invalid()

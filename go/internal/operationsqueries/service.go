@@ -20,6 +20,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsaudit"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsquerycontract"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsresources"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsrules"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
@@ -236,7 +237,13 @@ func (s *Service) Query(ctx context.Context, actor Actor, domain, tool string, i
 	}
 	args, e := parse(tool, input)
 	if e != nil {
-		return nil, e
+		if fault.Code(e) != "invalid_operations_agentos_query" {
+			return nil, e
+		}
+		scope := operationsquerycontract.QueryCoverageScope(tool, input)
+		out := Object{"tool": tool, "state": "invalid-request", "availability": "invalid-request", "code": "invalid_operations_agentos_query", "nextStep": "correct-arguments", "effectExecuted": false, "module": scope["module"], "view": scope["view"], "kind": scope["kind"], "idFormat": scope["idFormat"], "allowedModules": scope["allowedModules"], "allowedKinds": scope["allowedKinds"], "allowedViews": scope["allowedViews"], "allowedFilterKeys": scope["allowedFilterKeys"], "requiredFilterKeys": scope["requiredFilterKeys"], "invalidFilterKeys": scope["invalidFilterKeys"], "missingRequired": scope["missingRequired"], "unknownFields": scope["unknownFields"], "invalidRoute": scope["invalidRoute"], "filterEnums": scope["filterEnums"], "filterNumberRanges": scope["filterNumberRanges"], "filterFormats": scope["filterFormats"], "evidenceRefs": []any{}}
+		out["unknownFilterFields"], out["unknownTopLevel"] = scope["unknownFilterFields"], scope["unknownTopLevel"]
+		return out, nil
 	}
 	action := readAction(args)
 	contentPage := tool == "query-operations" && args.module == "content" && args.view == "list"

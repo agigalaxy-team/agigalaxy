@@ -59,7 +59,7 @@ func ParseRequest(input Object) (Object, error) {
 		required = append(required, "key", "reason")
 	case "rule-restore":
 		required = append(required, "key", "versionId", "reason")
-	case "search-apply", "search-restore", "recommendation-direction":
+	case "search-draft-save", "search-apply", "search-restore", "recommendation-direction":
 		return parseDiscoveryRequest(x)
 	case "job-cancel", "job-retry":
 		required = append(required, "targetId", "queue", "reason")

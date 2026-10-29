@@ -161,10 +161,12 @@ class GalaxyGateway:
             raise AuthorityDenied("agentos_autonomy_operation_invalid")
         return self.request("autonomy/authorize", {"taskId": autonomy_id(user_id), "operation": operation})
 
-    def duty_tool(self, user_id, tool, arguments, *, call_id, run_id):
-        return self.request("autonomy/tools/execute", {"taskId": autonomy_id(user_id),
-            "callId": str(UUID(call_id)), "nativeRunId": run_id, "tool": tool,
-            "arguments": arguments}, tool_feedback=True)
+    def duty_tool(self, user_id, tool, arguments, *, call_id, run_id, validation_failure=None):
+        payload = {"taskId": autonomy_id(user_id), "callId": str(UUID(call_id)),
+            "nativeRunId": run_id, "tool": tool, "arguments": arguments}
+        if validation_failure is not None:
+            payload["validationFailure"] = validation_failure
+        return self.request("autonomy/tools/execute", payload, tool_feedback=True)
 
     def duty_report(self, user_id, data):
         return self.request("autonomy/report", {"taskId": autonomy_id(user_id), **data})

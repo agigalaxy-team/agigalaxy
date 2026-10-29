@@ -2,11 +2,17 @@ package actions
 
 func discoveryResult(kind string, result Object, operationID string, x, command Object, receipt bool) (Object, error) {
 	if kind != "recommendation-direction" {
+		if result["operationId"] != operationID {
+			return nil, fail("operations_agentos_operation_conflict", 409)
+		}
 		safe := safeReceipt(result)
 		state, summary := "completed", "本次处理已完成。"
 		switch safe["phase"] {
 		case "applied":
 			summary = "搜索配置已生效。"
+			if kind == "search-draft-save" {
+				summary = "搜索配置草稿已保存，尚未应用。"
+			}
 		case "failed":
 			state, summary = "failed", "搜索配置未生效。"
 		case "result-unknown":

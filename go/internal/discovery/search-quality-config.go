@@ -14,8 +14,11 @@ import (
 
 func parseQualityInput(kind string, input Object) (Object, error) {
 	fields := []string{"operationId", "expectedRevision", "reason", "versionId"}
-	if kind == "draft" {
+	if kind == "draft" || kind == "prepared-draft" {
 		fields[3] = "settings"
+		if kind == "prepared-draft" {
+			fields = append(fields, "expectedDraftId")
+		}
 	} else if kind != "apply" && kind != "restore" {
 		return nil, settingsInvalid()
 	}
@@ -29,7 +32,17 @@ func parseQualityInput(kind string, input Object) (Object, error) {
 		return nil, settingsInvalid()
 	}
 	out := Object{"operationId": strings.ToLower(str(input, "operationId")), "expectedRevision": revision, "reason": reason}
-	if kind != "draft" {
+	if kind == "prepared-draft" {
+		id, exists := input["expectedDraftId"]
+		if !exists || id != nil && !validID(str(input, "expectedDraftId")) {
+			return nil, settingsInvalid()
+		}
+		if id != nil {
+			id = strings.ToLower(str(input, "expectedDraftId"))
+		}
+		out["expectedDraftId"] = id
+	}
+	if kind != "draft" && kind != "prepared-draft" {
 		if !validID(str(input, "versionId")) {
 			return nil, settingsInvalid()
 		}
@@ -152,6 +165,12 @@ func (q *SearchQuality) prepare(ctx context.Context, actor Actor, kind string, i
 	}
 	if q.Authority.Duty != nil && q.Authority.Duty.AcceptsDuty(fresh) {
 		selection := Object{"operationId": input["operationId"], "command": input}
+		if kind == "draft" {
+			selection["id"] = input["expectedDraftId"]
+			if selection["id"] == nil {
+				selection["id"] = input["operationId"]
+			}
+		}
 		if input["versionId"] != nil {
 			selection["id"] = input["versionId"]
 		}
@@ -175,6 +194,22 @@ func (q *SearchQuality) prepare(ctx context.Context, actor Actor, kind string, i
 	}
 	if state["pending_operation"] != nil {
 		return nil, false, qualityFailure("search_quality_operation_pending")
+	}
+	if kind == "draft" {
+		if expected, bound := input["expectedDraftId"]; bound {
+			if state["draft_id"] != expected {
+				return nil, false, qualityFailure("search_quality_draft_changed")
+			}
+			if expected != nil {
+				draft, e := q.version(ctx, tx, str(state, "draft_id"))
+				if e != nil {
+					return nil, false, e
+				}
+				if draft == nil || draft["operator_id"] != fresh.ID {
+					return nil, false, qualityFailure("search_quality_draft_changed")
+				}
+			}
+		}
 	}
 	at := q.now()
 	if _, e = tx.Exec(ctx, "INSERT INTO operations_search_quality_state_v1(endpoint,updated_at) VALUES($1,$2) ON CONFLICT DO NOTHING", q.Endpoint, at); e != nil {

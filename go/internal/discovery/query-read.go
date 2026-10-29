@@ -40,6 +40,26 @@ func (q *SearchQuality) QueryRead(ctx context.Context, a Actor, authority p.Auth
 		return reader.Overview(ctx, a, input)
 	case "history":
 		return reader.History(ctx, a, input)
+	case "search-version":
+		if !validID(id) {
+			return nil, settingsInvalid()
+		}
+		if _, e := reader.authorize(ctx, a, "search-quality.read"); e != nil {
+			return nil, e
+		}
+		version, e := reader.version(ctx, reader.Pool, id)
+		if e != nil {
+			return nil, e
+		}
+		if version == nil {
+			return nil, qualityFailure("search_quality_version_unavailable", 404)
+		}
+		if _, e = reader.authorize(ctx, a, "search-quality.read"); e != nil {
+			return nil, e
+		}
+		view := versionView(version)
+		view["wasApplied"] = version["was_applied"] == true
+		return merge(Object{"version": view}, reader.metadata()), nil
 	}
 	return nil, settingsInvalid()
 }

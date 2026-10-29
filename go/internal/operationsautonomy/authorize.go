@@ -69,11 +69,13 @@ func (s *Service) Authorize(ctx context.Context, input Object) (Object, error) {
 		}
 		tools := []string{}
 		var roleVersion any
+		var dutyActor Actor
 		if input["operation"] != "read" {
 			actor, e := s.DutyForTaskWithin(ctx, tx, str(row["id"]), "query")
 			if e != nil {
 				return nil, e
 			}
+			dutyActor = actor
 			roleVersion = actor.Version
 			tools, e = s.toolsWithin(ctx, tx, row, actor)
 			if e != nil {
@@ -81,6 +83,13 @@ func (s *Service) Authorize(ctx context.Context, input Object) (Object, error) {
 			}
 		} else if row["dispatch_started_at"] == nil {
 			return nil, fail("operations_autonomy_task_inactive")
+		}
+		sources := Object{"sourceTargets": []Object{}, "sourceCoverage": "unavailable", "basis": "task-event-locators-not-current-source-authorization"}
+		if input["operation"] != "read" {
+			sources, e = s.taskEventSourcesWithin(ctx, tx, row, dutyActor)
+			if e != nil {
+				return nil, e
+			}
 		}
 		cfg := obj(row["configuration"])
 		plan := obj(cfg["plan"])
@@ -96,7 +105,7 @@ func (s *Service) Authorize(ctx context.Context, input Object) (Object, error) {
 		if e != nil {
 			return nil, e
 		}
-		task := Object{"completion": completion, "taskId": row["id"], "operationId": row["id"], "planId": row["config_id"], "planVersion": row["plan_version"], "promptVersion": row["prompt_version"], "delegationVersion": row["delegation_version"], "domain": row["domain"], "aiAccountId": row["ai_account_id"], "mode": row["mode"], "source": row["source"], "purpose": cfg["purpose"], "sessionId": row["session_id"], "roleVersion": roleVersion, "scopeVersion": row["plan_version"], "state": row["state"], "businessState": row["business_state"], "effectiveCheck": row["effective_check"], "roundSeconds": round, "continuation": continuation, "prompt": Object{"boundary": BoundaryPrompt, "role": cfg["prompt"], "context": Object{"title": row["title"], "source": row["source"], "eventIds": row["event_ids"], "goal": cfg["goal"]}}, "plan": plan, "scope": Object{"actions": plan["actions"], "resourceIds": plan["resourceIds"]}, "modelBinding": Object{"domain": row["domain"], "source": "current-manual-model-settings"}, "tools": tools}
+		task := Object{"completion": completion, "taskId": row["id"], "operationId": row["id"], "planId": row["config_id"], "planVersion": row["plan_version"], "promptVersion": row["prompt_version"], "delegationVersion": row["delegation_version"], "domain": row["domain"], "aiAccountId": row["ai_account_id"], "mode": row["mode"], "source": row["source"], "purpose": cfg["purpose"], "sessionId": row["session_id"], "roleVersion": roleVersion, "scopeVersion": row["plan_version"], "state": row["state"], "businessState": row["business_state"], "effectiveCheck": row["effective_check"], "roundSeconds": round, "continuation": continuation, "prompt": Object{"boundary": BoundaryPrompt, "role": cfg["prompt"], "context": Object{"title": row["title"], "source": row["source"], "sourceTargets": sources["sourceTargets"], "sourceCoverage": sources["sourceCoverage"], "sourceBasis": sources["basis"], "goal": cfg["goal"]}}, "plan": plan, "scope": Object{"actions": plan["actions"], "resourceIds": plan["resourceIds"]}, "modelBinding": Object{"domain": row["domain"], "source": "current-manual-model-settings"}, "tools": tools}
 		if v, ok := cfg["runtime"]; ok {
 			task["runtime"] = v
 		}

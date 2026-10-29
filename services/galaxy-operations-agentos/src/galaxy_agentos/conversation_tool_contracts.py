@@ -23,7 +23,7 @@ View = Literal["list", "summary", "sections", "tags", "projects", "methods", "ov
     "cleanup-candidates", "cleanup-plans", "general", "mail", "service-connections", "advanced"]
 ReadKind = Literal["account", "account-summary", "post", "reply", "section", "case",
     "chat-report", "feedback", "chat-file", "forum-file", "project", "method",
-    "message-plan", "message-run", "rule", "strategy-run", "strategy-version", "ai-run", "backup-point",
+    "message-plan", "message-run", "rule", "strategy-run", "strategy-version", "search-version", "ai-run", "backup-point",
     "restore-plan", "role", "file-cleanup-plan", "file-cleanup-operation", "registered-user"]
 VIEWS = {"accounts": {"list", "summary"}, "content": {"list", "sections", "tags"},
     "cases": {"list"}, "chat-reports": {"list"}, "feedback": {"list"},
@@ -383,6 +383,13 @@ class SearchApply(ClosedArguments):
     reason: SearchReason
 
 
+class SearchDraftSave(ClosedArguments):
+    kind: Literal["search-draft-save"]
+    settings: dict
+    reason: SearchReason
+    expectedDraftId: UUID | None = None
+
+
 class SearchRestore(ClosedArguments):
     kind: Literal["search-restore"]
     versionId: UUID
@@ -425,7 +432,7 @@ _BusinessOperation = Union[JobCancel, JobRetry, SearchRetry, ContentVisibility, 
     SectionClassification, SectionVisibility, ResourceVisibility, FeedbackUpdate,
     FileScanRetry, FileCleanupApprove, AccountRestriction, FileAccess, CaseResolve, MessagingState, StrategyControl, StrategyContinue,
     OrdinaryStrategyDraft, OrdinaryStrategyPublish, StrategyDraft, StrategyRehearsal, StrategyPublish,
-    SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection]
+    SearchDraftSave, SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection]
 DutyPreparedOperation = Annotated[_BusinessOperation, Field(discriminator="kind")]
 PreparedOperation = Annotated[Union[_BusinessOperation, AiWorkPromptSave, AiRoleCommand], Field(discriminator="kind")]
 
@@ -451,6 +458,7 @@ def _prepared_arguments(operation):
         "case-resolve": ("restrictionAction", "hideUntil"),
         "ordinary-strategy-draft": ("mode", "enabled"),
         "strategy-draft": ("expectedDraftId",),
+        "search-draft-save": ("expectedDraftId",),
     }
     for name in optional_only.get(value["kind"], ()):
         if value.get(name) is None:

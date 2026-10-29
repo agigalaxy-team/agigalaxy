@@ -62,6 +62,21 @@ func (s *Service) QualifyTargetWithin(ctx context.Context, tx pgx.Tx, a Actor, p
 	if kind == "search-apply" || kind == "search-restore" {
 		selectedID = command["versionId"]
 	}
+	if kind == "search-draft-save" {
+		selectedID = command["expectedDraftId"]
+		if selectedID == nil {
+			metadata, err := s.Permissions.Duty.DutyMetadata(a)
+			if err != nil {
+				return err
+			}
+			selectedID = obj(metadata["operation"])["operationId"]
+			// During initial grant qualification the operation has not yet
+			// been bound; Prepare created this target from its operation ID.
+			if selectedID == nil {
+				selectedID = targetID
+			}
+		}
+	}
 	if kind == "message-draft-create" {
 		selectedID = command["planId"]
 	}
@@ -84,7 +99,14 @@ func (s *Service) QualifyTargetWithin(ctx context.Context, tx pgx.Tx, a Actor, p
 		if head["paused"] == true || strategy["ordinaryBounds"] == nil || strategy["mode"] == "human-led" {
 			return fail("operations_agentos_human_review_required", 409)
 		}
-	case "search-apply", "search-restore", "recommendation-direction":
+	case "search-draft-save", "search-apply", "search-restore", "recommendation-direction":
+		if kind == "search-draft-save" {
+			service, err := s.searchQuality(a, nil)
+			if err != nil {
+				return err
+			}
+			return service.QualifyPreparedDraftWithin(ctx, tx, a, command, targetID, grantID)
+		}
 		if err := s.qualifyDiscoveryWithin(ctx, tx, a, x, command, grantID); err != nil {
 			return err
 		}

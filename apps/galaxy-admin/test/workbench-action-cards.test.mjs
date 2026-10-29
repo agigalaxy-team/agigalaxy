@@ -30,3 +30,16 @@ test('strategy cards preserve complete reviewed differences and refuse incomplet
   }
  }
 });
+
+
+test('message state cards preserve the full reviewed plan and refuse incomplete review',()=>{
+ const raw={cardId:'11111111-1111-4111-8111-111111111111',operationId:'22222222-2222-4222-8222-222222222222',kind:'messaging-state',domain:'messaging',state:'prepared',target:{kind:'message',label:'消息方案',href:'/admin/operations/messaging'},title:'处理消息',impact:Array.from({length:80},(_,i)=>`字段 ${i}\n完整正文`),basis:[{label:'版本',value:'3'}],requiredAction:'notices.update',capability:{canConfirm:true},checkedAt:1000,readExpiresAt:1030};
+ const card=workbenchActionCards([raw],'messaging')[0];assert.deepEqual(card.impact,raw.impact);assert.equal(card.capability.canConfirm,true);
+ for(const bad of [{impact:[]},{basis:[]},{impact:[...raw.impact,'多一行']},{impact:['x'.repeat(5001)]},{impact:Array(5).fill('x'.repeat(5000))}]){const invalid=workbenchActionCards([{...raw,...bad}],'messaging')[0];assert.equal(invalid.capability.canConfirm,false);assert.equal(invalid.capability.reason,'messaging-review-unavailable');}
+});
+
+
+test('search review cards keep complete settings and reject missing or oversized review',()=>{
+ const raw={cardId:'11111111-1111-4111-8111-111111111111',operationId:'22222222-2222-4222-8222-222222222222',domain:'discovery',state:'prepared',target:{kind:'search',label:'搜索配置',href:'/admin/operations/search'},title:'处理搜索设置',impact:Array.from({length:80},(_,i)=>`设置 ${i}\n完整内容`),basis:[{label:'版本',value:'3'}],requiredAction:'search-quality.configure',capability:{canConfirm:true},checkedAt:1000,readExpiresAt:1030};
+ for(const kind of ['search-draft-save','search-apply','search-restore']){const card=workbenchActionCards([{...raw,kind}],'discovery')[0];assert.deepEqual(card.impact,raw.impact);assert.equal(card.capability.canConfirm,true);for(const bad of [{impact:[]},{basis:[]},{impact:[...raw.impact,'多一行']},{impact:['x'.repeat(5001)]},{impact:Array(5).fill('x'.repeat(5000))}]){const invalid=workbenchActionCards([{...raw,...bad,kind}],'discovery')[0];assert.equal(invalid.capability.canConfirm,false);assert.equal(invalid.capability.reason,'search-review-unavailable');}}
+});

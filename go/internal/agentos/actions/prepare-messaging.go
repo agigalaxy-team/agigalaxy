@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/messaging"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
@@ -133,13 +134,46 @@ func (s *Service) prepareMessaging(ctx context.Context, a Actor, x Object, opera
 	p.basis = []any{basis("当前计划", state), basis("渠道", channels), basis("受众", messageAudience(config, false))}
 	switch action {
 	case "activate", "resume":
-		p.impact = []any{"按这份计划的内容、渠道和时间发布或发送；每次执行时确定并保留当次符合条件的受众。", "邮件提交后是否送达，以实际回执为准。"}
+		if e = messagePublicationReview(p, config); e != nil {
+			return e
+		}
 	case "withdraw":
 		p.impact = []any{"撤回已发布的公告和站内信，停止后续发送；已提交的邮件无法收回。"}
 	case "pause":
 		p.impact = []any{"暂停后续发送，已发送的消息保持当前状态。"}
 	default:
 		p.impact = []any{"停止后续发送，已发送的消息保持当前状态。"}
+	}
+	return nil
+}
+
+func messagePublicationReview(p *preparation, config Object) error {
+	validated, e := messaging.ParseConfiguration(config)
+	if e != nil {
+		return e
+	}
+	p.impact = []any{"按这份计划的内容、渠道和时间发布或发送；每次执行时确定并保留当次符合条件的受众。", "邮件提交后是否送达，以实际回执为准。"}
+	p.impact = append(p.impact, "发送身份："+messaging.OfficialMailIdentities[str(validated["senderKey"])].Name)
+	for _, field := range []string{"content", "channels", "audience", "schedule", "senderKey", "automation"} {
+		raw, e := json.Marshal(validated[field])
+		if e != nil {
+			return e
+		}
+		parts := strategyReviewChunks(string(raw), 4000)
+		for i, part := range parts {
+			p.impact = append(p.impact, fmt.Sprintf("%s（%d/%d）：%s", field, i+1, len(parts), part))
+		}
+	}
+	total := 0
+	for _, line := range p.impact {
+		n := jsLength(str(line))
+		total += n
+		if n > 5000 {
+			return fail("operations_agentos_message_review_required", 409)
+		}
+	}
+	if len(p.impact) > 80 || total > 20000 {
+		return fail("operations_agentos_message_review_required", 409)
 	}
 	return nil
 }

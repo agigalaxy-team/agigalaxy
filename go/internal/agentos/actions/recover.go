@@ -43,7 +43,7 @@ func (s *Service) RecoverPrepared(ctx context.Context, a Actor, proposal Object,
 		if result == nil {
 			return missing(operationID), nil
 		}
-	} else if kind == "search-apply" || kind == "search-restore" || kind == "recommendation-direction" {
+	} else if kind == "search-draft-save" || kind == "search-apply" || kind == "search-restore" || kind == "recommendation-direction" {
 		result, e = s.recoverDiscovery(ctx, actor, x, command, operationID)
 		if e != nil {
 			return nil, e
@@ -137,7 +137,9 @@ func (s *Service) RecoverPrepared(ctx context.Context, a Actor, proposal Object,
 			if e == pgx.ErrNoRows {
 				return missing(operationID), nil
 			}
-			if owner != actor.ID || savedKind != x["action"] || input["planId"] != x["targetId"] {
+			expected := clone(command)
+			expected["planId"] = x["targetId"]
+			if owner != actor.ID || savedKind != x["action"] || !same(input, expected) {
 				return nil, fail("operations_agentos_operation_conflict", 409)
 			}
 		} else {
@@ -292,7 +294,7 @@ func (s *Service) RecoverPrepared(ctx context.Context, a Actor, proposal Object,
 	if kind == "feedback-update" {
 		return feedbackResult(result, operationID, x, command, true)
 	}
-	if kind == "search-apply" || kind == "search-restore" || kind == "recommendation-direction" {
+	if kind == "search-draft-save" || kind == "search-apply" || kind == "search-restore" || kind == "recommendation-direction" {
 		return discoveryResult(kind, result, operationID, x, command, true)
 	}
 	return actionResult(kind, result, operationID, x, command)

@@ -72,6 +72,15 @@ func searchProjection(x Object) Object {
 		settings = parsed
 	}
 	data["activeSettings"] = settings
+	var draftSettings any
+	if draft := object(object(x["configuration"])["draft"]); draft != nil {
+		if parsed, e := discovery.QuerySearchSettings(object(draft["settings"])); e == nil {
+			draftSettings = parsed
+		} else {
+			data["draftSettingsUnavailable"] = true
+		}
+	}
+	data["draftSettings"] = draftSettings
 	return data
 }
 func (s *Service) discoveryRead(ctx context.Context, a Actor, args arguments) (queryResult, error) {
@@ -84,13 +93,27 @@ func (s *Service) discoveryRead(ctx context.Context, a Actor, args arguments) (q
 	if reader == nil {
 		return queryResult{}, fail("operations_query_not_configured", 503)
 	}
-	value, e := reader.QueryRead(ctx, a, s.reader(a), args.view, "", args.filters)
+	view := args.view
+	if args.kind == "search-version" {
+		view = args.kind
+	}
+	value, e := reader.QueryRead(ctx, a, s.reader(a), view, args.id, args.filters)
 	if e != nil {
 		return queryResult{}, e
 	}
 	value, e = queryWireSource(value)
 	if e != nil {
 		return queryResult{}, e
+	}
+	if args.kind == "search-version" {
+		version := object(value["version"])
+		settings, e := discovery.QuerySearchSettings(object(version["settings"]))
+		if e != nil {
+			return queryResult{}, fail("operations_query_response_invalid", 503)
+		}
+		data := object(project(version, merge(shape("id kind createdAt restoredFrom", "s"), Object{"version": "n", "restorable": "b", "wasApplied": "b"})))
+		data["settings"] = settings
+		return queryResult{source: value, data: data}, nil
 	}
 	if args.module == "analytics" {
 		at := s.now()
@@ -100,6 +123,9 @@ func (s *Service) discoveryRead(ctx context.Context, a Actor, args arguments) (q
 		return queryResult{source: value, data: Object{"kind": value["kind"], "data": analyticsData(value["data"], args.view, at, object(value["basis"])), "basis": analyticsBasis(value["basis"]), "source": value["source"], "purpose": value["purpose"], "coverage": value["coverage"], "historicalBackfill": value["historicalBackfill"]}}, nil
 	}
 	if args.view == "history" {
+		if args.module == "search" {
+			return typedList(args, value, func(x Object) Object { return merge(historyItem(x), object(project(x, shape("versionId phase", "s")))) }, nil)
+		}
 		return typedList(args, value, historyItem, nil)
 	}
 	if args.module == "recommendations" {

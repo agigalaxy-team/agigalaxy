@@ -43,7 +43,7 @@ from galaxy_agentos.config import Settings
 from galaxy_agentos.conversation_tools import conversation_tools
 from galaxy_agentos.duties import duty_factory, duty_tools
 from galaxy_agentos.duty_deadline import await_duty_deadline, DutyRoundTimeout
-from galaxy_agentos.duty_storage import duty_database, duty_storage_fields
+from galaxy_agentos.duty_storage import duty_database, duty_storage_fields, duty_report_fields
 from galaxy_agentos.duty_surface import install_duty_routes, duty_view
 from galaxy_agentos.duty_continuation import call_reference, continuation_tools
 from galaxy_agentos.gateway import AuthorityDenied, AuthorityUnavailable, GalaxyGateway
@@ -372,6 +372,22 @@ class DutyContracts(unittest.TestCase):
         gateway.task["tools"] = []
         self.assertEqual(json.loads(tool.entrypoint(context, fc))["state"], "denied")
 
+    def test_local_validation_failure_records_original_task_call_without_private_invalid_value(self):
+        gateway = CurrentTask()
+        def record(user_id, tool, arguments, **binding):
+            gateway.calls.append({"tool":tool,"arguments":arguments,**binding})
+            return {"state":"recorded"}
+        gateway.duty_tool = record
+        tool = duty_tools(gateway, {"query-operations"})[0]
+        context = RunContext(user_id="autonomy:"+gateway.task["taskId"], session_id=gateway.task["sessionId"], run_id="native-run", metadata={})
+        fc = FunctionCall(function=tool, call_id="local-invalid")
+        feedback = json.loads(tool.entrypoint(context, fc, module="feedback", view="list", filters={"limit":"PRIVATE_INVALID"}))
+        self.assertEqual(feedback["state"], "invalid-request")
+        self.assertEqual(gateway.calls[-1]["tool"], "query-operations")
+        self.assertTrue(gateway.calls[-1]["validation_failure"]["ambiguous"])
+        self.assertNotIn("PRIVATE_INVALID", json.dumps(gateway.calls[-1]))
+        self.assertEqual(gateway.calls[-1]["call_id"], call_reference(gateway.task["taskId"], "native-run", "local-invalid"))
+
     def test_private_http_requires_service_and_task_claims_and_never_accepts_model_input(self):
         gateway, selected = CurrentTask(), settings()
         task = gateway.task
@@ -464,6 +480,15 @@ class DutyContracts(unittest.TestCase):
             fresh = domain_model(selected, "messaging", CurrentTask())
             self.assertEqual((old.id, old._galaxy_settings_version), ("galaxy-manual1", "manual-v1"))
             self.assertEqual((fresh.id, fresh._galaxy_settings_version), ("galaxy-manual2", "manual-v2"))
+
+    def test_failure_code_reads_original_nested_native_row_metadata(self):
+        row = {"run_id":"original-run", "status":"ERROR", "run_data":{"status":"RUNNING", "metadata":{"completionFailureCode":"operations_autonomy_completion_incomplete"}}}
+        report = duty_report_fields(row)
+        self.assertEqual(report["nativeRunId"], "original-run")
+        self.assertEqual(report["modelState"], "failed")
+        self.assertEqual(report["code"], "operations_autonomy_completion_incomplete")
+        row["run_data"]["metadata"]["completionFailureCode"] = "untrusted-value"
+        self.assertEqual(duty_report_fields(row)["code"], "operations_autonomy_model_failed")
 
     def test_atomic_storage_preserves_native_fence_and_withholds_timeout_tool_and_prompt_bodies(self):
         gateway = CurrentTask()

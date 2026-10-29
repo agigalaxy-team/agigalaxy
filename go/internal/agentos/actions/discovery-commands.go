@@ -59,6 +59,9 @@ func (s *Service) executeDiscovery(ctx context.Context, a Actor, x, command Obje
 	if e != nil {
 		return nil, e
 	}
+	if x["kind"] == "search-draft-save" {
+		return service.CommandPreparedDraft(ctx, a, command)
+	}
 	method := "apply"
 	if x["kind"] == "search-restore" {
 		method = "restore"
@@ -112,10 +115,13 @@ func (s *Service) recoverDiscovery(ctx context.Context, a Actor, x, command Obje
 		return nil, nil
 	}
 	method := "apply"
+	if x["kind"] == "search-draft-save" {
+		method = "draft"
+	}
 	if x["kind"] == "search-restore" {
 		method = "restore"
 	}
-	if row["operator_id"] != a.ID || row["kind"] != method || row["version_id"] != command["versionId"] {
+	if row["operator_id"] != a.ID || row["kind"] != method || !same(row["input"], command) || method != "draft" && row["version_id"] != command["versionId"] {
 		return conflict()
 	}
 	result, e := service.Operation(ctx, a, operationID)

@@ -55,7 +55,16 @@ func (w *Worker) Execute(ctx context.Context, input Object) (Object, error) {
 		if e != nil {
 			return claimed{}, e
 		}
-		if row["source"] == "workbench" || has(terminal, str(row["state"])) || has([]string{"paused", "waiting-human"}, str(row["state"])) {
+		if row["source"] == "workbench" {
+			return claimed{row: row, skip: true}, nil
+		}
+		if has(terminal, str(row["state"])) {
+			if input["reconcile"] == true && str(row["native_run_id"]) != "" {
+				return claimed{row: row, reconcile: true}, nil
+			}
+			return claimed{row: row, skip: true}, nil
+		}
+		if has([]string{"paused", "waiting-human"}, str(row["state"])) {
 			return claimed{row: row, skip: true}, nil
 		}
 		if row["dispatch_started_at"] != nil {
@@ -186,8 +195,10 @@ func (w *Worker) Reconcile(ctx context.Context, row Object) (Object, error) {
 	if value["status"] == "NOT_RECORDED" || str(row["native_run_id"]) != "" && str(runID) != "" && row["native_run_id"] != runID {
 		return Object{"state": "unknown"}, nil
 	}
-	if _, e = s.Pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET native_continuable=$3,native_run_id=COALESCE(native_run_id,$4) WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], value["continuable"] == true, runID); e != nil {
-		return nil, e
+	if !has(terminal, str(row["state"])) {
+		if _, e = s.Pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET native_continuable=$3,native_run_id=COALESCE(native_run_id,$4) WHERE endpoint=$1 AND id=$2 AND state NOT IN ('completed','failed','stopped','blocked')`, s.Endpoint, row["id"], value["continuable"] == true, runID); e != nil {
+			return nil, e
+		}
 	}
 	status := "running"
 	switch {
@@ -207,7 +218,7 @@ func (w *Worker) Reconcile(ctx context.Context, row Object) (Object, error) {
 		tokens := obj(run["tokens"])
 		usage := Object{"calls": finite(run["calls"]), "inputTokens": finite(tokens["input"]), "outputTokens": finite(tokens["output"]), "totalTokens": finite(tokens["total"]), "durationMs": finite(run["durationMs"])}
 		if _, e = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) {
-			if _, e := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET primary_model_usage=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(usage)); e != nil {
+			if _, e := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET primary_model_usage=$3 WHERE endpoint=$1 AND id=$2 AND native_run_id=$4`, s.Endpoint, row["id"], jsonText(usage), runID); e != nil {
 				return false, e
 			}
 			_, e := s.refreshUsageWithin(ctx, tx, str(row["id"]))
@@ -215,6 +226,9 @@ func (w *Worker) Reconcile(ctx context.Context, row Object) (Object, error) {
 		}); e != nil {
 			return nil, e
 		}
+	}
+	if has(terminal, str(row["state"])) {
+		return Object{"state": row["state"], "usageReconciled": str(runID) != "" && obj(value["run"]) != nil}, nil
 	}
 	report := Object{"taskId": row["id"], "modelState": value["modelState"], "status": status}
 	if report["modelState"] == nil {

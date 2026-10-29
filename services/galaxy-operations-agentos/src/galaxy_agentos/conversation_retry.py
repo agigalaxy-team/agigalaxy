@@ -10,7 +10,7 @@ from .gateway import AuthorityDenied
 
 _ATTEMPT_FIELDS = frozenset({"modelCalls", "modelSettingsVersion", "modelSettingsVersions",
     "modelFallbacks", "activeModelFallbackAlias", "toolRecovery", "rolePromptVersion",
-    "boundaryVersion", "_galaxyConversationCallReferences"})
+    "boundaryVersion", "_galaxyConversationCallReferences", "_galaxyPreparedCardIds"})
 
 class ConversationAgent(Agent):
     def _retry_source(self, run_response, options):

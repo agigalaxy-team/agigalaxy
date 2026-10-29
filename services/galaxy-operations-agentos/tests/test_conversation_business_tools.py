@@ -297,6 +297,68 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 self.assertEqual(stale.status_code, 403, stale.text)
                 self.assertNotIn("当前结果", stale.text)
 
+    def test_prepared_card_stops_native_followup_and_replaces_unconfirmed_content(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as cleanup:
+            db = SqliteDb(db_file=str(Path(directory) / "prepared.db"), id="prepared-local")
+            cleanup.callback(db.db_engine.dispose)
+            row = {"id": str(uuid4()), "sessionId": str(uuid4()), "domain": "overview", "mode": "conversation", "actions": [], "resourceIds": []}
+            card_id = str(uuid4())
+            class PreparedNode(NodeTransport):
+                def __call__(self, request):
+                    value = json.loads(request.content)
+                    if value.get("tool") == "prepare-operation":
+                        self.calls.append((request.url.path, value))
+                        return httpx.Response(200, json={"state":"prepared", "card":{"cardId":card_id, "state":"prepared"}})
+                    return super().__call__(request)
+            node = PreparedNode(row)
+            gateway = GalaxyGateway(settings(), transport=httpx.MockTransport(node)); cleanup.callback(gateway.close)
+            class PreparedModel(BusinessToolModel):
+                def invoke(self, messages=None, **kwargs):
+                    self.calls += 1
+                    if self.calls != 1:
+                        raise AssertionError("prepared card must not call provider again")
+                    return ModelResponse(role="assistant", content="已经完成变更", tool_calls=[{"id":"prepared-call", "type":"function", "function":{"name":"prepare_operation", "arguments":json.dumps({"operation":{"kind":"feedback-update", "targetId":node.object_id, "state":"processing"}})}}])
+            model = PreparedModel()
+            agents = conversation_agents(settings=settings(), db=db, gateway=gateway, domains={"overview":"运营概览"}, active_domains={"overview"}, model_factory=lambda:model)
+            native = AgentOS(id="prepared-local", db=db, agents=agents, user_isolation=True, authorization=Authorization(verification_keys=[settings().verification_key], algorithm="HS256", verify_audience=True, audience=settings().audience, issuer=settings().issuer, authorization_provider=GalaxyAuthorization(gateway)), telemetry=False)
+            app = native.get_app(); install_conversation_read(app, {"os":native,"db":db,"gateway":gateway,"configuredDomains":{"overview"}}, run_view)
+            app.add_middleware(PrivateSurface, settings=settings(), runtime={"os":native,"db":db,"gateway":gateway,"configuredDomains":{"overview"}})
+            now = int(time.time()); token = jwt.encode({"sub":"conversation:"+row["id"],"iat":now,"exp":now+120,"aud":settings().audience,"iss":settings().issuer},settings().verification_key,algorithm="HS256")
+            with TestClient(app) as client:
+                headers = {"Authorization":"Bearer "+token}
+                response = client.post("/agents/galaxy-conversation-overview/runs", headers={**headers,"Idempotency-Key":str(uuid4())}, data={"message":"准备处理", "stream":"true", "background":"false", "session_id":row["sessionId"]})
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(model.calls, 1)
+                self.assertIn("请确认操作。", response.text)
+                packets = [value for path,value in node.calls if path.endswith("/tools/execute")]
+                self.assertEqual(len(packets), 1)
+                stored = db.get_run(run_id=packets[0]["runId"], deserialize=False)["run_data"]
+                self.assertEqual(stored["content"], "请确认操作。")
+                self.assertEqual(stored["metadata"]["_galaxyPreparedCardIds"], [card_id])
+                self.assertEqual(client.get("/galaxy/conversations/"+row["id"], headers=headers).json()["runs"][0]["content"], "请确认操作。")
+
+    def test_preparation_stop_is_per_call_and_invalid_card_does_not_stop(self):
+        from agno.tools.function import FunctionCall
+        from galaxy_agentos.tool_reliability import reliable_function
+        first_id, second_id = str(uuid4()), str(uuid4())
+        def prepare_operation(run_context: RunContext, fc: FunctionCall, card_id: str) -> str:
+            return json.dumps({"state":"prepared", "card":{"state":"prepared", "cardId":card_id}})
+        function = reliable_function(prepare_operation)
+        context = RunContext(run_id="local-run", session_id="local-session", user_id="conversation:local", metadata={})
+        invalid = FunctionCall(function=function, call_id="bad")
+        value = function.entrypoint(context, invalid, card_id="invalid")
+        self.assertEqual(json.loads(value)["state"], "prepared")
+        self.assertFalse(invalid.function.stop_after_tool_call)
+        good = FunctionCall(function=function, call_id="good")
+        self.assertEqual(function.entrypoint(context, good, card_id=first_id), "请确认操作。")
+        self.assertTrue(good.function.stop_after_tool_call)
+        self.assertFalse(function.stop_after_tool_call)
+        other = FunctionCall(function=function, call_id="other")
+        self.assertEqual(function.entrypoint(context, other, card_id=second_id), "请确认操作。")
+        self.assertTrue(other.function.stop_after_tool_call)
+        self.assertEqual(context.metadata["_galaxyPreparedCardIds"], [first_id, second_id])
+        self.assertFalse(invalid.function.stop_after_tool_call)
+
     def test_native_error_persistence_scrubs_tool_payload_without_mutating_live_result(self):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as cleanup:
             db = SqliteDb(db_file=str(Path(directory) / "error.db"), id="error-local")

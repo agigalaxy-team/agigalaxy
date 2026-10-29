@@ -73,8 +73,8 @@ func (s *Service) PrepareWithReference(ctx context.Context, a Actor, domain stri
 		e = s.prepareStrategy(ctx, actor, x, &p)
 	case "rule-publish", "rule-restore":
 		e = s.prepareRule(ctx, actor, x, &p)
-	case "search-apply", "search-restore", "recommendation-direction":
-		e = s.prepareDiscovery(ctx, actor, x, &p)
+	case "search-draft-save", "search-apply", "search-restore", "recommendation-direction":
+		e = s.prepareDiscovery(ctx, actor, x, operationID, &p)
 	case "job-cancel", "job-retry", "search-retry":
 		e = s.prepareJobs(ctx, actor, x, &p)
 	case "content-visibility", "content-curation", "public-content-batch":

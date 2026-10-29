@@ -49,11 +49,19 @@ class RemainingWork(BaseModel):
     description: str = Field(min_length=1, max_length=240)
 
 
+class ReadResolution(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    failedCallId: UUID
+    resolution: Literal["superseded", "not-applicable"]
+    evidenceCallIds: list[UUID] = Field(min_length=1, max_length=20)
+
+
 class TaskAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid")
     goalSatisfied: bool
     remainingWork: list[RemainingWork] = Field(max_length=8)
     summary: str = Field(max_length=1000)
+    readResolutions: list[ReadResolution] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def consistent(self):
@@ -101,17 +109,25 @@ def _send(gateway, run_context, native_call_id, name, arguments):
 class _DutyReadGateway:
     def __init__(self, gateway):
         self.gateway = gateway
+        self.recorded_calls = set()
 
     def conversation_tool(self, user_id, name, arguments, **binding):
         # Reuse the existing closed query/read schemas and parameter handling.
         # The trusted native call identity is reconstructed only here.
         context = RunContext(user_id=user_id, run_id=binding["run_id"], session_id=binding["session_id"])
-        return json.loads(_send(self.gateway, context, binding["call_id"], name, arguments))
+        result = json.loads(_send(self.gateway, context, binding["call_id"], name, arguments))
+        self.recorded_calls.add((binding["run_id"], binding["call_id"]))
+        return result
 
 
 def duty_tools(gateway, allowed):
     def assess_task(run_context: RunContext, fc: FunctionCall, assessment: TaskAssessment) -> str:
-        """Assess the frozen task goal and list remaining work; this never proves an effect."""
+        """Assess the frozen goal; never treat an assessment as evidence of effects.
+
+        Use readResolutions only for original failed call IDs and completed
+        evidence call IDs returned by this task. The server verifies matching
+        scope or its supported empty-list condition; guesses cannot clear gaps.
+        """
         return _call(gateway, run_context, fc, "assess-task", assessment.model_dump(mode="json"))
 
     def reconcile_task_operations(run_context: RunContext, fc: FunctionCall) -> str:
@@ -144,7 +160,8 @@ def duty_tools(gateway, allowed):
         arguments = {} if ai_account_id is None else {"aiAccountId": str(ai_account_id)}
         return _call(gateway, run_context, fc, "read-ai-delegation", arguments)
 
-    reads = conversation_tools(_DutyReadGateway(gateway))[:2]
+    reader = _DutyReadGateway(gateway)
+    reads = conversation_tools(reader)[:2]
     candidates = {"assess-task": assess_task, "reconcile-task-operations": reconcile_task_operations, "current-summary": current_summary, "query-operations": reads[0],
         "read-operation-object": reads[1], "execute-operation": execute_operation,
         "read-ai-delegation": read_ai_delegation}
@@ -155,7 +172,46 @@ def duty_tools(gateway, allowed):
     candidates["manage-ai-role"] = manage_ai_role(gateway)
     candidates["manage-ai-prompt"] = manage_ai_prompt(gateway)
     from .tool_reliability import reliable_function
-    return [reliable_function(function) for name, function in candidates.items() if name in allowed]
+    from jsonschema import Draft202012Validator, FormatChecker
+
+    def record_invalid(context, fc, name, values, schema):
+        # A completed Node call already owns this exact task/run/call receipt.
+        if (context.run_id, fc.call_id) in reader.recorded_calls:
+            return
+        if not isinstance(fc, FunctionCall) or not fc.call_id or not context.run_id:
+            raise AuthorityDenied("agentos_native_tool_call_required")
+        task = task_context(gateway, context.user_id, operation="tool")["task"]
+        tool = name.replace("_", "-")
+        if context.session_id != task["sessionId"] or tool not in task.get("tools", []):
+            raise AuthorityDenied("agentos_autonomy_tool_denied")
+        defs, props = schema.get("$defs", {}), schema.get("properties", {})
+        safe, ambiguous = {}, False
+        def valid(value, spec):
+            return Draft202012Validator({**spec, "$defs": defs}, format_checker=FormatChecker()).is_valid(value)
+        for key, value in values.items():
+            if key == "filters" and isinstance(value, dict):
+                ref = props.get("filters", {})
+                branches = ref.get("anyOf", [ref])
+                target = next((schema.get("$defs", {}).get(part.get("$ref", "").removeprefix("#/$defs/"), {})
+                    for part in branches if isinstance(part, dict) and part.get("$ref")), {})
+                fields = target.get("properties", {})
+                selected = {}
+                for field, item in value.items():
+                    spec = fields.get(field)
+                    if isinstance(spec, dict) and valid(item, spec): selected[field] = item
+                    else: ambiguous = True
+                safe["filters"] = selected
+            elif key in props and isinstance(props[key], dict) and valid(value, props[key]):
+                safe[{"ai_account_id":"aiAccountId"}.get(key, key)] = value
+            else:
+                ambiguous = True
+        result = gateway.duty_tool(context.user_id, tool, safe,
+            call_id=call_reference(task["taskId"], context.run_id, fc.call_id), run_id=context.run_id,
+            validation_failure={"ambiguous": ambiguous})
+        if not isinstance(result, dict) or result.get("state") != "recorded":
+            raise AuthorityDenied("agentos_autonomy_validation_ledger_unavailable")
+
+    return [reliable_function(function, on_read_validation_failure=record_invalid) for name, function in candidates.items() if name in allowed]
 
 
 def duty_factory(*, settings, db, gateway, model_factory=None):

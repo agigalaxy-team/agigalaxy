@@ -79,7 +79,7 @@ func TestWorkerOriginalDispatchFenceAndNativeReceiptRecovery(t *testing.T) {
 		if nativeState == "COMPLETED" {
 			model = "completed"
 		}
-		json.NewEncoder(w).Encode(a.Object{"nativeRunId": "original-native-run", "status": nativeState, "modelState": model, "continuable": false})
+		json.NewEncoder(w).Encode(a.Object{"nativeRunId": "original-native-run", "status": nativeState, "modelState": model, "continuable": false, "run": a.Object{"calls": 5, "tokens": a.Object{"input": 12, "output": 3, "total": 15}, "durationMs": 1250}})
 	}))
 	defer server.Close()
 	client, e := agentos.New(agentos.Configuration{URL: server.URL, SigningKey: strings.Repeat("s", 32), ServiceKey: strings.Repeat("v", 32)}, agentos.Options{Now: now})
@@ -125,6 +125,23 @@ func TestWorkerOriginalDispatchFenceAndNativeReceiptRecovery(t *testing.T) {
 	var business, code string
 	if e = pool.QueryRow(ctx, `SELECT effective_check,business_state,code FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, endpoint, id).Scan(&effective, &business, &code); e != nil || effective || business != "not-started" || code != "task-assessment-required" {
 		t.Fatalf("business completion evidence %v %s %s %v", effective, business, code, e)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='failed',primary_model_usage=NULL,model_usage=NULL WHERE endpoint=$1 AND id=$2`, endpoint, id); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = worker.Execute(ctx, a.Object{"taskId": id, "reconcile": true}); e != nil {
+		t.Fatal(e)
+	}
+	var finalState string
+	var calls *float64
+	if e = pool.QueryRow(ctx, `SELECT state,(primary_model_usage->>'calls')::float8 FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, endpoint, id).Scan(&finalState, &calls); e != nil || finalState != "failed" || calls == nil || *calls != 5 {
+		t.Fatalf("terminal native usage %s %v %v", finalState, calls, e)
+	}
+	mu.Lock()
+	p = posts
+	mu.Unlock()
+	if p != 1 {
+		t.Fatalf("terminal reconcile posted again: %d", p)
 	}
 }
 
@@ -198,6 +215,35 @@ func TestAssessmentBecomesStaleAfterBusinessTool(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT code FROM operations_autonomy_tool_calls_v1 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, f.Endpoint, id, assessment).Scan(&code); err != nil || code != "task-assessment-stale" {
 		t.Fatalf("assessment code %q: %v", code, err)
 	}
+	s.QueryTool = func(context.Context, a.Actor, string, string, a.Object) (a.Object, error) {
+		return a.Object{"availability": "invalid-request"}, nil
+	}
+	failed := uuid.NewString()
+	if _, err := s.Tool(ctx, a.Object{"taskId": id, "callId": failed, "tool": "query-operations", "arguments": a.Object{"module": "feedback", "view": "list", "filters": a.Object{}}}, false); err != nil {
+		t.Fatal(err)
+	}
+	var state string
+	if err := pool.QueryRow(ctx, `SELECT state,code FROM operations_autonomy_tool_calls_v1 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, f.Endpoint, id, failed).Scan(&state, &code); err != nil || state != "failed" || code != "read-unavailable" {
+		t.Fatalf("invalid read ledger %s %s %v", state, code, err)
+	}
+	if _, err := s.Tool(ctx, a.Object{"taskId": id, "callId": failed, "tool": "query-operations", "arguments": a.Object{"module": "maintenance", "view": "overview", "filters": a.Object{}}, "validationFailure": a.Object{"ambiguous": false}}, false); err == nil {
+		t.Fatal("local failure reused another scope's call ID")
+	}
+	local := uuid.NewString()
+	if _, err := s.Tool(ctx, a.Object{"taskId": id, "callId": local, "tool": "query-operations", "arguments": a.Object{"module": "feedback", "view": "list", "filters": a.Object{"unknown-private": "DO_NOT_RETAIN"}}, "validationFailure": a.Object{"ambiguous": true}}, false); err != nil {
+		t.Fatal(err)
+	}
+	var raw []byte
+	if err := pool.QueryRow(ctx, `SELECT state,code,arguments FROM operations_autonomy_tool_calls_v1 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, f.Endpoint, id, local).Scan(&state, &code, &raw); err != nil || state != "invalid-request" || code != "local-validation-ambiguous" || strings.Contains(string(raw), "DO_NOT_RETAIN") {
+		t.Fatalf("local failure ledger %s %s %s %v", state, code, raw, err)
+	}
+	local = uuid.NewString()
+	if _, err := s.Tool(ctx, a.Object{"taskId": id, "callId": local, "tool": "query-operations", "arguments": a.Object{"module": "feedback", "view": "list", "filters": a.Object{"query": "DO_NOT_RETAIN"}}, "validationFailure": a.Object{"ambiguous": false}}, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT code,arguments FROM operations_autonomy_tool_calls_v1 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, f.Endpoint, id, local).Scan(&code, &raw); err != nil || code != "local-validation-ambiguous" || strings.Contains(string(raw), "DO_NOT_RETAIN") {
+		t.Fatalf("route-scope ambiguity %s %s %v", code, raw, err)
+	}
 }
 
 func TestUnsentRecoveryRequiresOriginalReadAndExplicitControl(t *testing.T) {
@@ -255,5 +301,53 @@ func TestUnsentRecoveryRequiresOriginalReadAndExplicitControl(t *testing.T) {
 	}
 	if _, err = worker.Execute(ctx, a.Object{"taskId": id}); err != nil || posts != 1 || gets != 3 {
 		t.Fatalf("original reconcile POST=%d GET=%d %v", posts, gets, err)
+	}
+}
+
+func TestDutyEventSourcesRespectTaskIDsAndCurrentReadPermissions(t *testing.T) {
+	pool, _ := testsupport.PostgreSQL(t)
+	ctx := context.Background()
+	f := operationsfixture.NewEndpoint(t, pool, "https://event-source.example.invalid")
+	base := autonomyfixture.Setup(t, f, f.Automation(t))
+	s := &a.Service{Pool: pool, Endpoint: f.Endpoint, AIWork: &operationsai.Service{Endpoint: f.Endpoint}, Now: time.Now}
+	id := uuid.NewString()
+	if _, err := postgres.InTx(ctx, pool, func(tx pgx.Tx) (a.Object, error) {
+		return s.LinkWorkbenchWithin(ctx, tx, a.WorkbenchLink{OperationID: id, Domain: "overview", AIAccountID: base["aiAccountId"].(string)})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE operations_autonomy_configs_v1 SET enabled=true WHERE endpoint=$1 AND domain='overview'`, f.Endpoint); err != nil {
+		t.Fatal(err)
+	}
+	event1, event2, foreign := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	feedbackID, contentID := uuid.NewString(), uuid.NewString()
+	if _, err := pool.Exec(ctx, `INSERT INTO operations_autonomy_events_v1(id,endpoint,domain,event_key,event_type,target_type,target_id,source_version,created_at,available_at) VALUES($1,$2,'overview','eligible','feedback.changed','feedback',$3,'3',now(),now()),($4,$2,'overview','withheld','content.changed','content-post',$5,'4',now(),now()),($6,'https://other.invalid','overview','foreign','feedback.changed','feedback',$3,'5',now(),now())`, event1, f.Endpoint, feedbackID, event2, contentID, foreign); err != nil {
+		t.Fatal(err)
+	}
+	outside, outsideID := uuid.NewString(), uuid.NewString()
+	if _, err := pool.Exec(ctx, `INSERT INTO operations_autonomy_events_v1(id,endpoint,domain,event_key,event_type,target_type,target_id,created_at,available_at) VALUES($1,$2,'overview','outside','feedback.changed','feedback',$3,now(),now())`, outside, f.Endpoint, outsideID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET source='event',mode='ai',state='running',lease_until=now()+interval '10 minutes',event_ids=$3,configuration=jsonb_set(configuration,'{plan,resourceIds}',$4::jsonb),dispatch_started_at=now(),target_type=NULL,target_id=NULL WHERE endpoint=$1 AND id=$2`, f.Endpoint, id, []string{event1, event2, foreign, outside}, `["`+feedbackID+`"]`); err != nil {
+		t.Fatal(err)
+	}
+	value, err := s.Authorize(ctx, a.Object{"taskId": id, "operation": "run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	context := value["task"].(map[string]any)["prompt"].(map[string]any)["context"].(map[string]any)
+	targets := context["sourceTargets"].([]a.Object)
+	if context["sourceCoverage"] != "partial" || len(targets) != 1 || targets[0]["eventId"] != event1 || targets[0]["targetId"] != feedbackID {
+		t.Fatalf("safe event source %#v", context)
+	}
+	if _, ok := context["eventIds"]; ok {
+		t.Fatal("raw event IDs leaked")
+	}
+	view, err := s.Tool(ctx, a.Object{"taskId": id, "callId": uuid.NewString(), "tool": "current-summary", "arguments": a.Object{}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view["sourceCoverage"] != "partial" || len(view["sourceTargets"].([]a.Object)) != 1 {
+		t.Fatalf("summary source %#v", view)
 	}
 }

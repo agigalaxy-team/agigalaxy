@@ -8,7 +8,7 @@ from agno.tools.function import Function, FunctionCall
 from pydantic import TypeAdapter, ValidationError
 
 from galaxy_agentos.conversation_tools import FileScanRetry, PreparedOperation
-from galaxy_agentos.conversation_tools import SearchApply, SearchRestore, conversation_tools
+from galaxy_agentos.conversation_tools import SearchApply, SearchRestore, ReadKind, _prepared_arguments, conversation_tools
 
 
 class RecordingNode:
@@ -21,6 +21,17 @@ class RecordingNode:
 
 
 class SearchReasonContract(unittest.TestCase):
+    def test_search_draft_and_exact_version_read_contract(self):
+        version = str(uuid4())
+        settings = {"synonyms": [], "rankingMode": "relevance", "fixedConstraints": {
+            "currentSource": True, "anonymousPublic": True, "withdrawnExcluded": True, "expiredExcluded": True}}
+        adapter = TypeAdapter(PreparedOperation)
+        create = adapter.validate_python({"kind": "search-draft-save", "settings": settings, "reason": "save"})
+        self.assertEqual(_prepared_arguments(create), {"kind": "search-draft-save", "settings": settings, "reason": "save"})
+        update = adapter.validate_python({"kind": "search-draft-save", "settings": settings, "reason": "save", "expectedDraftId": version})
+        self.assertEqual(_prepared_arguments(update)["expectedDraftId"], version)
+        self.assertEqual(TypeAdapter(ReadKind).validate_python("search-version"), "search-version")
+
     def test_only_search_preparation_uses_existing_trimmed_one_to_five_hundred(self):
         adapter = TypeAdapter(PreparedOperation)
         node = RecordingNode()

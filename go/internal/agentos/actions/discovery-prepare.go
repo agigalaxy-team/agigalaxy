@@ -2,13 +2,15 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/discovery"
 	"net/url"
 )
 
 var recommendationDirectionNames = map[string]string{"increase": "增加", "keep": "保持", "decrease": "减少"}
 
-func (s *Service) prepareDiscovery(ctx context.Context, a Actor, x Object, p *preparation) error {
+func (s *Service) prepareDiscovery(ctx context.Context, a Actor, x Object, operationID string, p *preparation) error {
 	if str(x["kind"]) == "recommendation-direction" {
 		return s.prepareRecommendation(ctx, a, x, p)
 	}
@@ -26,6 +28,37 @@ func (s *Service) prepareDiscovery(ctx context.Context, a Actor, x Object, p *pr
 	}
 	p.expiry(item["readExpiresAt"])
 	configuration := obj(item["configuration"])
+	if x["kind"] == "search-draft-save" {
+		if e = capability(obj(item["capabilities"])["canConfigure"]); e != nil {
+			return e
+		}
+		draft := obj(configuration["draft"])
+		if draft != nil && (draft["id"] != x["expectedDraftId"] || draft["operatorId"] != a.ID) || draft == nil && x["expectedDraftId"] != nil {
+			return fail("search_quality_draft_changed", 409)
+		}
+		target := x["expectedDraftId"]
+		if target == nil {
+			target = operationID
+		}
+		if !validID(target) {
+			return invalid()
+		}
+		p.target = Object{"kind": "search-configuration", "id": target, "label": "搜索配置草稿", "href": "/admin/operations/search-quality?tab=versions"}
+		p.title = "保存搜索配置草稿"
+		p.command = Object{"expectedRevision": configuration["revision"], "expectedDraftId": x["expectedDraftId"], "settings": x["settings"], "reason": x["reason"]}
+		p.basis = []any{basis("管理版本", fmt.Sprint(configuration["revision"]))}
+		before := obj(configuration["active"])["settings"]
+		if draft != nil {
+			before = draft["settings"]
+		}
+		if before == nil {
+			before = obj(configuration["native"])["settings"]
+		}
+		if before == nil {
+			return fail("operations_agentos_search_review_required", 409)
+		}
+		return searchReview(p, before, x["settings"], "仅保存草稿，不改变当前搜索。")
+	}
 	version := obj(configuration["draft"])
 	restore := x["kind"] == "search-restore"
 	if restore {
@@ -64,7 +97,43 @@ func (s *Service) prepareDiscovery(ctx context.Context, a Actor, x Object, p *pr
 	}
 	p.command = Object{"expectedRevision": configuration["revision"], "versionId": version["id"], "reason": x["reason"]}
 	p.basis = []any{basis("可见范围", "已下架、到期、非公开或无权阅读的内容仍不进入搜索结果")}
-	p.impact = []any{first, "设置完成后才会显示为已生效；结果暂未取得时，系统会继续查询。", "需要回退时，可在版本记录中恢复曾生效的配置。"}
+	return searchReview(p, obj(configuration["active"])["settings"], version["settings"], first)
+}
+
+func searchReview(p *preparation, before, after any, impact string) error {
+	before, e := discovery.QuerySearchSettings(obj(before))
+	if e != nil {
+		return fail("operations_agentos_search_review_required", 409)
+	}
+	after, e = discovery.QuerySearchSettings(obj(after))
+	if e != nil {
+		return fail("operations_agentos_search_review_required", 409)
+	}
+	p.impact = []any{impact, "设置完成后才会显示为已生效；结果暂未取得时，系统会继续查询。", "固定可见性约束保持不变，已下架、到期、非公开或无权阅读的内容不进入结果。"}
+	for _, item := range []struct {
+		label string
+		value any
+	}{{"当前设置", before}, {"目标设置", after}} {
+		raw, e := json.Marshal(item.value)
+		if e != nil {
+			return e
+		}
+		parts := strategyReviewChunks(string(raw), 4000)
+		for i, part := range parts {
+			p.impact = append(p.impact, fmt.Sprintf("%s（%d/%d）：%s", item.label, i+1, len(parts), part))
+		}
+	}
+	total := 0
+	for _, line := range p.impact {
+		n := jsLength(str(line))
+		total += n
+		if n > 5000 {
+			return fail("operations_agentos_search_review_required", 409)
+		}
+	}
+	if len(p.impact) > 80 || total > 20000 {
+		return fail("operations_agentos_search_review_required", 409)
+	}
 	return nil
 }
 func (s *Service) prepareRecommendation(ctx context.Context, a Actor, x Object, p *preparation) error {

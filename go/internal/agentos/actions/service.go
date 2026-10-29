@@ -268,6 +268,8 @@ func required(x Object) string {
 		return "rules.write"
 	case "search-apply":
 		return "search-quality.publish"
+	case "search-draft-save":
+		return "search-quality.configure"
 	case "search-restore":
 		return "search-quality.restore"
 	case "recommendation-direction":
@@ -329,7 +331,7 @@ func (s *Service) ActionReady(permission string) bool {
 		return s.Strategies != nil
 	case "rule-publish", "rule-restore":
 		return s.Rules != nil
-	case "search-apply", "search-restore":
+	case "search-draft-save", "search-apply", "search-restore":
 		return s.SearchQuality != nil
 	case "recommendation-direction":
 		return s.Recommendations != nil

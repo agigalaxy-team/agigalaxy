@@ -130,6 +130,10 @@ func TestOriginalSearchConfigurationPersistentACKRecoveryAndCurrentProvenance(t 
 	if e != nil || replay["replayed"] != true || patches.Load() != 0 {
 		t.Fatalf("draft replay %s %v", jsonString(replay), e)
 	}
+	guarded := Object{"operationId": uuid.NewString(), "expectedRevision": 1, "reason": "do not replace unselected draft", "settings": input["settings"], "expectedDraftId": nil}
+	if _, e = service.CommandPreparedDraft(ctx, actor, guarded); fault.Code(e) != "search_quality_draft_changed" {
+		t.Fatalf("unselected draft was not protected: %v", e)
+	}
 	loseACK.Store(true)
 	applyInput := Object{"operationId": uuid.NewString(), "expectedRevision": 1, "versionId": draft["versionId"], "reason": "原应用"}
 	applied, e := service.Command(ctx, actor, "apply", applyInput)

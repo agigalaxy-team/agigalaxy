@@ -6,7 +6,8 @@ from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
 from .model_gate import with_current_authority
 from .conversation_failures import with_conversation_failures
-from .tool_reliability import reliable_function
+from .tool_reliability import reliable_function, PREPARED_CARD_IDS, PREPARED_CARD_MESSAGE
+from agno.run.agent import RunOutput
 from .model_settings import domain_model
 from .conversation_storage import conversation_database
 from .conversation_tools import conversation_tools
@@ -35,6 +36,12 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
         if current.get("execution", {}).get("sessionId") != run_context.session_id:
             raise AuthorityDenied("agentos_conversation_context_changed")
 
+    def prepared_card_response(run_context: RunContext, run_output: RunOutput):
+        ids = (run_context.metadata or {}).get(PREPARED_CARD_IDS)
+        if isinstance(ids, list) and ids:
+            run_output.content = PREPARED_CARD_MESSAGE
+            run_output.metadata = {**(run_output.metadata or {}), PREPARED_CARD_IDS: list(ids)}
+
     agents = []
     conversation_db = conversation_database(db)
     for domain, label in domains.items():
@@ -46,7 +53,7 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
         model._galaxy_usage_database = conversation_db
         agents.append(ConversationAgent(id="galaxy-conversation-" + domain, name=label + "沟通", model=model,
             db=conversation_db, tools=[reliable_function(fn) for fn in [current_summary, *conversation_tools(gateway, domain=domain)]],
-            pre_hooks=[authorized_run], post_hooks=[authorized_run],
+            pre_hooks=[authorized_run], post_hooks=[authorized_run, prepared_card_response],
             instructions=current_role_instructions(gateway, domain=domain,
                 fixed=reference_aware_instructions(["你是银河工作台的" + label + "助手，和当前管理者连续沟通。",
                 "普通问候和不涉及当前业务数据的交流直接回应，不需要读取current_summary或先核验业务摘要。工具读取失败只简短说明该项实际限制，不复述内部错误码，不推断用户缺权限，也不默认要求人工改授权。",

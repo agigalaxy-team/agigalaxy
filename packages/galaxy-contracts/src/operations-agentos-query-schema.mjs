@@ -46,7 +46,7 @@ for(const view of ['roles','personnel','automation'])add('permissions',view);
 // Choose the declared route before parsing its cursor. Other modules may use
 // numeric sequences and must never evaluate a file's opaque cursor as BigInt.
 export const agentOsQueryArgumentsSchema=z.discriminatedUnion('module',Object.values(options).map(views=>views.length===1?views[0]:z.discriminatedUnion('view',views)));
-export const agentOsReadKinds=['account','account-summary','registered-user','post','reply','section','case','chat-report','feedback','chat-file','forum-file','file-cleanup-plan','file-cleanup-operation','project','method','message-plan','message-run','rule','strategy-run','strategy-version','ai-run','backup-point','restore-plan','role'];
+export const agentOsReadKinds=['account','account-summary','registered-user','post','reply','section','case','chat-report','feedback','chat-file','forum-file','file-cleanup-plan','file-cleanup-operation','project','method','message-plan','message-run','rule','strategy-run','strategy-version','search-version','ai-run','backup-point','restore-plan','role'];
 export const agentOsReadArgumentsSchema=z.discriminatedUnion('kind',agentOsReadKinds.map(kind=>z.strictObject({kind:z.literal(kind),id:kind==='rule'?p14KeySchema:kind==='backup-point'?z.string().regex(/^[a-f0-9]{64}$/):kind==='ai-run'?opaque:uuid,filters:(kind==='account-summary'?businessSummaryQuerySchema:empty).default({})})));
 export const agentOsQueryToolSchema=z.enum(['query-operations','read-operation-object']);
 export const agentOsQueryContract={tools:['query-operations','read-operation-object'],modules:agentOsQueryViews,readKinds:agentOsReadKinds};

@@ -18,10 +18,13 @@ MODEL_STATES = {"PENDING": "accepted", "RUNNING": "running", "COMPLETED": "compl
 
 
 def duty_report_fields(run):
-    status = str(getattr(run.get("status"), "value", run.get("status")) or "").upper()
-    failure = (run.get("metadata") or {}).get("completionFailureCode")
-    code = "operations_autonomy_completion_incomplete" if failure == "operations_autonomy_completion_incomplete" else "operations_autonomy_model_failed"
-    return {"nativeRunId": run.get("run_id"),
+    nested = run.get("run_data") if isinstance(run.get("run_data"), dict) else {}
+    status_value = run.get("status") or nested.get("status")
+    status = str(getattr(status_value, "value", status_value) or "").upper()
+    metadata = run.get("metadata") if isinstance(run.get("metadata"), dict) else nested.get("metadata")
+    failure = (metadata or {}).get("completionFailureCode")
+    code = failure if isinstance(failure, str) and failure in {"operations_autonomy_completion_incomplete", "operations_autonomy_validation_ledger_unavailable"} else "operations_autonomy_model_failed"
+    return {"nativeRunId": run.get("run_id") or nested.get("run_id"),
         "modelState": MODEL_STATES.get(status, "unknown"),
         "status": "waiting-human" if status == "PAUSED" else "completed" if status == "COMPLETED"
             else "failed" if status in {"ERROR", "CANCELLED"} else "running" if status in {"PENDING", "RUNNING"} else "unknown",
@@ -58,7 +61,7 @@ def duty_storage_fields(fields):
             "delegationVersion", "roleVersion", "domain", "aiAccountId", "source", "purpose", "modelSettingsVersion",
             "roundSeconds", "runtimeRevision", "modelCalls", "activeDurationBefore", "completionFailureCode"}
         result["metadata"] = {key: value for key, value in metadata.items() if key in allowed
-            and (key != "completionFailureCode" or value == "operations_autonomy_completion_incomplete")
+            and (key != "completionFailureCode" or isinstance(value, str) and value in {"operations_autonomy_completion_incomplete", "operations_autonomy_validation_ledger_unavailable"})
             and (value is None or type(value) in {str, int, bool}
                 or key == "activeDurationBefore" and type(value) is float and math.isfinite(value) and value >= 0)}
         versions = metadata.get("modelSettingsVersions")

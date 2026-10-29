@@ -53,6 +53,7 @@ from .conversation_tool_contracts import (
     JobRetry,
     SearchRetry,
     SearchApply,
+    SearchDraftSave,
     SearchRestore,
     RecommendationThemeKey,
     RecommendationDirection,
@@ -352,6 +353,14 @@ def conversation_tools(gateway, *, domain=None):
         Galaxy preserves policy/theme switches, other directions, controls and
         mappings. A saved direction does not mean ranking is active when the
         policy or theme is disabled. This route still requires a human card.
+        For search-draft-save first read search.overview, preserve the current
+        complete settings and fixedConstraints, and supply the intended complete
+        settings and a reason. If revising a draft explicitly select its actual
+        expectedDraftId; never overwrite an unselected draft. Search history
+        supplies versionId; read-operation-object search-version retrieves that
+        version's complete settings before preparing a restore. A saved draft
+        is not an applied search configuration. Apply and restore require the
+        original confirmed card and the actual native reconciliation result.
         In maintenance or overview, file-cleanup-approve only prepares review
         of an existing awaiting-approval plan returned by the query tools.
         Supply only its real planId. Galaxy shows the complete frozen selection

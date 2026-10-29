@@ -39,7 +39,7 @@ func (s *Service) proposal(proposal Object, operationID string) (Object, Object,
 		if err != nil {
 			return nil, nil, err
 		}
-	case "search-apply", "search-restore", "recommendation-direction":
+	case "search-draft-save", "search-apply", "search-restore", "recommendation-direction":
 		var err error
 		command, err = normalizeDiscoveryCommand(x, command, proposal)
 		if err != nil {
@@ -228,11 +228,38 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 		return nil, e
 	}
 	kind := str(x["kind"])
+	if kind == "search-apply" || kind == "search-restore" || kind == "search-draft-save" || kind == "messaging-state" && (x["action"] == "activate" || x["action"] == "resume") {
+		var exists bool
+		query := `SELECT EXISTS(SELECT 1 FROM operations_search_quality_operations_v1 WHERE endpoint=$1 AND operation_id=$2)`
+		if kind == "messaging-state" {
+			query = `SELECT EXISTS(SELECT 1 FROM operations_messaging_commands_v1 WHERE endpoint=$1 AND operation_id=$2)`
+		}
+		if e = s.Pool.QueryRow(ctx, query, s.Endpoint, operationID).Scan(&exists); e != nil {
+			return nil, e
+		}
+		if exists {
+			return s.RecoverPrepared(ctx, a, proposal, operationID)
+		}
+		review := preparation{impact: []any{}, basis: []any{}, expires: s.now() + 30}
+		if kind == "messaging-state" {
+			e = s.prepareMessaging(ctx, actor, x, operationID, &review)
+		} else {
+			e = s.prepareDiscovery(ctx, actor, x, operationID, &review)
+		}
+		if e != nil {
+			return nil, e
+		}
+		frozen := clone(command)
+		delete(frozen, "operationId")
+		if !same(review.command, frozen) || !same(review.impact, proposal["impact"]) || !same(review.basis, proposal["basis"]) {
+			return nil, fail("operations_agentos_review_changed", 409)
+		}
+	}
 	var result Object
 	switch kind {
 	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
 		result, e = s.executeStrategyRule(ctx, actor, x, command, authorize)
-	case "search-apply", "search-restore", "recommendation-direction":
+	case "search-draft-save", "search-apply", "search-restore", "recommendation-direction":
 		result, e = s.executeDiscovery(ctx, actor, x, command, authorize)
 	case "job-cancel", "job-retry", "search-retry":
 		service, err := s.jobActions(actor)
@@ -386,7 +413,7 @@ func actionResult(kind string, result Object, operationID string, x, command Obj
 	if strategyRuleKind(kind) {
 		return strategyRuleResult(kind, result, operationID, x)
 	}
-	if kind == "search-apply" || kind == "search-restore" || kind == "recommendation-direction" {
+	if kind == "search-draft-save" || kind == "search-apply" || kind == "search-restore" || kind == "recommendation-direction" {
 		return discoveryResult(kind, result, operationID, x, command, false)
 	}
 	if kind == "job-cancel" || kind == "job-retry" || kind == "search-retry" {

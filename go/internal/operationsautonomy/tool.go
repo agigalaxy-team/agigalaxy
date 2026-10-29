@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsquerycontract"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -13,8 +14,17 @@ import (
 var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "manage-ai-prompt", "read-ai-delegation", "assess-task", "reconcile-task-operations"}
 
 func parseTool(input Object) (Object, error) {
-	if !closed(input, []string{"taskId", "callId", "tool", "arguments"}, []string{"nativeRunId"}) || !schemaUUID.MatchString(str(input["taskId"])) || !schemaUUID.MatchString(str(input["callId"])) || !has(toolNames, str(input["tool"])) || obj(input["arguments"]) == nil {
+	if !closed(input, []string{"taskId", "callId", "tool", "arguments"}, []string{"nativeRunId", "validationFailure"}) || !schemaUUID.MatchString(str(input["taskId"])) || !schemaUUID.MatchString(str(input["callId"])) || !has(toolNames, str(input["tool"])) || obj(input["arguments"]) == nil {
 		return nil, invalid()
+	}
+	if v, ok := input["validationFailure"]; ok {
+		f := obj(v)
+		if !has([]string{"query-operations", "read-operation-object", "read-ai-delegation"}, str(input["tool"])) || !closed(f, []string{"ambiguous"}, nil) {
+			return nil, invalid()
+		}
+		if _, ok := f["ambiguous"].(bool); !ok {
+			return nil, invalid()
+		}
 	}
 	if v, ok := input["nativeRunId"]; ok && !nativeRunPattern.MatchString(str(v)) {
 		return nil, invalid()
@@ -23,9 +33,10 @@ func parseTool(input Object) (Object, error) {
 }
 
 type toolBinding struct {
-	row, prior  Object
-	actor       Actor
-	operationID string
+	row, prior    Object
+	actor         Actor
+	operationID   string
+	localRecorded bool
 }
 
 func errorCode(e error) string {
@@ -44,6 +55,10 @@ func (s *Service) taskSummaryWithin(ctx context.Context, tx pgx.Tx, row Object) 
 	if e != nil {
 		return nil, e
 	}
+	sources, e := s.taskEventSourcesWithin(ctx, tx, current, actor)
+	if e != nil {
+		return nil, e
+	}
 	var management Object
 	state := "not-configured"
 	if s.Permissions != nil {
@@ -53,7 +68,7 @@ func (s *Service) taskSummaryWithin(ctx context.Context, tx pgx.Tx, row Object) 
 		}
 		state = "available"
 	}
-	out := Object{"tool": "current-summary", "availability": "available", "basis": "capability-discovery-not-business-inspection", "inspectionChecked": false, "taskVersionBasis": "persisted-task-snapshot-with-current-authority", "task": Object{"taskId": current["id"], "aiAccountId": current["ai_account_id"], "domain": current["domain"], "source": current["source"], "mode": current["mode"], "state": current["state"], "planId": current["config_id"], "configRevision": current["config_revision"], "planVersion": current["plan_version"], "promptVersion": current["prompt_version"], "delegationVersion": current["delegation_version"], "roleVersion": actor.Version}, "queryAccess": operationsai.QueryAccess(actor.Permissions), "managementCapabilities": management, "managementAvailability": state}
+	out := Object{"tool": "current-summary", "availability": "available", "basis": "capability-discovery-not-business-inspection", "inspectionChecked": false, "taskVersionBasis": "persisted-task-snapshot-with-current-authority", "task": Object{"taskId": current["id"], "aiAccountId": current["ai_account_id"], "domain": current["domain"], "source": current["source"], "mode": current["mode"], "state": current["state"], "planId": current["config_id"], "configRevision": current["config_revision"], "planVersion": current["plan_version"], "promptVersion": current["prompt_version"], "delegationVersion": current["delegation_version"], "roleVersion": actor.Version}, "sourceTargets": sources["sourceTargets"], "sourceCoverage": sources["sourceCoverage"], "sourceBasis": sources["basis"], "queryAccess": operationsai.QueryAccess(actor.Permissions), "managementCapabilities": management, "managementAvailability": state}
 	return s.stamp(out), nil
 }
 func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Object, error) {
@@ -87,6 +102,46 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		if e != nil {
 			return toolBinding{}, e
 		}
+		if x["validationFailure"] != nil {
+			args := obj(x["arguments"])
+			safe := Object{}
+			ambiguous := obj(x["validationFailure"])["ambiguous"] == true
+			if x["tool"] != "read-ai-delegation" {
+				scope := operationsquerycontract.QueryCoverageScope(str(x["tool"]), args)
+				for _, key := range []string{"module", "view", "kind", "id"} {
+					if scope[key] != nil {
+						safe[key] = scope[key]
+					}
+				}
+				safe["filters"] = scope["filters"]
+				ambiguous = ambiguous || scope["invalidRoute"] == true || scope["invalidFilters"] == true || scope["unknownTopLevel"] == true || scope["unknownFilterFields"] == true && len(texts(scope["allowedFilterKeys"])) > 0 || len(list(scope["invalidFilterKeys"])) > 0 || len(list(scope["missingRequired"])) > 0
+				for _, key := range []string{"after", "limit", "page", "pageSize"} {
+					if value, ok := obj(args["filters"])[key]; ok && has(texts(scope["allowedFilterKeys"]), key) && !has(texts(scope["invalidFilterKeys"]), key) {
+						obj(safe["filters"])[key] = value
+					}
+				}
+			} else {
+				ambiguous = true
+			}
+			if prior != nil {
+				matched := !ambiguous && (sameValue(prior["arguments"], args) || sameReadScope(str(x["tool"]), obj(prior["arguments"]), safe))
+				if prior["tool"] != x["tool"] || !has([]string{"failed", "unknown", "invalid-request"}, str(prior["state"])) || !matched {
+					return toolBinding{}, fail("operations_autonomy_operation_conflict")
+				}
+				return toolBinding{row: row, prior: prior, actor: actor, localRecorded: true}, nil
+			}
+			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET code='task-assessment-stale' WHERE endpoint=$1 AND task_id=$2 AND tool='assess-task' AND (code='task-assessment-current' OR state='started' AND code IS NULL)`, s.Endpoint, row["id"]); e != nil {
+				return toolBinding{}, e
+			}
+			code := "local-validation-failed"
+			if ambiguous {
+				code = "local-validation-ambiguous"
+			}
+			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'invalid-request',$7,$8,$8)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(safe), uuid.NewString(), code, s.now()); e != nil {
+				return toolBinding{}, e
+			}
+			return toolBinding{row: row, actor: actor, localRecorded: true}, nil
+		}
 		if prior != nil && x["tool"] == "assess-task" && prior["code"] != "task-assessment-current" {
 			return toolBinding{}, fail("operations_autonomy_assessment_stale")
 		}
@@ -108,10 +163,13 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 			}
 		}
 		actor, e = s.BindDutyAuditSourceWithin(ctx, tx, actor, str(x["callId"]), operationID, ptr(x["nativeRunId"]), ruleSource)
-		return toolBinding{row, prior, actor, operationID}, e
+		return toolBinding{row: row, prior: prior, actor: actor, operationID: operationID}, e
 	})
 	if e != nil {
 		return nil, e
+	}
+	if binding.localRecorded {
+		return Object{"state": "recorded"}, nil
 	}
 	result, e := func() (Object, error) {
 		row, actor, operationID := binding.row, binding.actor, binding.operationID
@@ -195,6 +253,16 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 			} else {
 				if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET code='task-assessment-stale' WHERE endpoint=$1 AND task_id=$2 AND tool='assess-task' AND (code='task-assessment-current' OR state='started' AND code IS NULL)`, s.Endpoint, x["taskId"]); e != nil {
 					return false, e
+				}
+			}
+			if tool == "query-operations" || tool == "read-operation-object" {
+				state, code = readResultStatus(result)
+			}
+			if tool == "read-ai-delegation" {
+				if obj(result["prompt"]) != nil || obj(result["delegation"]) != nil && result["targetAiAccounts"] != nil {
+					code = "read-success-complete"
+				} else {
+					state, code = "failed", "read-unavailable"
 				}
 			}
 			if result["state"] == "waiting-human" {

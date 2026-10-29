@@ -34,6 +34,7 @@ const definitions=[
  ['strategy-control','overview','暂停或恢复策略执行','strategies.read',['strategies.control'],'strategies',['control'],[],true],
  ['strategy-continue','governance','决定已暂停的具体策略事项','strategies.read',['strategies.run'],'strategies',['continue'],[],true],
  ['search-apply','discovery','应用已保存搜索草稿','search-quality.read',['search-quality.publish'],'searchQuality',['overview','command'],['ordinary','prior-automatic-decision']],
+ ['search-draft-save','discovery','保存搜索配置草稿','search-quality.read',['search-quality.configure'],'searchQuality',['overview','command'],['draft-only','current-source']],
  ['search-restore','discovery','恢复曾生效搜索配置','search-quality.read',['search-quality.restore'],'searchQuality',['overview','history','command'],['ordinary','approved-version','prior-automatic-decision']],
  ['rule-publish','overview','发布已保存规则草稿','rules.read',['rules.write'],'rules',['publish'],[],true],
  ['rule-restore','overview','恢复已发布规则版本','rules.read',['rules.write'],'rules',['restore'],[],true],
@@ -48,7 +49,7 @@ const extra=[
  ['ai.roles.revoke','ai.roles.read','ai-role-delegation','permissions',['delegatedAssignment'],['delegated-ai-only']],
 ];
 const byPermission=new Map();
-const implementedAdapters=new Set(['job-cancel','job-retry','search-retry','content-visibility','content-curation','public-content-batch','private-case-message','section-classification','section-visibility','resource-visibility','account-restriction','case-resolve','feedback-update','file-scan-retry','file-access','recommendation-direction','search-apply','search-restore','ordinary-strategy-draft','ordinary-strategy-publish','message-draft-create','message-draft-save','messaging-state','ai-role-delegation','ai-prompt-delegation','strategy-draft','strategy-rehearsal','strategy-publish','strategy-control','strategy-continue','rule-publish','rule-restore','file-cleanup-approve']);
+const implementedAdapters=new Set(['job-cancel','job-retry','search-retry','content-visibility','content-curation','public-content-batch','private-case-message','section-classification','section-visibility','resource-visibility','account-restriction','case-resolve','feedback-update','file-scan-retry','file-access','recommendation-direction','search-draft-save','search-apply','search-restore','ordinary-strategy-draft','ordinary-strategy-publish','message-draft-create','message-draft-save','messaging-state','ai-role-delegation','ai-prompt-delegation','strategy-draft','strategy-rehearsal','strategy-publish','strategy-control','strategy-continue','rule-publish','rule-restore','file-cleanup-approve']);
 for(const entry of aiWorkPreparationRegistry)for(const permission of entry.actions)if(!byPermission.has(permission))byPermission.set(permission,{kind:entry.kind,read:entry.read,handler:entry.handler,conditions:entry.conditions,humanOnly:entry.humanOnly});
 for(const [permission,read,kind,service,methods,conditions] of extra)byPermission.set(permission,{kind,read,handler:{service,methods},conditions,humanOnly:false});
 byPermission.set('chat-reports.materials.read',{kind:'private-case-materials',read:'chat-reports.materials.read',handler:{service:'chatReports',methods:['operatorGet','assertDutyCaseWithin']},conditions:['triggered-case','purpose-bound-materials'],humanOnly:false,purposeBoundRead:true});

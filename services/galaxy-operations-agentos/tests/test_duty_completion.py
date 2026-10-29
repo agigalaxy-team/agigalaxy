@@ -1,4 +1,5 @@
 import asyncio
+import json
 import unittest
 from types import SimpleNamespace
 
@@ -39,6 +40,25 @@ class CompletionTests(unittest.TestCase):
         model = with_duty_completion(Model([ModelResponse(tool_executions=[tool("pause", True)])]), Gateway([]))
         run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={})
         self.assertTrue(model.response(messages=[], run_response=run).tool_executions[0].external_execution_required)
+
+    def test_unrecorded_local_validation_failure_cannot_finish_run(self):
+        model = with_duty_completion(Model([ModelResponse(content="done")]), Gateway([]))
+        run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={"_galaxyDutyValidationLedgerFailed": True})
+        with self.assertRaises(DutyCompletionIncomplete):
+            model.response(messages=[], run_response=run)
+
+    def test_repeated_same_fact_with_new_call_ids_is_not_progress(self):
+        values = [ModelResponse(tool_executions=[ToolExecution(tool_call_id=str(i), tool_name="query_operations", tool_args={"module":"feedback", "view":"list"}, result=json.dumps({"availability":"available", "checkedAt":i, "data":{"items":[]}}))]) for i in range(4)]
+        model = with_duty_completion(Model(values), Gateway(["continue"] * 4))
+        run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={})
+        with self.assertRaises(DutyCompletionIncomplete):
+            model.response(messages=[], run_response=run)
+
+    def test_new_scope_or_changed_fact_resets_progress(self):
+        values = [ModelResponse(tool_executions=[ToolExecution(tool_call_id=str(i), tool_name="query_operations", tool_args={"module":"feedback", "view":"list", "filters":{"state": state}}, result=json.dumps({"availability":"available", "data":{"items":[state]}}))]) for i, state in enumerate(["pending", "pending", "closed", "closed"])]
+        model = with_duty_completion(Model(values), Gateway(["continue", "continue", "continue", "completed"]))
+        run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={})
+        self.assertIsNotNone(model.response(messages=[], run_response=run))
 
     def test_no_progress_bounded(self):
         model = with_duty_completion(Model([ModelResponse(content="no") for _ in range(3)]), Gateway(["continue"] * 3))
