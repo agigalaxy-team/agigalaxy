@@ -1,6 +1,6 @@
 # 范围和覆盖快照
 
-时间为 2026-10-29 11:34 UTC 附近的已保存账本快照。full 表示有全文件静态阅读记录，不表示跨文件攻击链全部闭合、测试通过或安全认证。不得将相互重叠的账本直接相加为总体百分比。
+基线与前两次差量保留 2026-10-29 11:34 UTC 附近的已保存账本快照；2026-10-29 15:26 UTC 根据已保存账本补入第三次 eaf74b3 差量，不改写基线统计。full 表示有全文件静态阅读记录，不表示跨文件攻击链全部闭合、测试通过或安全认证。不得将相互重叠的账本直接相加为总体百分比。
 
 ## 不可变基线
 
@@ -24,11 +24,14 @@ Web 早期 checkpoint.md 的 1,061 分配、751 筛查是历史快照，不能�
 |---|---|---|
 | aa9dbc6 → 81797043ca9e871c353608c4c990a8daeb155f35 | Server 86 全读、6 完整比较、2 partial、6 显式排除、5 pending；Web 9 个变更文件全读；Auth 8 个分配变更文件已审 | 不覆盖全 HEAD；Server 13 个未完成/排除项仍单列；重叠不相加 |
 | 8179704 → 595cd2ad4e3d09eab61739ffa1b034c993f962cc | Server 43 全文件静态阅读、34 完整变更段/结构比较、16 部分阅读、31 显式排除，共124路径；Web 8个分配变更文件全读 | 比较不等于全文件重读；16部分与31排除仍未完成；已审服务端请求权限，不代表运行效果或部署验证 |
+| 595cd2a → eaf74b3b8f243b812eb7746488bc12264f1206ce | Server 对106路径记录28全读（15实现、13测试源码）、38完整变更段比较、13部分阅读、27明确排除；Web 13路径中3全读、10完整差量加定向上下文；Auth 2新增文件全读，另全读4个未变依赖 | 38个比较不等于全文件重读；13个部分项仍未完成；27个Server排除包含其他审阅者归属及受限范围，不能全部解释为无人审阅或工具拒绝；Web的10个完整差量仍是部分HEAD阅读；Auth依赖不能计入新增路径总数；各账本重叠不相加 |
+
+第三次差量仅复用现有静态审阅证据，未新增技术验证。请求权限、原始回执及元数据投影的已审部分未确立新增可利用回归；这不代表完整当前提交安全，也不证明三项基线发现已修复。SQL 138/139、数据库及生成目录、模型网关运行行为和调度/恢复等排除或混合未读部分继续保留限制，不因本次整理而恢复分析。eaf74b3 是本报告列示的固定差量终点，不声称它仍为最新 main 或线上部署。 主审于 2026-10-29 15:26 UTC 获取的 main 为 `685f1298c08727d29a498972dd4c4aea801481bb`；已有比较清单显示自 eaf74b3 起新增14次提交、81条变更路径。该后续差量仅完成前端局部检查：15 个变更文件中14个全文静态阅读、1个CSS完整变更段阅读；另7个未变前端依赖全文、1个依赖定向阅读。所有15个变更快照与 Git blob SHA 匹配。其余66条变更路径尚未计为已审，不能推断服务端授权或运行效果。前端未确立新增可利用漏洞；测试仅阅读、未执行。依据为 `web/delta-685f129-report.md` 与 `web/delta-685f129-ledger.json`。
 
 前端 delegation ceiling 差量已由 auth 交叉核对：去除 UI 前缀屏蔽并未证明可授予敏感写权限。差量“无新增已确认漏洞”不等于基线三项已修复，也不等于当前 main 或线上版本安全。
 
 ## 可追溯账本
 
-本地审计人员可查同级上层目录的 `server/coverage.json`、`server/COVERAGE-RECONCILIATION.json`、`server/FOLLOWUP-81-RESULT.md`、`auth/ledger.md`、`web/ledger.json` 与各 delta ledger。它们是已保存审阅证据，未随本草稿打包；本报告不生成原始证据总归档。Runtime 仅继承已保存 STATUS 的未完成标记，不恢复被中止分析。
+本地审计人员可查同级上层目录的 `server/coverage.json`、`server/COVERAGE-RECONCILIATION.json`、`server/FOLLOWUP-81-RESULT.md`、`auth/ledger.md`、`web/ledger.json` 与各 delta ledger。第三次差量的具体依据为 `server/delta-eaf74b3/coverage.json`、`server/delta-eaf74b3/INTEGRITY.json`、`server/delta-eaf74b3/REPORT.md`、`web/delta-eaf74b3-ledger.json`、`web/delta-eaf74b3-report.md`、`auth/delta-eaf74b3-ledger.md` 和 `auth/delta-eaf74b3-findings.md`。它们是已保存审阅证据，未随本草稿打包；本报告不生成原始证据总归档。Runtime 仅继承已保存 STATUS 的未完成标记，不恢复被中止分析。
 
 术语：full=全文件静态阅读；partial=部分阅读；pending=待审；excluded=明确排除；delta=两个固定提交间的变更。
