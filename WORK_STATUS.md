@@ -30,7 +30,11 @@ Gateway 诊断 `ca09091` 已通过 CI 并上线；新策略准备轮 `80b8c7fe-3
 
 显式profile巡检 `a0714e3a` 自然 failed/completion_incomplete，原inspect记载 autonomy source-withheld、workbench not-authorized、maintenance partial，其他五段完整；19次模型调用、876032 tokens，无业务写/无stop。总控配置已恢复 disabled v10，具体来源缺口交设计线继续处理。
 
+`595cd2a` Go-only 修复已上线；显式profile新任务 `ca2632d9` 原inspect八段完整、后续delegation读取与最新assessment有效，task/model completed、business not-started，native 4次调用/68003 tokens。读取与结束链通过，但模型最终摘要误称全平台，未说明 River 范围、维护异常和有界样本，汇报准确性未通过；原任务终态不改。
+
 聊天记录审查（五岗位现可读历史）：治理轮 `9a95f54f-67a8-42ee-abe2-3e2c8751d3b5` 与消息轮 `25936a95-11ff-4f75-a669-19e31190118c` 的普通问候回答暴露内部授权错误码；后续同岗位问候可正常回答，需核历史来源与当前修复覆盖。总控追问轮 `15718d5d-7ac9-4ef7-9b7b-0bebbf20c313` 将前次失败解释为权限或对象不可用，而相邻三轮原生记录为模型请求 502；指代与当时授权仍在核对，不先断言错拒权。已知提示词 prepared 被说成已恢复、策略类型校验和流终态失败保留上文记录。
+
+独立值守角色任务 `e76fcba3-918c-45d5-aa5c-cbda4884012a` 自然 completed，原工具账本按顺序记录创建角色、分配、读取、撤回同一分配、停用角色、再次读取和最新 assessment；四条原业务回执已独立核对，新增角色和分配均 v1 启用、v2 停用；治理岗位最终有效权限与前像相等且旧分配不变，中间 read-ai-delegation 的结果未持久，无法证明曾实际读到 effective=true；分配启用事件不能代替该证据。native 实际 13 次模型调用、448883 tokens，约 89 秒。临时配置已恢复 disabled v14。此结果不代替普通会话角色卡验收；后者 `04619614` 再次混入旧搜索目标且无角色卡，当前输入次序已核，历史投影修复待发布复测。
 
 首批 `f65434e` 已通过 CI `40838654493`、`40838654443` 并部署 Go、Admin、AgentOS；官网保持 `8e919ac`。业务迁移 133→134，仅额外授予 Worker 角色对原操作命令表 SELECT。部署及无头结果均记入同一 canonical 操作日志。
 
@@ -48,7 +52,7 @@ Gateway 诊断 `ca09091` 已通过 CI 并上线；新策略准备轮 `80b8c7fe-3
 
 服务器由 `go/cmd/galaxy-api`、`galaxy-worker`、`galaxy-information-worker`、`galaxy-publisher`、`galaxy-migrate`、`galaxy-lifecycle` 承担；Native由 `go/cmd/galaxy` 的native、integration-mcp、host、integration-host承接。Next官网与Admin/Payload分别运行，共用浏览器运行机制。
 
-`packages/galaxy-contracts` 维护共同合同，`packages/galaxy-client` 维护浏览器／Node SDK，`go/internal/databaseschema/sql` 是133份迁移与四角色SQL的唯一现行来源，最高134并保留120空号。旧Core、Node CLI、Edge及Official业务树已移出整个项目，当前源码不保留替代内核或转发壳。
+`packages/galaxy-contracts` 维护共同合同，`packages/galaxy-client` 维护浏览器／Node SDK，`go/internal/databaseschema/sql` 是迁移与四角色SQL的唯一现行来源，线上最高137并保留120空号。旧Core、Node CLI、Edge及Official业务树已移出整个项目，当前源码不保留替代内核或转发壳。
 
 源码主库为公开的 `agigalaxy-team/agigalaxy`；银河自有代码Apache-2.0，第三方保留原许可。原公开仓库已整合并删除远端，原始Git历史及替代源码归档在项目外 `source-reviews/retired/`。现行产品、架构、开发、运维和公开说明集中在docs/；原始资料在originals/。
 

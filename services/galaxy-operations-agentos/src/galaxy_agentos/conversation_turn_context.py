@@ -5,6 +5,7 @@ import json
 import re
 
 from .model_usage import _RUN
+from .conversation_history_projection import projection_status
 
 _ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 _ROLES = {"system", "developer", "user", "assistant", "tool"}
@@ -21,11 +22,13 @@ def _record(args, kwargs):
     last_user = next((m for m in reversed(messages) if getattr(m, "role", None) == "user"), None)
     run_id = getattr(run, "run_id", None)
     operation_id = (getattr(run, "metadata", None) or {}).get("operationId")
+    projection = projection_status() or {}
     event = {"event": "conversation-turn-context", "runId": run_id if isinstance(run_id, str) and _ID.fullmatch(run_id) else None,
         "operationId": operation_id if isinstance(operation_id, str) and _ID.fullmatch(operation_id) else None,
         "currentInputSha256": input_hash, "currentUserCount": len(current),
         "currentInputMatchesLastUser": isinstance(input_content, str) and last_user is not None and getattr(last_user, "content", None) == input_content,
         "historyCount": sum(bool(getattr(m, "from_history", False)) for m in messages),
+        "historyProjectionApplied": projection.get("applied", False), "historyNotProjectedCount": projection.get("notProjected", 0),
         "currentToolCount": sum(getattr(m, "role", None) == "tool" and not getattr(m, "from_history", False) for m in messages),
         "roles": [{"role": getattr(m, "role", None) if getattr(m, "role", None) in _ROLES else "other",
             "fromHistory": bool(getattr(m, "from_history", False))} for m in messages[:128]],

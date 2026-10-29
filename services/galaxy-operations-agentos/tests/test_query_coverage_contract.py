@@ -16,7 +16,7 @@ class QueryCoverageContract(unittest.TestCase):
                 return {"availability": "available", "data": None}
         gateway = Gateway()
         tools = conversation_tools(gateway)
-        self.assertEqual([tool.__name__ for tool in tools], ['query_operations', 'read_operation_object', 'list_authorized_work', 'run_authorized_work', 'read_ai_delegation', 'prepare_operation'])
+        self.assertEqual([tool.__name__ for tool in tools], ['query_operations', 'read_operation_object', 'list_authorized_work', 'run_authorized_work', 'read_task_operation', 'read_ai_delegation', 'prepare_operation'])
         turn, run, session = str(uuid4()), str(uuid4()), str(uuid4())
         context = RunContext(run_id=run, session_id=session, user_id="conversation:"+str(uuid4()), metadata={"operationId":turn})
         values = QueryFilters(page=2, pageSize=20, source="registered", business="not-formed", login="enabled", emailVerified="no", participation="restricted", registeredFrom="2026-10-01T00:00:00Z", registeredTo="2026-10-24T23:59:59Z", sort="registered-desc")

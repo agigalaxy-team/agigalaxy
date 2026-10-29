@@ -193,7 +193,7 @@ class ManagementToolNativeTest(unittest.TestCase):
                 return {"state": "prepared"} if tool == "prepare-operation" else {"items": []}
         tools = conversation_tools(Gateway())
         self.assertEqual([tool.name if isinstance(tool, Function) else tool.__name__ for tool in tools], ["query_operations", "read_operation_object",
-            "list_authorized_work", "run_authorized_work", "read_ai_delegation", "prepare_operation"])
+            "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "prepare_operation"])
         prepare, read = tools[-1], tools[-2]
         schema = Function.from_callable(prepare)
         schema.process_entrypoint()
