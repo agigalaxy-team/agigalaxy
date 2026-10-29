@@ -89,6 +89,12 @@ class ToolReliability(unittest.TestCase):
                 result = json.loads(call.result)
                 self.assertEqual(result['state'], state)
                 self.assertEqual(len(requests), expected_calls)
+                if status == 400:
+                    self.assertEqual(result, {'state': 'invalid-request', 'reason': code,
+                        'httpStatus': 400, 'scope': 'backend-request-validation',
+                        'retryable': True, 'action': 'correct-arguments'})
+                    self.assertNotIn('UPSTREAM_PRIVATE_PROSE', output.getvalue() + call.result)
+                    continue
                 self.assertIn('message', result)
                 self.assertNotIn('agentos_', call.result)
                 self.assertNotIn('business_admin_', call.result)
@@ -126,6 +132,72 @@ class ToolReliability(unittest.TestCase):
         summary, _ = _model_feedback({"availability":"unavailable","reason":"summary-not-connected"})
         self.assertEqual(summary["failureCategory"], "source-unavailable")
         self.assertNotIn("summary-not-connected", json.dumps(summary))
+
+    def test_closed_argument_feedback_and_unknown_errors(self):
+        for status, code, expected in [
+                (400, "invalid_p13_strategy_request", True),
+                (422, "invalid_operations_agentos_request", True),
+                (400, "unknown_SECRET_CANARY", False),
+                (503, "invalid_p13_strategy_request", False)]:
+            with self.subTest(status=status, code=code):
+                def respond(request):
+                    return httpx.Response(status, json={"error": code, "message": "SECRET_CANARY"})
+                gateway = GalaxyGateway(SimpleNamespace(service_key="synthetic",
+                    authority_url="http://127.0.0.1:1/v1/internal/agentos/"),
+                    transport=httpx.MockTransport(respond))
+                self.addCleanup(gateway.close)
+                if expected:
+                    feedback = gateway.request("tools/execute", {}, tool_feedback=True)
+                    self.assertEqual(feedback, {"state": "invalid-request", "reason": code,
+                        "httpStatus": status, "scope": "backend-request-validation", "retryable": True, "action": "correct-arguments"})
+                    projected, _ = _model_feedback(feedback)
+                    self.assertEqual(projected, feedback)
+                    projected_query, _ = _model_feedback({**feedback, "analysisConstraints": {"ignored": "SECRET_CANARY"}})
+                    self.assertEqual(projected_query, feedback)
+                else:
+                    with self.assertRaises(AuthorityUnavailable) as caught:
+                        gateway.request("tools/execute", {}, tool_feedback=True)
+                    feedback = _closed_failure("prepare_operation", caught.exception)
+                    self.assertEqual(feedback["state"], "unavailable")
+                    self.assertNotIn("SECRET_CANARY", json.dumps(feedback))
+        forged = {"state":"invalid-request", "reason":"invalid_p13_strategy_request",
+            "httpStatus":503, "scope":"backend-request-validation", "retryable":True, "action":"correct-arguments"}
+        projected, _ = _model_feedback(forged)
+        self.assertEqual(projected["state"], "unavailable")
+        self.assertNotIn("action", projected)
+        self.assertFalse(projected["retryable"])
+        forged.update({"httpStatus": 400, "extra": "SECRET_CANARY"})
+        projected, diagnostic = _model_feedback(forged)
+        self.assertEqual(projected["state"], "unavailable")
+        self.assertNotIn("SECRET_CANARY", json.dumps([projected, diagnostic]))
+
+    def test_sdk_prepare_invalid_then_corrected_card(self):
+        calls = []
+        card_id = str(uuid4())
+        def respond(request):
+            calls.append(json.loads(request.content))
+            if len(calls) == 1:
+                return httpx.Response(400, json={"error": "invalid_p13_strategy_request", "message": "SECRET_CANARY"})
+            return httpx.Response(200, json={"state": "prepared", "card": {"state": "prepared", "cardId": card_id}})
+        gateway = GalaxyGateway(SimpleNamespace(service_key="synthetic", authority_url="http://127.0.0.1:1/v1/internal/agentos/"),
+            transport=httpx.MockTransport(respond))
+        self.addCleanup(gateway.close)
+        function = reliable_function(conversation_tools(gateway)[-1])
+        function._run_context = self.context()
+        first = FunctionCall(function=function, call_id="first", arguments={"operation":{"kind":"rule-publish", "key":"business-controls", "reason":"first"}})
+        with redirect_stdout(StringIO()):
+            first.execute()
+        feedback = json.loads(first.result)
+        self.assertEqual(feedback["reason"], "invalid_p13_strategy_request")
+        self.assertEqual(feedback["scope"], "backend-request-validation")
+        self.assertEqual(feedback["action"], "correct-arguments")
+        self.assertNotIn("SECRET_CANARY", first.result)
+        second = FunctionCall(function=function, call_id="second", arguments={"operation":{"kind":"rule-publish", "key":"business-controls", "reason":"corrected"}})
+        with redirect_stdout(StringIO()):
+            second.execute()
+        self.assertEqual(second.result, "请确认操作。")
+        self.assertEqual(function._run_context.metadata["_galaxyPreparedCardIds"], [card_id])
+        self.assertEqual(len(calls), 2)
 
     def test_slow_read_timeouts_do_not_repeat_the_same_entire_call(self):
         for error_type in (httpx.ReadTimeout, httpx.PoolTimeout):

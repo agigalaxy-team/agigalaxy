@@ -19,6 +19,9 @@ func TestConversationToolFailureProjection(t *testing.T) {
 		sql         string
 	}{
 		{fault.New("invalid_operations_agentos_request", 400), "invalid_operations_agentos_request", "fault", 400, ""},
+		{fault.New("invalid_p13_strategy_request", 400), "invalid_p13_strategy_request", "fault", 400, ""},
+		{fault.New("invalid_p13_strategy_request", 503), "operations_agentos_tool_unavailable", "fault", 503, ""},
+		{fault.New("private_SECRET_CANARY", 400), "operations_agentos_tool_unavailable", "fault", 400, ""},
 		{errors.New("SECRET_CANARY"), "operations_agentos_tool_unavailable", "unexpected", 503, ""},
 		{context.DeadlineExceeded, "operations_agentos_tool_request_timeout", "context-timeout", 503, ""},
 		{&pgconn.PgError{Code: "23503", Message: "SECRET_CANARY", Detail: "SECRET_CANARY"}, "operations_agentos_tool_unavailable", "unexpected", 503, "23503"},

@@ -10,6 +10,7 @@ from .tool_call_ids import (PROVIDER_TOOL_CALL_ID_MAX_LENGTH, conversation_call_
 
 
 _LOGGER = logging.getLogger("galaxy_agentos.gateway")
+SAFE_ARGUMENT_ERROR_CODES = frozenset({"invalid_operations_agentos_request", "invalid_operations_agentos_query", "invalid_p13_strategy_request"})
 _DIAGNOSTIC_CODE = re.compile(r"^(?:agentos|operations|business_admin|invalid_operations|p13|search_quality|feedback|messaging|content|file|forum)_[a-z0-9_]{1,100}$")
 
 
@@ -26,7 +27,7 @@ def closed_failure_fact(*, state=None, status=None, code=None):
         return {"state": "unavailable", "failureCategory": "timeout", "causeKnown": False, "message": "本次读取超时，具体原因尚未查明。"}
     if status == 429 or isinstance(status, int) and status >= 500:
         return {"state": "unavailable", "failureCategory": "source-unavailable", "causeKnown": False, "message": "本次读取暂不可用，具体原因尚未查明。"}
-    if status in {400, 422}:
+    if status in {400, 422} and code in SAFE_ARGUMENT_ERROR_CODES:
         return {"state": "invalid-request", "failureCategory": "invalid-request", "causeKnown": True, "message": "本次请求参数不符。"}
     if status in {404, 410} or status is None and code == "agentos_object_unavailable":
         return {"state": "unavailable", "failureCategory": "object-unavailable", "causeKnown": False, "message": "本次对象暂不可读取。"}
@@ -142,9 +143,18 @@ class GalaxyGateway:
                     if isinstance(source, dict) and source.get("error") == "operations_agentos_source_changed":
                         return {"state": "changed", "reason": "agentos_public_reference_version_changed",
                             "nextStep": "select-current-version", "effectState": "not-confirmed"}
+                if response.status_code in {400, 422}:
+                    try:
+                        source = response.json()
+                    except ValueError:
+                        source = None
+                    code = source.get("error") if isinstance(source, dict) else None
+                    if isinstance(code, str) and code in SAFE_ARGUMENT_ERROR_CODES:
+                        return {"state": "invalid-request", "reason": code,
+                            "httpStatus": response.status_code, "scope": "backend-request-validation", "retryable": True,
+                            "action": "correct-arguments"}
+                    raise _rejected_response(response, AuthorityUnavailable, "agentos_authority_unavailable")
                 state, reason, next_step = {
-                    400: ("invalid-request", "agentos_tool_arguments_invalid", "correct-arguments"),
-                    422: ("invalid-request", "agentos_tool_arguments_invalid", "correct-arguments"),
                     404: ("unavailable", "agentos_object_unavailable", "select-current-object"),
                     410: ("unavailable", "agentos_object_unavailable", "select-current-object"),
                     409: ("changed", "agentos_tool_state_changed", "read-current-state"),

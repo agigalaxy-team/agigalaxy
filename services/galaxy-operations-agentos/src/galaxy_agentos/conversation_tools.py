@@ -24,6 +24,7 @@ from .conversation_tool_contracts import (
     Token,
     QueryFilters,
     AccountSummaryReadFilters,
+    StrategyVersionReadFilters,
     FeedbackMetadataFilters,
     Visibility,
     ContentVisibility,
@@ -233,7 +234,7 @@ def conversation_tools(gateway, *, domain=None):
 
     def read_operation_object(run_context: RunContext, fc: FunctionCall,
             kind: ReadKind, id: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")],
-            filters: AccountSummaryReadFilters | None = None) -> str:
+            filters: AccountSummaryReadFilters | StrategyVersionReadFilters | None = None) -> str:
         """Read a selected operations object through its current business permission.
 
         Use real object identifiers returned by an earlier query or the
@@ -247,18 +248,21 @@ def conversation_tools(gateway, *, domain=None):
         a processing conclusion. This task material is not a profile source.
         file-cleanup-plan and file-cleanup-operation are read-only; an original
         receipt lookup cannot approve, retry or execute cleanup.
-        Only account-summary accepts filters: days must be 7 or 28, with no
+        strategy-version exposes same-owner historical original rehearsals;
+        page with after and limit, and use the actual rehearsalId and versionId.
+        Historical valid does not establish current publication eligibility.
+        account-summary accepts days 7 or 28, with no
         calendar day/from/to. Use the returned basis for each analysis source;
         lifetime metrics and fixed weekly retention are not a selected-day result.
         """
         arguments = {"kind": kind, "id": id}
         if filters is not None:
             values = filters.model_dump(mode="json", exclude_none=True, exclude_unset=True)
-            if (values and kind != "account-summary" or set(values) - {"days"}
-                    or "days" in values and values["days"] not in {7, 28}):
+            allowed = {"days"} if kind == "account-summary" else {"after", "limit"} if kind == "strategy-version" else set()
+            if (set(values) - allowed or "days" in values and values["days"] not in {7, 28}):
                 return json.dumps({"state": "invalid-request",
                     "reason": "agentos_tool_arguments_invalid",
-                    "allowedFilters": ["days"] if kind == "account-summary" else [],
+                    "allowedFilters": sorted(allowed),
                     "allowedDays": [7, 28] if kind == "account-summary" else [],
                     "calendarDateSupported": False, "effectExecuted": False})
             arguments["filters"] = values

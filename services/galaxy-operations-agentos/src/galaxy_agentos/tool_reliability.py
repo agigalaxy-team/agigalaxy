@@ -13,7 +13,7 @@ from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from pydantic import ValidationError
 
-from .gateway import AuthorityDenied, AuthorityUnavailable, failure_diagnostic, is_internal_diagnostic, closed_failure_fact
+from .gateway import AuthorityDenied, AuthorityUnavailable, failure_diagnostic, is_internal_diagnostic, closed_failure_fact, SAFE_ARGUMENT_ERROR_CODES
 from .conversation_tool_feedback import _preparation_feedback
 from .tool_schema_feedback import operation_schema_feedback, repair_operation_alias
 
@@ -39,6 +39,18 @@ def _model_feedback(value):
     """Project only known failure fields; never traverse arbitrary user data."""
     if not isinstance(value, dict):
         return value, {}
+    # Only the exact closed envelope from the authenticated gateway survives.
+    if (set(value).difference({"state", "reason", "httpStatus", "scope", "retryable", "action", "preparationFeedback", "analysisConstraints"}) == set()
+            and value.get("state") == "invalid-request"
+            and isinstance(value.get("reason"), str) and value["reason"] in SAFE_ARGUMENT_ERROR_CODES
+            and type(value.get("httpStatus")) is int and value["httpStatus"] in {400, 422}
+            and value.get("scope") == "backend-request-validation"
+            and value.get("retryable") is True and value.get("action") == "correct-arguments"):
+        return {key: value[key] for key in ("state", "reason", "httpStatus", "scope", "retryable", "action")}, {"code": value["reason"]}
+    if value.get("scope") == "backend-request-validation":
+        # Reject the entire malformed envelope; never copy unknown fields.
+        return {**closed_failure_fact(state="unavailable"), "dataRead": False,
+            "valuesCurrent": False, "retryable": False}, {}
     result, diagnostic = dict(value), {}
     state = result.get("state")
     state = state if isinstance(state, str) else None

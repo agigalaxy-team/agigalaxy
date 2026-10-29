@@ -71,7 +71,7 @@ func parse(tool string, input Object) (arguments, error) {
 		}
 	}
 	if tool == "read-operation-object" {
-		if a.kind != "account-summary" && !exact(a.filters) {
+		if a.kind != "account-summary" && a.kind != "strategy-version" && !exact(a.filters) {
 			return a, invalid()
 		}
 		return a, nil

@@ -108,6 +108,12 @@ class AccountSummaryReadFilters(ClosedArguments):
         return self
 
 
+class StrategyVersionReadFilters(ClosedArguments):
+    """Page this person's historical original rehearsals for the exact version."""
+    after: UUID | None = None
+    limit: Annotated[int, Field(strict=True, ge=1, le=50)] | None = None
+
+
 class FeedbackMetadataFilters(ClosedArguments):
     """The feedback/list route exposes metadata filters, never prose search."""
     category: Literal["unclassified", "problem", "suggestion"] | None = None

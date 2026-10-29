@@ -53,7 +53,11 @@ func (s *Service) QueryRead(ctx context.Context, a Actor, authority p.Authority,
 		if creation != nil {
 			view["ordinaryCreation"] = Object{"operationId": creation["operation_id"], "sourceStrategyId": creation["source_strategy_id"], "sourceVersionId": creation["source_version_id"], "newStrategyId": creation["new_strategy_id"]}
 		}
-		return reader.metadata(Object{"version": view}), nil
+		rehearsals, e := reader.VersionRehearsals(ctx, a, id, input)
+		if e != nil {
+			return nil, e
+		}
+		return reader.metadata(Object{"version": view, "rehearsals": rehearsals}), nil
 	}
 	return nil, invalid()
 }

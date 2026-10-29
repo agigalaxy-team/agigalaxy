@@ -11,6 +11,12 @@ func TestStrategyVersionReadIsClosedAndRouted(t *testing.T) {
 	if _, err = parse("read-operation-object", Object{"kind": "strategy-version", "id": id, "filters": Object{"extra": true}}); err == nil {
 		t.Fatal("unexpected filter accepted")
 	}
+	if _, err = parse("read-operation-object", Object{"kind": "strategy-version", "id": id, "filters": Object{"after": id, "limit": 1}}); err != nil {
+		t.Fatalf("rehearsal page rejected: %v", err)
+	}
+	if _, err = parse("read-operation-object", Object{"kind": "strategy-version", "id": id, "filters": Object{"limit": 51}}); err == nil {
+		t.Fatal("oversized page accepted")
+	}
 }
 
 func TestSearchVersionReadIsClosedAndRouted(t *testing.T) {

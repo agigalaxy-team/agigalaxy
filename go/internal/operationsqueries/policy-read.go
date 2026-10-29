@@ -105,7 +105,13 @@ func (s *Service) strategies(ctx context.Context, a Actor, domain string, args a
 		if source := object(version["ordinaryCreation"]); source != nil {
 			data["ordinaryCreation"] = project(source, shape("operationId sourceStrategyId sourceVersionId newStrategyId", "s"))
 		}
-		return queryResult{source: value, data: data}, nil
+		rehearsals := object(value["rehearsals"])
+		if rehearsals == nil {
+			return queryResult{}, fail("operations_query_response_invalid", 503)
+		}
+		data["rehearsals"] = rehearsals
+		complete := rehearsals["hasMore"] == false && rehearsals["availability"] == "available"
+		return queryResult{source: value, data: data, pagination: Object{"next": rehearsals["nextAfter"], "complete": complete}, availability: str(rehearsals["availability"])}, nil
 	}
 	if args.kind != "" {
 		row := object(value["run"])

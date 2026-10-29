@@ -5,7 +5,7 @@ from uuid import uuid4
 from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from pydantic import ValidationError
-from galaxy_agentos.conversation_tools import AccountSummaryReadFilters, QueryFilters, conversation_tools
+from galaxy_agentos.conversation_tools import AccountSummaryReadFilters, StrategyVersionReadFilters, QueryFilters, conversation_tools
 
 
 class ReadObjectFilters(unittest.TestCase):
@@ -62,3 +62,26 @@ class ReadObjectFilters(unittest.TestCase):
         self.assertEqual(invalid['allowedFilters'], [])
         self.assertFalse(invalid['effectExecuted'])
         self.assertTrue(all(item['tool'] == 'read-operation-object' for item in calls))
+
+    def test_strategy_version_pages_are_closed_and_routed(self):
+        calls = []
+        class Gateway:
+            def conversation_tool(self, user, tool, arguments, **binding):
+                calls.append(arguments)
+                return {'availability': 'available'}
+        fn = conversation_tools(Gateway())[1]
+        native = Function.from_callable(fn)
+        native.process_entrypoint()
+        schema = json.dumps(native.parameters)
+        self.assertIn('historical original rehearsals', schema)
+        context = RunContext(run_id=str(uuid4()), user_id='local', session_id=str(uuid4()), metadata={'operationId': str(uuid4())})
+        cursor = uuid4()
+        filters = StrategyVersionReadFilters(after=cursor, limit=2)
+        fn(context, FunctionCall(function=native, call_id='page'), kind='strategy-version', id=str(uuid4()), filters=filters)
+        self.assertEqual(calls[-1]['filters'], {'after': str(cursor), 'limit': 2})
+        count = len(calls)
+        result = json.loads(fn(context, FunctionCall(function=native, call_id='wrong'), kind='feedback', id=str(uuid4()), filters=filters))
+        self.assertEqual(len(calls), count)
+        self.assertEqual(result['reason'], 'agentos_tool_arguments_invalid')
+        with self.assertRaises(ValidationError):
+            StrategyVersionReadFilters(limit=51)

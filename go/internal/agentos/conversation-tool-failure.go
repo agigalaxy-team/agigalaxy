@@ -15,7 +15,7 @@ var toolSQLState = regexp.MustCompile(`^[0-9A-Z]{5}$`)
 // prose, database detail, request/configuration, stack traces, or URLs.
 func conversationToolFailure(err error) Object {
 	code := fault.Code(err)
-	if code != "invalid_operations_agentos_query" && code != "invalid_operations_agentos_request" && !toolSafeError.MatchString(code) {
+	if code != "invalid_operations_agentos_query" && code != "invalid_operations_agentos_request" && !(code == "invalid_p13_strategy_request" && (fault.Status(err) == 400 || fault.Status(err) == 422)) && !toolSafeError.MatchString(code) {
 		code = "operations_agentos_tool_unavailable"
 	}
 	class := "unexpected"
