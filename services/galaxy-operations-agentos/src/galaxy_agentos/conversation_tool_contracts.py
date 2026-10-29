@@ -297,9 +297,19 @@ class CaseResolve(ClosedArguments):
 
 
 class MessagingState(ClosedArguments):
+    """Prepare a human-confirmed state change for the selected message plan.
+
+    Read message-plan lifecycle for current preparation options; an unknown
+    result is checked by the original operation instead of submitting again.
+    """
     kind: Literal["messaging-state"]
-    targetId: UUID
-    action: Literal["activate", "pause", "resume", "stop", "withdraw"]
+    targetId: UUID = Field(description="The selected existing message plan ID.")
+    action: Literal["activate", "pause", "resume", "stop", "withdraw"] = Field(description=(
+        "After human confirmation: activate or resume schedules delivery; pause or stop prevents "
+        "subsequent unsent delivery; withdraw retracts published notices and in-app messages and "
+        "stops future delivery, but cannot recall sent emails. Actual eligibility is in the "
+        "selected message-plan lifecycle, and actual delivery requires its original run and receipt."
+    ))
 
 
 class StrategyControl(ClosedArguments):

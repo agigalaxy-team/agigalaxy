@@ -88,7 +88,7 @@ func (s *Service) prepareMessaging(ctx context.Context, a Actor, x Object, opera
 			}
 			p.expiry(response["readExpiresAt"])
 			plan := obj(response["plan"])
-			if e = capability(plan["id"] == id && plan["state"] == "draft" && obj(plan["capabilities"])["canSave"] == true); e != nil {
+			if e = capability(plan["id"] == id && messaging.CanPrepareDraftSave(plan)); e != nil {
 				return e
 			}
 			p.command = Object{"expectedVersion": plan["version"], "expectedRevision": plan["revision"], "config": config}

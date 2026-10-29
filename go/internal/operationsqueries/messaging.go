@@ -6,6 +6,8 @@ import (
 	"slices"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/messaging"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
+	"github.com/jackc/pgx/v5"
 )
 
 var deliveryStates = merge(shape("total pending submitting submitted delivered skipped failed unknown blocked bounced opened clicked", "n"), Object{"receipts": "s"})
@@ -43,7 +45,7 @@ func historyItem(x Object) Object {
 func recipientItem(x Object) Object {
 	return object(project(x, merge(shape("id channel state errorCode retryAt submittedAt completedAt", "s"), Object{"attemptCount": "n", "deferred": "b", "retryable": "b", "account": accountShape, "attempts": []any{merge(shape("number", "n"), shape("state errorCode startedAt finishedAt", "s"), Object{"networkAttempt": "b"})}})))
 }
-func (s *Service) execute(ctx context.Context, a Actor, args arguments) (queryResult, error) {
+func (s *Service) execute(ctx context.Context, a Actor, domain string, args arguments) (queryResult, error) {
 	if args.module == "accounts" {
 		return s.accounts(ctx, a, args)
 	}
@@ -94,7 +96,22 @@ func (s *Service) execute(ctx context.Context, a Actor, args arguments) (queryRe
 		return s.noticeRead(ctx, source, a, args)
 	}
 	if args.kind != "" {
-		return s.readMessage(ctx, source, a, args)
+		known := false
+		if args.kind == "message-plan" && (s.Permissions.Duty == nil || !s.Permissions.Duty.AcceptsDuty(a)) {
+			// The normal query proof filters out preparation permissions. Obtain
+			// the same person's fixed-AI preparation projection for this read
+			// only, without invoking any prepare or mutation operation.
+			prepared, err := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Actor, error) {
+				return s.Permissions.HumanAIReadWithin(ctx, tx, a, domain, "prepare", "notices.read")
+			})
+			if err != nil {
+				return queryResult{}, err
+			}
+			a = prepared
+			source.Authority = s.Permissions.PreparationReader()
+			known = true
+		}
+		return s.readMessage(ctx, source, a, args, known)
 	}
 	filters := Object{}
 	for k, v := range args.filters {
@@ -154,7 +171,7 @@ func (s *Service) execute(ctx context.Context, a Actor, args arguments) (queryRe
 	}
 	return queryResult{source: result, data: data, refs: refs, pagination: Object{"next": resume, "complete": resume == nil && result["scanTruncated"] != true && result["scanLimited"] != true}}, nil
 }
-func (s *Service) readMessage(ctx context.Context, source *messaging.Service, a Actor, args arguments) (queryResult, error) {
+func (s *Service) readMessage(ctx context.Context, source *messaging.Service, a Actor, args arguments, lifecycleKnown bool) (queryResult, error) {
 	if args.kind == "message-run" {
 		result, e := source.Run(ctx, a, args.id)
 		if e != nil {
@@ -187,5 +204,9 @@ func (s *Service) readMessage(ctx context.Context, source *messaging.Service, a 
 			runs = append(runs, messageRun(object(v)))
 		}
 	}
-	return queryResult{source: result, data: Object{"plan": plan, "recentRuns": runs}, purpose: purpose, refs: []reference{{kind: args.kind, id: args.id, row: row, filters: args.filters, purpose: purpose}}}, nil
+	data := Object{"plan": plan, "recentRuns": runs, "lifecycle": messageLifecycle(row, lifecycleKnown)}
+	if purpose == "message-draft-editing" {
+		data["messagePurposeMeaning"] = "message-draft-editing describes the purpose of reading draft content; it does not restrict subsequent human publication review."
+	}
+	return queryResult{source: result, data: data, purpose: purpose, refs: []reference{{kind: args.kind, id: args.id, row: row, filters: args.filters, purpose: purpose}}}, nil
 }

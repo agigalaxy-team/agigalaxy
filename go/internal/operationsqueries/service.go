@@ -268,7 +268,7 @@ func (s *Service) Query(ctx context.Context, actor Actor, domain, tool string, i
 	if e != nil {
 		return nil, e
 	}
-	result, e := s.execute(ctx, fresh, args)
+	result, e := s.execute(ctx, fresh, domain, args)
 	if e != nil {
 		if fault.Code(e) != "operations_query_not_configured" {
 			return nil, e

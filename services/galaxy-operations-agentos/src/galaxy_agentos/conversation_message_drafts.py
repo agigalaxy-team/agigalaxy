@@ -110,8 +110,13 @@ class MessageDraftCreate(Closed):
 
 
 class MessageDraftSave(Closed):
+    """Save the selected message plan's draft configuration; this does not activate or deliver it.
+
+    Read the selected message-plan lifecycle for current preparation options.
+    A prepared card requires human confirmation; an unknown result is checked by its original operation.
+    """
     kind: Literal["message-draft-save"]
-    targetId: UUID
+    targetId: UUID = Field(description="The selected existing message plan ID.")
     config: MessageDraftConfig
 
 
