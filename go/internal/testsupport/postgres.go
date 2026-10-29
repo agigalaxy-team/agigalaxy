@@ -55,11 +55,15 @@ func PostgreSQL(t *testing.T) (*pgxpool.Pool, string) {
 		t.Fatal(e)
 	}
 	defer controlLog.Close()
-	start := exec.CommandContext(ctx, filepath.Join(bin, "pg_ctl"+ext), "-D", dir, "-l", log, "-o", fmt.Sprintf("-h 127.0.0.1 -p %d -F", port), "-w", "start")
+	// The fixture connects over TCP only. Distribution builds can default Unix
+	// sockets to a postgres-owned /var/run directory unavailable to a CI user.
+	start := exec.CommandContext(ctx, filepath.Join(bin, "pg_ctl"+ext), "-D", dir, "-l", log, "-o", fmt.Sprintf("-h 127.0.0.1 -p %d -F -c unix_socket_directories=", port), "-w", "start")
 	start.Stdout = controlLog
 	start.Stderr = controlLog
 	if e = start.Run(); e != nil {
-		t.Fatalf("isolated postgres start: %v", e)
+		control, _ := os.ReadFile(filepath.Join(filepath.Dir(dir), "control.log"))
+		server, _ := os.ReadFile(log)
+		t.Fatalf("isolated postgres start: %v\n%s\n%s", e, control, server)
 	}
 	t.Cleanup(func() {
 		c, stop := context.WithTimeout(context.Background(), 15*time.Second)
