@@ -81,6 +81,9 @@ func (t *ConversationTools) rememberSources(ctx context.Context, row Conversatio
 		if ref["purpose"] != "public-content" && ref["controlledSource"] != true {
 			continue
 		}
+		if ref["version"] == nil {
+			return fail("operations_agentos_source_qualification_unavailable", 503)
+		}
 		canonical, err := identity.Canonical([]any{ref["kind"], ref["id"]})
 		if err != nil {
 			return err
@@ -94,6 +97,9 @@ func (t *ConversationTools) rememberSources(ctx context.Context, row Conversatio
 		var original Object
 		if err = s.Pool.QueryRow(ctx, "SELECT evidence_ref FROM operations_agentos_conversation_sources_v1 WHERE conversation_id=$1 AND source_key=$2", row.ID, key).Scan(&original); err != nil {
 			return err
+		}
+		if original["version"] == nil {
+			return fail("operations_agentos_source_qualification_unavailable", 503)
 		}
 		if !sameConversationJSON(original["version"], ref["version"]) {
 			return fail("operations_agentos_source_changed", 409)

@@ -70,11 +70,11 @@ func cardAttempted(row *conversationCard) bool {
 }
 
 func sameConversationJSON(a, b any) bool {
-	left, e := identity.Canonical(a)
+	left, e := identity.Canonical([]any{a})
 	if e != nil {
 		return false
 	}
-	right, e := identity.Canonical(b)
+	right, e := identity.Canonical([]any{b})
 	return e == nil && bytes.Equal(left, right)
 }
 
