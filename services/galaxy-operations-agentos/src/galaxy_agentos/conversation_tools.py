@@ -1,4 +1,4 @@
-"""Native conversation tool adapters; Node owns permissions, source scope and effects."""
+"""Native conversation tool adapters; Galaxy owns permissions, source scope and effects."""
 import json
 from typing import Annotated
 from pydantic import Field
@@ -132,7 +132,7 @@ def conversation_tools(gateway, *, domain=None):
         is not a collection-health diagnosis; null/unknown reasons require an
         explicit source explanation; ratios need counts and cannot prove user
         intent. runtime_event_rejected in maintenance logs only normalizes an
-        event name outside the Node allowlist, not a proxy/security finding.
+        event name outside the Galaxy allowlist, not a proxy/security finding.
         Explicitly pass the user's supported days for each
         requested view; do not rely on another module's default. recommendations
         overview supports days=7/30/90 and defaults to 30; search overview also
@@ -274,7 +274,7 @@ def conversation_tools(gateway, *, domain=None):
             execution_id: UUID) -> str:
         """Run an existing authorized, prepared ordinary operation by execution ID.
 
-        Node checks current grants, frozen command, object/CAS and original
+        Galaxy checks current grants, frozen command, object/CAS and original
         human boundaries on every call. Existing human-review waits cannot be
         bypassed. A pending or unknown receipt is not successful execution.
         """
@@ -285,7 +285,7 @@ def conversation_tools(gateway, *, domain=None):
         """Read current human-approved AI-only management scope or one prompt.
 
         With no ID, return only the actual delegation, target AI IDs and role
-        metadata. For one genuine target ai_account_id, Node returns its role
+        metadata. For one genuine target ai_account_id, Galaxy returns its role
         prompt/current revision/version only when current prompt-read and
         ai.prompts.read permit that exact target. A missing scope or denied
         prompt is not permission to inspect other accounts or infer text.
@@ -310,16 +310,16 @@ def conversation_tools(gateway, *, domain=None):
         business effect; actual completion requires the original card receipt.
 
         It freezes the actual object, current permissions and versions in
-        Node. It performs no business mutation and grants no AI authority.
+        Galaxy. It performs no business mutation and grants no AI authority.
         This human-confirmed route does not require a pre-existing execution
         or automatic grant. An empty list_authorized_work is not a refusal of
-        this route; Node separately checks the current manager and AI's actual
+        this route; Galaxy separately checks the current manager and AI's actual
         preparation permissions, source and CAS. For content-curation, omit
         topic to keep its override; explicitly include topic=null to clear only
         the operational category override and return to current originalTopic.
         Keep unrelated pinned/featured/tagIds absent unless the user asks for
         them. This supports clearing the override without a separate action.
-        Supply the intended business change; Node determines CAS and stable
+        Supply the intended business change; Galaxy determines CAS and stable
         operation identifiers. Use genuine object IDs from query tools. Do not
         invent deadlines; ask the manager when an exact hide time is missing.
         A human card's actual result is required before reporting completion.
@@ -332,7 +332,7 @@ def conversation_tools(gateway, *, domain=None):
         For AI-only management first read current_summary and the current
         read_ai_delegation directory. ai-work-prompt-save accepts only the
         actual allowed aiAccountId and intended ordinary prompt text (up to
-        16000 characters); Node freezes its current revision/prompt/delegation
+        16000 characters); Galaxy freezes its current revision/prompt/delegation
         versions. It cannot edit a model, code boundary, goal or running plan.
         ai-role-command wraps one real role-create/role-update/assignment-save
         command and its current expectedVersion from that directory. Neither
@@ -346,12 +346,12 @@ def conversation_tools(gateway, *, domain=None):
         In discovery or overview, recommendation-direction changes only one
         existing category/tag/cross-category theme's soft display direction.
         Read recommendations.overview first and use its actual themeKey.
-        Node preserves policy/theme switches, other directions, controls and
+        Galaxy preserves policy/theme switches, other directions, controls and
         mappings. A saved direction does not mean ranking is active when the
         policy or theme is disabled. This route still requires a human card.
         In maintenance or overview, file-cleanup-approve only prepares review
         of an existing awaiting-approval plan returned by the query tools.
-        Supply only its real planId. Node shows the complete frozen selection
+        Supply only its real planId. Galaxy shows the complete frozen selection
         and derives the current revision. No approval or deletion occurs here;
         the manager must explicitly confirm the card before code can approve.
         In governance or overview, account-restriction prepares the existing
@@ -359,13 +359,13 @@ def conversation_tools(gateway, *, domain=None):
         real account first. Apply requires the manager's explicit future ISO
         deadline including timezone and a reason; never invent a duration.
         Release has a reason and until=null in nullable tool formats. The native
-        adapter omits only this null before Node. Both only prepare a human
+        adapter omits only this null before Galaxy. Both only prepare a human
         confirmation card and never enter automatic authorized work here.
         In maintenance or overview, file-access prepares an operational stop
         or restoration for a real chat/forum file returned by a query. Stop
         requires an explicit future epoch deadline and reason; restore has
         until=null in nullable tool formats; the native adapter omits this null.
-        Node supplies both current file and access revisions.
+        Galaxy supplies both current file and access revisions.
         This is neither a revoke/delete nor a scan bypass or retention change.
         No business change occurs until the manager confirms the exact card.
         """

@@ -41,7 +41,7 @@ func (s *Service) recommendations(a Actor, fresh Authorize) (*discovery.Recommen
 	return s.Recommendations.WithAuthorize(authority, fresh), nil
 }
 func unknownRecommendation(operationID string) Object {
-	return Object{"operationId": operationID, "state": "unknown", "summary": "推荐方向保存结果暂未核实，正在查询原结果。", "receipt": nil}
+	return Object{"operationId": operationID, "state": "unknown", "summary": "正在确认保存结果…", "receipt": nil}
 }
 func (s *Service) executeDiscovery(ctx context.Context, a Actor, x, command Object, fresh Authorize) (Object, error) {
 	if x["kind"] == "recommendation-direction" {

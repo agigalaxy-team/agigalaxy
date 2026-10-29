@@ -13,11 +13,74 @@ from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from pydantic import ValidationError
 
-from .gateway import AuthorityDenied, AuthorityUnavailable
+from .gateway import AuthorityDenied, AuthorityUnavailable, failure_diagnostic
 
 EFFECT_TOOLS = frozenset({"run_authorized_work", "execute_operation", "manage_ai_role", "manage_ai_prompt"})
 
 READ_TOOLS = frozenset({"current_summary", "query_operations", "read_operation_object", "list_authorized_work"})
+
+
+def _closed_failure(name, error):
+    """Describe the actual failure category without handing the model raw codes."""
+    diagnostic = failure_diagnostic(error)
+    code, status = diagnostic.get("code"), diagnostic.get("status")
+    state, message = "denied", "该项读取未获允许。"
+    if isinstance(error, AuthorityUnavailable):
+        state, message = "unavailable", "该项暂时读取失败。"
+        if code in {"operations_agentos_conversation_not_ready", "operations_agentos_action_not_connected"}:
+            message = "该项读取暂未就绪。"
+    elif status in {400, 422} or code in {"agentos_tool_arguments_invalid", "agentos_tool_call_id_invalid",
+            "agentos_native_tool_call_id_invalid", "agentos_native_tool_call_required",
+            "agentos_conversation_context_required", "agentos_injected_arguments_forbidden"}:
+        state, message = "invalid-request", "工具调用参数不符。"
+    elif status in {404, 410}:
+        state, message = "unavailable", "该项当前不可读取。"
+    elif status == 409 or code == "agentos_conversation_context_changed":
+        state, message = "changed", "该项状态已变化。"
+    elif status == 401:
+        message = "当前会话认证未通过。"
+    uncertain = name in EFFECT_TOOLS
+    result = {"state": state, "message": message, "effectExecuted": None if uncertain else False,
+        "cardPrepared": False, "retryable": False}
+    if uncertain:
+        result["nextStep"] = "read-original-operation"
+    return result
+
+
+def _model_feedback(value):
+    """Keep detailed schema feedback, but leave internal failure codes in logs."""
+    if not isinstance(value, dict):
+        return value, {}
+    result = dict(value)
+    diagnostic = {}
+    internal_code = r"(?:agentos|operations_agentos|business_admin)_[a-z0-9_]{1,100}"
+    if result.get("state") in {"denied", "unavailable", "invalid-request", "changed"}:
+        for key in ("reason", "code"):
+            raw = result.get(key)
+            if isinstance(raw, str) and re.fullmatch(internal_code, raw):
+                diagnostic["code"] = raw
+                del result[key]
+        if diagnostic:
+            result.setdefault("message", {"denied": "该项读取未获允许。", "unavailable": "该项当前不可读取。",
+                "invalid-request": "工具调用参数不符。", "changed": "该项状态已变化。"}[result["state"]])
+    # These are historical read outcomes, not a new denial in this turn. Keep
+    # the recorded state and route; an old internal code must not become the
+    # explanation for an ordinary current reply.
+    prior = result.get("priorReadReceipts")
+    if isinstance(prior, dict) and isinstance(prior.get("items"), list):
+        items, codes = [], set()
+        for item in prior["items"]:
+            entry = dict(item) if isinstance(item, dict) else item
+            code = entry.get("code") if isinstance(entry, dict) else None
+            if isinstance(code, str) and re.fullmatch(internal_code, code):
+                codes.add(code)
+                del entry["code"]
+                entry["message"] = "该次读取未成功。"
+            items.append(entry)
+        if codes:
+            diagnostic["priorReadCodes"] = sorted(codes)[:8]
+            result["priorReadReceipts"] = {**prior, "items": items}
+    return result, diagnostic
 
 
 def _event(name, context, state, **metadata):
@@ -27,7 +90,7 @@ def _event(name, context, state, **metadata):
 
 
 def tool_call_key(value):
-    """Keep the provider ID in Agno; send a stable bounded locator to Node only."""
+    """Keep the provider ID in Agno; send a stable bounded locator to Galaxy only."""
     if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", value):
         return value
     if isinstance(value, str) and len(value) <= 65536 and "__thought__" in value:
@@ -146,21 +209,22 @@ def reliable_function(fn):
                     except (ValueError, TypeError):
                         value = {}
                     state = value.get("state", value.get("availability", "returned")) if isinstance(value, dict) else "returned"
-                    _event(native.name, run_context, state if isinstance(state, str) and state in {"available", "prepared", "completed", "invalid-request", "changed", "unknown", "unavailable", "processing"} else "returned")
+                    feedback, diagnostic = _model_feedback(value)
+                    _event(native.name, run_context, state if isinstance(state, str) and state in {"available", "prepared", "completed", "invalid-request", "changed", "unknown", "unavailable", "processing", "denied"} else "returned", diagnostic=diagnostic)
+                    if diagnostic:
+                        return json.dumps(feedback, ensure_ascii=False)
                     return result
-                except AuthorityUnavailable:
+                except AuthorityUnavailable as error:
                     if native.name not in READ_TOOLS or attempt:
                         uncertain = native.name in EFFECT_TOOLS
-                        _event(native.name, run_context, "unavailable", outcome="unknown" if uncertain else "not-started")
-                        return json.dumps({"state": "unavailable", "reason": "agentos_authority_unavailable",
-                            "effectExecuted": None if uncertain else False, "cardPrepared": False, "retryable": False,
-                            "nextStep": "read-original-operation" if uncertain else "report-blocked"})
+                        _event(native.name, run_context, "unavailable", outcome="unknown" if uncertain else "not-started", diagnostic=failure_diagnostic(error))
+                        return json.dumps(_closed_failure(native.name, error), ensure_ascii=False)
                     _event(native.name, run_context, "retry-read", attempt=2)
                     time.sleep(0.2)
-        except AuthorityDenied:
-            _event(native.name, run_context, "denied")
-            return json.dumps({"state": "denied", "reason": "agentos_current_authority_denied",
-                "effectExecuted": None if native.name in EFFECT_TOOLS else False, "cardPrepared": False, "retryable": False, "nextStep": "read-original-operation" if native.name in EFFECT_TOOLS else "report-blocked"})
+        except AuthorityDenied as error:
+            feedback = _closed_failure(native.name, error)
+            _event(native.name, run_context, feedback["state"], diagnostic=failure_diagnostic(error))
+            return json.dumps(feedback, ensure_ascii=False)
         except ValidationError as error:
             # Unknown dictionary keys and field names can themselves contain
             # private input. Log only schema-owned names and bounded indices.
@@ -171,7 +235,7 @@ def reliable_function(fn):
             counters[key] = counters.get(key, 0) + 1
             exhausted = counters[key] > 2
             _event(native.name, run_context, "invalid-request", errors=errors, exhausted=exhausted)
-            return json.dumps({"state": "invalid-request", "reason": "agentos_tool_arguments_invalid", "errors": errors,
+            return json.dumps({"state": "invalid-request", "message": "工具调用参数不符。", "errors": errors,
                 "allowedFields": sorted(schema.get('properties',{})),
                 "effectExecuted": False, "cardPrepared": False, "retryable": not exhausted,
                 "nextStep": "report-blocked" if exhausted else "correct-arguments",

@@ -93,7 +93,7 @@ func (t *ConversationTools) Confirm(ctx context.Context, human operationspermiss
 	state := "unknown"
 	if err != nil {
 		status := fault.Status(err)
-		summary := "正在查询这次处理的原结果。"
+		summary := "正在确认结果…"
 		if status == 400 || status == 403 || status == 404 || status == 409 {
 			state = "not-available"
 			summary = "当前条件已变化，本次处理未继续。"

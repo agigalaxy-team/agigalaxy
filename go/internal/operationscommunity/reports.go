@@ -36,10 +36,10 @@ func (s *Service) independent(ctx context.Context, tx pgx.Tx, r Object, a Actor)
 		e := s.domain().Principal(ctx, tx, a)
 		return e == nil, e
 	}
-	if s.ReadPrincipalWithin == nil || s.Links == nil {
+	if s.Links == nil {
 		return false, fail("operations_authorization_unavailable", 503)
 	}
-	p, e := s.ReadPrincipalWithin(ctx, tx, a)
+	p, e := s.domain().ReadPrincipal(ctx, tx, a, s.ReadPrincipalWithin)
 	if e != nil {
 		return false, e
 	}

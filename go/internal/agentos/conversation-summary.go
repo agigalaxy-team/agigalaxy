@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsqueries"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
@@ -56,6 +55,26 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 	if e != nil {
 		return nil, e
 	}
+	// Both projections use the exact owning receipt. Reuse that I/O only within
+	// this summary; each projection still performs its own current card checks.
+	readOriginal := readers.OriginalOperation
+	if readOriginal == nil {
+		readOriginal = t.recoverPrepared
+	}
+	type originalReceipt struct {
+		proposal, value Object
+		err             error
+	}
+	originals := map[[3]string]originalReceipt{}
+	readers.OriginalOperation = func(ctx context.Context, actor operationspermissions.Actor, proposal Object, operation string) (Object, error) {
+		key := [3]string{actor.ID, actor.Version, operation}
+		if saved, ok := originals[key]; ok && sameConversationJSON(saved.proposal, proposal) {
+			return saved.value, saved.err
+		}
+		value, err := readOriginal(ctx, actor, proposal, operation)
+		originals[key] = originalReceipt{proposal: proposal, value: value, err: err}
+		return value, err
+	}
 	prior, e := t.priorSummaryReads(ctx, a, row, command)
 	if e != nil {
 		return nil, e
@@ -82,11 +101,11 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 			return nil, fail("operations_agentos_conversation_not_ready", 503)
 		}
 	}
-	actions, e := t.priorSummaryActions(ctx, a, row, command, readers)
+	operations, e := t.priorSummaryOperations(ctx, a, row, command, readers)
 	if e != nil {
 		return nil, e
 	}
-	operations, e := t.priorSummaryOperations(ctx, a, row, command, readers)
+	actions, e := t.priorSummaryActions(ctx, a, row, command, readers)
 	if e != nil {
 		return nil, e
 	}
@@ -156,13 +175,78 @@ func (t *ConversationTools) priorSummaryActions(ctx context.Context, a operation
 	if e != nil {
 		return nil, e
 	}
-	if len(cards) > 0 {
-		if r.PriorAction == nil {
-			return nil, fail("operations_agentos_conversation_not_ready", 503)
-		}
+	if len(cards) > 0 && r.PriorAction != nil {
 		return r.PriorAction(ctx, a, row.Domain, Object{"conversationId": row.ID, "turnId": command.ID})
 	}
+	// A completed card alone is not proof of an effect, nor permission to
+	// replay its old source prose. Missing/withdrawn individual receipts only
+	// narrow this projection, never fabricate a successful or empty history.
+	items := []any{}
+	for _, card := range cards {
+		actor, err := t.cardActor(ctx, a, card)
+		if err != nil {
+			out["availability"] = "partial"
+			continue
+		}
+		original, err := r.OriginalOperation(ctx, actor, card.Proposal, card.OperationID)
+		if err != nil || original["operationId"] != card.OperationID || original["state"] != "completed" {
+			out["availability"] = "partial"
+			continue
+		}
+		reference := priorActionReference(card.Proposal)
+		if reference == nil {
+			out["availability"] = "partial"
+			continue
+		}
+		if _, e = t.cardActor(ctx, a, card); e != nil {
+			out["availability"] = "partial"
+			continue
+		}
+		items = append(items, Object{"cardId": card.ID, "operationId": card.OperationID, "kind": card.Proposal["kind"], "state": "completed", "effectExecuted": true, "recordedEffect": summaryRecordedEffect(original), "reference": reference, "currentRead": nil})
+	}
+	out["items"] = items
+	at = t.Conversations.now().Unix()
+	out["checkedAt"], out["readExpiresAt"] = at, at+30
 	return out, nil
+}
+
+// Only a server-persisted request whose exact original receipt was verified can
+// supply this locator. It deliberately has no old title, excerpt or source lease;
+// the ordinary object-read tool must still establish current source eligibility.
+func priorActionReference(proposal Object) Object {
+	request := object(proposal["request"])
+	if request["kind"] != proposal["kind"] || !validOperationID(text(request, "targetId")) {
+		return nil
+	}
+	kind := ""
+	switch text(proposal, "kind") {
+	case "content-visibility", "content-curation":
+		kind = text(request, "targetKind")
+		if kind != "post" && kind != "reply" {
+			return nil
+		}
+	case "feedback-update":
+		kind = "feedback"
+	case "account-restriction":
+		kind = "account"
+	default:
+		return nil
+	}
+	arguments := Object{"kind": kind, "id": request["targetId"], "filters": Object{}}
+	return Object{"kind": kind, "id": request["targetId"], "read": Object{"tool": "read-operation-object", "arguments": arguments}}
+}
+
+func summaryRecordedEffect(original Object) Object {
+	effect := Object{}
+	for key, value := range object(original["receipt"]) {
+		if slices.Contains(strings.Fields("operationId phase state version revision publishedVersion themeKey direction enabled hidden planId strategyId versionId feedbackId accountId reportId messageId action"), key) {
+			switch value.(type) {
+			case nil, string, bool, float64, int, int64:
+				effect[key] = value
+			}
+		}
+	}
+	return effect
 }
 func (t *ConversationTools) priorSummaryOperations(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand, r SummaryContextReaders) (Object, error) {
 	at := t.Conversations.now().Unix()
@@ -181,9 +265,6 @@ func (t *ConversationTools) priorSummaryOperations(ctx context.Context, a operat
 		}
 		actor, e := t.cardActor(ctx, a, card)
 		if e != nil {
-			if fault.Status(e) == 503 {
-				return nil, e
-			}
 			out["availability"] = "partial"
 			continue
 		}
@@ -191,9 +272,6 @@ func (t *ConversationTools) priorSummaryOperations(ctx context.Context, a operat
 		if card.State == "prepared" {
 			view, e := readonly.cardView(ctx, a, card)
 			if e != nil {
-				if fault.Status(e) == 503 {
-					return nil, e
-				}
 				out["availability"] = "partial"
 				continue
 			}
@@ -211,9 +289,6 @@ func (t *ConversationTools) priorSummaryOperations(ctx context.Context, a operat
 				_, e = t.cardActor(ctx, a, card)
 			}
 			if e != nil {
-				if fault.Status(e) == 503 {
-					return nil, e
-				}
 				out["availability"] = "partial"
 				continue
 			}
@@ -222,16 +297,7 @@ func (t *ConversationTools) priorSummaryOperations(ctx context.Context, a operat
 				continue
 			}
 			item["state"], item["summary"] = original["state"], original["summary"]
-			effect := Object{}
-			for key, v := range object(original["receipt"]) {
-				if slices.Contains(strings.Fields("operationId phase state version revision publishedVersion themeKey direction enabled hidden planId strategyId versionId feedbackId accountId reportId messageId action"), key) {
-					switch v.(type) {
-					case nil, string, bool, float64, int, int64:
-						effect[key] = v
-					}
-				}
-			}
-			item["recordedEffect"] = effect
+			item["recordedEffect"] = summaryRecordedEffect(original)
 			item["currentRead"] = nil
 			if original["state"] == "completed" {
 				item["effectExecuted"] = true

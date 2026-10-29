@@ -31,7 +31,7 @@ export function WorkbenchActivityChart({daily,loading=false,available,basis,deni
   const titleId=useId(),fillId=useId().replace(/:/g,'')+'-activity-fill';
   return <section className="wb-trend" aria-labelledby={titleId}>
     <header className="wb-section-heading"><h2 id={titleId}>公开内容趋势</h2><div className="wb-chart-legend"><span><i className="wb-dot wb-dot--pink"/>帖子</span><span><i className="wb-dot wb-dot--blue"/>回复</span></div></header>
-    {denied?<WorkbenchEmpty title="没有公开内容数据的查看权限"/>:loading&&!available?<WorkbenchEmpty title="正在读取业务动态"/>:!available?<WorkbenchEmpty title="业务动态暂时无法取得" detail="读取恢复后会显示当前统计窗口。"/>:<>
+    {denied?<WorkbenchEmpty title="没有公开内容数据的查看权限"/>:loading&&!available?<WorkbenchEmpty title="正在读取业务动态"/>:!available?<WorkbenchEmpty title="业务动态暂时无法取得" detail=""/>:<>
       <div className="wb-chart-unit">首次发表（条）</div>
       <div className="wb-activity-chart" role="img" aria-label={'近'+daily.length+'日公开帖子与回复数量，详细数值见下表'}>
         <AdminChartSurface><WorkbenchActivityPlot daily={daily} fillId={fillId}/></AdminChartSurface>

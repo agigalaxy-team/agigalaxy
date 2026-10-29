@@ -10,7 +10,7 @@ func discoveryResult(kind string, result Object, operationID string, x, command 
 		case "failed":
 			state, summary = "failed", "搜索配置未生效。"
 		case "result-unknown":
-			state, summary = "unknown", "搜索配置结果暂未取得，正在查询原操作。"
+			state, summary = "unknown", "正在确认应用结果…"
 		case "prepared", "submitting", "task-pending":
 			state, summary = "processing", "搜索配置正在应用。"
 		}

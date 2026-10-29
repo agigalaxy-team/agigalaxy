@@ -24,7 +24,10 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
 	f := operationsfixture.New(t, owner)
-	f.Automation(t)
+	automation := f.Automation(t)
+	if _, err := f.Permissions.AIWorkAssignment(ctx, f.Root, "overview", Object{"operationId": uuid.NewString(), "expectedVersion": 0, "roleId": object(automation["role"])["id"], "enabled": true}); err != nil {
+		t.Fatal(err)
+	}
 	endpoint, issuer, idRoot := f.Endpoint, f.Issuer, f.IDs["root"]
 	cfg := owner.Config()
 	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error { _, e := c.Exec(ctx, "SET ROLE galaxy_api"); return e }
@@ -96,6 +99,73 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 	if _, e = q.Summary(ctx, human, "overview", Object{"conversationId": current.Row.ID, "turnId": uuid.NewString()}); fault.Status(e) != 403 {
 		t.Fatalf("unbound turn accepted %v", e)
 	}
+	// The production reader set has no bespoke PriorAction callback. Completed
+	// cards must use the owning exact receipt, not make the whole summary fail.
+	operations := map[string]int{}
+	states := map[string]int{}
+	var expectedTarget string
+	for i, kind := range []string{"feedback-update", "content-visibility", "account-restriction", "feedback-update"} {
+		cardID, toolID, operationID, target := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+		states[operationID] = i
+		if i == 0 {
+			expectedTarget = target
+		}
+		request := Object{"kind": kind, "targetId": target}
+		if kind == "content-visibility" {
+			request["targetKind"] = "post"
+		}
+		proposal := Object{"kind": kind, "domain": "overview", "request": request, "title": "synthetic private prose", "target": Object{"id": target, "label": "synthetic private prose"}}
+		if _, e = pool.Exec(ctx, `INSERT INTO operations_agentos_conversation_tool_calls_v1(id,endpoint,conversation_id,turn_id,native_run_id,call_id,tool,arguments_digest,state,metadata,created_at,updated_at) VALUES($1,$2,$3,$4,'native-summary',($1::uuid)::text,'prepare-operation',$5,'completed','{}',$6,$6)`, toolID, endpoint, current.Row.ID, prior, strings.Repeat("e", 64), now().Add(-45*time.Second)); e != nil {
+			t.Fatal(e)
+		}
+		if _, e = pool.Exec(ctx, `INSERT INTO operations_agentos_conversation_cards_v1(id,endpoint,conversation_id,turn_id,tool_call_id,operator_id,domain,operation_id,request_digest,proposal,state,result,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'overview',$7,$8,$9,'completed',$10,$11,$11)`, cardID, endpoint, current.Row.ID, prior, toolID, human.ID, operationID, strings.Repeat(strings.ReplaceAll(cardID, "-", ""), 2), proposal, Object{"operationId": operationID, "state": "completed"}, now().Add(-40*time.Second)); e != nil {
+			t.Fatal(e)
+		}
+	}
+	tools.CardReadPermission = func(kind string) (string, error) {
+		permission := map[string]string{"feedback-update": "feedback.read", "content-visibility": "content.read", "account-restriction": "accounts.read"}[kind]
+		if permission == "" {
+			return "", fail("operations_agentos_action_not_connected", 503)
+		}
+		return permission, nil
+	}
+	tools.RecoverPrepared = func(ctx context.Context, actor operationspermissions.Actor, proposal Object, operation string) (Object, error) {
+		operations[operation]++
+		if actor.ID != human.ID || actor.AIProof == nil {
+			t.Fatal("original receipt lost current human/fixed-AI scope")
+		}
+		switch states[operation] {
+		case 1:
+			return nil, fail("business_admin_denied", 403)
+		case 2:
+			return nil, fail("operations_agentos_action_not_connected", 503)
+		case 3:
+			return Object{"operationId": operation, "state": "not-recorded"}, nil
+		}
+		return Object{"operationId": operation, "state": "completed", "summary": "合成原处理已记录。", "receipt": Object{"operationId": operation, "revision": 2, "title": "synthetic private prose"}}, nil
+	}
+	result, e = q.Summary(ctx, human, "overview", bound)
+	if e != nil {
+		t.Fatal("completed cards required an unconnected callback", e)
+	}
+	actionsResult := object(result["priorActionReceipts"])
+	actionItems := actionsResult["items"].([]any)
+	if actionsResult["availability"] != "partial" || len(actionItems) != 1 {
+		t.Fatal("a missing/withdrawn original receipt erased the other action", actionsResult)
+	}
+	reference := object(object(actionItems[0])["reference"])
+	if reference["kind"] != "feedback" || reference["id"] != expectedTarget || object(reference["read"])["tool"] != "read-operation-object" || object(actionItems[0])["currentRead"] != nil {
+		t.Fatal("original action did not retain its minimal current-read locator", actionItems)
+	}
+	for operation, count := range operations {
+		if count != 1 {
+			t.Fatal("summary projections re-read the same original operation", operation, count)
+		}
+	}
+	raw, _ = json.Marshal(result)
+	if strings.Contains(string(raw), "synthetic private prose") {
+		t.Fatal("summary restored old source prose through an action receipt")
+	}
 	if _, e = pool.Exec(ctx, `UPDATE operations_agentos_conversation_commands_v1 SET result=$3 WHERE endpoint=$1 AND id=$2`, endpoint, turn, Object{"taskId": uuid.NewString()}); e != nil {
 		t.Fatal(e)
 	}
@@ -107,5 +177,23 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 	}
 	if e = tools.RecheckContext(ctx, human, "overview", bound); fault.Code(e) != "operations_agentos_source_changed" {
 		t.Fatalf("retired scope remained valid %v", e)
+	}
+}
+
+func TestPriorActionReferenceUsesOnlyOriginalLocator(t *testing.T) {
+	for _, value := range []struct{ action, target, kind string }{
+		{"content-visibility", "post", "post"}, {"content-curation", "reply", "reply"},
+		{"feedback-update", "", "feedback"}, {"account-restriction", "", "account"},
+	} {
+		id := uuid.NewString()
+		proposal := Object{"kind": value.action, "request": Object{"kind": value.action, "targetKind": value.target, "targetId": id}, "target": Object{"label": "old prose"}}
+		reference := priorActionReference(proposal)
+		if reference["kind"] != value.kind || reference["id"] != id || len(reference) != 3 {
+			t.Fatal("invalid action reference", reference)
+		}
+		object(proposal["request"])["targetId"] = "untrusted-locator"
+		if priorActionReference(proposal) != nil {
+			t.Fatal("invalid durable locator accepted")
+		}
 	}
 }

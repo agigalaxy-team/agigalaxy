@@ -33,7 +33,7 @@ export function WorkbenchShortcuts({operatorId}:{operatorId:string|null}){
   const open=()=>{setEditing([...selection]);setError('');dialog.current?.showModal();};
   const save=()=>{
     setSelection([...editing]);setError('');
-    if(storageKey){try{window.localStorage.setItem(storageKey,JSON.stringify(editing));}catch{setError('此浏览器暂时无法保存常用入口，本次选择仍可使用。');}}
+    if(storageKey){try{window.localStorage.setItem(storageKey,JSON.stringify(editing));}catch{setError('常用入口保存失败');}}
     dialog.current?.close();
   };
   const selected=selection.flatMap(id=>{const item=workbenchShortcuts.find(item=>item.id===id);return item?[item]:[];});

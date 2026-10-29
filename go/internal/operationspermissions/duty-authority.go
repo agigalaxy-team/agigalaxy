@@ -105,3 +105,43 @@ func (a *BusinessAuthority) RequireOperationWithin(ctx context.Context, tx pgx.T
 	}
 	return fresh, nil
 }
+
+// AcceptsQueryPrincipal forwards only a human-bound query proof, never a duty or
+// execution proof, to the wrapped read authority.
+func (a *BusinessAuthority) AcceptsQueryPrincipal(actor Actor) bool {
+	if a == nil || a.Human == nil || a.Execution != nil && a.Execution.AcceptsExecution(actor) || a.Duty != nil && a.Duty.AcceptsDuty(actor) {
+		return false
+	}
+	reader, ok := a.Human.(QueryPrincipalAuthority)
+	return ok && reader.AcceptsQueryPrincipal(actor)
+}
+func (a *BusinessAuthority) ReadQueryPrincipalWithin(ctx context.Context, tx pgx.Tx, actor Actor) (map[string]string, error) {
+	if !a.AcceptsQueryPrincipal(actor) {
+		return nil, fail("operations_agentos_scope_denied", 403)
+	}
+	return a.Human.(QueryPrincipalAuthority).ReadQueryPrincipalWithin(ctx, tx, actor)
+}
+
+// AcceptsScopedPrincipal forwards only an attested human query or preparation
+// proof; duty and execution retain their separate authority paths.
+func (a *BusinessAuthority) AcceptsScopedPrincipal(actor Actor) bool {
+	if a == nil || a.Human == nil || a.Execution != nil && a.Execution.AcceptsExecution(actor) || a.Duty != nil && a.Duty.AcceptsDuty(actor) {
+		return false
+	}
+	reader, ok := a.Human.(ScopedPrincipalAuthority)
+	return ok && reader.AcceptsScopedPrincipal(actor)
+}
+func (a *BusinessAuthority) ReadScopedPrincipalWithin(ctx context.Context, tx pgx.Tx, actor Actor) (map[string]string, error) {
+	if !a.AcceptsScopedPrincipal(actor) {
+		return nil, fail("operations_agentos_scope_denied", 403)
+	}
+	return a.Human.(ScopedPrincipalAuthority).ReadScopedPrincipalWithin(ctx, tx, actor)
+}
+
+func (a *BusinessAuthority) AcceptsStoredPreparation(actor Actor) bool {
+	if a == nil || a.Human == nil || a.Execution != nil && a.Execution.AcceptsExecution(actor) || a.Duty != nil && a.Duty.AcceptsDuty(actor) {
+		return false
+	}
+	reader, ok := a.Human.(StoredPreparationAuthority)
+	return ok && reader.AcceptsStoredPreparation(actor)
+}

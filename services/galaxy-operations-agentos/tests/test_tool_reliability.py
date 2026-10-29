@@ -1,12 +1,16 @@
 import json
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from types import SimpleNamespace
 from uuid import uuid4
+import httpx
 from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
 from pydantic import BaseModel, ConfigDict, Field
 from galaxy_agentos.tool_reliability import reliable_function, repair, tool_call_key
 from galaxy_agentos.conversation_tools import conversation_tools
-from galaxy_agentos.gateway import AuthorityDenied, AuthorityUnavailable
+from galaxy_agentos.gateway import AuthorityDenied, AuthorityUnavailable, GalaxyGateway
 
 
 class ToolReliability(unittest.TestCase):
@@ -54,6 +58,74 @@ class ToolReliability(unittest.TestCase):
         call=FunctionCall(function=fn,call_id='call_unknown',arguments={});call.execute();result=json.loads(call.result)
         self.assertEqual(len(calls),1);self.assertIsNone(result['effectExecuted'])
         self.assertEqual(result['nextStep'],'read-original-operation');self.assertFalse(result['cardPrepared'])
+
+    def test_actual_gateway_failures_keep_categories_and_codes_only_in_diagnostics(self):
+        for status, code, state, expected_calls in [
+                (503, 'operations_agentos_conversation_not_ready', 'unavailable', 2),
+                (403, 'business_admin_denied', 'denied', 1),
+                (400, 'invalid_operations_agentos_request', 'invalid-request', 1),
+                (404, 'operations_agentos_operation_not_found', 'unavailable', 1),
+                (410, 'operations_agentos_source_changed', 'unavailable', 1),
+                (409, 'operations_agentos_source_changed', 'changed', 1)]:
+            with self.subTest(status=status):
+                requests = []
+                def rejected(request):
+                    requests.append(request)
+                    return httpx.Response(status, json={'error': code, 'private': 'UPSTREAM_PRIVATE_PROSE'})
+                gateway = GalaxyGateway(SimpleNamespace(service_key='explicit-synthetic-key',
+                    authority_url='http://127.0.0.1:1/v1/internal/agentos/'),
+                    transport=httpx.MockTransport(rejected))
+                self.addCleanup(gateway.close)
+                def current_summary(run_context: RunContext, fc: FunctionCall):
+                    return json.dumps(gateway.conversation_summary(run_context.user_id,
+                        run_id=run_context.run_id, call_id=fc.call_id,
+                        session_id=run_context.session_id, turn_id=run_context.metadata['operationId']))
+                function = reliable_function(current_summary)
+                function._run_context = self.context()
+                output = StringIO()
+                with redirect_stdout(output):
+                    call = FunctionCall(function=function, call_id='closed-current-summary', arguments={})
+                    call.execute()
+                result = json.loads(call.result)
+                self.assertEqual(result['state'], state)
+                self.assertEqual(len(requests), expected_calls)
+                self.assertIn('message', result)
+                self.assertNotIn('agentos_', call.result)
+                self.assertNotIn('business_admin_', call.result)
+                self.assertNotIn('UPSTREAM_PRIVATE_PROSE', output.getvalue() + call.result)
+                self.assertNotIn('授权', result['message'])
+                self.assertNotEqual(result.get('nextStep'), 'read-original-operation')
+                if status in {403, 503}:
+                    self.assertIn(code, output.getvalue())
+
+    def test_native_binding_shape_failure_is_not_reported_as_user_permission_loss(self):
+        def query_operations(run_context: RunContext, fc: FunctionCall):
+            raise AuthorityDenied('agentos_conversation_context_required')
+        function = reliable_function(query_operations)
+        function._run_context = self.context()
+        call = FunctionCall(function=function, call_id='missing-trusted-context', arguments={})
+        call.execute()
+        result = json.loads(call.result)
+        self.assertEqual(result['state'], 'invalid-request')
+        self.assertEqual(result['message'], '工具调用参数不符。')
+        self.assertNotIn('agentos_', call.result)
+
+    def test_old_summary_failure_code_does_not_become_current_authority_feedback(self):
+        def current_summary(run_context: RunContext, fc: FunctionCall):
+            return json.dumps({'counts': {'feedback': 2}, 'priorReadReceipts': {'valuesCurrent': False,
+                'items': [{'tool': 'workbench-summary', 'state': 'unavailable',
+                    'code': 'operations_agentos_conversation_not_ready'}]}})
+        function = reliable_function(current_summary)
+        function._run_context = self.context()
+        output = StringIO()
+        with redirect_stdout(output):
+            call = FunctionCall(function=function, call_id='past-read-receipt', arguments={})
+            call.execute()
+        result = json.loads(call.result)
+        self.assertEqual(result['counts'], {'feedback': 2})
+        self.assertEqual(result['priorReadReceipts']['items'][0]['state'], 'unavailable')
+        self.assertNotIn('operations_agentos_', call.result)
+        self.assertIn('operations_agentos_conversation_not_ready', output.getvalue())
 
     def test_actual_agno_tools_normalize_filters_and_preserve_scope(self):
         calls=[]

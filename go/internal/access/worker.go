@@ -88,6 +88,16 @@ func (a *StoredOperatorAuthority) PersonWithin(ctx context.Context, tx pgx.Tx, o
 	return a.gateway.PersonWithin(ctx, tx, operatorID, includeEligibility)
 }
 
+// ReadStoredPersonPrincipalWithin returns only the current recorded person's
+// identity metadata under the same principal row lock used for portal reads.
+func (a *StoredOperatorAuthority) ReadStoredPersonPrincipalWithin(ctx context.Context, tx pgx.Tx, operatorID string) (map[string]string, error) {
+	person, err := a.principalWithin(ctx, tx, operatorID)
+	if err != nil {
+		return nil, err
+	}
+	return a.gateway.readOperationsPrincipalWithin(ctx, tx, person)
+}
+
 func (a *StoredOperatorAuthority) principalWithin(ctx context.Context, tx pgx.Tx, operatorID string) (session, error) {
 	if a == nil || a.gateway == nil || tx == nil || !scopePattern.MatchString(operatorID) {
 		return session{}, fault.New("business_admin_denied", 403)

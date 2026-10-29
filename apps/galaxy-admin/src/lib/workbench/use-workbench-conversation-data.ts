@@ -19,10 +19,10 @@ const terminal=new Set(['COMPLETED','ERROR','CANCELLED','PAUSED','REGENERATED'])
 // own operation so an in-flight snapshot cannot replace a newer turn.
 export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolean){
  const base=enabled?agentOsConversationPath(domain):null;
- const history=useOperationsRead<WorkbenchHistory>({path:base?base+'/history':null,failureMessage:'对话记录暂时无法取得。',clearOnOffline:true,retryUnavailable:true,renewBeforeMs:20000,invalidateMode:'external'});
- const cards=useOperationsRead<WorkbenchCards>({path:base?base+'/cards':null,failureMessage:'操作记录暂时无法取得。',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
- const context=useOperationsRead<WorkbenchContext>({path:base?base+'/context':null,failureMessage:'沟通条件暂时无法取得。',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
- const management=useOperationsRead<WorkbenchManagement>({path:base&&domain==='overview'?base+'/management-capabilities':null,failureMessage:'总控管理能力暂时无法取得。',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
+ const history=useOperationsRead<WorkbenchHistory>({path:base?base+'/history':null,failureMessage:'历史加载失败',clearOnOffline:true,retryUnavailable:true,renewBeforeMs:20000,invalidateMode:'external'});
+ const cards=useOperationsRead<WorkbenchCards>({path:base?base+'/cards':null,failureMessage:'操作记录加载失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
+ const context=useOperationsRead<WorkbenchContext>({path:base?base+'/context':null,failureMessage:'连接失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
+ const management=useOperationsRead<WorkbenchManagement>({path:base&&domain==='overview'?base+'/management-capabilities':null,failureMessage:'管理权限加载失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
  const [receipts,setReceipts]=useState<Partial<Record<AgentOsDomain,Record<string,Receipt>>>>({});
  const deniedStatus=[history.rejectionStatus,context.rejectionStatus,cards.rejectionStatus,management.rejectionStatus].find(status=>status===401||status===403)??null,denied=deniedStatus!==null,contextChanged=context.rejectionStatus===409||context.value?.contextChanged===true;
  const lastConversation=useRef<Partial<Record<AgentOsDomain,{id:string|null}>>>({}),[retired,setRetired]=useState<Partial<Record<AgentOsDomain,{id:string|null}>>>({});

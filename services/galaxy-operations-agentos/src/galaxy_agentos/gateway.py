@@ -10,6 +10,7 @@ from .tool_call_ids import (PROVIDER_TOOL_CALL_ID_MAX_LENGTH, conversation_call_
 
 
 _LOGGER = logging.getLogger("galaxy_agentos.gateway")
+_DIAGNOSTIC_CODE = re.compile(r"^(?:agentos|operations|business_admin|invalid_operations|p13|search_quality|feedback|messaging|content|file|forum)_[a-z0-9_]{1,100}$")
 
 
 class AuthorityDenied(PermissionError):
@@ -19,6 +20,31 @@ class AuthorityDenied(PermissionError):
 class AuthorityUnavailable(RuntimeError):
     """The current authority could not be checked; this is not a revocation."""
     pass
+
+
+def failure_diagnostic(error):
+    """Only closed codes/status belong in diagnostics, never upstream prose."""
+    value = getattr(error, "diagnostic_code", None) or str(error)
+    result = {"code": value} if isinstance(value, str) and _DIAGNOSTIC_CODE.fullmatch(value) else {}
+    status = getattr(error, "status_code", None)
+    if isinstance(status, int) and 100 <= status <= 599:
+        result["status"] = status
+    return result
+
+
+def _rejected_response(response, error_type, code):
+    error = error_type(code)
+    error.status_code = response.status_code
+    try:
+        value = response.json()
+    except ValueError:
+        value = None
+    diagnostic = value.get("error") if isinstance(value, dict) else None
+    if isinstance(diagnostic, str) and _DIAGNOSTIC_CODE.fullmatch(diagnostic):
+        error.diagnostic_code = diagnostic
+    _LOGGER.warning("agentos_gateway_rejected %s", json.dumps(failure_diagnostic(error),
+        ensure_ascii=True, sort_keys=True, separators=(",", ":")))
+    return error
 
 
 def execution_id(user_id: str | None) -> str:
@@ -76,7 +102,7 @@ class GalaxyGateway:
             # A rejected tool parameter, missing object or changed source is
             # not evidence that the current manager lost permission. Return
             # closed feedback without forwarding upstream bodies or URLs.
-            if tool_feedback and response.status_code in {400, 404, 409, 422}:
+            if tool_feedback and response.status_code in {400, 404, 409, 410, 422}:
                 if response.status_code == 409 and isinstance(data.get("publicReference"), dict) and data["publicReference"].get("versionId"):
                     try:
                         source = response.json()
@@ -89,14 +115,17 @@ class GalaxyGateway:
                     400: ("invalid-request", "agentos_tool_arguments_invalid", "correct-arguments"),
                     422: ("invalid-request", "agentos_tool_arguments_invalid", "correct-arguments"),
                     404: ("unavailable", "agentos_object_unavailable", "select-current-object"),
+                    410: ("unavailable", "agentos_object_unavailable", "select-current-object"),
                     409: ("changed", "agentos_tool_state_changed", "read-current-state"),
                 }[response.status_code]
                 return {"state": state, "reason": reason, "nextStep": next_step,
                     "effectState": "not-confirmed"}
             if response.status_code >= 500 or response.status_code == 429:
-                raise AuthorityUnavailable("agentos_authority_unavailable")
+                raise _rejected_response(response, AuthorityUnavailable, "agentos_authority_unavailable")
+            if response.status_code not in {200, 400, 401, 403, 404, 409, 410, 422}:
+                raise _rejected_response(response, AuthorityUnavailable, "agentos_authority_unavailable")
             if response.status_code != 200:
-                raise AuthorityDenied("agentos_current_authority_denied")
+                raise _rejected_response(response, AuthorityDenied, "agentos_current_authority_denied")
             result = response.json()
             if not isinstance(result, dict):
                 raise AuthorityUnavailable("agentos_authority_unavailable")

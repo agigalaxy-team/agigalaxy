@@ -63,7 +63,7 @@ export function useWorkbenchCommand({operatorId,csrfToken,canWrite,domain,permit
    await callbacks.current.onCommitted(result,value.path,value.body);return result;
   }catch(failure){
    if(controller.signal.aborted||!alive.current)return;
-   if(accepted){setError('操作已记录，当前内容暂时无法读取。');return;}
+   if(accepted){setError('结果加载失败');return;}
    const known=failure instanceof OperationsRequestError&&((failure.status<500&&![408,429].includes(failure.status)&&!(readingOriginal&&failure.status===404))||!readingOriginal&&['operations_agentos_not_configured','operations_agentos_model_not_configured','operations_agentos_conversation_not_ready','operations_agentos_conversation_transport_unavailable'].includes(failure.code));
    if(known){intent.current=null;if(memoryKey)retainedIntents.delete(memoryKey);setPending(null);callbacks.current.onRejected?.(value);if(failure.status===409)callbacks.current.onConflict();if([401,403].includes(failure.status))callbacks.current.onDenied();setError(agentOsErrors[failure.code]??operationsFailure(failure,'这次操作未能完成。'));}
    else{ambiguous.current=true;setError('');setAttempt(previous=>previous+1);}

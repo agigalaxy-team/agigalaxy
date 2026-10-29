@@ -118,10 +118,30 @@ func (d *Domain) Principal(ctx context.Context, tx pgx.Tx, a Actor) error {
 		_, e := d.DutyAuthority().RequireDutyAction(ctx, tx, a, "workbench.read", "")
 		return e
 	}
+	if reader, ok := d.Authority.(operationspermissions.ScopedPrincipalAuthority); ok && reader.AcceptsScopedPrincipal(a) {
+		_, err := reader.ReadScopedPrincipalWithin(ctx, tx, a)
+		return err
+	}
 	if d.PrincipalWithin == nil {
 		return fail("operations_authorization_unavailable", 503)
 	}
 	return d.PrincipalWithin(ctx, tx, a)
+}
+
+// ReadPrincipal resolves the same validated, locked human identity used by
+// Principal, including restricted AI query and preparation readers. Owning report domains
+// use its metadata only for their existing conflict-of-interest checks.
+func (d *Domain) ReadPrincipal(ctx context.Context, tx pgx.Tx, a Actor, portal func(context.Context, pgx.Tx, Actor) (map[string]string, error)) (map[string]string, error) {
+	if d == nil || a.Endpoint != d.Endpoint {
+		return nil, fail("business_admin_denied", 403)
+	}
+	if reader, ok := d.Authority.(operationspermissions.ScopedPrincipalAuthority); ok && reader.AcceptsScopedPrincipal(a) {
+		return reader.ReadScopedPrincipalWithin(ctx, tx, a)
+	}
+	if portal == nil {
+		return nil, fail("operations_authorization_unavailable", 503)
+	}
+	return portal(ctx, tx, a)
 }
 func (d *Domain) Record(ctx context.Context, tx pgx.Tx, a Actor, action string, selection, result Object, operationID any) error {
 	return d.record(ctx, tx, a, action, selection, result, operationID, nil)
@@ -247,6 +267,12 @@ func one(ctx context.Context, tx pgx.Tx, q string, args ...any) (Object, error) 
 	return x, e
 }
 func (d *Domain) Command(ctx context.Context, a Actor, action string, selection Object, fn func(pgx.Tx, Actor) (Object, error)) (Object, error) {
+	if reader, ok := d.Authority.(operationspermissions.StoredPreparationAuthority); ok && reader.AcceptsStoredPreparation(a) {
+		return nil, fail("operations_agentos_scope_denied", 403)
+	}
+	if reader, ok := d.Authority.(operationspermissions.QueryPrincipalAuthority); ok && reader.AcceptsQueryPrincipal(a) {
+		return nil, fail("operations_agentos_scope_denied", 403)
+	}
 	return postgres.InTx(ctx, d.Pool, func(tx pgx.Tx) (Object, error) {
 		if selection["id"] != nil {
 			selection["resourceId"] = selection["id"]
