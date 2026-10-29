@@ -58,6 +58,10 @@ class RecoveryModel(Model):
     def _parse_provider_response_delta(self, value): return value
 
 class ConversationRetry(unittest.TestCase):
+    def assert_historical_question_once(self, messages, expected):
+        historical = [json.loads(m.content) for m in messages if m.role == "user" and m.from_history and isinstance(m.content, str)]
+        self.assertEqual(sum(item.get("contextType") == "historical-conversation-record" and item.get("content") == expected for item in historical), 1)
+
     def test_retry_discards_prior_authority_events_without_bypassing_current_authority(self):
         user, session, old_op, new_op, old_run = (str(uuid4()) for _ in range(5))
         user = 'conversation:' + user
@@ -293,7 +297,8 @@ class ConversationRetry(unittest.TestCase):
                     'A failed retry must not overwrite its original failed run either')
                 runtime['db']=db
             self.assertEqual(model.calls,5)
-            self.assertEqual(sum(message.role=="user" and message.content=="这条问题只应出现一次。" for message in model.contexts[-1]),1)
+            self.assert_historical_question_once(model.contexts[-1], "这条问题只应出现一次。")
+            self.assertEqual(sum(message.role == "user" and not message.from_history and message.content == "合成的第二次失败重试。" for message in model.contexts[-1]), 1)
             new=db.get_run(run_id=result["run_id"])
             self.assertEqual(new.metadata["operationId"],new_op)
             self.assertEqual(new.metadata["retryOfOperationId"],old_op)
@@ -311,4 +316,5 @@ class ConversationRetry(unittest.TestCase):
             self.assertEqual(model.calls,6)
             self.assertEqual(db.get_run(run_id=failed_id).to_dict(),failed_snapshot,
                 'A later ordinary turn must not mutate an earlier failed attempt')
-            self.assertEqual(sum(message.role=="user" and message.content=="这条问题只应出现一次。" for message in model.contexts[-1]),1)
+            self.assert_historical_question_once(model.contexts[-1], "这条问题只应出现一次。")
+            self.assertEqual(sum(message.role == "user" and not message.from_history and message.content == "接着说明下一步。" for message in model.contexts[-1]), 1)
