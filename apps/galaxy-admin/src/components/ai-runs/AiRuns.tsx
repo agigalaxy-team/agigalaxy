@@ -21,7 +21,7 @@ import "../autonomy/autonomy.css";
 
 function useRunRead<T extends AiRunLease>(path:string|null,failureMessage:string){
  const read=useOperationsRead<T>({path,failureMessage,clearOnOffline:true});
- return {...read,value:read.verified?read.value:null};
+ return {...read,value:read.available?read.value:null};
 }
 function useRunScroll(key:string,readable:boolean){
  const ref=useRef<HTMLDivElement|null>(null),saved=useRef(new Map<string,number>());

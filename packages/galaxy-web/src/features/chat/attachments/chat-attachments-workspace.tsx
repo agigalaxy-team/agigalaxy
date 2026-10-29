@@ -1,4 +1,5 @@
 import {ReadingDetails,ReadingSummary} from "../../../shared/reading/reading-details";
+import {definitiveReadFailure} from '../../../shared/reading/read-failure';
 import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Paperclip} from 'lucide-react';
@@ -96,8 +97,8 @@ function ChatAttachmentComposerSession({runtime,roomId,disabled,selected,onChang
  }
  useEffect(()=>{const generation=epoch,transfer=control,alive=mounted;alive.current=true;generation.current++;let active=true;
   client.config().then(value=>{if(active)setLimits(value);}).catch(()=>{if(active)setError('无法取得附件设置。');});reload().catch(()=>{});
-  const refreshOnVisible=()=>{if(active&&!working.current&&!reading.current&&!document.hidden&&navigator.onLine!==false){reading.current=true;reload().catch(()=>{if(active)setItems([]);}).finally(()=>{reading.current=false;});}};
-  const offline=()=>{request.current++;setItems([]);};
+  const refreshOnVisible=()=>{if(active&&!working.current&&!reading.current&&!document.hidden&&navigator.onLine!==false){reading.current=true;reload().catch(reason=>{if(active){if(definitiveReadFailure(reason))setItems([]);setError('附件列表暂时无法读取。');}}).finally(()=>{reading.current=false;});}};
+  const offline=()=>{request.current++;setError('暂时离线，联网后继续读取附件。');};
   document.addEventListener('visibilitychange',refreshOnVisible);
   window.addEventListener('online',refreshOnVisible);window.addEventListener('offline',offline);
   const timer=setInterval(refreshOnVisible,5000);

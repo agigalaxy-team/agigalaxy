@@ -33,18 +33,23 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
   const cached=queryClient.getQueryData<T>(queryKey);
   const cursorValue=initial&&typeof initial==='object'&&'webEventCursor' in initial?initial.webEventCursor:undefined;
   useAdminEventCursorSeed(typeof cursorValue==='string'?cursorValue:undefined);
-  if(cached!==undefined&&initial===null)initial=cached;
+  // Cache is an existing snapshot, not a new server prop on every render.
+  // Promoting each query result to `initial` made session reads without a
+  // body lease trigger another initial fetch after their own completion.
+  const seed=initial??cached??null;
+  const seedCheckedAt=sourceCheckedAt(seed)??(cached!==undefined?queryClient.getQueryState(queryKey)?.dataUpdatedAt??null:initial!==null?Date.now():null);
   const logoutPending=useSyncExternalStore(subscribeOperationsReadLifecycle,operationsReadsSuspended,operationsReadServerSnapshot),resumeFresh=useRef(false);
-  const [state,setState]=useState<ReadState<T>>(()=>({path,value:initial,loading:!!path&&!initial&&!initialError,refreshing:false,error:initialError,checkedAt:sourceCheckedAt(initial)??(!clearOnOffline&&cached!==undefined?queryClient.getQueryState(queryKey)?.dataUpdatedAt??null:null),attemptedAt:null}));
+  const [state,setState]=useState<ReadState<T>>(()=>({path,value:seed,loading:!!path&&!seed&&!initialError,refreshing:false,error:initialError,checkedAt:seedCheckedAt,attemptedAt:null}));
   const latestState=useRef(state);latestState.current=state;
   const pendingInvalidation=useRef(false);
+  const rejection=useRef<{path:string|null;rejected:boolean}>({path,rejected:false});
   const retryable=useRef(false),active=useRef<AbortController|null>(null),inFlight=useRef<{path:string;controller:AbortController;promise:Promise<T|undefined>}|null>(null),generation=useRef(0),alive=useRef(false);
-  const performRead=useCallback((background=false):Promise<T|undefined>=>{
+  const performRead=useCallback((background=false,qualificationOnly=false):Promise<T|undefined>=>{
     if(!path||!scope.endpoint||!scope.identity||!alive.current||operationsReadsSuspended())return Promise.resolve(undefined);
     if(background&&inFlight.current?.path===path&&!inFlight.current.controller.signal.aborted)return inFlight.current.promise;
     active.current?.abort();const controller=new AbortController(),version=++generation.current;active.current=controller;retryable.current=false;
     setState(previous=>{
-      const keep=previous.path===path&&(!clearOnOffline||expiresAt(previous.value,previous.checkedAt)>Date.now()),value=keep?previous.value:null;
+      const keep=previous.path===path,value=keep?previous.value:null;
       return{path,value,loading:value===null,refreshing:true,error:'',checkedAt:keep?previous.checkedAt:null,attemptedAt:Date.now()};
     });
     const promise=(async()=>{
@@ -53,6 +58,11 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
         for(let retry=0;;retry++){
           try{value=await queryClient.query<T>({queryKey,queryFn:async({signal})=>{
             const previous=latestState.current.path===path?latestState.current.value:null;
+            if(qualificationOnly&&/^\/v1\/operations\/agentos\/conversations\/(overview|governance|messaging|discovery|maintenance)$/.test(path)&&previous&&typeof previous==='object'&&'conversationId' in previous){
+              const lease=await operationsRequest<{kind:string;metadataOnly:boolean;domain:string;conversationId:string|null;contextChanged:boolean;checkedAt:number;readExpiresAt:number}>(path+'/qualification',{signal});
+              if(lease.kind!=='conversation-read-qualification'||lease.metadataOnly!==true||!Number.isFinite(lease.checkedAt)||!Number.isFinite(lease.readExpiresAt)||lease.readExpiresAt*1000<=Date.now())throw new OperationsRequestError(503,'operations_read_lease_invalid');
+              if(lease.conversationId===previous.conversationId&&!lease.contextChanged)return {...previous,checkedAt:lease.checkedAt,readExpiresAt:lease.readExpiresAt} as T;
+            }
             if(background&&path==='/v1/operations/permissions/catalog'&&previous&&typeof previous==='object'&&'sourceVersion' in previous&&typeof previous.sourceVersion==='string'&&/^[0-9a-f]{64}$/.test(previous.sourceVersion)){
               const lease=await operationsRequest<{unchanged:boolean;sourceVersion:string;checkedAt:number;readExpiresAt:number;metadataOnly:true;permissions:unknown;webEventCursor?:string}>(path+'/lease?version='+previous.sourceVersion,{signal});
               if(lease.unchanged){if(lease.sourceVersion!==previous.sourceVersion||!Number.isFinite(lease.checkedAt)||!Number.isFinite(lease.readExpiresAt)||lease.readExpiresAt*1000<=Date.now()||lease.metadataOnly!==true||!lease.permissions)throw new OperationsRequestError(503,'operations_read_lease_invalid');
@@ -60,7 +70,9 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
               }
             }
             return operationsRequest<T>(path,{signal});
-          },staleTime:0,retry:false});break;}
+          },staleTime:0,retry:false});
+            if(clearOnOffline&&expiresAt(value,Date.now())<=Date.now())throw new OperationsRequestError(503,'operations_read_lease_expired_in_transit');
+            break;}
           catch(error){
             // Ordinary leased reads get a small transport-only recovery budget.
             // The explicit long-running recovery surface keeps its existing policy.
@@ -71,14 +83,14 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
         }
         if(!alive.current||controller.signal.aborted||operationsReadsSuspended()||version!==generation.current)return undefined;
         const now=Date.now();
-        if(clearOnOffline&&expiresAt(value,now)<=now)throw new OperationsRequestError(410,'operations_read_expired');
-        setState({path,value,loading:false,refreshing:false,error:'',checkedAt:now,attemptedAt:now});return value;
+        rejection.current={path,rejected:false};setState({path,value,loading:false,refreshing:false,error:'',checkedAt:now,attemptedAt:now});return value;
       }catch(error){
         if(!alive.current||controller.signal.aborted||operationsReadsSuspended()||version!==generation.current)return undefined;
         const invalidated=error instanceof OperationsRequestError&&error.status>=400&&error.status<500&&![408,429].includes(error.status);
+        if(invalidated){rejection.current={path,rejected:true};queryClient.removeQueries({queryKey,exact:true});}
         retryable.current=!invalidated;
         setState(previous=>{
-          const keep=!invalidated&&previous.path===path&&(!clearOnOffline||expiresAt(previous.value,previous.checkedAt)>Date.now());
+          const keep=!invalidated&&previous.path===path;
           return{path,value:keep?previous.value:null,loading:false,refreshing:false,error:operationsFailure(error,failureMessage),checkedAt:keep?previous.checkedAt:null,attemptedAt:previous.attemptedAt};
         });return undefined;
       }finally{
@@ -90,20 +102,25 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
     inFlight.current={path,controller,promise};return promise;
   },[path,failureMessage,clearOnOffline,retryUnavailable,queryClient,queryKey,scope]);
   const read=useCallback(()=>performRead(),[performRead]);
-  const renew=useCallback(()=>performRead(true),[performRead]);
-  const clear=useCallback(()=>{queryClient.removeQueries({queryKey,exact:true});generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState({path,value:null,loading:false,refreshing:false,error:'',checkedAt:null,attemptedAt:null});},[path,queryClient,queryKey]);
+  const renew=useCallback(()=>performRead(true,true),[performRead]);
+  const refresh=useCallback(()=>performRead(true),[performRead]);
+  const update=useCallback((change:(value:T)=>T)=>{
+    const previous=latestState.current;if(previous.path!==path||previous.value===null)return;
+    const value=change(previous.value),next={...previous,value};latestState.current=next;queryClient.setQueryData(queryKey,value);setState(next);
+  },[path,queryClient,queryKey]);
+  const clear=useCallback(()=>{rejection.current={path,rejected:true};queryClient.removeQueries({queryKey,exact:true});generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState({path,value:null,loading:false,refreshing:false,error:'',checkedAt:null,attemptedAt:null});},[path,queryClient,queryKey]);
   useLayoutEffect(()=>{
     if(path&&initial!==null&&queryClient.getQueryData(queryKey)===undefined)queryClient.setQueryData(queryKey,initial,{updatedAt:sourceCheckedAt(initial)??Date.now()});
   },[path,initial,queryClient,queryKey]);
   useLayoutEffect(()=>{
     alive.current=true;pendingInvalidation.current=false;
     return()=>{alive.current=false;generation.current++;active.current?.abort();active.current=null;inFlight.current=null;};
-  },[path]);
+  },[path,queryKey]);
   useLayoutEffect(()=>{
     // A soft navigation can supply a fresh snapshot for another object. Adopt
     // it before deciding whether a request is needed; otherwise the old path
     // stays masked until its renewal timer fires. Keep the source's own lease.
-    setState(previous=>previous.path===path?previous:{path,value:initial,loading:!!path&&!initial&&!initialError,refreshing:false,error:initialError,checkedAt:sourceCheckedAt(initial),attemptedAt:null});
+    setState(previous=>previous.path===path?previous:{path,value:seed,loading:!!path&&!seed&&!initialError,refreshing:false,error:initialError,checkedAt:seedCheckedAt,attemptedAt:null});
   },[path,initial,initialError]);
   useLayoutEffect(()=>{
     if(!logoutPending)return;
@@ -111,21 +128,22 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
   },[logoutPending,clear]);
   useEffect(()=>{
     if(!path||logoutPending)return;
-    const offline=()=>{generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState(previous=>({path,value:!clearOnOffline&&previous.path===path?previous.value:null,loading:false,refreshing:false,error:'网络已断开，恢复后可继续读取。',checkedAt:null,attemptedAt:null}));};
-
-    const initialFresh=initial!==null&&(!clearOnOffline||expiresAt(initial,sourceCheckedAt(initial))>Date.now());
+    const offline=()=>{generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState(previous=>({...previous,path,value:previous.path===path?previous.value:null,loading:false,refreshing:false,error:'网络已断开，恢复后可继续读取。'}));};
+    const snapshot=latestState.current;
+    const initialFresh=snapshot.path===path&&snapshot.value!==null&&(!clearOnOffline||expiresAt(snapshot.value,snapshot.checkedAt)>Date.now());
     const freshAfterFailure=resumeFresh.current;resumeFresh.current=false;
     if(!navigator.onLine)offline();else if((freshAfterFailure||!initialFresh)&&document.visibilityState==='visible')void performRead(true);
-    window.addEventListener('offline',offline);
-    return()=>{window.removeEventListener('offline',offline);};
+    const resume=()=>{const current=latestState.current;if(document.visibilityState==='visible'&&navigator.onLine&&(current.error||current.value===null||clearOnOffline&&expiresAt(current.value,current.checkedAt)<=Date.now()))void performRead(true,true);};
+    window.addEventListener('offline',offline);window.addEventListener('online',resume);document.addEventListener('visibilitychange',resume);
+    return()=>{window.removeEventListener('offline',offline);window.removeEventListener('online',resume);document.removeEventListener('visibilitychange',resume);};
   },[path,initial,read,performRead,clearOnOffline,clear,logoutPending]);
   useEffect(()=>{
     if(!ready||logoutPending||!clearOnOffline||state.value===null||state.checkedAt===null)return;
-    // Mask the expired snapshot without cancelling an already-running renewal.
-    // The response must still supply its own current lease before it can appear.
+    // A read lease expiring makes actions wait for validation; it does not
+    // erase already received content. Explicit denial, logout and scope changes
+    // still remove the affected snapshot immediately.
     const end=expiresAt(state.value,state.checkedAt),timer=setTimeout(()=>{
-      setState(previous=>previous.path===path&&expiresAt(previous.value,previous.checkedAt)<=Date.now()?{...previous,value:null,checkedAt:null,loading:previous.refreshing}:previous);
-      if(navigator.onLine&&document.visibilityState==='visible')void performRead(true);
+      if(navigator.onLine&&document.visibilityState==='visible')void performRead(true,true);
     },Math.max(0,end-Date.now()));
     return()=>clearTimeout(timer);
   },[ready,clearOnOffline,state.value,state.checkedAt,path,performRead,logoutPending]);
@@ -137,14 +155,14 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
     // expires. This only starts its GET earlier; the original expiry still wins.
     const earlyLead=typeof renewBeforeMs==='number'&&Number.isFinite(renewBeforeMs)?Math.max(0,Math.min(20000,renewBeforeMs)):0;
     const lead=Math.max(usualLead,Math.min(earlyLead,Math.max(250,(end-state.checkedAt)*.8))),next=Math.max(end-lead,(state.attemptedAt??state.checkedAt)+3000);
-    const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible')void performRead(true);},Math.max(0,next-Date.now()));
+    const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible')void performRead(true,true);},Math.max(0,next-Date.now()));
     return()=>clearTimeout(timer);
   },[ready,clearOnOffline,state.value,state.checkedAt,state.attemptedAt,state.refreshing,performRead,logoutPending,renewBeforeMs]);
   useEffect(()=>{
     // Opt-in for a long-running operation's read surface. A transient API
     // outage can outlive a lease; keep the original GET recoverable without
-    // retaining expired material or permitting a second command.
-    if(logoutPending||!retryUnavailable||!path||state.path!==path||state.value!==null||state.loading||state.refreshing||!state.error||!retryable.current)return;
+    // discarding the last accepted display or permitting a second command.
+    if(logoutPending||!retryUnavailable||!path||state.path!==path||state.loading||state.refreshing||!state.error||!retryable.current)return;
     const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible')void performRead(true);},4000);
     return()=>clearTimeout(timer);
   },[retryUnavailable,path,state.path,state.value,state.loading,state.refreshing,state.error,state.attemptedAt,performRead,logoutPending]);
@@ -154,5 +172,6 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
   useEffect(()=>{const reset=(event:Event)=>{const modules=(event as CustomEvent<string[]>).detail;if(!modules.length||modules.includes(module)){clear();if(modules.length&&navigator.onLine&&document.visibilityState==='visible')void performRead(true);}};window.addEventListener('galaxy:admin-reset',reset);return()=>window.removeEventListener('galaxy:admin-reset',reset);},[module,clear,performRead]);
   const current=state.path===path?state:{path,value:null,loading:!!path,refreshing:false,error:'',checkedAt:null,attemptedAt:null};
   const valid=!ready||!clearOnOffline||expiresAt(current.value,current.checkedAt)>Date.now();
-  return{...current,value:!logoutPending&&valid?current.value:null,loading:!logoutPending&&current.loading,refreshing:!logoutPending&&current.refreshing,error:logoutPending?'':current.error,read,renew,clear,ready,verified:!logoutPending&&ready&&valid&&current.checkedAt!==null};
+  const available=!logoutPending&&current.value!==null&&current.checkedAt!==null;
+  return{...current,value:!logoutPending?current.value:null,loading:!logoutPending&&current.loading,refreshing:!logoutPending&&current.refreshing,error:logoutPending?'':current.error,read,renew,refresh,update,clear,ready,available,rejected:rejection.current.path===path&&rejection.current.rejected,verified:available&&ready&&valid};
 }

@@ -123,6 +123,10 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 			_ = json.NewEncoder(w).Encode(Object{"runs": []Object{{"runId": "original-native-run", "operationId": operationID, "status": "RUNNING", "content": nil}}})
 			return
 		}
+		if r.Method == "GET" && r.URL.Path == "/galaxy/conversations/"+id+"/operations/"+operationID {
+			_ = json.NewEncoder(w).Encode(Object{"conversationId": id, "sessionId": current.Row.SessionID, "operationId": operationID, "runId": "original-native-run", "state": "RUNNING", "native": Object{"runId": "original-native-run", "operationId": operationID, "status": "RUNNING", "content": nil}})
+			return
+		}
 		http.NotFound(w, r)
 	}))
 	defer agent.Close()

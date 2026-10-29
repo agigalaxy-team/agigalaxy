@@ -23,7 +23,10 @@ func (s *Conversations) ReadConversation(ctx context.Context, operator operation
 	version, _ := index(status["conversationVersion"])
 	ready := (version == 1 || version == 2) && includesString(status["conversationDomains"], domain)
 	var native Object
+	var conversationID any
+	var sourceDeadline int64
 	if current.Row != nil {
+		conversationID = current.Row.ID
 		if status["state"] != "connected" {
 			return nil, fail("operations_agentos_unavailable", 503)
 		}
@@ -63,9 +66,11 @@ func (s *Conversations) ReadConversation(ctx context.Context, operator operation
 		if err != nil {
 			return nil, err
 		}
-		if _, err = s.Current(ctx, current.Row.ID, &operator); err != nil {
-			return nil, err
+		qualified, e := s.Current(ctx, current.Row.ID, &operator)
+		if e != nil {
+			return nil, e
 		}
+		sourceDeadline = qualified.ReadExpiresAt
 		if s.SyncWorkbenchRuns != nil {
 			if err = s.SyncWorkbenchRuns(ctx, *current.Row, runs); err != nil {
 				return nil, err
@@ -107,6 +112,9 @@ func (s *Conversations) ReadConversation(ctx context.Context, operator operation
 	}
 	transport := object(status["conversationTransport"])
 	expires := s.now().Unix() + 30
+	if sourceDeadline > 0 && sourceDeadline < expires {
+		expires = sourceDeadline
+	}
 	if lease, ok := index(native["readExpiresAt"]); ok && lease < expires {
 		expires = lease
 	}
@@ -115,5 +123,5 @@ func (s *Conversations) ReadConversation(ctx context.Context, operator operation
 			expires = lease
 		}
 	}
-	return Object{"domain": domain, "runs": runs, "toolCards": cards, "contextChanged": current.ContextChanged, "runtimeState": status["state"], "managementCapabilities": capabilities, "modelState": model, "capabilities": Object{"canSend": connected && configured && ready, "canStream": connected && ready && transport["events"] == true && transport["originalRunLookup"] == true, "canCancel": connected && ready && transport["cancel"] == true && transport["originalRunLookup"] == true}, "blockedReason": blocked, "checkedAt": s.now().Unix(), "readExpiresAt": expires}, nil
+	return Object{"domain": domain, "conversationId": conversationID, "runs": runs, "toolCards": cards, "contextChanged": current.ContextChanged, "runtimeState": status["state"], "managementCapabilities": capabilities, "modelState": model, "capabilities": Object{"canSend": connected && configured && ready, "canStream": connected && ready && transport["events"] == true && transport["originalRunLookup"] == true, "canCancel": connected && ready && transport["cancel"] == true && transport["originalRunLookup"] == true}, "blockedReason": blocked, "checkedAt": s.now().Unix(), "readExpiresAt": expires}, nil
 }

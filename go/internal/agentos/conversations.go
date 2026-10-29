@@ -32,6 +32,14 @@ type CurrentConversation struct {
 	Row            *Conversation
 	Actor          operationspermissions.Actor
 	ContextChanged bool
+	ReadExpiresAt  int64
+}
+
+// SourceQualification is a current read result, not a retained descriptor's
+// old freshness timestamp. Its deadline must include every controlled source.
+type SourceQualification struct {
+	Valid         bool
+	ReadExpiresAt int64
 }
 type Conversations struct {
 	Pool                  *pgxpool.Pool
@@ -39,7 +47,7 @@ type Conversations struct {
 	Permissions           *operationspermissions.Service
 	Client                *Client
 	Now                   func() time.Time
-	ValidateSources       func(context.Context, Conversation, operationspermissions.Actor) (bool, error)
+	ValidateSources       func(context.Context, Conversation, operationspermissions.Actor) (SourceQualification, error)
 	LinkWorkbenchWithin   func(context.Context, pgx.Tx, Conversation, string, string) error
 	UpdateWorkbenchWithin func(context.Context, pgx.Tx, string, Object) error
 	SyncWorkbenchRuns     func(context.Context, Conversation, []Object) error
@@ -152,17 +160,18 @@ func (s *Conversations) Current(ctx context.Context, id string, operator *operat
 		return current, err
 	}
 	if s.ValidateSources != nil {
-		valid, err := s.ValidateSources(ctx, *current.Row, current.Actor)
+		qualification, err := s.ValidateSources(ctx, *current.Row, current.Actor)
 		if err != nil {
 			return current, err
 		}
-		if !valid {
+		if !qualification.Valid {
 			_, err = s.Pool.Exec(ctx, "UPDATE operations_agentos_conversations_v1 SET retired_at=$3,retirement_reason='source-changed' WHERE endpoint=$1 AND id=$2 AND retired_at IS NULL", s.Endpoint, id, s.now())
 			if err != nil {
 				return current, err
 			}
 			return current, fail("operations_agentos_source_changed", 409)
 		}
+		current.ReadExpiresAt = qualification.ReadExpiresAt
 	} else {
 		var refs bool
 		if err = s.Pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM operations_agentos_conversation_sources_v1 WHERE conversation_id=$1)", id).Scan(&refs); err != nil {
@@ -171,6 +180,10 @@ func (s *Conversations) Current(ctx context.Context, id string, operator *operat
 		if refs {
 			return current, fail("operations_agentos_conversation_not_ready", 503)
 		}
+		current.ReadExpiresAt = s.now().Unix() + 30
+	}
+	if current.ReadExpiresAt <= s.now().Unix() {
+		return current, fail("operations_agentos_source_qualification_unavailable", 503)
 	}
 	return current, nil
 }
@@ -227,10 +240,10 @@ func (s *Conversations) AuthorizeNative(ctx context.Context, input Object) (Obje
 		}
 		prompt = Object{"version": version, "text": text}
 	}
-	if _, err = s.Current(ctx, id, nil); err != nil {
+	if current, err = s.Current(ctx, id, nil); err != nil {
 		return nil, err
 	}
 	view := row.View()
 	view["rolePrompt"] = prompt
-	return Object{"allowed": true, "resourceIds": []any{component}, "execution": view, "readExpiresAt": s.now().Unix() + 30}, nil
+	return Object{"allowed": true, "resourceIds": []any{component}, "execution": view, "readExpiresAt": current.ReadExpiresAt}, nil
 }

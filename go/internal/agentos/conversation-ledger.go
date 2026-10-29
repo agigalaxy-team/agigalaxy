@@ -30,26 +30,35 @@ func (s *Conversations) command(ctx context.Context, id string) (*conversationCo
 }
 
 func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, command *conversationCommand) (Object, error) {
-	value, err := s.Client.ReadConversation(ctx, row.Execution())
-	if err != nil && forbidden(err) {
-		return nil, err
-	}
-	runs, _ := object(value)["runs"].([]any)
 	known := text(command.Result, "runId")
 	if command.NativeRunID != nil {
 		known = *command.NativeRunID
 	}
-	for _, entry := range runs {
-		run := object(entry)
-		if run["operationId"] == command.ID || known != "" && run["runId"] == known {
-			return run, nil
-		}
-	}
+	// Current transports resolve one original durable operation directly. An
+	// uncertain/missing exact lookup is not permission to scan another history
+	// or issue the operation again. Legacy transports retain their history read.
 	status := s.Client.Status(ctx)
 	if object(status["conversationTransport"])["originalRunLookup"] != true {
+		value, err := s.Client.ReadConversation(ctx, row.Execution())
+		if err != nil {
+			if forbidden(err) {
+				return nil, err
+			}
+			return nil, nil
+		}
+		runs, _ := object(value)["runs"].([]any)
+		for _, entry := range runs {
+			run := object(entry)
+			if run["operationId"] == command.ID || known != "" && run["runId"] == known {
+				if operation := run["operationId"]; operation != nil && operation != command.ID {
+					return nil, streamInvalid()
+				}
+				return run, nil
+			}
+		}
 		return nil, nil
 	}
-	value, err = s.Client.ReadConversationOperation(ctx, row.Execution(), command.ID)
+	value, err := s.Client.ReadConversationOperation(ctx, row.Execution(), command.ID)
 	if err != nil {
 		if forbidden(err) {
 			return nil, err
@@ -58,7 +67,15 @@ func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, c
 	}
 	original := object(value)
 	runID := text(original, "runId")
-	if original["operationId"] != command.ID || original["runId"] != nil && !nativeRunID.MatchString(runID) {
+	if original["operationId"] != command.ID || original["runId"] != nil && (!nativeRunID.MatchString(runID) || known != "" && known != runID) {
+		return nil, streamInvalid()
+	}
+	// New responses state the exact context as well. Older v2 responses were
+	// already bound by their private conversation JWT and native session check.
+	if id, present := original["conversationId"]; present && id != row.ID {
+		return nil, streamInvalid()
+	}
+	if session, present := original["sessionId"]; present && session != row.SessionID {
 		return nil, streamInvalid()
 	}
 	if runID == "" || original["state"] == "not-recorded" {

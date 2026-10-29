@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect,useId,useLayoutEffect,useRef,useState,type KeyboardEvent} from 'react';
+import {useCallback,useEffect,useId,useLayoutEffect,useRef,useState,type KeyboardEvent} from 'react';
 import Link from 'next/link';
 import {createPortal} from 'react-dom';
 import {useRouter,useSearchParams} from 'next/navigation';
@@ -21,7 +21,9 @@ import {useWorkbenchCommand} from "../../lib/workbench/use-workbench-command";
 import {WorkbenchReplyProgress,WorkbenchAnswer,replyProgressLabel} from './WorkbenchReply';
 import {useConversationScroll} from '../../lib/workbench/use-conversation-scroll';
 import {useConversationStream} from "../../lib/workbench/use-conversation-stream";
-import {agentOsCanUseDomain,agentOsConversationPath,agentOsConversationOperationPath,agentOsConversationCancelPath,nativeConversationFailure,nativeConversationRetryMessage,nativeConversationDisplayRuns,nativeConversationPreviousAttempts,nativeConversationFailureLabel,type AgentOsConversation,type AgentOsDomain,type AgentOsSession,type AgentOsStatus} from "../../lib/workbench/agentos-client";
+import {operationsRequest} from '../../lib/operations-client';
+import {applyConversationReceipt} from '../../lib/workbench/conversation-turns';
+import {agentOsCanUseDomain,agentOsConversationPath,agentOsConversationOperationPath,agentOsConversationCancelPath,nativeConversationFailure,nativeConversationRetryMessage,nativeConversationDisplayRuns,nativeConversationPreviousAttempts,nativeConversationFailureLabel,type AgentOsCommand,type AgentOsConversation,type AgentOsDomain,type AgentOsSession,type AgentOsStatus} from "../../lib/workbench/agentos-client";
 
 const domains=[{id:'overview',label:'总控'},{id:'governance',label:'治理'},{id:'messaging',label:'消息'},{id:'discovery',label:'数据与发现'},{id:'maintenance',label:'运维'}];
 const queries=[{label:'今天的变化',text:'总结今天的运营变化，并说明需要关注的事项。'},{label:'待办原因',text:'梳理当前待办的原因，以及需要人工处理的事项。'},{label:'处理进展',text:'查看最近处理进展和仍未解决的问题。'}];
@@ -29,7 +31,8 @@ const queries=[{label:'今天的变化',text:'总结今天的运营变化，并�
 type WorkbenchConversation=AgentOsConversation&{toolCards?:unknown;contextChanged?:boolean};
 type WaitingReply={retryOfOperationId?:string;operationId:string;runId:string|null;text:string;csrfToken:string};
 type StoppingReply={operationId:string;parentOperationId:string;csrfToken:string};
-type PanelMemory={focused:boolean;positions:Record<string,{top:number;follow:boolean}>;waiting:Partial<Record<AgentOsDomain,WaitingReply>>;stopping:Partial<Record<AgentOsDomain,StoppingReply>>};
+type UnsentReply={operationId:string;text:string};
+type PanelMemory={focused:boolean;positions:Record<string,{top:number;follow:boolean}>;waiting:Partial<Record<AgentOsDomain,WaitingReply>>;stopping:Partial<Record<AgentOsDomain,StoppingReply>>;unsent?:Partial<Record<AgentOsDomain,UnsentReply[]>>};
 const retainedPanels=new Map<string,PanelMemory>();
 function panelMemory(operatorId:string|null):PanelMemory{if(!operatorId)return {focused:false,positions:{},waiting:{},stopping:{}};let value=retainedPanels.get(operatorId);if(!value){value={focused:false,positions:{},waiting:{},stopping:{}};retainedPanels.set(operatorId,value);}return value;}
 function saveDrafts(key:string,domain:string,drafts:Record<string,string>){
@@ -41,17 +44,18 @@ export function WorkbenchCommunication(props:Props){return <WorkbenchCommunicati
 function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,operatorId,onIdentityChange,signedOut}:Props){
   const {source:logSource,actionsTarget}=useWorkbenchInteraction();
   const router=useRouter(),search=useSearchParams(),requestedTask=search.get('taskId')??'',taskId=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedTask)?requestedTask:'';
-  const task=useOperationsRead<AutonomyTaskRead>({path:operatorId&&taskId?'/v1/operations/autonomy/tasks/'+taskId:null,clearOnOffline:true,failureMessage:'接续任务暂时无法读取。'}),linkedTask=task.verified?task.value?.task:null,appliedTask=useRef('');
+  const task=useOperationsRead<AutonomyTaskRead>({path:operatorId&&taskId?'/v1/operations/autonomy/tasks/'+taskId:null,clearOnOffline:true,failureMessage:'接续任务暂时无法读取。'}),linkedTask=task.available?task.value?.task:null,appliedTask=useRef('');
   const [domain,setDomain]=useState<AgentOsDomain>('overview'),[drafts,setDrafts]=useState<Record<string,string>>({}),[draftStorageError,setDraftStorageError]=useState(false);
   const draftsRef=useRef<Record<string,string>>({}),domainRef=useRef('overview');
   const memory=useRef(panelMemory(operatorId)),composing=useRef(false),animatedTurns=useRef(new Set<string>()),revealDomain=useRef<AgentOsDomain>('overview'),outputStarted=useRef(new Set<string>()),lastSubmission=useRef<{domain:AgentOsDomain;message:string}|null>(null);
   const [readRecoveryBusy,setReadRecoveryBusy]=useState(false);
   const [waiting,setWaiting]=useState(memory.current.waiting),[stopping,setStopping]=useState(memory.current.stopping??{}),[contextNotices,setContextNotices]=useState<Partial<Record<AgentOsDomain,boolean>>>({});
+  const [unsent,setUnsent]=useState(memory.current.unsent??{});
   const input=useRef<HTMLTextAreaElement>(null),panelId=useId(),inputId=useId();
   const conversationElement=useRef<HTMLDivElement>(null),conversationContent=useRef<HTMLDivElement>(null),scrollPositions=useRef(memory.current.positions);
   const storageKey=operatorId?'galaxy:operations:workbench:drafts:v1:'+operatorId:null;
   const session=useOperationsRead<AgentOsSession>({path:operatorId?'/v1/operations/session':null,failureMessage:'当前管理登录暂时无法核对。',clearOnOffline:true,retryUnavailable:true});
-  const checkedSession=session.verified?session.value:null;
+  const checkedSession=session.available?session.value:null;
   const identityEnded=!!checkedSession&&(checkedSession.state==='signed-out'||checkedSession.operator.id!==operatorId);
   const verifiedSession=!signedOut&&checkedSession?.state==='signed-in'&&checkedSession.operator.id===operatorId?checkedSession:null;
   const permittedDomains=domains.map(item=>item.id as AgentOsDomain).filter(item=>agentOsCanUseDomain(verifiedSession,item)),canUseDomain=permittedDomains.includes(domain);
@@ -87,12 +91,27 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const currentToken=async(targetDomain:AgentOsDomain)=>{const current=await session.read();return current?.state==='signed-in'&&current.operator.id===operatorId&&agentOsCanUseDomain(current,targetDomain)?current.csrfToken:null;};
   const denyConversation=()=>{session.clear();conversation.clear();void session.read();};
   const reread=()=>{void conversation.read();void runtime.read();};
+  const restoreUnsent=(sentDomain:AgentOsDomain,operationId:string,text:string)=>{
+    if(!draftsRef.current[sentDomain]){const next={...draftsRef.current,[sentDomain]:text};draftsRef.current=next;setDrafts(next);if(storageKey)setDraftStorageError(!saveDrafts(storageKey,domainRef.current,next));}
+    else setUnsent(previous=>{const next={...previous,[sentDomain]:[...(previous[sentDomain]??[]),{operationId,text}]};memory.current.unsent=next;return next;});
+  };
   const command=useWorkbenchCommand({operatorId,csrfToken:verifiedSession?.csrfToken??'',canWrite:canUseDomain,domain,permittedDomains,currentToken,onProgress:conversation.renew,validateResult:authorizedCommandMatches,onConflict:reread,onDenied:denyConversation,
+    onQueued:intent=>{
+      const sentDomain=domains.find(item=>intent.path===agentOsConversationPath(item.id as AgentOsDomain)+'/runs')?.id;
+      if(!sentDomain||typeof intent.body.message!=='string'||intent.body.retryOfOperationId)return;
+      if(draftsRef.current[sentDomain]===intent.body.message){const next={...draftsRef.current,[sentDomain]:''};draftsRef.current=next;setDrafts(next);if(storageKey)setDraftStorageError(!saveDrafts(storageKey,domainRef.current,next));}
+    },
+    onRejected:intent=>{
+      const sentDomain=domains.find(item=>intent.path===agentOsConversationPath(item.id as AgentOsDomain)+'/runs')?.id as AgentOsDomain|undefined;
+      if(!sentDomain||typeof intent.body.message!=='string'||intent.body.retryOfOperationId)return;
+      restoreUnsent(sentDomain,String(intent.body.operationId),intent.body.message);
+    },
     onCommitted:async(value,path,body)=>{
       const dismissedCard=path.endsWith('/dismiss')&&typeof body.cardId==='string'?document.querySelector('[data-workbench-card="'+body.cardId+'"]'):null;
       const returnToInput=!!dismissedCard&&(document.activeElement===document.body||dismissedCard.contains(document.activeElement));
       const sentDomain=domains.find(item=>path===agentOsConversationPath(item.id as AgentOsDomain)+'/runs')?.id as AgentOsDomain|undefined;
       if(sentDomain)lastSubmission.current=null;
+      if(sentDomain&&['context-changed','not-started'].includes(value.state??'')&&typeof body.message==='string'&&!body.retryOfOperationId)restoreUnsent(sentDomain,String(body.operationId),body.message);
       if(sentDomain&&value.state==='context-changed'){
         setWaiting(previous=>{const next={...previous};delete next[sentDomain];memory.current.waiting=next;return next;});
         setContextNotices(previous=>({...previous,[sentDomain]:true}));
@@ -100,9 +119,11 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
         animatedTurns.current.add(String(body.operationId));
         setContextNotices(previous=>{if(!previous[sentDomain])return previous;const next={...previous};delete next[sentDomain];return next;});
         setWaiting(previous=>{const next={...previous};if(['COMPLETED','ERROR','CANCELLED','PAUSED'].includes(value.state??''))delete next[sentDomain];else next[sentDomain]={operationId:String(body.operationId),runId:value.runId??null,text:String(body.message),...(typeof body.retryOfOperationId==='string'?{retryOfOperationId:body.retryOfOperationId}:{}),csrfToken:verifiedSession?.csrfToken??''};memory.current.waiting=next;return next;});
-        if(!body.retryOfOperationId&&draftsRef.current[sentDomain]===body.message){const next={...draftsRef.current,[sentDomain]:''};draftsRef.current=next;setDrafts(next);if(storageKey)setDraftStorageError(!saveDrafts(storageKey,domainRef.current,next));}
       }
-      await conversation.read();
+      if(sentDomain&&value.state!=='context-changed'&&value.state!=='not-started'){
+        conversation.update(previous=>previous.domain===sentDomain?applyConversationReceipt(previous,value,typeof body.message==='string'?body.message:undefined,typeof body.retryOfOperationId==='string'?body.retryOfOperationId:undefined):previous);
+        await conversation.renew();
+      }else await conversation.read();
       if(returnToInput&&(document.activeElement===document.body||dismissedCard?.contains(document.activeElement)))input.current?.focus({preventScroll:true});
     }});
   const dismissCommand=useWorkbenchCommand({operatorId,csrfToken:verifiedSession?.csrfToken??'',canWrite:canUseDomain,domain,permittedDomains,memoryLane:'card-dismissal',currentToken,onProgress:conversation.renew,onConflict:reread,onDenied:denyConversation,
@@ -127,7 +148,15 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   // A local intent may still be awaiting fresh authorization, before any POST.
   // Stream only a server-observed run or an ACK/original-GET-admitted reply.
   const activeTurn=activeRun?.operationId??waitingReply?.operationId??null;
-  const stream=useConversationStream({operatorId,csrfToken:verifiedSession?.csrfToken??'',domain,operationId:activeTurn,enabled:focused&&canUseDomain&&conversation.verified&&!!currentConversation?.capabilities.canStream&&!currentConversation?.contextChanged&&!!activeTurn,readExpiresAt:Math.min(currentConversation?.readExpiresAt??0,session.value?.state==='signed-in'?session.value.expiresAt:Number.MAX_SAFE_INTEGER),onResync:conversation.renew,onDenied:denyConversation,onContextChanged:()=>{setWaiting(previous=>{const next={...previous};delete next[domain];memory.current.waiting=next;return next;});setContextNotices(previous=>({...previous,[domain]:true}));}});
+  const refreshActiveTurn=useCallback(async()=>{
+    if(!activeTurn)return conversation.refresh();
+    const receipt=await operationsRequest<AgentOsCommand>(agentOsConversationOperationPath(domain,activeTurn));
+    if(receipt.operationId!==activeTurn)throw Error('Invalid original conversation receipt');
+    if(receipt.state==='context-changed')return conversation.refresh();
+    conversation.update(previous=>previous.domain===domain?applyConversationReceipt(previous,receipt,waiting[domain]?.text):previous);
+    return conversation.renew();
+  },[activeTurn,domain,conversation.refresh,conversation.update,conversation.renew,waiting]);
+  const stream=useConversationStream({operatorId,csrfToken:verifiedSession?.csrfToken??'',domain,operationId:activeTurn,enabled:focused&&canUseDomain&&conversation.verified&&!!currentConversation?.capabilities.canStream&&!currentConversation?.contextChanged&&!!activeTurn,readExpiresAt:Math.min(currentConversation?.readExpiresAt??0,session.value?.state==='signed-in'?session.value.expiresAt:Number.MAX_SAFE_INTEGER),onResync:refreshActiveTurn,onRenew:conversation.renew,onDenied:denyConversation,onContextChanged:()=>{setWaiting(previous=>{const next={...previous};delete next[domain];memory.current.waiting=next;return next;});setContextNotices(previous=>({...previous,[domain]:true}));}});
   const storedStop=stopping[domain]?.csrfToken===verifiedSession?.csrfToken&&stopping[domain]?.parentOperationId===activeTurn?stopping[domain]:undefined;
   const stopInProgress=!!activeRun?.cancellation||!!storedStop||stopCommand.pending?.domain===domain;
   const canStop=canUseDomain&&conversation.verified&&!!currentConversation?.capabilities.canCancel&&!!activeTurn&&!stream.finished&&(stream.stopAvailable||!!activeRun?.runId)&&!stopInProgress&&!stopCommand.locked;
@@ -147,7 +176,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     onIdentityChange(checkedSession.state==='signed-in'?checkedSession.operator.id:null);
   },[identityEnded,checkedSession,operatorId,onIdentityChange,command.cancel,dismissCommand.cancel,stopCommand.cancel,conversation.clear]);
 
-  const taskReady=!taskId||!!linkedTask&&linkedTask.domain===domain&&!['stopped','completed','failed'].includes(linkedTask.state);
+  const taskReady=!taskId||task.verified&&!!linkedTask&&linkedTask.domain===domain&&!['stopped','completed','failed'].includes(linkedTask.state);
   const sendMessage=async(message:string,retryOfOperationId?:string)=>{if(!taskReady||!canUseDomain||!verifiedSession||workLocked||replying||!conversation.verified||conversation.value?.domain!==domain||!conversation.value.capabilities.canSend||!message.trim()||message.length>12000)return;
     scrolling.jumpToLatest();
     const path=agentOsConversationPath(domain)+'/runs';
@@ -202,7 +231,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const showCards=(cards:WorkbenchActionCard[],label:string)=><WorkbenchActionCards cards={cards} label={label} now={cardNow} verified={canUseDomain&&conversation.verified} busy={workLocked} pendingCardId={typeof dismissCommand.pending?.body.cardId==='string'?dismissCommand.pending.body.cardId:typeof command.pending?.body.cardId==='string'?command.pending.body.cardId:null} pendingDismissCardId={cards.find(card=>card.capability.canDismiss&&canDismissPending(card))?.cardId??null} dismissBusy={dismissCommand.locked} onConfirm={confirmCard} onDismiss={dismissCard}/>;
   const latestRun=currentConversation?.runs.at(-1);
   const latestFailure=conversation.verified&&!waitingReply&&!command.pending&&latestRun?.status==='ERROR'?latestRun:null;
-  const pendingOutgoing=canUseDomain&&conversation.verified&&command.pending?.domain===domain&&command.pending.path===agentOsConversationPath(domain)+'/runs'&&!command.pending.body.retryOfOperationId&&typeof command.pending.body.message==='string'&&!waitingReply&&!currentConversation?.runs.some(run=>run.operationId===command.pending?.body.operationId)?command.pending:null;
+  const pendingOutgoing=canUseDomain&&conversation.available&&command.pending?.domain===domain&&command.pending.path===agentOsConversationPath(domain)+'/runs'&&!command.pending.body.retryOfOperationId&&typeof command.pending.body.message==='string'&&!waitingReply&&!currentConversation?.runs.some(run=>run.operationId===command.pending?.body.operationId)?command.pending:null;
   const headerError=command.error||dismissCommand.error||stopCommand.error||conversation.error||session.error||runtime.error;
   const retryRead=!!(conversation.error||session.error||runtime.error)&&!workLocked&&!replying&&!signedOut;
   const retryModel=!!latestFailure&&nativeConversationFailure(latestFailure).canRetry&&!(drafts[domain]??'').trim();
@@ -236,6 +265,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
 
       {conversation.verified&&waitingReply&&!waitingRun&&<article className="wb-run wb-run--waiting">{!waitingReply.retryOfOperationId&&<p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{waitingReply.text}</p>}{!waitingReply.retryOfOperationId&&<hr className="wb-message-divider"/>}{stream.text&&<WorkbenchAnswer content={stream.text} binding={waitingReply.operationId} animate streaming/>}<WorkbenchReplyProgress active={!stream.text&&!outputStarted.current.has(waitingReply.operationId)&&!stopInProgress} label={replyProgressLabel(stream.phase,stream.finished)}/></article>}
       {pendingOutgoing&&<article className="wb-run wb-run--waiting"><p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{String(pendingOutgoing.body.message)}</p><WorkbenchReplyProgress active label="正在发送"/></article>}
+      {(unsent[domain]??[]).map(item=><article className="wb-run" key={item.operationId}><p className="wb-run-input" style={{whiteSpace:'pre-wrap'}}><strong>你</strong><br/>{item.text}</p><p role="status">未发送。<button type="button" className="wb-text-button" onClick={()=>{fillReplyDraft(item.text);setUnsent(previous=>{const next={...previous,[domain]:(previous[domain]??[]).filter(row=>row.operationId!==item.operationId)};memory.current.unsent=next;return next;});}}>放回输入框</button></p></article>)}
 
       {conversation.verified&&currentConversation?.runs.length===0&&currentConversation.capabilities.canSend&&!conversation.loading&&!conversation.error&&!session.error&&!waitingReply&&command.pending?.domain!==domain&&<div className="wb-empty wb-conversation-empty" role="status"><p><strong>开始对话</strong></p><p>询问这个领域的情况，或使用预设问题。</p></div>}
       </div>

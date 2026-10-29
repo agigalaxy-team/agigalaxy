@@ -7,16 +7,16 @@ import {agentOsErrors,type AgentOsCommand,type AgentOsDomain} from './agentos-cl
 export type WorkbenchIntent={path:string;body:Record<string,unknown>;label:string;csrfToken:string;domain:AgentOsDomain;lookupPath?:string;attempted:boolean};
 // Same-tab memory only. No original message, CSRF or command body is persisted.
 const retainedIntents=new Map<string,WorkbenchIntent>();
-type Props={operatorId:string|null;csrfToken:string;canWrite:boolean;domain:AgentOsDomain;permittedDomains:AgentOsDomain[];memoryLane?:string;currentToken:(domain:AgentOsDomain)=>Promise<string|null>;validateResult?:(value:AgentOsCommand,intent:WorkbenchIntent)=>boolean;onCommitted:(value:AgentOsCommand,path:string,body:Record<string,unknown>)=>void|Promise<void>;onProgress?:()=>void|Promise<unknown>;onConflict:()=>void;onDenied:()=>void};
+type Props={operatorId:string|null;csrfToken:string;canWrite:boolean;domain:AgentOsDomain;permittedDomains:AgentOsDomain[];memoryLane?:string;currentToken:(domain:AgentOsDomain)=>Promise<string|null>;validateResult?:(value:AgentOsCommand,intent:WorkbenchIntent)=>boolean;onQueued?:(intent:WorkbenchIntent)=>void;onRejected?:(intent:WorkbenchIntent)=>void;onCommitted:(value:AgentOsCommand,path:string,body:Record<string,unknown>)=>void|Promise<void>;onProgress?:()=>void|Promise<unknown>;onConflict:()=>void;onDenied:()=>void};
 
-export function useWorkbenchCommand({operatorId,csrfToken,canWrite,domain,permittedDomains,memoryLane='',currentToken,validateResult,onCommitted,onProgress,onConflict,onDenied}:Props){
+export function useWorkbenchCommand({operatorId,csrfToken,canWrite,domain,permittedDomains,memoryLane='',currentToken,validateResult,onQueued,onRejected,onCommitted,onProgress,onConflict,onDenied}:Props){
  const memoryKey=operatorId?operatorId+(memoryLane?':'+memoryLane:''):null;
  const restored=useRef(memoryKey?retainedIntents.get(memoryKey):undefined);
  const [pending,setPending]=useState<WorkbenchIntent|null>(restored.current??null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[attempt,setAttempt]=useState(0);
  const ambiguous=useRef(!!restored.current),requestToken=useRef(csrfToken||restored.current?.csrfToken||'');
- const alive=useRef(false),inFlight=useRef(false),active=useRef<AbortController|null>(null),intent=useRef<WorkbenchIntent|null>(restored.current??null),callbacks=useRef({canWrite,permittedDomains,currentToken,validateResult,onCommitted,onProgress,onConflict,onDenied}),sendRef=useRef<(value:WorkbenchIntent)=>Promise<AgentOsCommand|undefined>>(async()=>undefined);
+ const alive=useRef(false),inFlight=useRef(false),active=useRef<AbortController|null>(null),intent=useRef<WorkbenchIntent|null>(restored.current??null),callbacks=useRef({canWrite,permittedDomains,currentToken,validateResult,onQueued,onRejected,onCommitted,onProgress,onConflict,onDenied}),sendRef=useRef<(value:WorkbenchIntent)=>Promise<AgentOsCommand|undefined>>(async()=>undefined);
  const permissionKey=permittedDomains.join(',');
- useLayoutEffect(()=>{callbacks.current={canWrite,permittedDomains,currentToken,validateResult,onCommitted,onProgress,onConflict,onDenied};});
+ useLayoutEffect(()=>{callbacks.current={canWrite,permittedDomains,currentToken,validateResult,onQueued,onRejected,onCommitted,onProgress,onConflict,onDenied};});
  useLayoutEffect(()=>{
   if(!intent.current||permittedDomains.includes(intent.current.domain))return;
   ambiguous.current=true;active.current?.abort();active.current=null;inFlight.current=false;setBusy(false);
@@ -65,7 +65,7 @@ export function useWorkbenchCommand({operatorId,csrfToken,canWrite,domain,permit
    if(controller.signal.aborted||!alive.current)return;
    if(accepted){setError('操作已记录，当前内容暂时无法读取。');return;}
    const known=failure instanceof OperationsRequestError&&((failure.status<500&&![408,429].includes(failure.status)&&!(readingOriginal&&failure.status===404))||!readingOriginal&&['operations_agentos_not_configured','operations_agentos_model_not_configured','operations_agentos_conversation_not_ready','operations_agentos_conversation_transport_unavailable'].includes(failure.code));
-   if(known){intent.current=null;if(memoryKey)retainedIntents.delete(memoryKey);setPending(null);if(failure.status===409)callbacks.current.onConflict();if([401,403].includes(failure.status))callbacks.current.onDenied();setError(agentOsErrors[failure.code]??operationsFailure(failure,'这次操作未能完成。'));}
+   if(known){intent.current=null;if(memoryKey)retainedIntents.delete(memoryKey);setPending(null);callbacks.current.onRejected?.(value);if(failure.status===409)callbacks.current.onConflict();if([401,403].includes(failure.status))callbacks.current.onDenied();setError(agentOsErrors[failure.code]??operationsFailure(failure,'这次操作未能完成。'));}
    else{ambiguous.current=true;setError('');setAttempt(previous=>previous+1);}
   }finally{if(active.current===controller){active.current=null;inFlight.current=false;if(alive.current)setBusy(false);}}
  },[csrfToken,memoryKey]);
@@ -82,6 +82,6 @@ export function useWorkbenchCommand({operatorId,csrfToken,canWrite,domain,permit
  return{pending,busy,error,message,cancel,locked:busy||pending!==null,submit:(path:string,body:Record<string,unknown>,label:string,lookup?:(operationId:string)=>string,fixedOperationId?:string)=>{
   if(intent.current||!callbacks.current.canWrite||!csrfToken||!navigator.onLine)return Promise.resolve(undefined);
   const operationId=fixedOperationId??crypto.randomUUID(),value:WorkbenchIntent={path,body:{...structuredClone(body),operationId},label,csrfToken,domain,lookupPath:lookup?.(operationId),attempted:false};
-  ambiguous.current=false;intent.current=value;if(memoryKey)retainedIntents.set(memoryKey,value);setPending(value);setAttempt(0);setError('');setMessage('');return sendRef.current(value);
+  ambiguous.current=false;intent.current=value;if(memoryKey)retainedIntents.set(memoryKey,value);setPending(value);setAttempt(0);setError('');setMessage('');callbacks.current.onQueued?.(value);return sendRef.current(value);
  }};
 }

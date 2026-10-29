@@ -14,28 +14,28 @@ const plain=(event:React.MouseEvent<HTMLAnchorElement>)=>event.button===0&&!even
 export function AccountFollowsWorkspace({endpoint,navigate,search=''}:{endpoint?:string;navigate:(path:string)=>void;search?:string}){
  const {model,memory,lease,client,available,scope}=useAccountFollows(endpoint),parameters=useMemo(()=>new URLSearchParams(search),[search]),after=parameters.get('after'),
   [page,setPage]=useState<Page|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[pendingCount,setPendingCount]=useState(0),
-  heading=useRef<HTMLHeadingElement>(null),returnFocus=useRef<Element|null>(null),readPage=useRef<(()=>void)|null>(null);
+  heading=useRef<HTMLHeadingElement>(null),returnFocus=useRef<Element|null>(null),readPage=useRef<(()=>void)|null>(null),pageScope=useRef('');
  const tasks=useQueryReads(scope,'follows','page:'+ (model.session?.csrfToken??''));
  const refresh=useCallback(()=>readPage.current?.(),[]);
  useLayoutEffect(()=>{if(page&&returnFocus.current){if(document.activeElement===document.body||document.activeElement===returnFocus.current)heading.current?.focus({preventScroll:true});returnFocus.current=null;}},[page]);
  const refreshAccount=useEffectEvent(()=>model.refresh());
  useEffect(()=>{
   let active=true,working=false,expiry:ReturnType<typeof setTimeout>|undefined,blocked=false;
-  setPage(null);setError('');setBusy(false);setPendingCount(client?.pendingAll().length??0);
+  const selectedScope=JSON.stringify([client?.ownerId??null,model.session?.csrfToken??null,after]);if(pageScope.current!==selectedScope){pageScope.current=selectedScope;setPage(null);}setError('');setBusy(false);setPendingCount(client?.pendingAll().length??0);
   const read=(force=false)=>{
    if(!active||!client||!available||working||blocked||navigator.onLine===false)return;
    working=true;setBusy(true);
    void tasks.run({lane:'page',key:after??'first'},({signal})=>client.query(after?{after}:{},{signal}),{
-    force,validUntil:value=>value.readExpiresAt*1000,onSuccess:value=>{setPage(value);setError('');setPendingCount(client.pendingAll().length);if(expiry)clearTimeout(expiry);expiry=setTimeout(()=>{if(active){setPage(null);read(true);}},Math.max(0,value.readExpiresAt*1000-Date.now()));},
-    onError:problem=>{setPage(null);setError(accountFollowMessage(problem));const status=problem&&typeof problem==='object'&&'status'in problem?Number(problem.status):0;if(status===401||status===403){blocked=true;void refreshAccount();}},
+    force,validUntil:value=>value.readExpiresAt*1000,onSuccess:value=>{setPage(value);setError('');setPendingCount(client.pendingAll().length);if(expiry)clearTimeout(expiry);expiry=setTimeout(()=>{if(active)read(true);},Math.max(0,value.readExpiresAt*1000-Date.now()));},
+    onError:problem=>{setError(accountFollowMessage(problem));const status=problem&&typeof problem==='object'&&'status'in problem?Number(problem.status):0;if(status===401||status===403){setPage(null);blocked=true;void refreshAccount();}},
     onSettled:()=>{working=false;setBusy(false);},
    });
   };
   readPage.current=()=>{blocked=false;read(true);};
-  const offline=()=>{tasks.cancel();working=false;setBusy(false);setPage(null);setError('暂时离线，联网后继续读取。');},visible=()=>{read();};
+  const offline=()=>{tasks.cancel();working=false;setBusy(false);setError('暂时离线，联网后继续读取。');},visible=()=>{read();};
   if(navigator.onLine===false)offline();else read();
-  window.addEventListener('offline',offline);window.addEventListener('online',visible);
-  return()=>{active=false;readPage.current=null;tasks.cancel();if(expiry)clearTimeout(expiry);window.removeEventListener('offline',offline);window.removeEventListener('online',visible);};
+  window.addEventListener('offline',offline);window.addEventListener('online',visible);document.addEventListener('visibilitychange',visible);
+  return()=>{active=false;readPage.current=null;tasks.cancel();if(expiry)clearTimeout(expiry);window.removeEventListener('offline',offline);window.removeEventListener('online',visible);document.removeEventListener('visibilitychange',visible);};
  },[client,available,after,tasks]);
  const currentPage=page?.accountId===client?.ownerId?page:null;
  if(model.phase==='signed-out')return <AccountEntryPage navigate={navigate} returnTo={target(after)}/>;

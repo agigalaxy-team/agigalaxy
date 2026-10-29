@@ -10,40 +10,57 @@ import (
 // SourceValidator binds the original conversation contextValid consumer to the
 // current operations query service. Saved evidence is only a read locator: the
 // reader must repeat its actual fixed-AI and current source authorization.
-func (s *Conversations) SourceValidator(revalidate func(context.Context, operationspermissions.Actor, string, []Object) (Object, error)) func(context.Context, Conversation, operationspermissions.Actor) (bool, error) {
-	return func(ctx context.Context, row Conversation, actor operationspermissions.Actor) (bool, error) {
+func (s *Conversations) SourceValidator(revalidate func(context.Context, operationspermissions.Actor, string, []Object) (Object, error)) func(context.Context, Conversation, operationspermissions.Actor) (SourceQualification, error) {
+	return func(ctx context.Context, row Conversation, actor operationspermissions.Actor) (SourceQualification, error) {
 		if s == nil || s.Pool == nil {
-			return false, fail("operations_authorization_unavailable", 503)
+			return SourceQualification{}, fail("operations_authorization_unavailable", 503)
 		}
 		rows, err := s.Pool.Query(ctx, "SELECT evidence_ref FROM operations_agentos_conversation_sources_v1 WHERE conversation_id=$1", row.ID)
 		if err != nil {
-			return false, err
+			return SourceQualification{}, err
 		}
 		refs := []Object{}
 		for rows.Next() {
 			var reference Object
 			if err = rows.Scan(&reference); err != nil {
 				rows.Close()
-				return false, err
+				return SourceQualification{}, err
 			}
 			refs = append(refs, reference)
 		}
 		err = rows.Err()
 		rows.Close()
 		if err != nil {
-			return false, err
+			return SourceQualification{}, err
 		}
 		if len(refs) == 0 {
-			return true, nil
+			return SourceQualification{Valid: true, ReadExpiresAt: s.now().Unix() + 30}, nil
 		}
 		if revalidate == nil {
-			return false, fail("operations_agentos_conversation_not_ready", 503)
+			return SourceQualification{}, fail("operations_agentos_conversation_not_ready", 503)
 		}
 		value, err := revalidate(ctx, actor, row.Domain, refs)
 		if err != nil {
-			return false, err
+			return SourceQualification{}, err
 		}
-		return value["valid"] == true, nil
+		if value["valid"] != true {
+			return SourceQualification{}, nil
+		}
+		current, ok := value["refs"].([]any)
+		if !ok || len(current) != len(refs) {
+			return SourceQualification{}, fail("operations_agentos_source_qualification_unavailable", 503)
+		}
+		deadline := s.now().Unix() + 30
+		for _, ref := range current {
+			expires, ok := index(object(ref)["readExpiresAt"])
+			if !ok || expires <= s.now().Unix() {
+				return SourceQualification{}, fail("operations_agentos_source_qualification_unavailable", 503)
+			}
+			if expires < deadline {
+				deadline = expires
+			}
+		}
+		return SourceQualification{Valid: true, ReadExpiresAt: deadline}, nil
 	}
 }
 

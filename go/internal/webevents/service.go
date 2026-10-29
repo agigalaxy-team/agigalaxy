@@ -56,6 +56,7 @@ type Frame struct {
 	ObjectID    string   `json:"objectId,omitempty"`
 	ParentID    string   `json:"parentId,omitempty"`
 	Version     any      `json:"version,omitempty"`
+	Reason      string   `json:"reason,omitempty"`
 }
 
 // Empty modules are significant on reset/snapshot and always encode as [].
@@ -71,7 +72,8 @@ func (f Frame) MarshalJSON() ([]byte, error) {
 		Type    string   `json:"type"`
 		Cursor  string   `json:"cursor"`
 		Modules []string `json:"modules"`
-	}{f.Type, f.Cursor, append([]string{}, f.Modules...)})
+		Reason  string   `json:"reason,omitempty"`
+	}{f.Type, f.Cursor, append([]string{}, f.Modules...), f.Reason})
 }
 
 type Connection struct {
@@ -201,7 +203,7 @@ func (s *Service) Read(ctx context.Context, c *Connection, cursor *string) ([]Fr
 		if cursor != nil {
 			pos = *cursor
 		}
-		frames = append(frames, Frame{Type: "reset", Cursor: pos, Modules: lost})
+		frames = append(frames, Frame{Type: "reset", Cursor: pos, Modules: lost, Reason: "access-changed"})
 	}
 	c.Modules = fresh.Modules
 	c.Principal = fresh.Principal
@@ -216,7 +218,7 @@ func (s *Service) Read(ctx context.Context, c *Connection, cursor *string) ([]Fr
 		invalid = invalid || lo > 0 && curN < lo-1
 	}
 	if invalid || len(events) > maximumReplay {
-		return append(frames, Frame{Type: "reset", Cursor: high, Modules: c.Modules}, Frame{Type: "snapshot", Cursor: high, Modules: c.Modules}), nil
+		return append(frames, Frame{Type: "reset", Cursor: high, Modules: c.Modules, Reason: "replay-gap"}, Frame{Type: "snapshot", Cursor: high, Modules: c.Modules}), nil
 	}
 	resets := []string{}
 	addReset := func(m string) {
@@ -269,7 +271,7 @@ func (s *Service) Read(ctx context.Context, c *Connection, cursor *string) ([]Fr
 		}
 	}
 	if len(resets) > 0 {
-		frames = append(frames, Frame{Type: "reset", Cursor: high, Modules: resets})
+		frames = append(frames, Frame{Type: "reset", Cursor: high, Modules: resets, Reason: "access-changed"})
 	}
 	return append(frames, Frame{Type: "snapshot", Cursor: high, Modules: c.Modules}), nil
 }

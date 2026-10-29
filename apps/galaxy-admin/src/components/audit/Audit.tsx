@@ -19,7 +19,6 @@ const kindItems=[{id:'all',label:'全部记录'},{id:'business',label:'业务操
 type FilterDraft={query:string;action:string;day:string};
 const filterDraft=(filters:AuditFilters):FilterDraft=>({query:filters.query,action:filters.action,day:filters.day});
 const filterKey=(draft:FilterDraft)=>JSON.stringify([draft.query,draft.action,draft.day]);
-const readEnd=(value:AuditPage)=>typeof value.readExpiresAt==='number'?value.readExpiresAt*1000:value.checkedAt*1000+30000;
 
 type AuditPositionOwner={operatorId:string;loginGeneration:string;authorizationVersion:string};
 type AuditPositions={owner:AuditPositionOwner;source:string;rows:string;list:number;details:Map<string,number>};
@@ -86,8 +85,8 @@ export function Audit({filters,positionOwner}:{filters:AuditFilters;positionOwne
   const page=useOperationsRead<AuditPage>({path,failureMessage:'审计记录暂时无法取得。',clearOnOffline:true});
   const [bridge,setBridge]=useState<{path:string;value:AuditPage}|null>(null);
   // Canonicalising the newly issued snapshot changes the URL, not the material.
-  // Keep that same already-verified response only until its original read lease.
-  const carried=bridge?.path===path&&page.ready&&!page.error&&typeof navigator!=='undefined'&&navigator.onLine&&readEnd(bridge.value)>Date.now()?bridge.value:null;
+  // Keep the same scoped response while its canonical URL is loading.
+  const carried=bridge?.path===path&&page.ready&&!page.rejected?bridge.value:null;
   const value=page.value??carried,pagination=value?.pagination,search=value?.search;
   const sourceKey=auditReadPath({...filters,snapshot:pagination?.snapshot??filters.snapshot}),positionKey=sourceKey;
   const [picked,setPicked]=useState<{source:string;id:string}|null>(null),[selections,setSelections]=useState<Record<string,string>>({}),[knownActions,setKnownActions]=useState<string[]>([]);
@@ -183,12 +182,8 @@ export function Audit({filters,positionOwner}:{filters:AuditFilters;positionOwne
     setBridge({path:auditReadPath(next),value:page.value});
     startNavigation(()=>router.replace(auditHref(next),{scroll:false}));
   },[page.value,filters.snapshot,path,routeScopeKey]);
-  useEffect(()=>{
-    if(!bridge)return;
-    const timer=setTimeout(()=>setBridge(current=>current===bridge?null:current),Math.max(0,readEnd(bridge.value)-Date.now()));
-    return()=>clearTimeout(timer);
-  },[bridge]);
-  useEffect(()=>{if(page.error||page.value&&filters.snapshot)setBridge(null);},[page.error,page.value,filters.snapshot]);
+  useEffect(()=>{if(page.rejected||page.value&&filters.snapshot)setBridge(null);},[page.rejected,page.value,filters.snapshot]);
+  useEffect(()=>{const reset=(event:Event)=>{const modules=(event as CustomEvent<string[]>).detail;if(!modules.length||modules.includes('audit'))setBridge(null);};window.addEventListener('galaxy:admin-reset',reset);return()=>window.removeEventListener('galaxy:admin-reset',reset);},[]);
   useEffect(()=>{
     if(!scanning||page.loading||page.refreshing||page.error||!pagination||filters.snapshot!==pagination.snapshot)return;
     const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible')void page.read();},400);

@@ -23,7 +23,7 @@ type ConversationHandler struct {
 	Next      http.Handler
 }
 
-var conversationHTTPPath = regexp.MustCompile(`(?i)^/v1/operations/agentos/conversations/(overview|governance|messaging|discovery|maintenance)(?:/(runs|operations/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:/(events|cancel))?))?$`)
+var conversationHTTPPath = regexp.MustCompile(`(?i)^/v1/operations/agentos/conversations/(overview|governance|messaging|discovery|maintenance)(?:/(runs|qualification|operations/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:/(events|cancel))?))?$`)
 var conversationAfter = regexp.MustCompile(`^(?:0|[1-9][0-9]{0,9})$`)
 var conversationCardHTTPPath = regexp.MustCompile(`(?i)^/v1/operations/agentos/conversations/(overview|governance|messaging|discovery|maintenance)/cards/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:/(confirm|dismiss))?$`)
 
@@ -144,6 +144,8 @@ func (h ConversationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	case operation != "":
 		out, err = h.Service.Operation(r.Context(), actor, domain, operation)
+	case path[2] == "qualification":
+		out, err = h.Service.ReadQualification(r.Context(), actor, domain)
 	default:
 		out, err = h.Service.ReadConversation(r.Context(), actor, domain)
 	}

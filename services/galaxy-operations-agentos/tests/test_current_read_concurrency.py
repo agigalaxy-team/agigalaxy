@@ -26,11 +26,13 @@ from agno.run.agent import RunOutput
 from agno.run.authorization import RunAuthorization, authorization_scope
 from agno.run.base import RunStatus
 from agno.session.agent import AgentSession
+from sqlalchemy import Column, MetaData, Table, Text
 
 from galaxy_agentos.app import PrivateSurface, run_view
 from galaxy_agentos.authorization import GalaxyAuthorization
 from galaxy_agentos.config import Settings
 from galaxy_agentos.conversations import install_conversation_read
+from galaxy_agentos.conversation_transport import install_conversation_transport_read
 from galaxy_agentos.gateway import AuthorityDenied
 from galaxy_agentos.model_gate import with_current_authority
 
@@ -88,6 +90,7 @@ def read_app(reader, db, projector=lambda run: dict(run)):
     app = FastAPI()
     runtime = {"gateway": reader, "db": db, "os": SimpleNamespace(agents=[])}
     install_conversation_read(app, runtime, projector)
+    install_conversation_transport_read(app, runtime, projector)
     app.add_middleware(PrivateSurface, settings=settings, runtime=runtime)
     now = int(time.time())
     token = jwt.encode({"sub": "conversation:" + reader.row["id"], "iat": now, "exp": now + 120,
@@ -129,6 +132,60 @@ class LocalModel(Model):
 
 
 class CurrentReadConcurrencyTest(unittest.IsolatedAsyncioTestCase):
+    async def test_original_operation_authority_and_sql_leave_asgi_heartbeat_responsive(self):
+        for blocked in ("middleware", "before", "database", "after"):
+            with self.subTest(blocked=blocked), tempfile.TemporaryDirectory() as directory:
+                reader = Reader()
+                db = SqliteDb(db_file=str(Path(directory) / "original.sqlite3"), id="local-original-read")
+                metadata = MetaData()
+                jobs = Table("synthetic_original_jobs", metadata, *(Column(name, Text, primary_key=name == "id") for name in
+                    ["id", "idempotency_key", "user_id", "session_id", "component_type", "component_id", "status"]))
+                metadata.create_all(db.db_engine)
+                entered, release = threading.Event(), threading.Event()
+                threads, contexts = [], []
+
+                class OriginalLedger:
+                    Session = db.Session
+
+                    def _get_table(self, table_type, create_table_if_not_found=False):
+                        threads.append(threading.get_ident())
+                        contexts.append(REQUEST_CONTEXT.get())
+                        if blocked == "database":
+                            entered.set()
+                            if not release.wait(3):
+                                raise AssertionError("blocked original SQL was not released")
+                        return jobs if table_type == "jobs" else None
+
+                if blocked != "database":
+                    reader.block_call = {"middleware": 1, "before": 2, "after": 3}[blocked]
+                    entered, release = reader.entered, reader.release
+                app, headers = read_app(reader, OriginalLedger())
+                main_thread = threading.get_ident()
+                marker = REQUEST_CONTEXT.set("trusted-original-request")
+                try:
+                    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://local-asgi") as client:
+                        original = asyncio.create_task(client.get("/galaxy/conversations/" + reader.row["id"]
+                            + "/operations/" + str(uuid4()), headers=headers))
+                        try:
+                            self.assertTrue(await asyncio.to_thread(entered.wait, 1))
+                            heartbeat = await asyncio.wait_for(client.get("/health"), timeout=0.5)
+                            self.assertEqual(heartbeat.status_code, 200)
+                            self.assertFalse(original.done())
+                        finally:
+                            release.set()
+                        response = await original
+                    self.assertEqual(response.status_code, 200, response.text)
+                    self.assertEqual(response.json()["state"], "not-recorded")
+                    self.assertEqual(response.json()["readExpiresAt"], reader.lease)
+                    self.assertEqual(reader.calls, 3)
+                    self.assertEqual(reader.contexts, ["trusted-original-request"] * 3)
+                    self.assertTrue(all(ident != main_thread for ident in reader.threads + threads))
+                    self.assertEqual(contexts, ["trusted-original-request"])
+                finally:
+                    release.set()
+                    REQUEST_CONTEXT.reset(marker)
+                    db.db_engine.dispose()
+
     async def test_each_current_authority_boundary_and_native_read_leave_asgi_heartbeat_responsive(self):
         for blocked in ("middleware", "before", "database", "after"):
             with self.subTest(blocked=blocked):

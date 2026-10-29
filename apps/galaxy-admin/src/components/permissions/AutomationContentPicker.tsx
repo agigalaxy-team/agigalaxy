@@ -15,16 +15,16 @@ type Props={selected:readonly string[];onChange:(ids:string[],picked?:Selection)
 
 export function AutomationContentPicker({selected,onChange,canRead,disabled=false,maxSelected=100,allowedIds,label='查找公开内容'}:Props){
   const [input,setInput]=useState(''),[kind,setKind]=useState<''|'post'|'reply'>(''),[search,setSearch]=useState<Search|null>(null);
-  const [walking,setWalking]=useState(false),[paused,setPaused]=useState(false),[stalled,setStalled]=useState(false),[known,setKnown]=useState<Record<string,Known>>({}),[,tick]=useState(0);
+  const [walking,setWalking]=useState(false),[paused,setPaused]=useState(false),[stalled,setStalled]=useState(false),[known,setKnown]=useState<Record<string,Known>>({});
   const inputRef=useRef<HTMLInputElement>(null),fieldId=useId(),visited=useRef(new Set<string>());
   const scope=String(canRead)+'|'+(allowedIds?[...allowedIds].sort().join(','):'*'),previousScope=useRef(scope);
   const activeSearch=canRead&&!disabled&&!paused&&search?.scope===scope?search:null;
   const targetId=activeSearch&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(activeSearch.query)?activeSearch.query.toLowerCase():null;
   const path=activeSearch?'/v1/operations/community/content?'+new URLSearchParams({days:'all',limit:'20',...(targetId?{targetId}:{query:activeSearch.query}),...(activeSearch.kind?{kind:activeSearch.kind}:{}),...(activeSearch.after?{after:activeSearch.after}:{})}):null;
   const page=useOperationsRead<PublicContentPage>({path,failureMessage:'公开内容暂时无法查找。',clearOnOffline:true});
-  const selectedKey=selected.join(','),now=Math.floor(Date.now()/1000);
-  const names=Object.fromEntries(Object.entries(known).filter(([id,value])=>canRead&&value.readExpiresAt>now&&(!allowedIds||allowedIds.includes(id))));
-  const visible=activeSearch&&page.verified?(page.value?.items??[]).filter(item=>item.sourceState==='available'&&(!allowedIds||allowedIds.includes(item.id))):[];
+  const selectedKey=selected.join(',');
+  const names=Object.fromEntries(Object.entries(known).filter(([id,value])=>canRead&&(!allowedIds||allowedIds.includes(id))));
+  const visible=activeSearch&&page.available?(page.value?.items??[]).filter(item=>item.sourceState==='available'&&(!allowedIds||allowedIds.includes(item.id))):[];
 
   useEffect(()=>{
     if(previousScope.current===scope)return;
@@ -32,7 +32,7 @@ export function AutomationContentPicker({selected,onChange,canRead,disabled=fals
   },[scope]);
   useEffect(()=>{
     if(!page.ready)return;
-    if(page.error&&!page.verified||!navigator.onLine)setKnown({});
+    if(/登录|权限|未获准/.test(page.error))setKnown({});
     if(page.error)setWalking(false);
   },[page.ready,page.verified,page.error]);
   useEffect(()=>{
@@ -49,12 +49,8 @@ export function AutomationContentPicker({selected,onChange,canRead,disabled=fals
   useEffect(()=>{
     if(!activeSearch||!page.verified||!page.value)return;
     const readExpiresAt=page.value.checkedAt+30,items=page.value.items.filter(item=>selected.includes(item.id)&&item.sourceState==='available'&&(!allowedIds||allowedIds.includes(item.id)));
-    if(items.length)setKnown(previous=>({...previous,...Object.fromEntries(items.map(item=>[item.id,{target:{kind:item.kind,id:item.id},label:automationContentLabel(item),readExpiresAt}]))}));
+    setKnown(previous=>{const next={...previous};for(const item of page.value!.items)if(item.sourceState!=='available')delete next[item.id];for(const item of items)next[item.id]={target:{kind:item.kind,id:item.id},label:automationContentLabel(item),readExpiresAt};return next;});
   },[activeSearch,page.verified,page.value,selectedKey,scope]);
-  useEffect(()=>{
-    const expiry=Math.min(...Object.values(known).map(value=>value.readExpiresAt));if(!Number.isFinite(expiry))return;
-    const timer=setTimeout(()=>{const current=Math.floor(Date.now()/1000);setKnown(previous=>Object.fromEntries(Object.entries(previous).filter(([,value])=>value.readExpiresAt>current)));tick(value=>value+1);},Math.max(0,expiry*1000-Date.now())+1);return()=>clearTimeout(timer);
-  },[known]);
 
   function resetSearch(){setSearch(null);setWalking(false);setPaused(false);setStalled(false);visited.current.clear();}
   function find(){

@@ -110,7 +110,7 @@ function FeedbackContent({selected,after,query,category,state,module,days,csrfTo
   useEffect(()=>{if(!item||!memory.initialized)return;setDrafts(previous=>{const old=previous[item.id];const next=old?mergeDraft(old,item):createDraft(item);return old===next?previous:{...previous,[item.id]:next};});},[item,memory.initialized]);
   const canEdit=memory.initialized&&canManage&&current.value?.permissions.canManage===true&&current.verified&&!current.loading&&!locked;
   useSettingsDraftState(Object.values(drafts).some(changed),command.locked);
-  const summary=directory.verified?directory.value?.summary??null:null;
+  const summary=directory.available?directory.value?.summary??null:null;
   function pick(id:string){if(locked)return;setPicked({context:filterKey,id});startNavigation(()=>router.replace(pageHref(filters,{id}),{scroll:false}));}
   function apply(form:HTMLFormElement){if(locked)return;const data=new FormData(form),params=new URLSearchParams();for(const key of ['query','category','state','module','days']){const value=String(data.get(key)??'').trim();if(value)params.set(key,value);}startNavigation(()=>router.push(route+'?'+params.toString(),{scroll:false}));}
   function update(values:Partial<Pick<Draft,'category'|'module'|'state'|'note'>>){if(!item)return;setDrafts(previous=>({...previous,[item.id]:{...(previous[item.id]??createDraft(item)),...values}}));}

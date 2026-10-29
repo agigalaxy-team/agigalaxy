@@ -24,7 +24,7 @@ export function AiWorkDuty({domain,value,account,loading,error,refresh,canConfig
  function update(patch:Partial<AutonomyConfig>){if(!input||locked)return;onDraft({configuration:{...structuredClone(input),...patch},base:structuredClone(current!)});setChoices({});}
  function plan(patch:Partial<AutonomyPlan>){if(input)update({plan:{...input.plan,...patch}});}
  function toggle(ids:string[],id:string){return ids.includes(id)?ids.filter(value=>value!==id):[...ids,id];}
- const configuredStrategies=strategies.verified?(strategies.value?.active?.configuration??strategies.value?.configuration)?.strategies??[]:[];
+ const configuredStrategies=strategies.available?(strategies.value?.active?.configuration??strategies.value?.configuration)?.strategies??[]:[];
  const selectedStrategies=configuredStrategies.filter(strategy=>input.plan.strategyIds.includes(strategy.id));
  const availableStrategies=configuredStrategies.filter(strategy=>strategy.domain===domain||input.plan.strategyIds.includes(strategy.id));
  const validDaily=input.schedule.kind==='interval'?Number.isSafeInteger(input.schedule.minutes)&&input.schedule.minutes>=1&&input.schedule.minutes<=10080:!input.enabled||!!input.schedule.at;

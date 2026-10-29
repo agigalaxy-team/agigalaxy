@@ -18,7 +18,7 @@ export const strategyModeForExecution:Record<StrategyExecution['mode'],StrategyM
 
 
 export function StrategyExecutionFields({strategy,disabled,onChange}:{strategy:StrategyDefinition;disabled:boolean;onChange:(patch:Partial<StrategyDefinition>)=>void}){
- const read=useOperationsRead<Options>({path:autonomyBase+'/options',failureMessage:'执行选项暂时无法读取。',clearOnOffline:true}),options=read.verified?read.value:null,value=strategy.execution;
+ const read=useOperationsRead<Options>({path:autonomyBase+'/options',failureMessage:'执行选项暂时无法读取。',clearOnOffline:true}),options=read.available?read.value:null,value=strategy.execution;
  function change(patch:Partial<StrategyExecution>){const next={...(value??strategyExecutionDefaults(strategy)),...patch};onChange({execution:next,mode:strategyModeForExecution[next.mode],...(next.actions.length?{template:'business-action'}:{})});}
  function toggle(items:string[],id:string){return items.includes(id)?items.filter(item=>item!==id):[...items,id];}
  const ai=options?.accounts.find(account=>account.domain===value?.aiDomain),actions=options?.actions.filter(action=>!action.humanOnly&&(!ai?.permissions||ai.permissions.includes(action.code)))??[];

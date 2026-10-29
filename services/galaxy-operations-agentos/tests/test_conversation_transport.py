@@ -137,6 +137,8 @@ class ConversationTransportTest(unittest.TestCase):
                 original = client.get('/galaxy/conversations/' + row['id'] + '/operations/' + operation, headers=headers)
                 self.assertEqual(original.status_code, 200)
                 self.assertEqual(original.json()['operationId'], operation)
+                self.assertEqual(original.json()['conversationId'], row['id'])
+                self.assertEqual(original.json()['sessionId'], row['sessionId'])
                 self.assertEqual(original.json()['runId'], run_id)
                 self.assertEqual(original.json()['state'], 'COMPLETED')
                 self.assertEqual(original.json()['native']['content'], '完整的本地回复 🌌。')

@@ -164,7 +164,7 @@ export function PublicContent(location:PublicContentProps){
   const directoryItem=directory.value?.items.find(entry=>publicContentKey(entry)===chosenKey);
   const detail=directoryItem?.sourceState==='unavailable'&&current.value?.content.sourceState==='available'?null:current.value;
   const item=detail?.content,draft=item?drafts[publicContentKey(item)]??newDraft(item):undefined;
-  const tags=vocabulary.value?.items??directory.value?.tags??[],summary=directory.verified?directory.value?.summary??null:null,selectedRows=selection.context===filterKey?selection.items:[];
+  const tags=vocabulary.value?.items??directory.value?.tags??[],summary=directory.available?directory.value?.summary??null:null,selectedRows=selection.context===filterKey?selection.items:[];
   useEffect(()=>{if(directoryItem?.sourceState==='unavailable'&&current.value?.content.sourceState==='available'){current.clear();void current.read();}},[directory.value,chosenKey,current.clear,current.read]);
   useEffect(()=>{setPicked(null);},[selected,selectedKind,filterKey]);
   useEffect(()=>{const first=directory.value?.items[0];if(!selected&&!picked&&first)setPicked({context:filterKey,kind:first.kind,id:first.id});},[selected,picked,filterKey,directory.value]);

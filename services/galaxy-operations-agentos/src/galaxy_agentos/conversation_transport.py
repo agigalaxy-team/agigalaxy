@@ -1,4 +1,5 @@
 """Private metadata lookup for the original native durable conversation run."""
+import asyncio
 from uuid import UUID
 
 from fastapi import Request
@@ -11,7 +12,12 @@ from .gateway import AuthorityDenied, AuthorityUnavailable
 def install_conversation_transport_read(app, runtime, run_view):
     @app.get("/galaxy/conversations/{ident}/operations/{operation_id}")
     async def original_conversation_run(ident: str, operation_id: str, request: Request):
-        row, user_id = request.state.galaxy_execution, request.state.galaxy_user_id
+        # HTTP authority and SQLAlchemy are synchronous. Keep the whole owned
+        # lookup, including both current checks, off the shared ASGI loop.
+        return await asyncio.to_thread(read_original, ident, operation_id,
+            dict(request.state.galaxy_execution), request.state.galaxy_user_id)
+
+    def read_original(ident, operation_id, row, user_id):
         if row.get("mode") != "conversation" or row["id"] != ident:
             raise AuthorityDenied()
         try:
@@ -58,13 +64,13 @@ def install_conversation_transport_read(app, runtime, run_view):
         if current.get("execution", {}).get("sessionId") != row["sessionId"]:
             raise AuthorityDenied()
         if not found:
-            return {"operationId": operation_id, "runId": None, "state": "not-recorded", "native": None,
+            return {"conversationId": ident, "sessionId": row["sessionId"], "operationId": operation_id, "runId": None, "state": "not-recorded", "native": None,
                 "readExpiresAt": current.get("readExpiresAt")}
         from agno.os.job_queue import ticket_status_to_api
         item = found[0]._mapping
         state = ticket_status_to_api(item["status"])
         if state not in {"PENDING", "RUNNING", "COMPLETED", "CANCELLED", "ERROR"}:
             state = "unknown"
-        return {"operationId": operation_id, "runId": item["id"], "state": state, "native": native,
+        return {"conversationId": ident, "sessionId": row["sessionId"], "operationId": operation_id, "runId": item["id"], "state": state, "native": native,
             "readExpiresAt": current.get("readExpiresAt")}
 

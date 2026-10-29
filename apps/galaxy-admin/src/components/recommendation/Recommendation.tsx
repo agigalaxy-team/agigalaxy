@@ -45,9 +45,7 @@ function RecommendationTrend({data}:{data:readonly RecommendationTrendPoint[]}){
 function useRecommendationRead<T extends RecommendationLease>(path:string,normalize:(value:unknown)=>T|null){
  const read=useOperationsRead<unknown>({path,failureMessage:'当前内容暂时无法读取。',clearOnOffline:true});
  const data=useMemo(()=>normalize(read.value),[normalize,read.value]);
- const [clock,setClock]=useState(0);
- useEffect(()=>{if(!data)return;const timer=setTimeout(()=>{setClock(value=>value+1);},Math.max(0,data.readExpiresAt*1000-Date.now()));return()=>clearTimeout(timer);},[data]);
- const value=data&&data.readExpiresAt*1000>Date.now()?data:null;void clock;
+ const value=data;
  return {...read,value,error:read.error||(read.value!==null&&!data?'当前内容暂时无法读取，请重新读取。':'')};
 }
 
@@ -110,7 +108,7 @@ function RecommendationSettings({location,csrfToken}:{location:RecommendationLoc
   overview.clear();history.clear();await Promise.all([overview.read(),history.read()]);
  },[overview.clear,overview.read,history.clear,history.read,navigate]);
  const conflict=useCallback(()=>{void overview.read();},[overview.read]);
- const localCommand=useOperationCommand<RecommendationSaved|RecommendationRecovered>({csrfToken,canWrite:canConfigure||canMap,onCommitted:committed,onConflict:conflict,errorMessages:commandErrors,canRecover:!!data&&overview.verified,recover:async(pending,{signal})=>{
+ const localCommand=useOperationCommand<RecommendationSaved|RecommendationRecovered>({csrfToken,canWrite:overview.verified&&(canConfigure||canMap),onCommitted:committed,onConflict:conflict,errorMessages:commandErrors,canRecover:!!data&&overview.verified,recover:async(pending,{signal})=>{
   try{
    const operationId=pending.body.operationId;if(typeof operationId!=='string')throw Error('Original recommendation operation unavailable');
    const value=await operationsRequest('/v1/operations/recommendation/operations/'+operationId,{signal});
@@ -123,7 +121,7 @@ function RecommendationSettings({location,csrfToken}:{location:RecommendationLoc
   }
  }});
  const recovery=useSettingsReceiptRecovery({scope:'recommendation',refresh:async()=>{await Promise.all([overview.read(),history.read()]);},live:localCommand.pending&&target.current?{operationId:String(localCommand.pending.body.operationId),kind:target.current.kind}:null,ready:!!data&&overview.verified,denied:!!overview.error&&/登录|权限/.test(overview.error),onRecorded:async()=>{await Promise.all([overview.read(),history.read()]);},onDenied:()=>{overview.clear();history.clear();setPolicyDrafts({});setGlobalDraft(null);setThemeDrafts({});}});
- const command={...localCommand,locked:localCommand.locked||recovery.pending};
+ const command={...localCommand,locked:localCommand.locked||recovery.pending||!overview.verified};
  useEffect(()=>{if(!policyConflict||!policyMerged||policyMerged.unresolved||command.locked||!selected)return;setGlobalDraft(policyMerged.global);if(policyMerged.theme)setPolicyDrafts(previous=>({...previous,[selected.key]:policyMerged.theme!}));setPolicyMergeDecision(null);},[policyConflict,policyMerged,command.locked,selected]);
  useEffect(()=>{if(!themeConflict||!themeMerged||themeMerged.unresolved||command.locked)return;setThemeDrafts(previous=>({...previous,[themeKey]:themeMerged.draft}));setThemeMergeDecision(null);},[themeConflict,themeMerged,command.locked,themeKey]);
  const updatePolicy=(patch:Partial<RecommendationPolicyDraft>)=>{

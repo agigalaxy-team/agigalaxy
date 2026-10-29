@@ -21,7 +21,7 @@ const empty:AiDelegationFields={enabled:false,targetAiAccountIds:[],grantablePer
 type Props={csrfToken:string;canConfigure:boolean;ownPermissions:readonly string[];draft:AiDelegationDraft|null;onDraft:(value:AiDelegationDraft|null)=>void;restored:SettingsPendingReceipt|null;onRestored:()=>void;onStatus:(value:{dirty:boolean;pending:boolean;operationId:string|null})=>void};
 export function AiDelegation({csrfToken,canConfigure,ownPermissions,draft,onDraft,restored,onRestored,onStatus}:Props){
  const read=useOperationsRead<AiDelegationRead>({path:base,failureMessage:'总控管理范围暂时无法读取。',clearOnOffline:true}),catalogRead=useOperationsRead<AiDelegationCatalog>({path:'/v1/operations/permissions/catalog',failureMessage:'权限目录暂时无法读取。',clearOnOffline:true});
- const value=read.verified?read.value:null,catalog=catalogRead.verified?catalogRead.value:null,current=value?.delegation,source=fields(current??empty),input=draft??{...source,baseVersion:current?.version??0,baseline:source};
+ const value=read.available?read.value:null,catalog=catalogRead.available?catalogRead.value:null,current=value?.delegation,source=fields(current??empty),input=draft??{...source,baseVersion:current?.version??0,baseline:source};
  const [filter,setFilter]=useState<PermissionFilter>(emptyPermissionFilter),[choices,setChoices]=useState<Record<string,'mine'|'current'>>({});
  const callbacks=useRef({onDraft,onRestored,onStatus});callbacks.current={onDraft,onRestored,onStatus};
  const committed=useCallback(async()=>{callbacks.current.onDraft(null);callbacks.current.onRestored();setChoices({});await read.read();},[read.read]);

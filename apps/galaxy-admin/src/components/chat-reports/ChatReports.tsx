@@ -38,8 +38,8 @@ function downloadReadable(flight:DownloadFlight,context:DownloadContext){
  return context.path===flight.path&&context.reportId===flight.reportId&&context.csrfToken===flight.csrfToken&&detail?.reportId===flight.reportId&&
   !detail.materialsExpired&&detail.readExpiresAt*1000>now&&flight.readExpiresAt*1000>now&&
   detail.materials.some(material=>material.state==='available'&&material.eventId===flight.material.eventId&&material.messageId===flight.material.messageId&&
-   material.revision===flight.material.revision&&material.sourceExpiresAt===flight.material.sourceExpiresAt&&material.attachments.some(file=>
-    file.attachmentId===flight.attachment.attachmentId&&file.contentAvailable&&file.name===flight.attachment.name&&file.mediaType===flight.attachment.mediaType&&file.size===flight.attachment.size&&file.state===flight.attachment.state));
+   material.revision===flight.material.revision&&material.sourceExpiresAt===flight.material.sourceExpiresAt&&Date.parse(material.sourceExpiresAt)>now&&material.attachments.some(file=>
+    file.attachmentId===flight.attachment.attachmentId&&(!file.expiresAt||Date.parse(file.expiresAt)>now)&&file.contentAvailable&&file.name===flight.attachment.name&&file.mediaType===flight.attachment.mediaType&&file.size===flight.attachment.size&&file.state===flight.attachment.state));
 }
 function State({value}:{value:keyof typeof reportStates}){return <span className="galaxy-private-state" data-state={value}>{reportStates[value]}</span>;}
 function Account({id,label}:{id:string;label?:string}){
@@ -69,7 +69,10 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
  const reportId=filters.report,path=reportId?'/v1/operations/chat-reports/'+reportId:null;
  const queryKey=useMemo(()=>galaxyQueryKey(scope,'chat-reports',path),[scope,path]);
  const [reading,setReading]=useState<{path:string|null;value:ReportDetail|null;loading:boolean;error:string}>({path:null,value:null,loading:false,error:''});
- const detail=reading.path===path&&reading.value&&reading.value.readExpiresAt*1000>Date.now()?reading.value:null;
+ const [clock,setClock]=useState(()=>Date.now());
+ const rawDetail=reading.path===path?reading.value:null;
+ const detail=useMemo(()=>rawDetail?{...rawDetail,materials:rawDetail.materials.map(material=>{const now=Date.now(),expired=rawDetail.materialsExpired||!Number.isFinite(Date.parse(material.sourceExpiresAt))||Date.parse(material.sourceExpiresAt)<=now;return expired?{...material,state:'unavailable' as const,text:null,attachments:[],moderation:undefined}:{...material,attachments:material.attachments.map(file=>file.expiresAt&&(!Number.isFinite(Date.parse(file.expiresAt))||Date.parse(file.expiresAt)<=now)?{...file,name:undefined,contentAvailable:false}:file)};})}:null,[rawDetail,clock]);
+ const detailFresh=!!detail&&!reading.error&&detail.readExpiresAt*1000>Date.now();
  const loading=reading.path===path?reading.loading:!!path,error=reading.path===path?reading.error:'';
  const [drafts,setDrafts]=useState<Record<string,CaseDraft>>({}),[chosen,setChosen]=useState<Record<string,{room:string;message:string}>>({});
  const [messageDrafts,setMessageDrafts]=useState<Record<string,{action:MessageVisibilityAction;summary:string}>>({});
@@ -93,7 +96,7 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
    if(!response.ok){
     // Known read failure invalidates an in-flight download before error-body
     // parsing or React's next commit can yield to its buffered Blob.
-    cancelDownload();latest.current={...latest.current,resource:null};setReading({path,value:null,loading:true,error:''});
+    cancelDownload();
     const failure=await response.json().catch(()=>null),code=typeof failure?.error==='string'?failure.error:typeof failure?.error?.code==='string'?failure.error.code:'operations_unavailable';
     throw new OperationsRequestError(response.status,code);
    }
@@ -103,11 +106,12 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
    if(downloadFlight.current&&!downloadReadable(downloadFlight.current,{...latest.current,resource:value}))cancelDownload();
    queryClient.setQueryData(queryKey,value);
    latest.current={...latest.current,resource:value};
-   setReading({path,value,loading:false,error:''});
+   setClock(Date.now());setReading({path,value,loading:false,error:''});
   }catch(failure){
    if(!alive.current||controller.signal.aborted||generation!==readGeneration.current||latest.current.path!==path)return;
-   cancelDownload();latest.current={...latest.current,resource:null};
-   setReading({path,value:null,loading:false,error:operationsFailure(failure,'这份案件暂时无法取得。')});
+   cancelDownload();const invalidated=failure instanceof OperationsRequestError&&failure.status>=400&&failure.status<500&&![408,429].includes(failure.status);
+   if(invalidated){queryClient.removeQueries({queryKey,exact:true});latest.current={...latest.current,resource:null};}
+   setReading(previous=>({path,value:invalidated||previous.path!==path?null:previous.value,loading:false,error:operationsFailure(failure,'这份案件暂时无法取得。')}));
   }finally{if(activeRead.current===controller)activeRead.current=null;}
  },[path,reportId,cancelDownload,queryClient,queryKey]);
  useLayoutEffect(()=>{
@@ -117,18 +121,18 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
  useLayoutEffect(()=>{if(downloadFlight.current&&!downloadReadable(downloadFlight.current,latest.current))cancelDownload();},[detail,path,reportId,csrfToken,cancelDownload]);
  useEffect(()=>{
   if(!path)return;
-  const offline=()=>clearDetail('网络已断开，恢复后继续读取。');
-  const visible=()=>{if(document.visibilityState==='visible'&&navigator.onLine&&!(latest.current.resource&&latest.current.resource.readExpiresAt*1000>Date.now()))void read();else if(document.visibilityState!=='visible')clearDetail();};
+  const offline=()=>{cancelDownload();setReading(previous=>({...previous,loading:false,error:'网络已断开，恢复后继续读取。'}));};
+  const visible=()=>{setClock(Date.now());if(document.visibilityState==='visible'&&navigator.onLine&&!(latest.current.resource&&latest.current.resource.readExpiresAt*1000>Date.now()))void read();else if(document.visibilityState!=='visible')cancelDownload();};
   if(!navigator.onLine)offline();else if(document.visibilityState==='visible'){const cached=queryClient.getQueryData<ReportDetail>(queryKey);if(cached?.reportId===reportId&&cached.readExpiresAt*1000>Date.now()){latest.current={...latest.current,resource:cached};setReading({path,value:cached,loading:false,error:''});}else void read();}
   window.addEventListener('offline',offline);window.addEventListener('online',visible);window.addEventListener('focus',visible);document.addEventListener('visibilitychange',visible);
   return()=>{window.removeEventListener('offline',offline);window.removeEventListener('online',visible);window.removeEventListener('focus',visible);document.removeEventListener('visibilitychange',visible);};
- },[path,read,clearDetail,csrfToken]);
+ },[path,read,cancelDownload,queryClient,queryKey,reportId,csrfToken]);
  useEffect(()=>queryClient.getQueryCache().subscribe(event=>{if(event.type==='updated'&&event.action.type==='invalidate'&&event.query.queryHash===queryClient.getQueryCache().find({queryKey,exact:true})?.queryHash)void read();}),[queryClient,queryKey,read]);
- useEffect(()=>{const reset=(event:Event)=>{const modules=(event as CustomEvent<string[]>).detail;if(!modules.length||modules.includes('chat-reports')){clearDetail();if(modules.length)void read();}};window.addEventListener('galaxy:admin-reset',reset);return()=>window.removeEventListener('galaxy:admin-reset',reset);},[clearDetail,read]);
+ useEffect(()=>{const reset=(event:Event)=>{const modules=(event as CustomEvent<string[]>).detail;if(!modules.length)clearDetail();else if(modules.includes('chat-reports')){clearDetail();void read();}};window.addEventListener('galaxy:admin-reset',reset);return()=>window.removeEventListener('galaxy:admin-reset',reset);},[clearDetail,read]);
  useEffect(()=>{
-  if(!detail)return;const timer=setTimeout(()=>{clearDetail();if(navigator.onLine&&document.visibilityState==='visible')void read();},Math.max(0,detail.readExpiresAt*1000-Date.now()));
-  return()=>clearTimeout(timer);
- },[detail,read,clearDetail]);
+  if(!rawDetail)return;const now=Date.now(),ends=[rawDetail.readExpiresAt*1000,...rawDetail.materials.flatMap(material=>[Date.parse(material.sourceExpiresAt),...material.attachments.map(file=>file.expiresAt?Date.parse(file.expiresAt):NaN)])].filter(value=>Number.isFinite(value)&&value>now);
+  if(!ends.length)return;const timer=setTimeout(()=>{setClock(Date.now());if(rawDetail.readExpiresAt*1000<=Date.now()&&navigator.onLine&&document.visibilityState==='visible')void read();},Math.max(1,Math.min(...ends)-now));return()=>clearTimeout(timer);
+ },[rawDetail,clock,read]);
 
  const committed=useCallback(async(value:ReportDetail|ChatRecovered)=>{
   setDrafts(previous=>{const next={...previous};delete next[value.reportId];return next;});
@@ -136,7 +140,7 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
   void directory.read();
  },[read,directory.read]);
  const conflict=useCallback(()=>{void read();void directory.read();},[read,directory.read]);
- const command=useOperationCommand<ReportDetail|ChatRecovered>({csrfToken,canWrite:canManage,canRecover:directory.verified,recover:recoverChatCommand,validateResult:validateChatOperation,recoveryPendingMessage:chatRecoveryPendingMessage,onCommitted:committed,onConflict:conflict,errorMessages:errors});
+ const command=useOperationCommand<ReportDetail|ChatRecovered>({csrfToken,canWrite:canManage&&detailFresh,canRecover:directory.verified,recover:recoverChatCommand,validateResult:validateChatOperation,recoveryPendingMessage:chatRecoveryPendingMessage,onCommitted:committed,onConflict:conflict,errorMessages:errors});
  const materials=useMemo(()=>[...(detail?.materials??[])].sort((a,b)=>a.sentAt.localeCompare(b.sentAt)||a.messageId.localeCompare(b.messageId)||a.revision-b.revision),[detail]);
  const rooms=[...new Set(materials.map(item=>item.roomId))],room=rooms.includes(chosen[reportId]?.room??'')?chosen[reportId].room:rooms[0]??'';
  const roomMaterials=materials.filter(item=>item.roomId===room),authors=[...new Set(roomMaterials.map(item=>item.authorRef))];
@@ -149,8 +153,9 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
   setMessageDrafts(previous=>{const next={...previous};delete next[messageOperationKey.current];return next;});
   if(latest.current.reportId===value.reportId)await read();void directory.read();
  },[read,directory.read]);
- const messageCommand=useOperationCommand<ReportDetail|ChatRecovered>({csrfToken,canWrite:canManage,canRecover:directory.verified,recover:recoverChatCommand,validateResult:validateChatOperation,recoveryPendingMessage:chatRecoveryPendingMessage,onCommitted:messageCommitted,onConflict:conflict,errorMessages:errors});
+ const messageCommand=useOperationCommand<ReportDetail|ChatRecovered>({csrfToken,canWrite:canManage&&detailFresh,canRecover:directory.verified,recover:recoverChatCommand,validateResult:validateChatOperation,recoveryPendingMessage:chatRecoveryPendingMessage,onCommitted:messageCommitted,onConflict:conflict,errorMessages:errors});
  const locked=command.locked||messageCommand.locked;
+ const writeLocked=locked||!detailFresh;
  useEffect(()=>{if(!locked)setPendingFilters(null);},[locked]);
  const scroll=useRef<HTMLDivElement>(null),side=useRef<HTMLElement>(null),list=useRef<HTMLDivElement>(null),positions=useRef(new Map<string,number>());
  const messageElements=useRef(new Map<string,HTMLElement>()),viewKey=reportId+':'+filters.view+':'+room;
@@ -174,7 +179,7 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
   setFocusTarget(null);
  },[focusTarget,reportId,room,filters.view,!!detail]);
  async function submitCase(event:FormEvent){
-  event.preventDefault();if(!detail?.canModerate||!canManage||locked||!draft.summary.trim())return;
+  event.preventDefault();if(!detailFresh||!detail?.canModerate||!canManage||locked||!draft.summary.trim())return;
   const body:Record<string,unknown>={reportId:detail.reportId,expectedVersion:detail.version,kind:draft.action,summary:draft.summary};
   if(draft.action==='pause'||draft.action==='resolve'){
    if(!detail.currentTarget)return;body.targetVersion=detail.currentTarget.version;body.rule=draft.rule;
@@ -187,7 +192,7 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
   await command.submit('/v1/operations/chat-reports/'+detail.reportId+'/event',body,'案件处理已记录。');
  }
  async function submitMessage(event:FormEvent){
-  event.preventDefault();if(!detail||!canManage||!picked||!moderation||!messageAction||locked||!messageDraft.summary.trim())return;
+  event.preventDefault();if(!detailFresh||!detail||!canManage||!picked||!moderation||!messageAction||locked||!messageDraft.summary.trim())return;
   messageOperationKey.current=messageKey;cancelDownload();
   setPendingFilters({...filters,report:detail.reportId});
   await messageCommand.submit('/v1/operations/chat-reports/'+detail.reportId+'/messages/'+picked.messageId+'/visibility',
@@ -238,7 +243,7 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
       <div className="galaxy-private-message-control"><div className="galaxy-private-message-facts"><p>{moderation?moderation.hidden?'网站后续展示已屏蔽':'无生效的运营屏蔽':'尚无可读取的消息处置状态'}</p>{moderation&&<small>{moderation.ownHidden?'本案屏蔽生效':moderation.hidden?'仍有其他来源的屏蔽':'本案没有生效屏蔽'}</small>}
        {moderation?.initialDecision&&<p className="galaxy-private-message-decision">原决定：{messageVisibilityLabels[moderation.initialDecision.action]} · {timeLabel(moderation.initialDecision.at)}<br/>管理身份 <HistoryOperator id={moderation.initialDecision.operatorId} name={moderation.initialDecision.operatorDisplayName}/> · 消息版本 {moderation.initialDecision.sourceRevision}</p>}
        {moderation?.currentDecision&&moderation.currentDecision.eventId!==moderation.initialDecision?.eventId&&<p className="galaxy-private-message-decision">当前决定：{messageVisibilityLabels[moderation.currentDecision.action]} · {timeLabel(moderation.currentDecision.at)}</p>}
-      </div>{allowedMessageActions.length>0?<form onSubmit={submitMessage}><fieldset disabled={locked||loading}><label>本次动作<select value={messageAction} onChange={event=>setMessageDrafts(previous=>({...previous,[messageKey]:{...messageDraft,action:event.target.value as MessageVisibilityAction}}))}>{allowedMessageActions.map(action=><option key={action} value={action}>{messageVisibilityLabels[action]}</option>)}</select></label><label className="galaxy-private-message-note">处理说明<textarea value={messageDraft.summary} maxLength={1600} rows={2} required onChange={event=>setMessageDrafts(previous=>({...previous,[messageKey]:{...messageDraft,summary:event.target.value}}))}/></label><button type="submit" className="galaxy-private-primary" disabled={!messageDraft.summary.trim()||!messageAction}>{messageAction==='hide'?'屏蔽这条消息':messageAction==='restore'?'解除本案屏蔽':'记录维持决定'}</button></fieldset>{messageAction==='restore'&&<p className="galaxy-private-message-impact">只解除本案屏蔽；其他案件、来源失效和访问权限继续生效。</p>}</form>:<p className="galaxy-private-muted">{!canManage?'当前没有这项处置权限。':picked.state!=='available'?'当前来源或版本不符合消息处置条件。':'当前没有可用的消息处置操作。'}</p>}</div>
+      </div>{allowedMessageActions.length>0?<form onSubmit={submitMessage}><fieldset disabled={writeLocked||loading}><label>本次动作<select value={messageAction} onChange={event=>setMessageDrafts(previous=>({...previous,[messageKey]:{...messageDraft,action:event.target.value as MessageVisibilityAction}}))}>{allowedMessageActions.map(action=><option key={action} value={action}>{messageVisibilityLabels[action]}</option>)}</select></label><label className="galaxy-private-message-note">处理说明<textarea value={messageDraft.summary} maxLength={1600} rows={2} required onChange={event=>setMessageDrafts(previous=>({...previous,[messageKey]:{...messageDraft,summary:event.target.value}}))}/></label><button type="submit" className="galaxy-private-primary" disabled={!messageDraft.summary.trim()||!messageAction}>{messageAction==='hide'?'屏蔽这条消息':messageAction==='restore'?'解除本案屏蔽':'记录维持决定'}</button></fieldset>{messageAction==='restore'&&<p className="galaxy-private-message-impact">只解除本案屏蔽；其他案件、来源失效和访问权限继续生效。</p>}</form>:<p className="galaxy-private-muted">{!canManage?'当前没有这项处置权限。':picked.state!=='available'?'当前来源或版本不符合消息处置条件。':'当前没有可用的消息处置操作。'}</p>}</div>
      </section>}
     </>:!loading&&!error&&<div className="galaxy-private-empty"><AdminIcon name="messages" size={34}/><h2>{reportId?'这份案件当前没有可读取的材料':'选择一份案件'}</h2><p>查看选入对话、证据与处理记录。</p></div>}
    </section>
@@ -259,7 +264,7 @@ export function ChatReports({filters:location,csrfToken,canManage}:Props){
     </section>
     <section className="galaxy-private-handling"><header><h2>案件处理</h2><span>版本 {detail.version}</span></header>
      <dl className="galaxy-private-facts"><dt>当前状态</dt><dd><State value={detail.state}/></dd><dt>本案对话限制</dt><dd>{detail.ownRestriction?<>{detail.ownRestriction.scopes.map(scope=>scopeLabels[scope]).join('、')}<br/>至 {timeLabel(detail.ownRestriction.until)}</>:'无生效限制'}</dd></dl>
-     {reviewEnabled?<form onSubmit={submitCase}><fieldset disabled={locked||loading}><label>处理操作<select value={draft.action} onChange={event=>updateDraft({action:event.target.value as CaseDraft['action']})}><option value="review" disabled={terminal}>记录处理进展</option><option value="pause" disabled={terminal||!detail.currentTarget}>临时限制对话参与</option><option value="resume" disabled={!detail.ownRestriction}>解除本案对话限制</option><option value="resolve" disabled={terminal||!detail.currentTarget}>记录处理结果</option></select></label>
+     {reviewEnabled?<form onSubmit={submitCase}><fieldset disabled={writeLocked||loading}><label>处理操作<select value={draft.action} onChange={event=>updateDraft({action:event.target.value as CaseDraft['action']})}><option value="review" disabled={terminal}>记录处理进展</option><option value="pause" disabled={terminal||!detail.currentTarget}>临时限制对话参与</option><option value="resume" disabled={!detail.ownRestriction}>解除本案对话限制</option><option value="resolve" disabled={terminal||!detail.currentTarget}>记录处理结果</option></select></label>
       {(draft.action==='pause'||draft.action==='resolve')&&<label>适用规则<input value={draft.rule} onChange={event=>updateDraft({rule:event.target.value})} maxLength={120} required/></label>}
       {draft.action==='resolve'&&<><label>处理结果<select value={draft.verdict} onChange={event=>updateDraft({verdict:event.target.value as CaseDraft['verdict']})}><option value="dismissed">举报不成立</option><option value="upheld">举报成立</option></select></label>{draft.verdict==='upheld'&&<label className="galaxy-private-checkbox"><input type="checkbox" checked={draft.withRestriction} onChange={event=>updateDraft({withRestriction:event.target.checked})}/>同时限制此对话参与</label>}</>}
       {needsScope&&<><div className="galaxy-private-scopes">{Object.entries(scopeLabels).map(([scope,label])=><label className="galaxy-private-checkbox" key={scope}><input type="checkbox" checked={draft.scopes.includes(scope as ChatScope)} onChange={event=>updateDraft({scopes:event.target.checked?[...draft.scopes,scope as ChatScope]:draft.scopes.filter(value=>value!==scope)})}/>{label}</label>)}</div><label>持续时间<select value={draft.action==='pause'&&draft.days==='30'?'7':draft.days} onChange={event=>updateDraft({days:event.target.value})}><option value="1">1 天</option><option value="7">7 天</option>{draft.action==='resolve'&&<option value="30">30 天</option>}</select></label></>}

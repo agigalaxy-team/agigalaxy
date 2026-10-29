@@ -23,6 +23,7 @@ import {AccountSessionScope,useAccountSessionModel} from "../accounts/account-se
 import {clearForumLoginDraft,forumLoginDraft,rememberForumLoginDraft,forumAuthorAccountId,forumAuthorSubjectId,forumOwnsContent} from './forum-account-state.mjs';
 import {ForumAudienceEditor,ForumAudienceSummary} from './forum-audience';
 import {useQueryReads,sourceReadDeadline} from "../../application/query-reads";
+import {definitiveReadFailure} from '../../shared/reading/read-failure';
 import {LoadingFeedback,ReadFailure} from "../../shared/feedback/interaction-feedback";
 import {useSiteContentReadyTransition} from "../../use-site-content-transition";
 import {createCurrentOfficialAccount} from "../accounts/official-account-reading.mjs";
@@ -37,7 +38,7 @@ import {availableForumContent,forumPayload,forumCategory,forumResolution,assertF
 type Props = { runtime: ChatRuntime|null; subjectId?: string; connected: boolean; navigate: (path: string) => void;
   postId?: string; versionId?: string; replyId?: string; reportId?: string; memberSectionId?:string; section?: string; compose?: boolean; manage?: boolean;
   routeSearch?:string; browseReturn?:string; browseReturnLabel?:string;registerShellNavigation?:(isCurrent:()=>boolean,leaveAction:(action:()=>void)=>void)=>()=>void };
-const noticeDeadline=(value:ForumNotification)=>Math.min(typeof value.sourceExpiresAt==='number'?value.sourceExpiresAt:Date.parse(value.sourceExpiresAt)/1000,value.readUntil??Infinity);
+const noticeDeadline=(value:ForumNotification)=>typeof value.sourceExpiresAt==='number'?value.sourceExpiresAt:Date.parse(value.sourceExpiresAt)/1000;
 const leaseNotices=(values:ForumNotification[],startedAt:number)=>values.map(value=>({...value,readUntil:startedAt+15}));
 const sessionStore=()=>{try{return window.sessionStorage;}catch{return undefined;}};
 const needsAccount = (kind: string) => publicWrite(kind) || kind === 'create-report' || sectionWrite(kind);
@@ -103,7 +104,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const client = useMemo<ForumClient|null>(() => runtime ? createCommunityForumClient(runtime, { subjectId:null, context,account,browserDrafts:true,onAcknowledged:feedback?.participation }) : null, [runtime, context,account,feedback]);
   const backgroundRead=useRef<(lane:string,value:unknown)=>void>(()=>{});
   const detailReads=useQueryReads({endpoint:runtime?.api.endpoint??'',identity:account?.id??'anonymous',surface:'web'},'forum',JSON.stringify([context,versionId,manage]),(lane,value)=>backgroundRead.current(lane,value));
-  const detailSource=useRef<DetailSource|null>(null),discussionAppend=useRef(false);
+  const detailSource=useRef<DetailSource|null>(null),discussionAppend=useRef(false),primaryDeadline=useRef<number|null>(null),readGap=useRef(false);
   const [visitorConflict,setVisitorConflict]=useState<{id:string;revision:number}|null>(null);
   const accountReady=official.phase!=='loading';
   const alive = useRef(true), working = useRef(false), readEpoch = useRef(0), draftEpoch = useRef(0), composeStarted = useRef(false);
@@ -244,7 +245,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       let afterVersion:number|undefined,nextAfterVersion:number|null=null;const rows:ForumVersionEntry[]=[];
       for(let page=0;page<depth;page++){const result=await client.versions(source.postId,afterVersion===undefined?{}:{afterVersion});if(signal.aborted)throw new DOMException('Read replaced','AbortError');rows.push(...result.items);nextAfterVersion=result.nextAfterVersion??null;if(nextAfterVersion===null)break;if(nextAfterVersion===afterVersion)throw Error('版本分页暂时无法继续。');afterVersion=nextAfterVersion;}
       return{items:rows,nextAfterVersion};
-    },{validUntil:sourceReadDeadline,onStart:()=>{if(!quiet)setVersionsReading(true);setVersionsError('');},onSuccess:value=>{if(sourceCurrent(source)){setVersions(value.items);setVersionNext(value.nextAfterVersion);}},onError:()=>{if(sourceCurrent(source)){setVersions([]);setVersionNext(null);setVersionsError('版本记录暂时无法读取。');}},onSettled:()=>{if(sourceCurrent(source))setVersionsReading(false);}});
+    },{validUntil:sourceReadDeadline,onStart:()=>{if(!quiet)setVersionsReading(true);setVersionsError('');},onSuccess:value=>{if(sourceCurrent(source)){setVersions(value.items);setVersionNext(value.nextAfterVersion);}},onError:reason=>{if(sourceCurrent(source)){if(definitiveReadFailure(reason)){setVersions([]);setVersionNext(null);}setVersionsError('版本记录暂时无法读取。');}},onSettled:()=>{if(sourceCurrent(source))setVersionsReading(false);}});
   }
   async function loadDiscussion(source=detailSource.current,after?:string,quiet=false){
     if(!client||!source||!source.versionId||source.replyId){setRepliesReading(false);return;}
@@ -254,7 +255,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       const valid=()=>sourceCurrent(source)&&!signal.aborted;
       if(after){const page=await client.replies({postId:source.postId,postVersionId:selectedVersion,after});return{...page,pagesRead:1};}
       return readPages<ForumReplyView>(after=>client.replies({postId:source.postId,postVersionId:selectedVersion,...(after?{after}:{})}),depth,valid,undefined,requestedReply?item=>item.locator.replyId===requestedReply:undefined);
-    },{validUntil:sourceReadDeadline,onStart:()=>{if(!quiet)setRepliesReading(true);setRepliesError('');},onSuccess:page=>{if(page&&sourceCurrent(source)){replyPages.current=after?replyPages.current+page.pagesRead:page.pagesRead;setReplies(old=>after?[...new Map([...old,...page.items].map(item=>[item.locator.replyId,item])).values()]:page.items);setReplyNext(page.nextAfter??null);if(requestedReply&&page.items.some(item=>item.locator.replyId===requestedReply))replyAnchor.current=null;}},onError:()=>{if(sourceCurrent(source)){setReplies([]);setReplyNext(null);setRepliesError('讨论暂时无法读取。');}},onSettled:()=>{if(sourceCurrent(source)){discussionAppend.current=false;setRepliesReading(false);}}});
+    },{validUntil:sourceReadDeadline,onStart:()=>{if(!quiet)setRepliesReading(true);setRepliesError('');},onSuccess:page=>{if(page&&sourceCurrent(source)){replyPages.current=after?replyPages.current+page.pagesRead:page.pagesRead;setReplies(old=>after?[...new Map([...old,...page.items].map(item=>[item.locator.replyId,item])).values()]:page.items);setReplyNext(page.nextAfter??null);if(requestedReply&&page.items.some(item=>item.locator.replyId===requestedReply))replyAnchor.current=null;}},onError:reason=>{if(sourceCurrent(source)){if(definitiveReadFailure(reason)){setReplies([]);setReplyNext(null);}setRepliesError('讨论暂时无法读取。');}},onSettled:()=>{if(sourceCurrent(source)){discussionAppend.current=false;setRepliesReading(false);}}});
   }
   async function loadManagement(source=detailSource.current,quiet=false){
     if(!client||!source)return;
@@ -265,14 +266,14 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   }
   async function loadParent(source=detailSource.current,quiet=false){
     if(!client||!source?.replyId||!source.versionId){setParentReading(false);return;}
-    return detailReads.run({lane:'parent',key:source.key},()=>client.version(source.postId,source.versionId!),{validUntil:sourceReadDeadline,onStart:()=>{if(!quiet)setParentReading(true);setParentError('');},onSuccess:value=>{if(sourceCurrent(source))setParent(value);},onError:()=>{if(sourceCurrent(source)){setParent(null);setParentError('暂时无法读取原帖。');}},onSettled:()=>{if(sourceCurrent(source))setParentReading(false);}});
+    return detailReads.run({lane:'parent',key:source.key},()=>client.version(source.postId,source.versionId!),{validUntil:sourceReadDeadline,onStart:()=>{if(!quiet)setParentReading(true);setParentError('');},onSuccess:value=>{if(sourceCurrent(source))setParent(value);},onError:reason=>{if(sourceCurrent(source)){if(definitiveReadFailure(reason))setParent(null);setParentError('暂时无法读取原帖。');}},onSettled:()=>{if(sourceCurrent(source))setParentReading(false);}});
   }
   const refresh=async(initial?:{first:Awaited<ReturnType<typeof firstForumRead>>;ticket:number},quiet=false)=>{
     if(!client||!current()||!connected&&(reportId||!postId&&!replyId&&!memberSectionId&&privatePage))return;
     if(!quiet)setReading(true);
     const ticket=initial?.ticket??++readEpoch.current,valid=()=>current()&&ticket===readEpoch.current,startedAt=Math.floor(Date.now()/1000);
     try{
-      const outcome=initial?{status:'success' as const,value:initial.first}:await readFirst(!quiet);if(!valid()||outcome.status==='superseded')return;if(outcome.status==='error')throw outcome.error;const first=outcome.value;
+      const outcome=initial?{status:'success' as const,value:initial.first}:await readFirst(!quiet);if(!valid()||outcome.status==='superseded')return;if(outcome.status==='error')throw outcome.error;const first=outcome.value;primaryDeadline.current=sourceReadDeadline(first);readGap.current=false;
       if(first.kind==='section'){const page=await readPages<ForumCardView>(after=>client.posts({...listQuery,sectionId:first.value.sectionId,...(after?{after}:{})}),feedPages.current,valid);if(page&&valid()){setSectionDetail(first.value);setItems(page.items);setNext(page.nextAfter);setError('');}}
       else if(first.kind==='sections'){const page=await readPages(after=>client.sections(after?{after}:{}),feedPages.current,valid,first.value);if(page&&valid()){setMemberSections(page.items);setNext(page.nextAfter);setError('');}}
       else if(first.kind==='notifications'){const page=await readPages(after=>client.notifications(after?{after}:{}),feedPages.current,valid,first.value);if(page&&valid()){setNotifications(leaseNotices(page.items,startedAt));setNext(page.nextAfter);setError('');}}
@@ -297,7 +298,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       }
       if(valid())setReading(false);
     }catch(reason){
-      if(valid()){setReading(false);clearReading();displayError(reason);}
+      if(valid()){setReading(false);if(definitiveReadFailure(reason))clearReading();displayError(reason);}
     }
   };
   async function run(action: () => Promise<void>) {
@@ -420,12 +421,11 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   useLayoutEffect(()=>{backgroundRead.current=(lane,value)=>{if(lane==='primary'&&current()){if(value===undefined)clearReading();else void refreshLatest({first:value as Awaited<ReturnType<typeof firstForumRead>>,ticket:++readEpoch.current},true);}};});
   const restoreInput=useEffectEvent(async(records:ForumPending[])=>{if(accountReady&&current()){setPending(records);await readDraft();await resumeQuietly();await readPending();}});
   const tickLatest=useEffectEvent(async()=>{
-    if(document.hidden||working.current||!current())return;
+    if(document.hidden||working.current||!current()||!readGap.current&&(primaryDeadline.current===null||primaryDeadline.current>Date.now()))return;
     await resumeQuietly();if(current())await refresh(undefined,true);
   });
-  const clearPrivateReading=useEffectEvent(clearReading);
   const readFailure=useEffectEvent((reason:unknown)=>{if(current())displayError(reason);});
-  const initialFailure=useEffectEvent((reason:unknown,ticket:number)=>{if(current()&&ticket===readEpoch.current){clearReading();displayError(reason);setReading(false);}});
+  const initialFailure=useEffectEvent((reason:unknown,ticket:number)=>{if(current()&&ticket===readEpoch.current){if(definitiveReadFailure(reason))clearReading();displayError(reason);setReading(false);}});
   const readFirstCurrent=useEffectEvent(readFirst);
   useEffect(()=>{
     const life=alive,readingVersion=readEpoch,draftVersion=draftEpoch;life.current=true;
@@ -434,8 +434,8 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     }
     if(client&&accountReady&&current())void client.pending().then(restoreInput).catch(readFailure);
     const tick=()=>{if(!document.hidden){setNow(Math.floor(Date.now()/1000));void tickLatest().catch(readFailure);}};
-    const visible=()=>{if(document.hidden)clearPrivateReading();else tick();};
-    const offline=()=>{readingVersion.current++;clearPrivateReading();setReading(false);setError('网络已断开，草稿仍保留；恢复连接后重新读取允许的内容。');};
+    const visible=()=>{if(!document.hidden)tick();};
+    const offline=()=>{readingVersion.current++;readGap.current=true;setReading(false);setError('网络已断开，草稿仍保留；恢复连接后重新读取允许的内容。');};
     document.addEventListener('visibilitychange',visible);
     window.addEventListener('offline',offline);window.addEventListener('online',tick);
     return()=>{life.current=false;readingVersion.current++;draftVersion.current++;document.removeEventListener('visibilitychange',visible);window.removeEventListener('offline',offline);window.removeEventListener('online',tick);client?.close();};

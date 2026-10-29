@@ -82,12 +82,8 @@ export function Cases({filters:location,csrfToken,canManage}:Props){
  const decision=report?caseDecisionBody(report,effectiveDraft,now):null;
  const events=report?.events??[],lastDecision=report?.currentDecision?events.find(event=>event.id===report.currentDecision?.id):[...events].reverse().find(event=>event.kind==='resolve');
  const restrictionActions=report?caseRestrictionActions(report,now):[],availableActions=restrictionActions.filter(action=>action!=='hide'||draft.resolution==='accepted');
- const expiry=report?.source?.publishedUntil,listExpiry=page.value?.readExpiresAt;
+ const expiry=report?.source?.publishedUntil;
  useEffect(()=>{if(selected)setSelections(previous=>previous[listPath]===selected?previous:{...previous,[listPath]:selected});},[selected,listPath]);
- useEffect(()=>{
-  if(!listExpiry||!Number.isFinite(listExpiry))return;
-  return scheduleOperationsDeadline(listExpiry*1000,()=>{page.clear();if(navigator.onLine&&document.visibilityState==='visible')void page.read();});
- },[listExpiry,page.clear,page.read]);
  useEffect(()=>{
   if(!expiry)return;
   return scheduleOperationsDeadline(expiry*1000,()=>{current.clear();if(navigator.onLine&&document.visibilityState==='visible')void current.read();});

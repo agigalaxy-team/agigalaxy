@@ -13524,37 +13524,37 @@
       "code": "web_events_authority_unavailable",
       "status": 503,
       "source": "go/internal/webevents/service.go",
-      "line": 98
+      "line": 100
     },
     {
       "code": "web_events_access_denied",
       "status": 403,
       "source": "go/internal/webevents/service.go",
-      "line": 105
+      "line": 107
     },
     {
       "code": "invalid_web_events_topics",
       "status": 400,
       "source": "go/internal/webevents/service.go",
-      "line": 113
+      "line": 115
     },
     {
       "code": "invalid_web_events_topics",
       "status": 400,
       "source": "go/internal/webevents/service.go",
-      "line": 118
+      "line": 120
     },
     {
       "code": "invalid_web_events_cursor",
       "status": 400,
       "source": "go/internal/webevents/service.go",
-      "line": 144
+      "line": 146
     },
     {
       "code": "web_events_identity_changed",
       "status": 409,
       "source": "go/internal/webevents/service.go",
-      "line": 154
+      "line": 156
     },
     {
       "code": "operations_job_adoption_source_changed",

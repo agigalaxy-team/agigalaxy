@@ -48,7 +48,7 @@ const messagingWritePath=new RegExp('^/v1/operations/messaging/(?:plans(?:/'+uui
 const smtpReadPath=new RegExp('^/v1/operations/smtp(?:/(?:identities|queue|bounces|domains|tests|history|operations/'+uuid+'))?$','i');
 const smtpWritePath=/^\/v1\/operations\/smtp\/(?:settings|tests\/(?:connection|delivery))$/;
 const agentOsConversationRoot='conversations/(?:overview|governance|messaging|discovery|maintenance)';
-const agentOsReadPath=new RegExp('^/v1/operations/agentos/(?:status|options|operations/'+uuid+'|executions(?:/'+uuid+')?|runs(?:/[A-Za-z0-9_-]{1,128})?|'+agentOsConversationRoot+'(?:/(?:operations/'+uuid+'(?:/events)?|cards/'+uuid+'))?)$','i');
+const agentOsReadPath=new RegExp('^/v1/operations/agentos/(?:status|options|operations/'+uuid+'|executions(?:/'+uuid+')?|runs(?:/[A-Za-z0-9_-]{1,128})?|'+agentOsConversationRoot+'(?:/(?:qualification|operations/'+uuid+'(?:/events)?|cards/'+uuid+'))?)$','i');
 const agentOsWritePath=new RegExp('^/v1/operations/agentos/(?:executions(?:/'+uuid+'/(?:events|runs|review|continue))?|'+agentOsConversationRoot+'/(?:runs|cards/'+uuid+'/(?:confirm|dismiss)|operations/'+uuid+'/cancel))$','i');
 const agentOsConversationEventsPath=new RegExp('^/v1/operations/agentos/'+agentOsConversationRoot+'/operations/'+uuid+'/events$','i');
 export const isAgentOsConversationEventsPath=pathname=>agentOsConversationEventsPath.test(pathname);

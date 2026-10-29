@@ -15,7 +15,7 @@ import {useOperationCommand} from "../../lib/use-operation-command";
 import {useOperationsRead} from "../../lib/use-operations-read";
 import {operationsRequest,OperationsRequestError} from "../../lib/operations-client";
 import type {MaintenanceRecoveredResult} from "../../lib/maintenance-view-model";
-import {maintenanceApprovalBody,maintenanceRecoveryReceipt,maintenanceRecoveryNative,maintenanceAvailabilityText,maintenanceBytes,maintenanceCalendar,maintenanceCommandErrors,maintenanceComponentSource,maintenanceConditionLabels,maintenanceCount,maintenanceCurrentAuthorityDeclared,maintenanceExecutionBody,maintenanceHealthText,maintenanceHref,maintenanceIntegrity,maintenanceLease,maintenanceLocation,maintenanceLossText,maintenanceNext,maintenancePath,maintenancePlanLabels,maintenancePrevious,maintenanceProcessText,maintenanceReason,maintenanceRestoreBasis,maintenanceTime} from "../../lib/maintenance-view-model";
+import {maintenanceApprovalBody,maintenanceRecoveryReceipt,maintenanceRecoveryNative,maintenanceAvailabilityText,maintenanceBytes,maintenanceCalendar,maintenanceCommandErrors,maintenanceComponentSource,maintenanceConditionLabels,maintenanceCount,maintenanceCurrentAuthorityDeclared,maintenanceExecutionBody,maintenanceHealthText,maintenanceHref,maintenanceIntegrity,maintenanceLocation,maintenanceLossText,maintenanceNext,maintenancePath,maintenancePlanLabels,maintenancePrevious,maintenanceProcessText,maintenanceReason,maintenanceRestoreBasis,maintenanceTime} from "../../lib/maintenance-view-model";
 import type {MaintenanceAvailability,MaintenanceBackupDetail,MaintenanceBackupPage,MaintenanceComponent,MaintenanceLocation,MaintenanceLog,MaintenanceLogPage,MaintenanceModule,MaintenanceNativeOperation,MaintenanceOperationDetail,MaintenanceOverview,MaintenancePlanDetail,MaintenancePlanPage,MaintenancePolicy} from './maintenance-types';
 import './maintenance.css';
 
@@ -95,9 +95,9 @@ function MaintenanceSettings({location:requestedLocation,csrfToken,canRead,canRe
  const plansRead=useOperationsRead<MaintenancePlanPage>({path:canRead&&inBackups?maintenancePath('plans',location):null,clearOnOffline:true,retryUnavailable:true,failureMessage:'恢复方案记录暂时无法取得。'});
  const planRead=useOperationsRead<MaintenancePlanDetail>({path:canRead&&inBackups?maintenancePath('plan',location):null,clearOnOffline:true,failureMessage:'这份恢复方案暂时无法取得。'});
  const logsRead=useOperationsRead<MaintenanceLogPage>({path:location.tab==='logs'&&canReadLogs?maintenancePath('logs',location):null,clearOnOffline:true,failureMessage:'运行日志暂时无法取得。'});
- const [clock,setClock]=useState(()=>Date.now()),[drafts,setDrafts]=useState<Record<string,RestoreDraft>>({}),[operationId,setOperationId]=useState(''),[selectedLog,setSelectedLog]=useState<string|null>(null),[writeIntent,setWriteIntent]=useState<WriteIntent|null>(null);
+ const [drafts,setDrafts]=useState<Record<string,RestoreDraft>>({}),[operationId,setOperationId]=useState(''),[selectedLog,setSelectedLog]=useState<string|null>(null),[writeIntent,setWriteIntent]=useState<WriteIntent|null>(null);
  const operationRead=useOperationsRead<MaintenanceOperationDetail>({path:canRead&&operationId?'/v1/operations/maintenance/operations/'+operationId:null,clearOnOffline:true,retryUnavailable:true,failureMessage:'本次维护任务结果暂时无法取得。'});
- const overview=maintenanceLease(overviewRead.value,clock),backups=maintenanceLease(backupsRead.value,clock),point=maintenanceLease(pointRead.value,clock)?.point??null,plans=maintenanceLease(plansRead.value,clock),detail=maintenanceLease(planRead.value,clock),logs=maintenanceLease(logsRead.value,clock),operation=maintenanceLease(operationRead.value,clock)?.operation??null;
+ const overview=overviewRead.value,backups=backupsRead.value,point=pointRead.value?.point??null,plans=plansRead.value,detail=planRead.value,logs=logsRead.value,operation=operationRead.verified?operationRead.value?.operation??null:null;
  const positions=useRef<Record<string,number>>({}),runtimeColumn=useRef<HTMLDivElement|null>(null),backupColumn=useRef<HTMLDivElement|null>(null),restoreColumn=useRef<HTMLDivElement|null>(null),logsColumn=useRef<HTMLDivElement|null>(null);
  const draft=drafts[location.point]??blankDraft;
  useSettingsDraftMemory({scope:'maintenance',ready:!!overview&&overviewRead.verified&&(!location.point||!!point&&pointRead.verified),denied:!canRead||!!overview&&!overview.permissions.canPlanRestore||!!overviewRead.error&&/登录|权限/.test(overviewRead.error)||!!pointRead.error&&/登录|权限/.test(pointRead.error),snapshot:()=>({drafts,positions:positions.current}),restore:value=>{setDrafts(value.drafts);positions.current=value.positions;},discard:()=>{setDrafts({});}});
@@ -142,10 +142,6 @@ function MaintenanceSettings({location:requestedLocation,csrfToken,canRead,canRe
  const command={...localCommand,locked:localCommand.locked||recovery.pending};
  useEffect(()=>{if(!command.locked)setPinned(null);},[command.locked]);
  useEffect(()=>{if(!command.locked)setWriteIntent(null);},[command.locked]);
- useEffect(()=>{
-  setClock(Date.now());const ends=[overviewRead.value,backupsRead.value,pointRead.value,plansRead.value,planRead.value,logsRead.value,operationRead.value].flatMap(value=>value&&value.readExpiresAt*1000>Date.now()?[value.readExpiresAt*1000]:[]);
-  if(!ends.length)return;const timer=setTimeout(()=>setClock(Date.now()),Math.max(1,Math.min(...ends)-Date.now()));return()=>clearTimeout(timer);
- },[overviewRead.value,backupsRead.value,pointRead.value,plansRead.value,planRead.value,logsRead.value,operationRead.value]);
  useEffect(()=>{
   if(!operationId||!operationRead.value||operationRead.loading||operationRead.refreshing||operation&&!['pending','running','unknown'].includes(operation.state))return;
   const timer=setTimeout(()=>{if(navigator.onLine&&document.visibilityState==='visible'){void operationRead.read();}},4000);return()=>clearTimeout(timer);

@@ -323,7 +323,10 @@ func (t *ConversationTools) Card(ctx context.Context, human operationspermission
 				recovered["confirmationAttemptedAt"] = attempt
 			}
 			s := t.Conversations
-			changed, err := readConversationCard(s.Pool.QueryRow(ctx, `UPDATE operations_agentos_conversation_cards_v1 SET state=$3,result=$4,updated_at=$5 WHERE endpoint=$1 AND id=$2 AND state=$6 AND updated_at=$7 RETURNING `+conversationCardColumns, s.Endpoint, row.ID, state, recovered, s.now(), row.State, row.UpdatedAt))
+			// A receipt read may observe the same unknown/processing result.
+			// Preserve CAS, but do not turn that observation into a new agentos
+			// event just by advancing updated_at.
+			changed, err := readConversationCard(s.Pool.QueryRow(ctx, `UPDATE operations_agentos_conversation_cards_v1 SET state=$3,result=$4,updated_at=$5 WHERE endpoint=$1 AND id=$2 AND state=$6 AND updated_at=$7 AND (state IS DISTINCT FROM $3 OR result IS DISTINCT FROM $4::jsonb) RETURNING `+conversationCardColumns, s.Endpoint, row.ID, state, recovered, s.now(), row.State, row.UpdatedAt))
 			if err != nil {
 				return nil, err
 			}

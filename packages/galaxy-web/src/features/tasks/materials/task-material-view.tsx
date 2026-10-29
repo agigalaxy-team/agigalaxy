@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useSyncExternalStore} from "react";
+import {definitiveReadFailure} from '../../../shared/reading/read-failure';
 import {withholdTaskMaterialProjection,withholdTaskMaterialTree,taskMaterialProjectionNodes,taskMaterialProjectionId,taskMaterialProjectionKey} from "./task-material-client.mjs";
 import type {WorkRuntime} from "../work-task-types";
 import type {z} from "zod/v4";
@@ -21,7 +22,7 @@ function read(runtime:Runtime,node:TaskProjection,scope:string):Promise<unknown>
 function currentStore<T>(runtime:Runtime|null|undefined,input:T,scope:string,tree:boolean){
  const nodes:TaskProjection[]=tree?taskMaterialProjectionNodes(input):projection(input).textView?.fields?[projection(input)]:[];
  const listeners=new Set<()=>void>();let active=false,epoch=0,checking=false;
- let current:Map<string,unknown>|null=null,all=!nodes.every(node=>node._webTaskScope===scope);
+ let current:Map<string,unknown>|null=null,all=!nodes.every(node=>node._webTaskScope===scope),gap=false;
  const sameScope=()=>!runtime?.taskDraftScope||scope===runtime.taskDraftScope().key;
  const render=():T|null=>{
   if(!sameScope()||nodes.some(node=>node._webTaskScope&&node._webTaskScope!==scope))return null;
@@ -32,27 +33,29 @@ function currentStore<T>(runtime:Runtime|null|undefined,input:T,scope:string,tre
  };
  let snapshot=render();
  const update=()=>{snapshot=render();for(const listener of listeners)listener();};
- const hide=()=>{epoch++;checking=false;all=true;current=null;update();};
+ const suspend=()=>{epoch++;checking=false;update();};
+ const needsRefresh=()=>all||gap||nodes.some(node=>{const key=taskMaterialProjectionKey(node),selected=current?.has(key)?current.get(key):node;const view=projection(selected).textView as {materials?:Array<{status?:string;availableUntil?:number}>}|undefined;return view?.materials?.some(item=>item.status==='available'&&Number.isSafeInteger(item.availableUntil)&&item.availableUntil!<=seconds())??false;});
  const refresh=async()=>{
   if(!active||!runtime||!sameScope()||checking||document.hidden||navigator.onLine===false)return;
-  const token=++epoch;checking=true;all=true;current=null;update();
+  const token=++epoch;checking=true;let transient=false;
   const targets=new Map<string,TaskProjection>();for(const node of nodes){const key=taskMaterialProjectionKey(node);if(typeof key==='string')targets.set(key,node);}
   const entries=await Promise.all([...targets].map(async ([key,target])=>{
    try{const value=await read(runtime,target,scope),node=projection(value);return [key,node._webTaskScope===scope&&(target._webTaskRead?!!node.textView:node.taskId===taskMaterialProjectionId(target))?value:null] as const;}
-   catch{return [key,null] as const;}
+   catch(reason){if(!definitiveReadFailure(reason))transient=true;return [key,definitiveReadFailure(reason)?null:current?.has(key)?current.get(key):all?null:target] as const;}
   }));
   if(!active||token!==epoch||!sameScope())return;
-  checking=false;all=false;current=new Map(entries);update();
+  checking=false;all=false;gap=transient;current=new Map(entries);update();
  };
  return{
   read:()=>snapshot,subscribe:(listener:()=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};},
   open(){
    active=true;if(!nodes.length)return()=>{active=false;};
-   const visible=()=>{hide();if(!document.hidden)void refresh();};
-   if(document.hidden||navigator.onLine===false)hide();else if(all)void refresh();
-   const tick=setInterval(update,1000),timer=setInterval(()=>void refresh(),15000);
-   document.addEventListener('visibilitychange',visible);window.addEventListener('online',visible);window.addEventListener('offline',hide);
-   return()=>{active=false;epoch++;clearInterval(tick);clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('online',visible);window.removeEventListener('offline',hide);};
+   const visible=()=>{if(document.hidden)suspend();else if(needsRefresh())void refresh();};
+   const offline=()=>{gap=true;suspend();},online=()=>{if(needsRefresh())void refresh();};
+   if(document.hidden||navigator.onLine===false){if(navigator.onLine===false)gap=true;suspend();}else if(needsRefresh())void refresh();
+   const tick=setInterval(update,1000),timer=setInterval(()=>{if(needsRefresh())void refresh();},15000);
+   document.addEventListener('visibilitychange',visible);window.addEventListener('online',online);window.addEventListener('offline',offline);
+   return()=>{active=false;epoch++;clearInterval(tick);clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('online',online);window.removeEventListener('offline',offline);};
   },
  };
 }

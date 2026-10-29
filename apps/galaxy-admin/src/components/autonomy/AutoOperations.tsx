@@ -15,7 +15,7 @@ import './autonomy.css';
 export function AutoOperations({csrfToken,canConfigure=false,initial=null,initialError=''}:{csrfToken:string;canConfigure?:boolean;initial?:AutonomyOverview|null;initialError?:string}){
  const search=useSearchParams(),router=useRouter(),tab=search.get('tab')==='attention'?'attention':'overview';
  const read=useOperationsRead<AutonomyOverview>({path:autonomyBase+'/overview',initial,initialError,failureMessage:'自动运行概览暂时无法读取。',clearOnOffline:true});
- const value=read.verified?read.value:null,[selected,setSelected]=useState<AutonomyDomain[]>([]);
+ const value=read.available?read.value:null,[selected,setSelected]=useState<AutonomyDomain[]>([]);
  const command=useAutonomyCommand<AutonomyEnableSave>({csrfToken,canWrite:!!value&&(value.capabilities?.canEnable??canConfigure),onCommitted:async()=>{setSelected([]);await read.read();},onConflict:()=>void read.read()});
  const chosen=value?.accounts.filter(account=>selected.includes(account.domain)&&!account.config.enabled)??[];
  const ready=chosen.length>0&&chosen.every(account=>account.readiness.ready&&!(account.config.schedule.kind==='daily'&&!account.config.schedule.at));

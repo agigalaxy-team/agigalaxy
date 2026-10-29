@@ -20,7 +20,6 @@ import {useModelSettingsCommand} from "../../lib/models/use-model-settings-comma
 import './model-settings.css';
 import './model-connection-editor.css';
 
-const readable=<T extends {readExpiresAt:number},>(value:T|null)=>value&&value.readExpiresAt*1000>Date.now()?value:null;
 
 function Fact({label,children}:{label:string;children:ReactNode}){return <div><dt>{label}</dt><dd>{children}</dd></div>;}
 function StateTag({children,tone='neutral'}:{children:ReactNode;tone?:string}){return <span className="model-settings-state" data-tone={tone}>{children}</span>;}
@@ -49,7 +48,7 @@ function ModelSettingsSettings({location,csrfToken,canConfigure,canApply}:{locat
  const history=useOperationsRead<ModelSettingsHistory>({path:modelSettingsPath('history',location),failureMessage:'配置记录暂时无法取得。',clearOnOffline:true});
  const [clock,setClock]=useState(()=>Date.now()),[configuration,setConfiguration]=useState<ModelSettingsConfiguration>(modelSettingsEmpty),[baseConfiguration,setBaseConfiguration]=useState<ModelSettingsConfiguration>(modelSettingsEmpty),[baseRevision,setBaseRevision]=useState<number|null>(null),[keys,setKeys]=useState<Record<string,string>>({}),[errors,setErrors]=useState<string[]>([]),[mergeDecision,setMergeDecision]=useState<{revision:number;choices:Record<string,'mine'|'current'>}|null>(null),[selected,setSelected]=useState(location.id);
  const editor=useRef<HTMLDivElement|null>(null),sidebar=useRef<HTMLElement|null>(null),positions=useRef<Record<string,number>>({});
- const current=readable(overview.value),historyValue=readable(history.value),usageValue=modelUsage(readable(usage.value)),source=current?modelSettingsSource(current):null;
+ const current=overview.value,historyValue=history.value,usageValue=modelUsage(usage.value),source=current?modelSettingsSource(current):null;
  const dirty=!modelSettingsSame(configuration,baseConfiguration)||Object.values(keys).some(Boolean);
  const changed=!!current&&baseRevision!==null&&current.revision!==baseRevision;
  const memory=useSettingsDraftMemory({scope:'models',ready:!!current&&overview.verified,blocked:!!current?.pending&&!current.capabilities.canConfigure,denied:!canConfigure||!!current&&!current.capabilities.canConfigure&&!current.pending||!!overview.error&&/登录|权限/.test(overview.error),snapshot:()=>({configuration,baseConfiguration,baseRevision,selected,positions:positions.current}),restore:value=>{setConfiguration(value.configuration);setBaseConfiguration(value.baseConfiguration);setBaseRevision(value.baseRevision);setSelected(location.id||value.selected);positions.current=value.positions;setKeys({});setMergeDecision(null);},discard:()=>{const fresh=modelSettingsClone(source?.configuration??modelSettingsEmpty());setConfiguration(fresh);setBaseConfiguration(modelSettingsClone(fresh));setBaseRevision(current?.revision??null);setKeys({});setMergeDecision(null);}});
@@ -63,15 +62,15 @@ function ModelSettingsSettings({location,csrfToken,canConfigure,canApply}:{locat
  const recovery=useSettingsReceiptRecovery({scope:'models',refresh:refresh,live:localCommand.receipt,ready:!!current&&overview.verified,denied:!!overview.error&&/登录|权限/.test(overview.error),onRecorded:async receipt=>{if(receipt.kind==='credential-provision'&&receipt.phase==='applied'&&receipt.modelRecordId&&receipt.credentialRef){const apply=(value:ModelSettingsConfiguration)=>({...value,models:value.models.map(model=>model.id===receipt.modelRecordId?{...model,credentialRef:receipt.credentialRef}:model)});const saved=memory.session?.read('models');if(saved)memory.session?.write('models',{...saved,configuration:apply(saved.configuration)});setConfiguration(apply);}await refresh();},onDenied:()=>{setKeys({});overview.clear();usage.clear();history.clear();}});
  const command={...localCommand,locked:localCommand.locked||recovery.pending};
  useEffect(()=>{
-   if(!memory.initialized||!current||command.locked)return;
+   if(!memory.initialized||!current||!overview.verified||command.locked)return;
   if(baseRevision===null||!dirty){const next=modelSettingsClone(source?.configuration??modelSettingsEmpty());setConfiguration(next);setBaseConfiguration(modelSettingsClone(next));setBaseRevision(current.revision);setMergeDecision(null);}
-  },[memory.initialized,current?.checkedAt,current?.revision,source,baseRevision,dirty,command.locked]);
+  },[memory.initialized,current?.checkedAt,current?.revision,source,baseRevision,dirty,command.locked,overview.verified]);
  useEffect(()=>{if(changed)command.clearConflict();},[changed,command.clearConflict]);
  useEffect(()=>{
-  if(!current||!changed||!merge?.configuration||merge.unresolved||command.locked)return;
+  if(!current||!overview.verified||!changed||!merge?.configuration||merge.unresolved||command.locked)return;
   setConfiguration(modelSettingsClone(merge.configuration));setBaseConfiguration(modelSettingsClone(source?.configuration??modelSettingsEmpty()));setBaseRevision(current.revision);setMergeDecision(null);setErrors([]);
   if(merge.discardCredentialIds.length)setKeys(previous=>Object.fromEntries(Object.entries(previous).filter(([id])=>!merge.discardCredentialIds.includes(id))));
- },[current,changed,merge,source,command.locked]);
+ },[current,changed,merge,source,command.locked,overview.verified]);
  useEffect(()=>{setSelected(location.id);},[location.id]);
  useEffect(()=>{
   setClock(Date.now());const ends=[overview.value?.readExpiresAt,usage.value?.readExpiresAt,history.value?.readExpiresAt].filter((value):value is number=>typeof value==='number'&&value*1000>Date.now());if(!ends.length)return;

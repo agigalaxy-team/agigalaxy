@@ -8,12 +8,13 @@ import type {ForumNotification} from "../community-forum/community-forum-view-ty
 import {MemberAvatar} from "../../shared/people/conversation-ui";
 import {LoadingFeedback,ReadFailure} from "../../shared/feedback/interaction-feedback";
 import {useQueryReads,sourceReadDeadline} from "../../application/query-reads";
+import {definitiveReadFailure} from '../../shared/reading/read-failure';
 import {useAccountQueryScope} from "../accounts/account-session-scope";
 
 type Model=OfficialAccountModel;
 type Props={endpoint?:string;navigate:(path:string)=>void;secondary?:boolean};
 type Item=ForumNotification&{readUntil:number};
-const deadline=(value:Item)=>Math.min(value.readUntil,typeof value.sourceExpiresAt==='number'?value.sourceExpiresAt:Date.parse(value.sourceExpiresAt)/1000);
+const deadline=(value:Item)=>typeof value.sourceExpiresAt==='number'?value.sourceExpiresAt:Date.parse(value.sourceExpiresAt)/1000;
 export function AccountReplyNotifications(props:Props){
  return <AccountSessionScope endpoint={props.endpoint}><AccountReplyNotificationsSession {...props}/></AccountSessionScope>;
 }
@@ -64,7 +65,7 @@ function AccountServiceNotices({client,session,navigate,refreshSession}:{client:
     for(const value of values)if(value.read)failedWrites.current.delete(value.noticeId);
     setWriteErrors(previous=>Object.fromEntries(Object.entries(previous).filter(([id])=>failedWrites.current.has(id))));
    },onError:reason=>{
-    setItems([]);setNext(null);
+    if(definitiveReadFailure(reason)){setItems([]);setNext(null);}
     setError(noticeCode(reason)==='official_account_session_expired'?'登录已过期，正在重新连接账户。':'银河通知暂时无法加载，联网后会继续。');
     if(noticeCode(reason)==='official_account_session_expired')void refreshSession();
    },onSettled:()=>setLoading(false)});
@@ -74,10 +75,10 @@ function AccountServiceNotices({client,session,navigate,refreshSession}:{client:
   const refresh=()=>{if(!document.hidden&&navigator.onLine!==false)void load(undefined,true);},offline=()=>{tasks.cancel('notices');setLoading(false);setError('暂时离线，联网后自动恢复。');};
   if(navigator.onLine===false)offline();else refresh();
   const clock=window.setInterval(()=>setNow(Date.now()/1000),1000);
-  window.addEventListener('online',refresh);window.addEventListener('offline',offline);
-  return()=>{tasks.cancel('notices');window.clearInterval(clock);window.removeEventListener('online',refresh);window.removeEventListener('offline',offline);};
+  window.addEventListener('online',refresh);window.addEventListener('offline',offline);document.addEventListener('visibilitychange',refresh);
+  return()=>{tasks.cancel('notices');window.clearInterval(clock);window.removeEventListener('online',refresh);window.removeEventListener('offline',offline);document.removeEventListener('visibilitychange',refresh);};
  },[load,tasks]);
- useEffect(()=>{if(!items.length)return;const expires=Math.min(...items.map(value=>value.readUntil));const timer=setTimeout(()=>{setItems([]);if(navigator.onLine!==false&&!document.hidden)void load(undefined,true,true);},Math.max(0,expires*1000-Date.now()));return()=>clearTimeout(timer);},[items,load]);
+ useEffect(()=>{if(!items.length)return;const expires=Math.min(...items.map(value=>value.readUntil));const timer=setTimeout(()=>{if(navigator.onLine!==false&&!document.hidden)void load(undefined,true,true);},Math.max(0,expires*1000-Date.now()));return()=>clearTimeout(timer);},[items,load]);
  useEffect(()=>{
   if(!next||!more.current||typeof IntersectionObserver==='undefined')return;
   const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))void load(next);},{rootMargin:'250px'});observer.observe(more.current);return()=>observer.disconnect();
@@ -96,7 +97,7 @@ function AccountServiceNotices({client,session,navigate,refreshSession}:{client:
    else{failedWrites.current.set(value.noticeId,value);setWriteErrors(previous=>({...previous,[value.noticeId]:'暂未确认已读状态，可以重试。'}));if(noticeCode(reason)==='official_account_session_expired')void refreshSession();}
   }finally{writes.current.delete(value.noticeId);if(life.current.active&&generation===life.current.generation)setPending(new Set(writes.current));}
  },[client,session,load,refreshSession,tasks]);
- const visible=items.filter(item=>item.readUntil>now&&(!unread||!item.read));
+ const visible=items.filter(item=>Date.parse(item.expiresAt)>now*1000&&(!unread||!item.read));
  const filter=(value:boolean)=>{if(value===unread)return;tasks.cancel('notices');pages.current=1;setUnread(value);setItems([]);setNext(null);setError('');setLoading(true);};
  return <section aria-label="银河通知"><h2 className="small">银河通知</h2>
   <div className="notification-filter" aria-label="银河通知筛选"><button type="button" aria-pressed={!unread} onClick={()=>filter(false)}>全部</button><button type="button" aria-pressed={unread} onClick={()=>filter(true)}>未读</button></div>
@@ -119,13 +120,13 @@ function AccountReplyList({client,session,navigate}:{client:NonNullable<Model['c
  async function load(after?:string,force=false){if(reading.current)return;reading.current=true;const depth=after?pages.current+1:pages.current;
   try{const result=await reads.run({lane:'replies',key:String(depth)},async({signal})=>{let cursor:string|undefined,last:string|null=null;const values:Item[]=[],readUntil=Date.now()/1000+15;
    for(let page=0;page<depth;page++){const response=await client.call('/v2/community/notifications/query',{...(cursor?{after:cursor}:{}),limit:20},{session,signal}) as {items:ForumNotification[];nextAfter:string|null};values.push(...response.items.map(value=>({...value,readUntil})));last=response.nextAfter;if(!last)break;if(last===cursor)throw Error('回复分页已变化。');cursor=last;}return{values,last,readUntil};
-  },{force,validUntil:sourceReadDeadline,onSuccess:({values,last})=>{if(!life.current)return;pages.current=depth;setItems(values);setNext(last);setNow(Date.now()/1000);setError('');setLoading(false);},onError:()=>{if(life.current){setItems([]);setNext(null);setError('回复暂时无法加载，联网后会继续。');setLoading(false);}}});if(result.status==='error')throw result.error;
+  },{force,validUntil:sourceReadDeadline,onSuccess:({values,last})=>{if(!life.current)return;pages.current=depth;setItems(values);setNext(last);setNow(Date.now()/1000);setError('');setLoading(false);},onError:reason=>{if(life.current){if(definitiveReadFailure(reason)){setItems([]);setNext(null);}setError('回复暂时无法加载，联网后会继续。');setLoading(false);}}});if(result.status==='error')throw result.error;
   }catch{if(life.current)setError('回复暂时无法加载，联网后会继续。');}finally{reading.current=false;if(life.current)setLoading(false);}
  }
  const loadCurrent=useEffectEvent((after?:string)=>load(after));
  const invalidateRequests=useEffectEvent(()=>{ticket.current++;});
- useEffect(()=>{life.current=true;const refresh=()=>{if(!document.hidden&&navigator.onLine!==false)void loadCurrent();},offline=()=>{ticket.current++;setItems([]);setError('暂时离线，联网后自动恢复。');};refresh();const clock=setInterval(()=>setNow(Date.now()/1000),1000);window.addEventListener('online',refresh);window.addEventListener('offline',offline);return()=>{life.current=false;invalidateRequests();reads.cancel('replies');clearInterval(clock);window.removeEventListener('online',refresh);window.removeEventListener('offline',offline);};},[client,session.account.id,session.csrfToken,reads]);
- useEffect(()=>{if(!items.length)return;const expires=Math.min(...items.map(deadline));const timer=setTimeout(()=>{setItems([]);if(navigator.onLine!==false&&!document.hidden)void loadCurrent(undefined);},Math.max(0,expires*1000-Date.now()));return()=>clearTimeout(timer);},[items]);
+ useEffect(()=>{life.current=true;const refresh=()=>{if(!document.hidden&&navigator.onLine!==false)void loadCurrent();},offline=()=>{ticket.current++;setError('暂时离线，联网后自动恢复。');};refresh();const clock=setInterval(()=>setNow(Date.now()/1000),1000);window.addEventListener('online',refresh);window.addEventListener('offline',offline);document.addEventListener('visibilitychange',refresh);return()=>{life.current=false;invalidateRequests();reads.cancel('replies');clearInterval(clock);window.removeEventListener('online',refresh);window.removeEventListener('offline',offline);document.removeEventListener('visibilitychange',refresh);};},[client,session.account.id,session.csrfToken,reads]);
+ useEffect(()=>{if(!items.length)return;const expires=Math.min(...items.map(value=>value.readUntil));const timer=setTimeout(()=>{if(navigator.onLine!==false&&!document.hidden)void loadCurrent(undefined);},Math.max(0,expires*1000-Date.now()));return()=>clearTimeout(timer);},[items]);
  useEffect(()=>{if(!next||!more.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(value=>value.isIntersecting))void loadCurrent(next);},{rootMargin:'250px'});observer.observe(more.current);return()=>observer.disconnect();},[next,items]);
   async function open(value:Item){const request=++opening.current;failedOpen.current=null;try{reads.invalidate('replies');await client.call('/v2/community/notifications/read',{replyId:value.replyId},{session});if(life.current&&request===opening.current)navigate(forumVersionPath(value.postId,value.postVersionId)+'#reply-'+value.replyId);}catch(reason){if(life.current&&request===opening.current){const code=reason&&typeof reason==='object'&&'code'in reason?String(reason.code):'';if(code==='not_found'){setItems(old=>old.filter(item=>item.replyId!==value.replyId));setError('这条回复当前不可读取。');void load();}else{failedOpen.current=value;setError(navigator.onLine===false?'暂时离线，联网后可以继续打开这条回复。':'暂时无法打开这条回复，通知仍保留。');}}}}
  const visible=items.filter(value=>deadline(value)>now);

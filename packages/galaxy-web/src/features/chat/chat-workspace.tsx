@@ -61,7 +61,7 @@ function rejectionMessage(code?:string){return({chat_revision_conflict:'原消�
 function readDeadline(value:number|undefined){if(typeof value!=='number'||!Number.isFinite(value)||value<=0)throw Error('暂时无法确认消息的读取范围，请稍后再试。');return value;}
 function ConversationSidebar({runtime,subjectId,lease,roomId,navigate}:{runtime:ChatRuntime;subjectId:string;lease:ChoiceViewLease;roomId:string;navigate:(path:string)=>void}){
  const [rows,setRows]=useState<ChatDirectoryRoom[]>([]),[next,setNext]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[query,setQuery]=useState(''),[submittedQuery,setSubmittedQuery]=useState(''),[clock,setClock]=useState(()=>Date.now());
- const pages=useRef(1),live=useRef(false),inFlight=useRef<number|null>(null),version=useRef(0),readAgain=useRef<()=>void>(()=>{});
+ const pages=useRef(1),live=useRef(false),inFlight=useRef<number|null>(null),version=useRef(0),readAgain=useRef<()=>void>(()=>{}),sidebarDeadline=useRef<number|null>(null);
  const {names,profiles}=useChatMembers(runtime,subjectId,true,rows.flatMap(item=>[...item.members.map(member=>member.subjectId),item.latestMessage?.subjectId]));
  const title=(item:ChatDirectoryRoom)=>item.title==='对话'?(item.members.filter(member=>member.subjectId!==subjectId).map(member=>memberName(member.subjectId,subjectId,names[member.subjectId]??undefined)).slice(0,3).join('、')||'新的对话'):item.title;
  const canRead=useCallback(()=>{try{lease.assertCurrent();return live.current;}catch{return false;}},[lease]);
@@ -72,9 +72,10 @@ function ConversationSidebar({runtime,subjectId,lease,roomId,navigate}:{runtime:
    const first:ChatDirectory=await runtime.chat.directory({...(cursor?{cursor}:{}),...(submittedQuery?{query:submittedQuery}:{})});if(!canRead()||token!==version.current)return;
    const values=[...first.rooms];let after=first.nextCursor;const seen=new Set<string>();
    if(!cursor)for(let page=1;page<pages.current&&after;page++){if(seen.has(after))throw Error('对话列表暂时无法继续读取。');seen.add(after);const more:ChatDirectory=await runtime.chat.directory({cursor:after,...(submittedQuery?{query:submittedQuery}:{})});if(!canRead()||token!==version.current)return;values.push(...more.rooms);after=more.nextCursor;}
-   const now=Date.now(),available=values.filter(item=>readDeadline(item.readExpiresAt)*1000>now);
+   const now=Date.now(),available=values.filter(item=>{readDeadline(item.readExpiresAt);return true;});
    if(cursor)pages.current++;
-   setRows(previous=>cursor?[...new Map([...previous.filter(item=>item.readExpiresAt*1000>now),...available].map(item=>[item.roomId,item])).values()]:available);setNext(after);setError('');setClock(now);
+   const deadline=available.length?Math.min(...available.map(item=>item.readExpiresAt))*1000:null;sidebarDeadline.current=cursor&&sidebarDeadline.current!==null&&deadline!==null?Math.min(sidebarDeadline.current,deadline):deadline;
+   setRows(previous=>cursor?[...new Map([...previous,...available].map(item=>[item.roomId,item])).values()]:available);setNext(after);setError('');setClock(now);
   }catch{if(canRead()&&token===version.current){setError('对话列表暂时未读到。');}}
   finally{if(inFlight.current===token)inFlight.current=null;if(canRead()&&token===version.current)setBusy(false);}
  },[runtime,canRead,submittedQuery]);
@@ -85,10 +86,11 @@ function ConversationSidebar({runtime,subjectId,lease,roomId,navigate}:{runtime:
   readAgain.current=refresh;
   const initial=window.setTimeout(refresh,0);
   const unsubscribe=(runtime as ChatRuntime&{subscribe?:(fn:(reset?:boolean)=>void)=>()=>void}).subscribe?.(reset=>{if(reset){setRows([]);setNext(null);}refresh();});
-  window.addEventListener('online',refresh);window.addEventListener('offline',lost);
-  return()=>{life.current=false;sequence.current++;flight.current=null;window.clearTimeout(initial);unsubscribe?.();window.removeEventListener('online',refresh);window.removeEventListener('offline',lost);};
+  const visible=()=>{if(sidebarDeadline.current!==null&&sidebarDeadline.current<=Date.now())refresh();};
+  window.addEventListener('online',refresh);window.addEventListener('offline',lost);document.addEventListener('visibilitychange',visible);
+  return()=>{life.current=false;sequence.current++;flight.current=null;window.clearTimeout(initial);unsubscribe?.();window.removeEventListener('online',refresh);window.removeEventListener('offline',lost);document.removeEventListener('visibilitychange',visible);};
  },[read,runtime]);
- useEffect(()=>{if(!rows.length)return;const deadlines=rows.map(item=>item.readExpiresAt*1000).filter(value=>value>clock),messageExpiry=nextChatMessageExpiry(rows.map(item=>item.latestMessage).filter((item):item is ChatMessage=>!!item),clock);if(messageExpiry!==null)deadlines.push(messageExpiry);if(!deadlines.length)return;const timer=window.setTimeout(()=>{const now=Date.now();setClock(now);setRows(previous=>previous.filter(item=>item.readExpiresAt*1000>now));readAgain.current();},Math.min(2147483647,Math.max(0,Math.min(...deadlines)-Date.now()+1)));return()=>window.clearTimeout(timer);},[rows,clock]);
+ useEffect(()=>{if(!rows.length)return;const deadlines=rows.map(item=>item.readExpiresAt*1000).filter(value=>value>clock),messageExpiry=nextChatMessageExpiry(rows.map(item=>item.latestMessage).filter((item):item is ChatMessage=>!!item),clock);if(messageExpiry!==null)deadlines.push(messageExpiry);if(!deadlines.length)return;const timer=window.setTimeout(()=>{const now=Date.now();setClock(now);readAgain.current();},Math.min(2147483647,Math.max(0,Math.min(...deadlines)-Date.now()+1)));return()=>window.clearTimeout(timer);},[rows,clock]);
  const shown=rows;
  return <MemberAvatarProvider profiles={profiles}><aside className="selected-conversation-directory" aria-label="对话列表"><header><h2>消息</h2><button type="button" onClick={()=>navigate('/app/rooms?compose=conversation')}>发起对话</button></header><MessageNavigation active="rooms" navigate={navigate}/><label className="selected-conversation-search"><Search size={17}/><input type="search" value={query} maxLength={120} onChange={event=>{setQuery(event.target.value);if(!event.target.value)setSubmittedQuery('');}} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();setSubmittedQuery(query.trim());}}} placeholder="对话名称或成员，回车查找" aria-label="查找对话或成员"/></label>{error&&<p role="alert">{error}<button type="button" onClick={()=>void read()}>重试</button></p>}<div className="conversation-list">{shown.map(item=><a key={item.roomId} href={'/app/rooms/'+item.roomId} aria-current={item.roomId===roomId?'page':undefined} onClick={event=>{if(event.button===0&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate('/app/rooms/'+item.roomId);}}}><MemberAvatar subjectId={item.members.find(member=>member.subjectId!==subjectId)?.subjectId??item.roomId} name={names[item.members.find(member=>member.subjectId!==subjectId)?.subjectId??'']??undefined}/><div><div className="conversation-row-heading"><h3>{title(item)}</h3><time>{readableTime(item.lastActivityAt)}</time></div><p className="conversation-last-message">{item.latestMessage?messagePreview(item.latestMessage,clock):'暂无可读消息预览'}</p></div>{!!item.unreadHumanCount&&<span className="conversation-unread">{item.unreadHumanCount>99?'99+':item.unreadHumanCount}</span>}</a>)}</div>{busy&&!rows.length&&<output>正在读取对话…</output>}{!busy&&!error&&!shown.length&&<p className="selected-directory-empty">{submittedQuery?'没有找到这段对话或成员。':'还没有其他对话。'}</p>}{next&&<button type="button" className="text-link" disabled={busy} onClick={()=>void read(next)}>更多对话</button>}</aside></MemberAvatarProvider>;
 }
@@ -125,6 +127,7 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
   const [messageReading, setMessageReading] = useState<ChatMessage[]>([]), [decisions, setDecisions] = useState<ChatDecision[]>([]), [pending, setPending] = useState<ChatPending|null>(null);
   const [references,setReferences]=useState<Record<string,ChatMessage|null>>({}),[offline,setOffline]=useState(()=>navigator.onLine===false);
   const [readExpiresAt,setReadExpiresAt]=useState<number|null>(null),[targetState,setTargetState]=useState<string>('available');
+  const currentReadExpiry=useRef(readExpiresAt);currentReadExpiry.current=readExpiresAt;
   const [clock,setClock]=useState(()=>Date.now());
   const messages=availableChatMessages(messageReading,clock);
   const reply=replyLocator?references[replyLocator.messageId]??messages.find(item=>item.messageId===replyLocator.messageId):null;
@@ -283,7 +286,7 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
       if(!check())return;
       setHiddenMessageId(previous=>hidden?messageId:previous===messageId?null:previous);
       if(hidden){setMessageReading(previous=>previous.filter(item=>item.messageId!==messageId));setReferences(previous=>{const next={...previous};delete next[messageId];return next;});}
-      try{await reload();}catch(reason){if(check()){clearControlled();setLoading(false);}throw reason;}
+      try{await reload();}catch(reason){if(check())setLoading(false);throw reason;}
     },false);
   }
   async function run<T>(operation: (check:()=>boolean) => Promise<T>, refreshAfter = true):Promise<T|undefined> {
@@ -310,9 +313,10 @@ function ChatWorkspaceSession({ runtime, roomId, search='', connected, subjectId
   useEffect(()=>{
     const lost=()=>{readEpoch.current++;setOffline(true);setLoading(false);setErrorMessage('已离线。输入保留在本机，连接恢复后会重新读取对话。');};
     const restored=()=>{setOffline(false);setLoading(true);setReadRefresh(value=>value+1);};
-    window.addEventListener('offline',lost);window.addEventListener('online',restored);if(navigator.onLine===false)lost();return()=>{window.removeEventListener('offline',lost);window.removeEventListener('online',restored);};
+    const visible=()=>{if(!document.hidden&&navigator.onLine!==false&&currentReadExpiry.current!==null&&currentReadExpiry.current*1000<=Date.now())setReadRefresh(value=>value+1);};
+    window.addEventListener('offline',lost);window.addEventListener('online',restored);document.addEventListener('visibilitychange',visible);if(navigator.onLine===false)lost();return()=>{window.removeEventListener('offline',lost);window.removeEventListener('online',restored);document.removeEventListener('visibilitychange',visible);};
   },[]);
-  useEffect(()=>{if(readExpiresAt===null)return;const timer=window.setTimeout(()=>{clearControlled();if(navigator.onLine!==false)setReadRefresh(value=>value+1);},Math.min(2147483647,Math.max(0,readExpiresAt*1000-Date.now())));return()=>window.clearTimeout(timer);},[readExpiresAt]);
+  useEffect(()=>{if(readExpiresAt===null)return;const timer=window.setTimeout(()=>{if(navigator.onLine!==false)setReadRefresh(value=>value+1);},Math.min(2147483647,Math.max(0,readExpiresAt*1000-Date.now())));return()=>window.clearTimeout(timer);},[readExpiresAt]);
   useEffect(()=>{
     let stopped=false,reading=false,queued=false;const epoch=readEpoch;
     // A reset can cancel an in-flight snapshot. Coalesce that request instead of

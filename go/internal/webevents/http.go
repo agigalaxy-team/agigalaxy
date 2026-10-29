@@ -147,7 +147,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if cursor != nil {
 					v = *cursor
 				}
-				b, _ := json.Marshal(Frame{Type: "reset", Cursor: v, Modules: c.Modules})
+				b, _ := json.Marshal(Frame{Type: "reset", Cursor: v, Modules: c.Modules, Reason: "access-changed"})
 				controller.SetWriteDeadline(time.Now().Add(15 * time.Second))
 				fmt.Fprintf(w, "data: %s\n\n", b)
 				controller.Flush()

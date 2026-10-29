@@ -33,7 +33,6 @@ const fileErrors={
  invalid_operations_file_access:'请填写明确的截止时间和处理说明。',
 };
 const sourceNames={chat:'私聊附件',forum:'社区附件'} as const;
-const lease=<T extends {readExpiresAt:number},>(value:T|null,now:number)=>value&&value.readExpiresAt*1000>now?value:null;
 const count=(value:number|undefined)=>typeof value==='number'?value.toLocaleString('zh-CN'):'未确认';
 type RetryResult={file:FileRecord;state:'scheduled';processingComplete:false};
 type FileIntent={kind:'scan';key:string;reason:string}|{kind:'access';key:string;reason:string;until:string;action:'stop'|'restore'};
@@ -71,7 +70,7 @@ export function Files({location:requestedLocation,csrfToken,canManage}:{location
  const intent=useRef<FileIntent|null>(null),listScroll=useRef<HTMLDivElement|null>(null),detailScroll=useRef<HTMLDivElement|null>(null);
  const listPositions=useRef<Record<string,number>>({}),detailPositions=useRef<Record<string,number>>({});
  const lastDirectory=useRef<FilesLocation>({...location,view:location.issue?'exceptions':'records'});
- const directory=lease(page.value,clock),totals=lease(summary.value,clock),detail=lease(current.value,clock);
+ const directory=page.value,totals=summary.value,detail=current.value;
  const selectedKey=location.selected&&location.fileKind?location.fileKind+':'+location.selected:'',reason=drafts[selectedKey]??'';
  const detailFocus=useDetailReturnFocus({selectedKey,scopeKey:location.view+':'+query,readableKeys:(location.view==='records'||location.view==='exceptions')&&page.verified&&directory?directory.items.map(fileKey):null});
  const committed=useCallback(async()=>{
