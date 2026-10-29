@@ -61,6 +61,7 @@ type Service struct {
 	Mail               *SMTPService
 	ContinueAIApproval func(context.Context, pgx.Tx, Object) (ApprovedActor, error)
 	Approver           ApprovalAuthority
+	PlanLockWithin     func(context.Context, pgx.Tx, string, string) error
 }
 
 func (s *Service) now() time.Time {
@@ -252,13 +253,33 @@ func (s *Service) planWithin(ctx context.Context, db Reader, id string, lock boo
 	}
 	suffix := ""
 	if lock {
-		suffix = " FOR UPDATE OF p"
+		if s.PlanLockWithin != nil {
+			tx, ok := db.(pgx.Tx)
+			if !ok {
+				return nil, failure("operations_authorization_unavailable", 503)
+			}
+			if e := s.PlanLockWithin(ctx, tx, id, s.Endpoint); e != nil {
+				return nil, e
+			}
+		} else {
+			suffix = " FOR UPDATE OF p"
+		}
 	}
 	row, e := one(ctx, db, `SELECT to_jsonb(p)||jsonb_build_object('config',v.config) FROM operations_messaging_plans_v1 p JOIN operations_messaging_versions_v1 v ON v.plan_id=p.id AND v.version=p.version WHERE p.id=$1 AND p.endpoint=$2`+suffix, id, s.Endpoint)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return nil, failure("operations_messaging_plan_not_found", 404)
 	}
 	return row, e
+}
+
+// WorkerPlanLockWithin locks only the specified plan at the worker's endpoint.
+func WorkerPlanLockWithin(ctx context.Context, tx pgx.Tx, id, endpoint string) error {
+	var lockedID string
+	e := tx.QueryRow(ctx, "SELECT id::text FROM public.galaxy_worker_lock_messaging_plan($1,$2)", id, endpoint).Scan(&lockedID)
+	if errors.Is(e, pgx.ErrNoRows) {
+		return failure("operations_messaging_plan_not_found", 404)
+	}
+	return e
 }
 func (s *Service) runWithin(ctx context.Context, db Reader, id string, lock bool) (Object, error) {
 	if !uuidOK(id) {

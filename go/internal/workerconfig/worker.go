@@ -256,6 +256,7 @@ func assemble(ctx context.Context, pool *pgxpool.Pool, c Config) (*Runtime, erro
 			approver = stored
 		}
 		messages, smtp = c.Messaging.Services(pool, nil, approver)
+		messages.PlanLockWithin = messaging.WorkerPlanLockWithin
 	}
 	autonomy, e := autonomyWorker(pool, c, stored, messages)
 	if e != nil {

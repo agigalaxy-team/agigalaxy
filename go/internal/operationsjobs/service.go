@@ -288,7 +288,7 @@ func (s *Service) SearchFailure(ctx context.Context, a Actor, id string) (Object
 	return Object{"job": v}, e
 }
 func equal(a, b any) bool {
-	x, e := identity.Canonical(a)
-	y, f := identity.Canonical(b)
+	x, e := identity.Canonical([]any{a})
+	y, f := identity.Canonical([]any{b})
 	return e == nil && f == nil && string(x) == string(y)
 }
