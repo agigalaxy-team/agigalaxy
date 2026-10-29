@@ -304,3 +304,5 @@
 .wb-message-queue li button{margin-right:.5rem}
 .wb-message-queue li span{display:block;font-size:.85em}
 .wb-message-queue textarea{display:block;width:100%;min-height:4rem}
+
+.galaxy-workbench .wb-answer-time{margin-left:4px;color:var(--wb-muted);font-size:12px;line-height:1.4}
