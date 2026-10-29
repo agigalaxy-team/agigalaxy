@@ -123,6 +123,9 @@ def conversation_tools(gateway, *, domain=None):
         service-authorized public-case-review material. An unavailable module
         is not an empty or zero result.
 
+        system-settings describes configuration and consumer adoption, not service
+        health. Use maintenance/overview for observed runtime and health facts.
+
         Windowed reads: days is mandatory for each supported window view:
         accounts/summary 7 or 28; content/list and feedback/list 7,28,all;
         analytics overview/business/retention/paths/account integers 1..90;

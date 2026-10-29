@@ -9,6 +9,10 @@ import (
 
 var settingsPurposes = []string{"operations", "account-authentication", "runtime-alerts"}
 
+func settingsEvidenceMeaning() Object {
+	return Object{"kind": "configuration-and-adoption", "availabilityMeaning": "section-readable", "configuredMeaning": "configuration-present-or-adopted", "connectivity": Object{"state": "not-observed"}, "liveness": Object{"state": "not-observed"}, "health": Object{"state": "not-observed"}, "healthRead": Object{"tool": "query-operations", "module": "maintenance", "view": "overview"}}
+}
+
 func settingsCurrent(value any) ([]any, error) {
 	if value == nil {
 		value = []any{}
@@ -39,7 +43,7 @@ func settingsCommon(value Object) (Object, error) {
 	if e != nil {
 		return nil, e
 	}
-	return Object{"revision": safeInteger(value["revision"]), "version": version, "configurationBasis": extensionOne(value["configurationBasis"], "saved-version", "observed-current", "empty"), "availability": Object{"state": extensionOne(object(value["availability"])["state"], "available", "unavailable", "not-configured")}, "current": current, "pending": pending}, nil
+	return Object{"revision": safeInteger(value["revision"]), "version": version, "configurationBasis": extensionOne(value["configurationBasis"], "saved-version", "observed-current", "empty"), "availability": Object{"state": extensionOne(object(value["availability"])["state"], "available", "unavailable", "not-configured")}, "current": current, "pending": pending, "evidenceMeaning": settingsEvidenceMeaning()}, nil
 }
 func settingsCredential(value Object, id any) any {
 	connectionID, ok := id.(string)
@@ -141,7 +145,7 @@ func systemAdvanced(value Object) (Object, error) {
 	if e != nil {
 		return nil, e
 	}
-	return Object{"section": "advanced", "revision": safeInteger(value["revision"]), "versionId": extensionUUID(value["versionId"]), "connections": connections, "source": extensionOne(value["source"], "mail-configuration"), "limitsScope": extensionOne(value["limitsScope"], "per-worker-process"), "current": current}, nil
+	return Object{"section": "advanced", "revision": safeInteger(value["revision"]), "versionId": extensionUUID(value["versionId"]), "connections": connections, "source": extensionOne(value["source"], "mail-configuration"), "limitsScope": extensionOne(value["limitsScope"], "per-worker-process"), "current": current, "evidenceMeaning": settingsEvidenceMeaning()}, nil
 }
 func systemGeneral(value Object) (Object, error) {
 	publication := object(value["publication"])
@@ -254,7 +258,7 @@ func (s *Service) settings(ctx context.Context, a Actor, args arguments) (queryR
 		if e != nil {
 			return queryResult{}, e
 		}
-		return queryResult{source: lease, data: Object{"sections": Object{"general": generalData, "mail": mailData, "service-connections": connectionData, "advanced": advanced}, "basis": "current-safe-section-reads-general-published-only"}}, nil
+		return queryResult{source: lease, data: Object{"sections": Object{"general": generalData, "mail": mailData, "service-connections": connectionData, "advanced": advanced}, "basis": "current-safe-section-reads-general-published-only", "evidenceMeaning": settingsEvidenceMeaning()}}, nil
 	}
 	value, e := source.Read(ctx, a, args.view)
 	if e != nil {

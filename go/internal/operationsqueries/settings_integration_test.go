@@ -78,6 +78,16 @@ func verifySystemQuerySources(t *testing.T, ctx context.Context, q *Service, own
 		if got["availability"] != "available" || got["data"] == nil || object(got["pagination"])["complete"] != true {
 			t.Fatalf("settings %s current read unavailable: %s", view, encoded(got))
 		}
+		if view != "general" {
+			var wire Object
+			if err := json.Unmarshal([]byte(encoded(got)), &wire); err != nil {
+				t.Fatal(err)
+			}
+			meaning := object(object(wire["data"])["evidenceMeaning"])
+			if object(meaning["health"])["state"] != "not-observed" || object(meaning["healthRead"])["module"] != "maintenance" {
+				t.Fatalf("settings %s lost health evidence meaning", view)
+			}
+		}
 		if strings.Contains(encoded(got), credentialID) || strings.Contains(encoded(got), key) {
 			t.Fatal("protected Native credential reference escaped query")
 		}

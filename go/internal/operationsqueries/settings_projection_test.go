@@ -30,6 +30,9 @@ func TestSystemSettingsProjectionMatchesOriginalClosedViews(t *testing.T) {
 	}
 	functions := map[string]func(Object) (Object, error){"mail": systemMail, "connections": systemConnections, "advanced": systemAdvanced, "general": systemGeneral}
 	for i, input := range cases {
+		if input["kind"] != "general" {
+			expected[i]["evidenceMeaning"] = settingsEvidenceMeaning()
+		}
 		result, e := functions[str(input["kind"])](object(input["value"]))
 		if e != nil {
 			t.Fatal(e)
@@ -41,6 +44,9 @@ func TestSystemSettingsProjectionMatchesOriginalClosedViews(t *testing.T) {
 		}
 		if strings.Contains(encoded(result), "private-credential-material") {
 			t.Fatal("credential/source outside closed view escaped")
+		}
+		if input["kind"] != "general" && object(object(result["evidenceMeaning"])["health"])["state"] != "not-observed" {
+			t.Fatal("configured or adopted is not an observed health check")
 		}
 	}
 }

@@ -85,6 +85,8 @@ func connectExecutions(gateway *access.Gateway, permissions *p.Service, autonomy
 	}
 	strategies.PreviewObjectWithin = func(ctx context.Context, tx pgx.Tx, a p.Actor, kind, id string) (operationsstrategies.Object, error) {
 		switch kind {
+		case "ordinary-strategy-draft", "ordinary-strategy-publish":
+			return previewOrdinaryStrategy(ctx, tx, a, id, strategies.InspectOrdinaryWithin)
 		case "feedback-update":
 			if feedbackSource == nil {
 				return operationsstrategies.Object{"available": false, "version": nil}, nil

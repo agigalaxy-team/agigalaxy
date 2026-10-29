@@ -268,5 +268,11 @@ func (s *Conversations) Run(ctx context.Context, operator operationspermissions.
 	if _, err = s.Current(ctx, row.ID, &final); err != nil {
 		return nil, err
 	}
+	if runID := text(result, "runId"); runID != "" {
+		projected, e := s.decorateRuns(ctx, row, []Object{{"operationId": turn.ID, "runId": runID, "status": "RUNNING"}})
+		if e == nil {
+			result["sentAt"] = projected[0]["sentAt"]
+		}
+	}
 	return result, nil
 }

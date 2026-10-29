@@ -32,6 +32,7 @@ def run_view(run):
     content = run.content if isinstance(run.content, str) and str(status).upper() != "ERROR" else None
     content = _completed_conversation_content(run, status, content)
     events = []
+    completed_at = None
     error_code = "operations_agentos_run_failed" if str(status).upper() == "ERROR" else None
     failure = failure_view(run.content) if str(status).upper() in {"ERROR", "REGENERATED"} and getattr(run, "agent_id", None) in {
         "galaxy-conversation-overview", "galaxy-conversation-governance",
@@ -44,6 +45,12 @@ def run_view(run):
     for event in getattr(run, "events", None) or []:
         event_name = getattr(event, "event", None)
         error_type = getattr(event, "error_type", None)
+        timestamp = getattr(event, "created_at", None)
+        if (str(status).upper() == "COMPLETED" and event_name == "RunCompleted"
+                and getattr(event, "run_id", None) == run.run_id
+                and type(timestamp) in {int, float} and 0 <= timestamp <= 9007199254740991
+                and math.isfinite(timestamp)):
+            completed_at = timestamp
         if error_code and error_type == "AuthorityUnavailable":
             error_code = "operations_authorization_unavailable"
         elif error_code and error_type == "AuthorityDenied":
@@ -73,7 +80,7 @@ def run_view(run):
         "regeneratedFrom": getattr(run, "regenerated_from", None),
         "retryOfOperationId": (getattr(run, "metadata", None) or {}).get("retryOfOperationId"),
         "userInput": getattr(getattr(run, "input", None), "input_content", None) if isinstance(getattr(getattr(run, "input", None), "input_content", None), str) else None,
-        "createdAt": getattr(run, "created_at", None), "events": events,
+        "createdAt": getattr(run, "created_at", None), "completedAt": completed_at, "events": events,
         "metrics": {"inputTokens": tokens("input_tokens") if reported else None,
             "outputTokens": tokens("output_tokens") if reported else None,
             "totalTokens": tokens("total_tokens") if reported else None, "durationMs": duration_ms},

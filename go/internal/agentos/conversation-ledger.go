@@ -180,6 +180,9 @@ func (s *Conversations) Operation(ctx context.Context, actor operationspermissio
 		state = "unknown"
 	}
 	result["state"], result["native"], result["replayed"] = state, native, true
+	if native != nil {
+		result["sentAt"] = native["sentAt"]
+	}
 	return result, nil
 }
 

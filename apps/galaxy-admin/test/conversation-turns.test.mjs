@@ -14,3 +14,13 @@ test('unstarted and changed-context receipts cannot manufacture a turn; mismatch
  assert.equal(applyConversationReceipt(snapshot,{operationId:'new-operation',runId:'new-run',state:'context-changed'},'Question'),snapshot);
  assert.throws(()=>applyConversationReceipt(snapshot,{operationId:'new-operation',runId:'new-run',native:{...old}}),/binding/);
 });
+
+test('timestamps keep same-run evidence and preserve explicit unknown',()=>{
+ const initial=applyConversationReceipt(snapshot,{operationId:'new-operation',runId:'new-run',state:'accepted',sentAt:120},'Question');
+ assert.equal(initial.runs[1].sentAt,120); assert.equal(initial.runs[1].completedAt,null);
+ const running=applyConversationReceipt(initial,{operationId:'new-operation',runId:'new-run',native:{...old,operationId:'new-operation',runId:'new-run',status:'RUNNING',userInput:null}});
+ assert.equal(running.runs[1].sentAt,120);
+ const done=applyConversationReceipt(running,{operationId:'new-operation',runId:'new-run',native:{...old,operationId:'new-operation',runId:'new-run',status:'COMPLETED',sentAt:null,completedAt:130}});
+ assert.equal(done.runs[1].sentAt,null); assert.equal(done.runs[1].completedAt,130);
+ assert.throws(()=>applyConversationReceipt(done,{operationId:'new-operation',runId:'foreign-run'}),/binding/);
+});
