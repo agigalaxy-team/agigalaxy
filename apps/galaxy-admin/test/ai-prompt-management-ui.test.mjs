@@ -49,7 +49,7 @@ test('only the bound original completed receipt can display saved prompt version
  assert.doesNotMatch(renderCard({...completed,result:{...completed.result,operationId:id(8)}}),/原操作已保存/);
  assert.doesNotMatch(renderCard({...completed,result:{...completed.result,receipt:{...receipt,aiAccountId:id(8)}}}),/原操作已保存/);
  for(const state of ['processing','unknown','not-available'])assert.doesNotMatch(renderCard({...completed,state}),/原操作已保存岗位工作要求|按此方案处理/);
- assert.match(renderCard({...card,state:'unknown'}),/正在读取这项处理的结果/);
+ assert.match(renderCard({...card,state:'unknown'}),/正在确认结果/);
 });
 
 const fact=(permission,patch={})=>({permission,systemSupport:'connected',permissionAllowed:true,delegated:true,available:true,confirmation:'operation-card',reasons:[],...patch});
@@ -61,7 +61,7 @@ test('management hints display distinct server facts for missing permission, del
  for(const label of ['当前权限不足','未获管理授权','服务尚未接通','仅人工设置','治理 AI（停用）','委派 v5'])assert.ok(html.includes(label));
  assert.equal(aiManagementFeatureLabel(fact('ai.prompts.update')),'已获准 · 操作卡确认');
  assert.equal(aiManagementFeatureLabel(fact('ai.prompts.update',{confirmation:'autonomous-tool'})),'按当前任务授权处理');
- const unknown=renderToStaticMarkup(React.createElement(WorkbenchManagementCapabilities,{value:null}));assert.match(unknown,/暂时无法取得/);assert.doesNotMatch(unknown,/不支持|未接通|未获管理授权/);
+ const unknown=renderToStaticMarkup(React.createElement(WorkbenchManagementCapabilities,{value:null}));assert.match(unknown,/加载失败/);assert.doesNotMatch(unknown,/不支持|未接通|未获管理授权/);
  assert.equal(aiManagementCapabilities({...capabilities,prompt:{...capabilities.prompt,read:{...capabilities.prompt.read,systemSupport:['connected']}}}),null);
  assert.equal(aiManagementCapabilities({...capabilities,prompt:{...capabilities.prompt,scope:'global-system-frame'}}),null);
 });

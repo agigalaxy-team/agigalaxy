@@ -158,7 +158,8 @@ class ToolCallIdDiagnosticsTest(unittest.TestCase):
             self.assertEqual(call.call_id, supplied)
             result = call.execute()
             self.assertEqual(result.status, "success")
-            self.assertEqual(json.loads(result.result)["state"], "denied")
+            self.assertEqual(json.loads(result.result)["state"], "invalid-request")
+            self.assertNotIn("agentos_", result.result)
             self.assertEqual(call.call_id, supplied)
         self.assertEqual(self.requests, [])
 
