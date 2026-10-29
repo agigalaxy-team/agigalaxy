@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -112,7 +113,9 @@ func (s *Service) ReadManagementTool(ctx context.Context, operator Actor, domain
 	if v, ok := input["aiAccountId"]; ok && !validUUID(v) {
 		return nil, fail("invalid_operations_agentos_query", 400)
 	}
-	actor, e := s.actionHuman(ctx, operator, domain, "query", "workbench.read")
+	actor, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Actor, error) {
+		return s.HumanAIReadWithin(ctx, tx, operator, domain, "query", "workbench.read")
+	})
 	if e != nil {
 		return nil, e
 	}
@@ -149,7 +152,9 @@ func (s *Service) ReadManagementTool(ctx context.Context, operator Actor, domain
 			action = "ai.prompts.read"
 		}
 	}
-	if _, e = s.actionHuman(ctx, actor, domain, "query", action); e != nil {
+	if _, e = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Actor, error) {
+		return s.HumanAIReadWithin(ctx, tx, actor, domain, "query", action)
+	}); e != nil {
 		return nil, e
 	}
 	now := s.now()

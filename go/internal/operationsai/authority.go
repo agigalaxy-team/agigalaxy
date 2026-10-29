@@ -58,20 +58,57 @@ func array(v []string) []any {
 	}
 	return a
 }
-func catalog() Object        { var o Object; json.Unmarshal([]byte(actionJSON), &o); return o }
-func Known(code string) bool { return Definition(code) != nil }
-func Definition(code string) Object {
-	for _, v := range arr(catalog()["actions"]) {
-		o := obj(v)
-		if o["permission"] == code {
-			return o
+
+// The generated action contract is immutable program data, not current grants.
+// Compile it once; never decode the whole contract for each role permission.
+var actionCatalog = func() Object {
+	var value Object
+	if err := json.Unmarshal([]byte(actionJSON), &value); err != nil {
+		panic(err)
+	}
+	return value
+}()
+var actionDefinitions = func() map[string]Object {
+	out := map[string]Object{}
+	for _, value := range arr(actionCatalog["actions"]) {
+		entry := obj(value)
+		out[str(entry["permission"])] = entry
+	}
+	return out
+}()
+
+func catalog() Object        { return actionCatalog }
+func Known(code string) bool { return actionDefinitions[code] != nil }
+
+// Return an owned value: callers cannot change the compiled contract or another
+// request's capability projection through a returned map or nested slice.
+func copyDefinition(value any) any {
+	switch item := value.(type) {
+	case map[string]any:
+		out := Object{}
+		for key, child := range item {
+			out[key] = copyDefinition(child)
 		}
+		return out
+	case []any:
+		out := make([]any, len(item))
+		for index, child := range item {
+			out[index] = copyDefinition(child)
+		}
+		return out
+	default:
+		return value
+	}
+}
+func Definition(code string) Object {
+	if entry := actionDefinitions[code]; entry != nil {
+		return obj(copyDefinition(entry))
 	}
 	return nil
 }
 func Autonomous(code string) bool { return contains(stringsOf(catalog()["autonomous"]), code) }
 func Projection(permission string, permissions []string, handlerReady *bool, humanConditions []string) Object {
-	entry := Definition(permission)
+	entry := actionDefinitions[permission]
 	permissionAllowed := entry != nil && contains(permissions, permission)
 	humanOnly := entry["humanOnly"] == true
 	humanRequired := entry == nil || humanOnly || len(humanConditions) > 0
@@ -215,31 +252,48 @@ func (s *Service) AssertRoleWithin(ctx context.Context, tx pgx.Tx, domain, actio
 // WorkPermissions is the original purpose projection of a current position's
 // own roles, before intersection with the independently authenticated human.
 func WorkPermissions(purpose string, permissions []string) []string {
-	capabilities := Capabilities("", permissions)
-	switch purpose {
-	case "conversation":
+	if purpose == "conversation" {
 		return []string{}
-	case "query":
-		return stringsOf(capabilities["queryPermissions"])
-	case "execution":
-		return stringsOf(capabilities["autonomousPermissions"])
-	case "prepare":
+	}
+	selectAllowed := func(key string) []string {
 		out := []string{}
-		add := func(p string) {
-			if contains(permissions, p) && !contains(out, p) {
-				out = append(out, p)
+		for _, permission := range stringsOf(catalog()[key]) {
+			if contains(permissions, permission) {
+				out = append(out, permission)
 			}
 		}
-		for _, p := range stringsOf(capabilities["queryPermissions"]) {
-			add(p)
+		return out
+	}
+	switch purpose {
+	case "query":
+		return selectAllowed("query")
+	case "execution":
+		return selectAllowed("autonomous")
+	case "prepare":
+		out := selectAllowed("query")
+		add := func(permission string) {
+			if contains(permissions, permission) && !contains(out, permission) {
+				out = append(out, permission)
+			}
 		}
 		add("chat-reports.materials.read")
-		for _, v := range arr(catalog()["preparation"]) {
-			entry := obj(v)
-			if contains(stringsOf(capabilities["preparableKinds"]), str(entry["kind"])) {
+		for _, value := range arr(catalog()["preparation"]) {
+			entry := obj(value)
+			if !contains(permissions, str(entry["read"])) {
+				continue
+			}
+			actions := stringsOf(entry["actions"])
+			eligible := false
+			for _, action := range actions {
+				if contains(permissions, action) {
+					eligible = true
+					break
+				}
+			}
+			if eligible {
 				add(str(entry["read"]))
-				for _, p := range stringsOf(entry["actions"]) {
-					add(p)
+				for _, action := range actions {
+					add(action)
 				}
 			}
 		}

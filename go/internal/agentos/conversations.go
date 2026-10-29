@@ -133,6 +133,17 @@ func (s *Conversations) session(ctx context.Context, actor operationspermissions
 	})
 }
 func (s *Conversations) CurrentWithin(ctx context.Context, tx pgx.Tx, id string, operator *operationspermissions.Actor) (CurrentConversation, error) {
+	return s.currentWithin(ctx, tx, id, operator, false)
+}
+
+// CurrentReadWithin revalidates the durable owner and fixed AI once in this
+// transaction for a pure read. It does not authorize preparation or execution,
+// or replace the independent current/source check before returning a result.
+func (s *Conversations) CurrentReadWithin(ctx context.Context, tx pgx.Tx, id string, operator *operationspermissions.Actor) (CurrentConversation, error) {
+	return s.currentWithin(ctx, tx, id, operator, true)
+}
+
+func (s *Conversations) currentWithin(ctx context.Context, tx pgx.Tx, id string, operator *operationspermissions.Actor, readSnapshot bool) (CurrentConversation, error) {
 	if s == nil || s.Permissions == nil {
 		return CurrentConversation{}, fail("operations_authorization_unavailable", 503)
 	}
@@ -151,9 +162,17 @@ func (s *Conversations) CurrentWithin(ctx context.Context, tx pgx.Tx, id string,
 	}
 	var current operationspermissions.Actor
 	if operator == nil {
-		current, err = s.Permissions.StoredHumanAIWithin(ctx, tx, row.OperatorID, row.Domain, *row.AIAccountID, "conversation", "workbench.read")
+		require := s.Permissions.StoredHumanAIWithin
+		if readSnapshot {
+			require = s.Permissions.StoredHumanAIReadWithin
+		}
+		current, err = require(ctx, tx, row.OperatorID, row.Domain, *row.AIAccountID, "conversation", "workbench.read")
 	} else {
-		current, err = s.Permissions.HumanAIAccountWithin(ctx, tx, *operator, row.Domain, *row.AIAccountID, "conversation", "workbench.read")
+		require := s.Permissions.HumanAIAccountWithin
+		if readSnapshot {
+			require = s.Permissions.HumanAIAccountReadWithin
+		}
+		current, err = require(ctx, tx, *operator, row.Domain, *row.AIAccountID, "conversation", "workbench.read")
 	}
 	if err != nil {
 		return CurrentConversation{}, err
@@ -164,10 +183,22 @@ func (s *Conversations) CurrentWithin(ctx context.Context, tx pgx.Tx, id string,
 	return CurrentConversation{Row: row, Actor: current}, nil
 }
 func (s *Conversations) Current(ctx context.Context, id string, operator *operationspermissions.Actor) (CurrentConversation, error) {
+	return s.current(ctx, id, operator, false)
+}
+
+// CurrentRead includes the same live source validation and expiry as Current.
+// Each invocation reads fresh authority; no snapshot survives this request.
+func (s *Conversations) CurrentRead(ctx context.Context, id string, operator *operationspermissions.Actor) (CurrentConversation, error) {
+	return s.current(ctx, id, operator, true)
+}
+
+func (s *Conversations) current(ctx context.Context, id string, operator *operationspermissions.Actor, readSnapshot bool) (CurrentConversation, error) {
 	if s == nil || s.Pool == nil {
 		return CurrentConversation{}, fail("operations_authorization_unavailable", 503)
 	}
-	current, err := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (CurrentConversation, error) { return s.CurrentWithin(ctx, tx, id, operator) })
+	current, err := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (CurrentConversation, error) {
+		return s.currentWithin(ctx, tx, id, operator, readSnapshot)
+	})
 	if err != nil {
 		return current, err
 	}

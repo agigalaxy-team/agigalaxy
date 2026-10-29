@@ -36,6 +36,12 @@ func (s *Service) delegatedCurrentWithin(ctx context.Context, tx pgx.Tx, actor A
 	if e != nil {
 		return out, e
 	}
+	return s.delegatedCurrentForIdentity(ctx, tx, fresh, domain, accountID, metadata, permission, action, expected)
+}
+
+// The caller must have freshly checked the specific action in this transaction.
+func (s *Service) delegatedCurrentForIdentity(ctx context.Context, tx pgx.Tx, fresh Actor, domain, accountID string, metadata Object, permission, action string, expected *int64) (delegatedCurrent, error) {
+	var out delegatedCurrent
 	if domain != "overview" {
 		return out, fail("operations_ai_delegation_source_denied", 403)
 	}
@@ -63,6 +69,30 @@ func (s *Service) delegatedCurrentWithin(ctx context.Context, tx pgx.Tx, actor A
 	}
 	return delegatedCurrent{fresh, row, accountID}, nil
 }
+
+// delegatedCurrentReadWithin is an independent fresh barrier for directory
+// publication. Duty actors retain their original action-specific checks.
+func (s *Service) delegatedCurrentReadWithin(ctx context.Context, tx pgx.Tx, actor Actor, action string) (delegatedCurrent, error) {
+	if s.Duty != nil && s.Duty.AcceptsDuty(actor) {
+		return s.delegatedCurrentWithin(ctx, tx, actor, action, nil)
+	}
+	permission := "ai.roles.read"
+	if action == "prompt-read" {
+		permission = "ai.prompts.read"
+	} else if action != "read" {
+		return delegatedCurrent{}, fail("operations_agentos_scope_denied", 403)
+	}
+	c, err := s.humanContext(actor)
+	if err != nil {
+		return delegatedCurrent{}, err
+	}
+	fresh, err := s.HumanAIReadWithin(ctx, tx, actor, c.domain, "query", permission)
+	if err != nil {
+		return delegatedCurrent{}, err
+	}
+	return s.delegatedCurrentForIdentity(ctx, tx, fresh, c.domain, c.accountID, nil, permission, action, nil)
+}
+
 func parseDelegated(input Object, prepare bool) (Object, error) {
 	x := obj(clone(input))
 	kind := str(x["kind"])
@@ -133,7 +163,17 @@ func allSubset(values, allowed []string) bool {
 	return true
 }
 func (s *Service) delegatedRoleWithin(ctx context.Context, tx pgx.Tx, delegation Object, id string) (Object, error) {
-	role, e := one(ctx, tx, "SELECT to_jsonb(r) FROM operations_business_roles_v1 r WHERE endpoint=$1 AND id=$2 FOR UPDATE", s.Endpoint, id)
+	return s.delegatedRoleWithinMode(ctx, tx, delegation, id, true)
+}
+
+// Only directory reads use lock=false. The authority shared advisory lock
+// still fences role/delegation commands; mutation paths retain FOR UPDATE.
+func (s *Service) delegatedRoleWithinMode(ctx context.Context, tx pgx.Tx, delegation Object, id string, lock bool) (Object, error) {
+	query := "SELECT to_jsonb(r) FROM operations_business_roles_v1 r WHERE endpoint=$1 AND id=$2"
+	if lock {
+		query += " FOR UPDATE"
+	}
+	role, e := one(ctx, tx, query, s.Endpoint, id)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return nil, fail("operations_role_not_found", 404)
 	}
@@ -213,7 +253,11 @@ func (s *Service) delegatedAvailabilityForIdentity(ctx context.Context, tx pgx.T
 }
 func (s *Service) DelegatedDirectory(ctx context.Context, actor Actor) (Object, error) {
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
-		availability, e := s.delegatedAvailability(ctx, tx, actor)
+		identity, e := s.delegatedReadIdentitiesWithin(ctx, tx, actor)
+		if e != nil {
+			return nil, e
+		}
+		availability, row, e := s.delegatedAvailabilityForIdentity(ctx, tx, identity)
 		if e != nil {
 			return nil, e
 		}
@@ -224,9 +268,15 @@ func (s *Service) DelegatedDirectory(ctx context.Context, actor Actor) (Object, 
 		if availability["canReadRoles"] != true {
 			action = "prompt-read"
 		}
-		current, e := s.delegatedCurrentWithin(ctx, tx, actor, action, nil)
-		if e != nil {
-			return nil, e
+		// Availability has checked the human query projection's selected read
+		// action and every delegation ceiling in this same transaction. Duty
+		// proofs retain their separate action-specific authority check.
+		current := delegatedCurrent{identity.query, row, identity.accountID}
+		if s.Duty != nil && s.Duty.AcceptsDuty(actor) {
+			current, e = s.delegatedCurrentWithin(ctx, tx, actor, action, nil)
+			if e != nil {
+				return nil, e
+			}
 		}
 		roles := []any{}
 		roleIDs := []string{}
@@ -236,7 +286,7 @@ func (s *Service) DelegatedDirectory(ctx context.Context, actor Actor) (Object, 
 				return nil, e
 			}
 			for _, v := range rows {
-				r, e := s.delegatedRoleWithin(ctx, tx, current.Row, str(obj(v)["id"]))
+				r, e := s.delegatedRoleWithinMode(ctx, tx, current.Row, str(obj(v)["id"]), false)
 				if e != nil {
 					if fault.Status(e) == 403 {
 						continue
@@ -270,7 +320,7 @@ func (s *Service) DelegatedDirectory(ctx context.Context, actor Actor) (Object, 
 				return nil, e
 			}
 		}
-		if _, e = s.delegatedCurrentWithin(ctx, tx, actor, action, nil); e != nil {
+		if _, e = s.delegatedCurrentReadWithin(ctx, tx, actor, action); e != nil {
 			return nil, e
 		}
 		return Object{"delegation": delegationView(current.Row), "targetAiAccounts": targets, "roles": roles, "assignments": assignments, "availability": availability, "checkedAt": s.now(), "readExpiresAt": s.now() + 30}, nil

@@ -161,16 +161,11 @@ var afterPattern = regexp.MustCompile(`^[1-9][0-9]{0,18}$`)
 func validUUID(v any) bool { return uuidPattern.MatchString(str(v)) }
 func catalogItems() []any  { var a []any; json.Unmarshal([]byte(catalogJSON), &a); return a }
 func known(code string) bool {
-	for _, v := range catalogItems() {
-		if obj(v)["code"] == code {
-			return true
-		}
-	}
-	return false
+	return staticCatalog.known[code]
 }
 func permissionList(v any) bool {
 	a, ok := v.([]any)
-	if !ok || len(a) > len(catalogItems()) {
+	if !ok || len(a) > staticCatalog.count {
 		return false
 	}
 	seen := map[string]bool{}

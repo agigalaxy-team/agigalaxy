@@ -10896,17 +10896,11 @@
       "code": "invalid_operations_ai_work_request",
       "status": 400,
       "source": "go/internal/operationsai/authority.go",
-      "line": 137
+      "line": 174
     },
     {
       "code": "operations_ai_work_not_initialized",
       "status": 409,
-      "source": "go/internal/operationsai/authority.go",
-      "line": 144
-    },
-    {
-      "code": "operations_ai_work_permission_denied",
-      "status": 403,
       "source": "go/internal/operationsai/authority.go",
       "line": 181
     },
@@ -10914,19 +10908,25 @@
       "code": "operations_ai_work_permission_denied",
       "status": 403,
       "source": "go/internal/operationsai/authority.go",
-      "line": 185
-    },
-    {
-      "code": "operations_ai_work_disabled",
-      "status": 403,
-      "source": "go/internal/operationsai/authority.go",
-      "line": 196
+      "line": 218
     },
     {
       "code": "operations_ai_work_permission_denied",
       "status": 403,
       "source": "go/internal/operationsai/authority.go",
-      "line": 210
+      "line": 222
+    },
+    {
+      "code": "operations_ai_work_disabled",
+      "status": 403,
+      "source": "go/internal/operationsai/authority.go",
+      "line": 233
+    },
+    {
+      "code": "operations_ai_work_permission_denied",
+      "status": 403,
+      "source": "go/internal/operationsai/authority.go",
+      "line": 247
     },
     {
       "code": "operations_autonomy_scope_denied",

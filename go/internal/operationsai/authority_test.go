@@ -34,3 +34,78 @@ func TestGeneratedAIActionCapabilitiesMatchSharedContract(t *testing.T) {
 		}
 	}
 }
+
+// This is the CPU-only portion performed after loading an AI role from SQL.
+func BenchmarkAIReadPermissionProjection(b *testing.B) {
+	permissions := []string{}
+	for _, item := range arr(catalog()["actions"]) {
+		permissions = append(permissions, str(obj(item)["permission"]))
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		current := []string{}
+		for _, permission := range permissions {
+			if Known(permission) {
+				current = append(current, permission)
+			}
+		}
+		_ = WorkPermissions("query", current)
+	}
+}
+
+func TestDefinitionReturnsIndependentContractValues(t *testing.T) {
+	first := Definition("accounts.restriction.apply")
+	first["humanOnly"] = true
+	obj(first["handler"])["service"] = "changed"
+	arr(first["conditions"])[0] = "changed"
+	next := Definition("accounts.restriction.apply")
+	if next["humanOnly"] != false || obj(next["handler"])["service"] != "accounts" || arr(next["conditions"])[0] != "ordinary" {
+		t.Fatal("definition mutation escaped into shared contract")
+	}
+	if Known("not-a-permission") || Definition("not-a-permission") != nil {
+		t.Fatal("unknown permission admitted")
+	}
+}
+func TestWorkPermissionsMatchCapabilityProjection(t *testing.T) {
+	all := []string{}
+	for _, item := range arr(catalog()["actions"]) {
+		all = append(all, str(obj(item)["permission"]))
+	}
+	for _, permissions := range [][]string{{}, all, {"content.read", "content.hide", "feedback.read"}, {"feedback.update"}} {
+		capabilities := Capabilities("", permissions)
+		for _, purpose := range []string{"query", "execution", "prepare", "conversation"} {
+			expected := []string{}
+			add := func(permission string) {
+				if contains(permissions, permission) && !contains(expected, permission) {
+					expected = append(expected, permission)
+				}
+			}
+			switch purpose {
+			case "query":
+				expected = stringsOf(capabilities["queryPermissions"])
+			case "execution":
+				expected = stringsOf(capabilities["autonomousPermissions"])
+			case "prepare":
+				for _, p := range stringsOf(capabilities["queryPermissions"]) {
+					add(p)
+				}
+				add("chat-reports.materials.read")
+				for _, v := range arr(catalog()["preparation"]) {
+					entry := obj(v)
+					if contains(stringsOf(capabilities["preparableKinds"]), str(entry["kind"])) {
+						add(str(entry["read"]))
+						for _, p := range stringsOf(entry["actions"]) {
+							add(p)
+						}
+					}
+				}
+			}
+			a, _ := json.Marshal(expected)
+			b, _ := json.Marshal(WorkPermissions(purpose, permissions))
+			if string(a) != string(b) {
+				t.Fatalf("purpose %s changed: %s != %s", purpose, a, b)
+			}
+		}
+	}
+}

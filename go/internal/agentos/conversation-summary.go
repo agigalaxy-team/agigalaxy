@@ -27,7 +27,7 @@ func (t *ConversationTools) summaryScope(ctx context.Context, a operationspermis
 	if len(bound) != 2 || !validOperationID(text(bound, "conversationId")) || !validOperationID(text(bound, "turnId")) {
 		return nil, nil, fail("invalid_operations_agentos_request", 400)
 	}
-	current, e := t.Conversations.Current(ctx, text(bound, "conversationId"), &a)
+	current, e := t.Conversations.CurrentRead(ctx, text(bound, "conversationId"), &a)
 	if e != nil {
 		return nil, nil, e
 	}
@@ -68,7 +68,7 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 			return nil, fail("operations_agentos_conversation_not_ready", 503)
 		}
 		task, e = postgres.InTx(ctx, t.Conversations.Pool, func(tx pgx.Tx) (Object, error) {
-			fresh, e := t.Conversations.CurrentWithin(ctx, tx, row.ID, &a)
+			fresh, e := t.Conversations.CurrentReadWithin(ctx, tx, row.ID, &a)
 			if e != nil {
 				return nil, e
 			}

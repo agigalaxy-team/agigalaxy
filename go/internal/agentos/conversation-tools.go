@@ -43,6 +43,16 @@ var toolPairID = regexp.MustCompile(`^[\x21-\x7E]{1,200}$`)
 var toolSafeError = regexp.MustCompile(`^(?:operations|business_admin|p13|search_quality|feedback|messaging|content|file|forum)_[a-z0-9_]{1,100}$`)
 var toolRoute = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,79}$`)
 
+// Only these closed tools read business state. Their call ledger and source
+// descriptors are still recorded, but they cannot prepare or execute a command.
+func conversationReadTool(tool string) bool {
+	switch tool {
+	case "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work":
+		return true
+	}
+	return false
+}
+
 func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConversationTool, error) {
 	var out boundConversationTool
 	_, hasReference := input["publicReference"]
@@ -80,7 +90,11 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 	if s == nil || s.Pool == nil {
 		return out, fail("operations_authorization_unavailable", 503)
 	}
-	current, err := s.Current(ctx, conversationID, nil)
+	currentRead, currentWithin := s.Current, s.CurrentWithin
+	if conversationReadTool(tool) {
+		currentRead, currentWithin = s.CurrentRead, s.CurrentReadWithin
+	}
+	current, err := currentRead(ctx, conversationID, nil)
 	if err != nil {
 		return out, err
 	}
@@ -92,7 +106,7 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (boundConversationTool, error) {
-		fresh, err := s.CurrentWithin(ctx, tx, conversationID, nil)
+		fresh, err := currentWithin(ctx, tx, conversationID, nil)
 		if err != nil {
 			return out, err
 		}
@@ -183,7 +197,11 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 		err = t.rememberSources(ctx, bound.row, result["evidenceRefs"])
 	}
 	if err == nil {
-		_, err = s.Current(ctx, bound.row.ID, nil)
+		currentRead := s.Current
+		if conversationReadTool(bound.tool) {
+			currentRead = s.CurrentRead
+		}
+		_, err = currentRead(ctx, bound.row.ID, nil)
 	}
 	metadata := Object{"tool": bound.tool}
 	metadata["module"], metadata["view"] = nil, nil
