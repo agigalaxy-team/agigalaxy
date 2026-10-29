@@ -44,3 +44,35 @@
 ## 尚未完成的验证
 
 以上修复尚未实施。本轮未运行隔离回归，未检查真实用户安装与生产部署是否包含受影响版本；最终报告需单独记录部署适用性和剩余证据，不能把静态修复建议写成已解决。
+
+
+## WEB-L003 离线来源原作者签名校验缺少身份归属绑定
+
+- 优先级：中；完整性与来源归属风险。
+- 状态：confirmed_static，经两个审阅方向独立发现并由主审复读。SVC-002 与本项合并，不重复计数。
+- [verification/trust-package.mjs 103–112](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/packages/galaxy-contracts/src/verification/trust-package.mjs#L103-L112) 校验提供的 identity 控制链与其中设备签名，但只比较 consent.subjectId 与 source.authorId，没有把实际签名身份的 subjectId 绑定至这两个字段。
+- 相邻 verifyTrustPermission 已有 grant.subjectId 与 proof.identity.subjectId/source.authorId 的等值要求，不能用复制许可的独立校验代替原作者签名校验。
+- 导入 verifyTrustPackage 对无效复制许可记录 invalid-or-expired 后继续计算 originalSignature，所以可出现“复制许可无效、原作者签名却有效”的错误归属结果。CLI verify-trust-package 输出保留该字段。
+
+### 条件与影响
+
+接收者导入外部资料包或读取该验证器输出。提供者拥有自己的合法身份私钥，可让其签名载荷声称另一作者；无须取得被声称作者的私钥。这里确认的是错误的原作者签名归属，不是外层包完整性失效、线上权限绕过、复制许可通过或能力认证。
+
+### 修复与验证
+
+宣称原作者签名有效前，要求验证后 identity.subjectId、原 identity.subjectId、source.authorId 和已签 consent.subjectId 一致；按实际协议严格校验 consent 结构、用途和设备授权范围。用离线合成身份 A/B 的正负例验证 A 签署、声称 B 的材料不得返回原作者有效，外层签名完整也不能修复内层归属。未执行该回归。
+
+## NATIVE-006 并发修改单项归档选择可恢复已撤销的采集
+
+- 优先级：中；本机隐私选择与并发一致性风险。
+- 状态：confirmed_static；主审独立复读关键读改写与数据库写入代码，未动态复现。
+- [work-archive-choice.mjs 3–9](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/integrations/host-adapters/opencode-stable/work-archive-choice.mjs#L3-L9) 先读取全部选择，再合并某一工作的修改并全量 configure。
+- [archive.go 167–211](https://github.com/agigalaxy-team/agigalaxy/blob/9fa17ee2b74c621303c598fcd272f8c38f4b9b8f/go/internal/native/archive.go#L167-L211) 在锁内写入，但没有 settings revision 比较，锁不包含前一步客户端读取。
+- 同身份两宿主并发：原选择 [A]；客户1为启用 B 读取 [A]；客户2停用 A 并成功提交；客户1用旧快照提交 [A,B]，重新启用 A。
+- recorder 后续重新读取设置并对选中会话回填，因此可能重新采集本机消息。此项不代表云端上传授权被绕过。
+
+修复应采用服务端单项原子修改或 revision/CAS，冲突时只重新应用用户当前明确指定的工作，不恢复其他已撤销范围。隔离回归应有两个共享临时 store 的客户端，在读/写间设置确定性屏障，验证停 A 后启 B 最终仅包含 B，并覆盖全局暂停、保留期限和切换身份。现未执行。
+
+## 其他发现的处理状态
+
+Native 信任缓存更新、RPC 超时/关闭、验证后设备投影，以及构建目录残留公开等线索已完成分域源码追踪，仍在主审复核和统一影响分级，不在本页提前列为最终验收结论。其余资源预算、上游依赖与运行环境风险继续审阅。
