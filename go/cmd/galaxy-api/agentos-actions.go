@@ -4,7 +4,10 @@ import (
 	"context"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos/actions"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/filegovernance"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
 	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
@@ -32,6 +35,55 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 	autonomy.ActionReady = service.ActionReady
 	autonomy.QualifyTargetWithin = service.QualifyTargetWithin
 	autonomy.ExecuteDutyOperation = service.ExecuteDutyOperation
+	// checkTargetWithin owns the surrounding current read-authority checks.
+	// These source readers use the same transaction and return no content.
+	autonomy.ReadTargetWithin = func(ctx context.Context, tx pgx.Tx, actor p.Actor, _ string, kind, id string) (agentos.Object, error) {
+		switch kind {
+		case "feedback":
+			if service.Feedback == nil {
+				break
+			}
+			value, err := service.Feedback.HeadWithin(ctx, tx, id)
+			if err != nil {
+				return nil, err
+			}
+			if value["id"] != id {
+				return nil, fault.New("operations_autonomy_source_unavailable", 503)
+			}
+			return agentos.Object{"availability": "available"}, nil
+		case "post", "reply":
+			if service.Content == nil || service.Content.Forum == nil {
+				break
+			}
+			value, err := service.Content.ContentViewWithin(ctx, tx, actor, kind, id, false, false)
+			if err != nil {
+				return nil, err
+			}
+			if value["sourceState"] != "available" {
+				return nil, fault.New("operations_autonomy_source_unavailable", 503)
+			}
+			return agentos.Object{"availability": "available"}, nil
+		}
+		return nil, fault.New("operations_autonomy_source_unavailable", 503)
+	}
+	autonomy.OriginalAIReceiptWithin = func(ctx context.Context, tx pgx.Tx, human p.Actor, src businessadmin.OriginalAIReceiptSource) (agentos.Object, error) {
+		var err error
+		src, err = normalizeOriginalAIReceiptSource(src)
+		if err != nil {
+			return nil, err
+		}
+		switch src.Request["kind"] {
+		case "feedback-update":
+			if service.Feedback != nil {
+				return service.Feedback.OriginalAIReceiptWithin(ctx, tx, human, src)
+			}
+		case "content-visibility":
+			if service.Content != nil {
+				return service.Content.OriginalAIReceiptWithin(ctx, tx, human, src)
+			}
+		}
+		return nil, fault.New("operations_autonomy_receipt_unavailable", 503)
+	}
 	priorSource := autonomy.PersistedSourceWithin
 	autonomy.PersistedSourceWithin = func(ctx context.Context, tx pgx.Tx, metadata agentos.Object) (bool, error) {
 		matched, err := service.PersistedSourceWithin(ctx, tx, metadata)
@@ -41,4 +93,23 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 		return priorSource(ctx, tx, metadata)
 	}
 	return service
+}
+
+// normalizeOriginalAIReceiptSource compares the actual call against the exact
+// parser used by its original execution. It does not accept caller input.
+func normalizeOriginalAIReceiptSource(src businessadmin.OriginalAIReceiptSource) (businessadmin.OriginalAIReceiptSource, error) {
+	request, err := actions.ParseRequest(src.CallArguments)
+	if err != nil {
+		return src, fault.New("operations_autonomy_operation_not_found", 404)
+	}
+	if src.Command != nil {
+		current, e := identity.Canonical(request)
+		original, f := identity.Canonical(src.Request)
+		if e != nil || f != nil || string(current) != string(original) {
+			return src, fault.New("operations_autonomy_operation_not_found", 404)
+		}
+	} else {
+		src.Request = request
+	}
+	return src, nil
 }

@@ -21,6 +21,7 @@ type Handler struct {
 var configPath = regexp.MustCompile(`^/v1/operations/autonomy/accounts/(overview|governance|messaging|discovery|maintenance)/config$`)
 var runPath = regexp.MustCompile(`^/v1/operations/autonomy/accounts/(overview|governance|messaging|discovery|maintenance)/run$`)
 var taskPath = regexp.MustCompile(`^/v1/operations/autonomy/tasks/([0-9a-f-]{36})(?:/(control|decisions))?$`)
+var taskOperationPath = regexp.MustCompile(`^/v1/operations/autonomy/tasks/([0-9a-f-]{36})/operations/([0-9a-f-]{36})$`)
 var operationPath = regexp.MustCompile(`^/v1/operations/autonomy/operations/([0-9a-f-]{36})$`)
 
 func readBody(r *http.Request, limit int64) (Object, error) {
@@ -43,7 +44,19 @@ func readBody(r *http.Request, limit int64) (Object, error) {
 func queryValues(raw string) (url.Values, error) {
 	return url.ParseQuery(strings.ReplaceAll(raw, ";", "%3B"))
 }
-func queryNumber(s string)(float64,error){s=trim(s);if s==""{return 0,nil};for prefix,base:=range map[string]int{"0x":16,"0X":16,"0b":2,"0B":2,"0o":8,"0O":8}{if strings.HasPrefix(s,prefix){n,e:=strconv.ParseUint(s[2:],base,64);return float64(n),e}};return strconv.ParseFloat(s,64)}
+func queryNumber(s string) (float64, error) {
+	s = trim(s)
+	if s == "" {
+		return 0, nil
+	}
+	for prefix, base := range map[string]int{"0x": 16, "0X": 16, "0b": 2, "0B": 2, "0o": 8, "0O": 8} {
+		if strings.HasPrefix(s, prefix) {
+			n, e := strconv.ParseUint(s[2:], base, 64)
+			return float64(n), e
+		}
+	}
+	return strconv.ParseFloat(s, 64)
+}
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	const root = "/v1/operations/autonomy"
 	path := r.URL.EscapedPath()
@@ -61,6 +74,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	config, run, task, operation := configPath.FindStringSubmatch(path), runPath.FindStringSubmatch(path), taskPath.FindStringSubmatch(path), operationPath.FindStringSubmatch(path)
+	taskOperation := taskOperationPath.FindStringSubmatch(path)
 	write := r.Method == "POST"
 	if r.Method != "GET" && !write {
 		respond(w, nil, fault.New("not_found", 404))
@@ -154,6 +168,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if e == nil {
 			out, e = s.Tasks(r.Context(), actor, input)
 		}
+	case taskOperation != nil && !write && r.URL.RawQuery == "":
+		out, e = s.OriginalAIReceipt(r.Context(), actor, taskOperation[1], taskOperation[2])
 	case task != nil:
 		if write && task[2] != "" {
 			x := body(2048)

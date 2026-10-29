@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	perms "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
@@ -30,6 +31,7 @@ type Service struct {
 	RuntimeStatus             func(context.Context) (Object, error)
 	NativeConfigured          func() bool
 	CodeRunner                func(context.Context, string) (Object, error)
+	OriginalAIReceiptWithin   func(context.Context, pgx.Tx, Actor, businessadmin.OriginalAIReceiptSource) (Object, error)
 	ReadTargetWithin          func(context.Context, pgx.Tx, Actor, string, string, string) (Object, error)
 	Native                    Native
 	EnqueueWithin             func(context.Context, pgx.Tx, string, Object, string, *time.Time) error

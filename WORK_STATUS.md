@@ -22,6 +22,14 @@ Gateway 诊断 `ca09091` 已通过 CI 并上线；新策略准备轮 `80b8c7fe-3
 
 消息岗位真实只读轮 `97acc926` 的 workbench-summary 原工具 completed，native 两次模型调用；本次历史拒权未复现，不推断历史原因。角色创建轮 `103772e8` 在参数校验 extra_forbidden 后未出卡，原生事件不保存非法字段名，未写角色；待 nested schema 反馈修复后再验。策略失败追问 `db9048a5` 如实说明模型请求失败、具体原因未明，无新卡；原工具账本待核。
 
+搜索真实链：草稿保存及应用已通过原回执并核 native 采用；恢复原active内容的原业务操作 `1f80c7e9` 已 applied，active/native 等原v2，但卡 `59d8f9bb` 仍 unknown/conflict。模型同轮额外生成的 apply 卡已取消、未执行。当前 draft 仍是本轮测试 v7，待原卡同操作恢复后以新操作恢复原v6草稿内容；不能称全部恢复。
+
+`64f5adf` Go/Admin/AgentOS 与源码等价的 `3866fc4` Gateway 已分别通过相应 CI 并上线；数据库已至137，受保护配置与官网保持。profile巡检、角色 nested 反馈、Gateway原run关联及清理/标签完整卡须以下一轮真实路径验收。
+
+新版本角色创建轮 `223fbcaf` 未出卡，模型把旧搜索目标带入并两次准备已变更的搜索草稿；治理账户/角色无写。Go命令摘要、原native RunInput及唯一持久user均与本轮角色意图相符，但provider完整历史未持久，无法据此断定消息顺序；正在定位跨轮语义问题。
+
+显式profile巡检 `a0714e3a` 自然 failed/completion_incomplete，原inspect记载 autonomy source-withheld、workbench not-authorized、maintenance partial，其他五段完整；19次模型调用、876032 tokens，无业务写/无stop。总控配置已恢复 disabled v10，具体来源缺口交设计线继续处理。
+
 聊天记录审查（五岗位现可读历史）：治理轮 `9a95f54f-67a8-42ee-abe2-3e2c8751d3b5` 与消息轮 `25936a95-11ff-4f75-a669-19e31190118c` 的普通问候回答暴露内部授权错误码；后续同岗位问候可正常回答，需核历史来源与当前修复覆盖。总控追问轮 `15718d5d-7ac9-4ef7-9b7b-0bebbf20c313` 将前次失败解释为权限或对象不可用，而相邻三轮原生记录为模型请求 502；指代与当时授权仍在核对，不先断言错拒权。已知提示词 prepared 被说成已恢复、策略类型校验和流终态失败保留上文记录。
 
 首批 `f65434e` 已通过 CI `40838654493`、`40838654443` 并部署 Go、Admin、AgentOS；官网保持 `8e919ac`。业务迁移 133→134，仅额外授予 Worker 角色对原操作命令表 SELECT。部署及无头结果均记入同一 canonical 操作日志。

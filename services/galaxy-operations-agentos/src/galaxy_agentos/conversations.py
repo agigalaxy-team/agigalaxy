@@ -6,6 +6,8 @@ from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
 from .model_gate import with_current_authority
 from .conversation_failures import with_conversation_failures
+from .conversation_tool_batches import with_conversation_tool_batches
+from .conversation_turn_context import with_conversation_turn_context
 from .tool_reliability import reliable_function, PREPARED_CARD_IDS, PREPARED_CARD_MESSAGE
 from agno.run.agent import RunOutput
 from .model_settings import domain_model
@@ -49,7 +51,7 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
             continue
         model = (with_current_authority(model_factory(), gateway) if model_factory is not None
             else domain_model(settings, domain, gateway))
-        model = with_conversation_failures(model)
+        model = with_conversation_tool_batches(with_conversation_turn_context(with_conversation_failures(model)))
         model._galaxy_usage_database = conversation_db
         agents.append(ConversationAgent(id="galaxy-conversation-" + domain, name=label + "沟通", model=model,
             db=conversation_db, tools=[reliable_function(fn) for fn in [current_summary, *conversation_tools(gateway, domain=domain)]],
