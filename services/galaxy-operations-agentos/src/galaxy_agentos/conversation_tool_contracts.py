@@ -352,9 +352,14 @@ class StrategyRehearsal(ClosedArguments):
 
 
 class StrategyPublish(ClosedArguments):
+    """Prepare publication of a current draft using its original valid rehearsal.
+
+    Historical rehearsal receipts are evidence, not current publication authority;
+    the service rechecks the selected version and present eligibility.
+    """
     kind: Literal["strategy-publish"]
-    versionId: UUID
-    rehearsalId: UUID
+    versionId: UUID = Field(description="The actual current strategy draft configuration version ID.")
+    rehearsalId: UUID = Field(description="The ID from the real valid original rehearsal receipt for that same version; not a conversation, turn, run or card ID.")
     reason: Reason
 
 

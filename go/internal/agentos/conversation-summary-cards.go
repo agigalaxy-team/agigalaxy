@@ -111,6 +111,11 @@ func (t *ConversationTools) summaryCard(ctx context.Context, card *conversationC
 		return item
 	}
 	original := completedSummaryReceipt(card)
+	// Rehearsal receipts have a distinct identity contract and must be checked
+	// against the owning service even if a stored projection has an operationId.
+	if card.Proposal["kind"] == "strategy-rehearsal" {
+		original = nil
+	}
 	if original == nil {
 		if card.State != "processing" && card.State != "unknown" && card.State != "completed" {
 			return nil
@@ -136,9 +141,21 @@ func (t *ConversationTools) summaryCard(ctx context.Context, card *conversationC
 	}
 	item["state"], item["summary"] = original["state"], original["summary"]
 	item["recordedEffect"] = summaryRecordedEffect(original)
+	if card.Proposal["kind"] == "strategy-rehearsal" && original["state"] == "completed" {
+		receipt := object(original["receipt"])
+		request := object(card.Proposal["request"])
+		valid, validOK := receipt["valid"].(bool)
+		if !validOK || overviewUUID(receipt["rehearsalId"]) == nil || receipt["rehearsalId"] != card.OperationID || overviewUUID(receipt["versionId"]) == nil || receipt["versionId"] != request["versionId"] {
+			return nil
+		}
+		item["recordedEffect"] = Object{"rehearsalId": receipt["rehearsalId"], "versionId": receipt["versionId"], "valid": valid, "basis": "historical-original-rehearsal-not-current-publish-authorization"}
+	}
 	item["effectExecuted"] = nil
 	if original["state"] == "completed" {
 		item["effectExecuted"] = true
+		if card.Proposal["kind"] == "strategy-rehearsal" {
+			item["effectExecuted"] = false
+		}
 	}
 	return item
 }
