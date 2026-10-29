@@ -23,7 +23,7 @@ View = Literal["list", "summary", "sections", "tags", "projects", "methods", "ov
     "cleanup-candidates", "cleanup-plans", "general", "mail", "service-connections", "advanced"]
 ReadKind = Literal["account", "account-summary", "post", "reply", "section", "case",
     "chat-report", "feedback", "chat-file", "forum-file", "project", "method",
-    "message-plan", "message-run", "notice", "recommendation-theme", "rule", "strategy-run", "strategy-version", "search-version", "ai-run", "backup-point",
+    "message-plan", "message-run", "notice", "recommendation-theme", "content-tag", "rule", "strategy-run", "strategy-version", "search-version", "ai-run", "backup-point",
     "restore-plan", "role", "file-cleanup-plan", "file-cleanup-operation", "registered-user"]
 VIEWS = {"accounts": {"list", "summary"}, "content": {"list", "sections", "tags"},
     "cases": {"list"}, "chat-reports": {"list"}, "feedback": {"list"},
@@ -424,6 +424,33 @@ class RuleRestore(ClosedArguments):
     reason: RuleReason
 
 
+class ContentTagCreate(ClosedArguments):
+    kind: Literal["content-tag-create"]
+    name: Annotated[str, Field(min_length=1, max_length=40)]
+
+    @model_validator(mode="after")
+    def no_control_characters(self):
+        if any(__import__("unicodedata").category(c) == "Cc" for c in self.name):
+            raise ValueError("agentos_tag_name_invalid")
+        return self
+
+
+class ContentTagUpdate(ClosedArguments):
+    kind: Literal["content-tag-update"]
+    targetId: UUID
+    expectedVersion: Annotated[int, Field(strict=True, ge=0, le=2147483646)]
+    name: Annotated[str, Field(min_length=1, max_length=40)] | None = None
+    enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def changed_field(self):
+        if self.name is None and self.enabled is None:
+            raise ValueError("agentos_tag_change_required")
+        if self.name is not None and any(__import__("unicodedata").category(c) == "Cc" for c in self.name):
+            raise ValueError("agentos_tag_name_invalid")
+        return self
+
+
 class RecommendationControls(ClosedArguments):
     avoidRepetition: bool
     avoidConcentration: bool
@@ -457,7 +484,7 @@ from .conversation_message_drafts import MessageDraftCreate, MessageDraftSave, N
 from .conversation_ai_management import AiWorkPromptSave, AiRoleCommand
 
 
-_BusinessOperation = Union[JobCancel, JobRetry, SearchRetry, ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave, NoticeDraftCreate, NoticeDraftSave, NoticeState,
+_BusinessOperation = Union[ContentTagCreate, ContentTagUpdate, JobCancel, JobRetry, SearchRetry, ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave, NoticeDraftCreate, NoticeDraftSave, NoticeState,
     SectionClassification, SectionVisibility, ResourceVisibility, FeedbackUpdate,
     FileScanRetry, FileCleanupApprove, AccountRestriction, FileAccess, CaseResolve, MessagingState, StrategyControl, StrategyContinue,
     OrdinaryStrategyDraft, OrdinaryStrategyPublish, StrategyDraft, StrategyRehearsal, StrategyPublish,
@@ -488,6 +515,7 @@ def _prepared_arguments(operation):
         "ordinary-strategy-draft": ("mode", "enabled"),
         "strategy-draft": ("expectedDraftId",),
         "search-draft-save": ("expectedDraftId",),
+        "content-tag-update": ("name", "enabled"),
     }
     for name in optional_only.get(value["kind"], ()):
         if value.get(name) is None:

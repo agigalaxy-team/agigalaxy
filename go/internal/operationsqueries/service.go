@@ -365,7 +365,7 @@ func readAction(a arguments) string {
 	if a.module == "content" && (a.view == "sections" || a.kind == "section") {
 		return "sections.read"
 	}
-	if a.module == "content" && a.view == "tags" {
+	if a.module == "content" && (a.view == "tags" || a.kind == "content-tag") {
 		return "content.tags.read"
 	}
 	if a.module == "maintenance" && a.view == "logs" {

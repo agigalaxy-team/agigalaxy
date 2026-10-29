@@ -13,7 +13,7 @@ export function WorkbenchActionCards({cards,verified,available=verified,busy,pen
   const dismissible=live&&!!onDismiss&&card.capability.canDismiss&&(!busy||pendingDismissCardId===card.cardId)&&!dismissBusy;
   return <section key={card.cardId} data-workbench-card={card.cardId} className="wb-action-card" aria-label={card.title}>
    <><header><h3>{card.title}</h3>{card.target.href?<Link href={card.target.href} prefetch={false}>{card.target.label}</Link>:<p className="wb-action-target">{card.target.label}</p>}</header>
-    <ul className={strategyCard||['messaging-state','search-draft-save','search-apply','search-restore','notice-draft-create','notice-draft-save','notice-state','recommendation-policy-save','recommendation-theme-update'].includes(card.kind)?"wb-action-impact wb-strategy-impact":"wb-action-impact"}>{card.impact.map((line,index)=><li key={index}>{line}</li>)}</ul>
+    <ul className={strategyCard||['messaging-state','search-draft-save','search-apply','search-restore','notice-draft-create','notice-draft-save','notice-state','recommendation-policy-save','recommendation-theme-update','content-tag-create','content-tag-update'].includes(card.kind)?"wb-action-impact wb-strategy-impact":"wb-action-impact"}>{card.impact.map((line,index)=><li key={index}>{line}</li>)}</ul>
     {strategyCard&&<p><Link href="/admin/operations/strategy" prefetch={false}>在策略管理页查看完整配置</Link></p>}
     {!!card.basis.length&&<dl className="wb-action-basis">{card.basis.map((row,index)=><div key={index}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl>}
     {card.review&&<WorkbenchPromptReview review={card.review}/>}

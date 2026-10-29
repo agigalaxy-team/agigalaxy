@@ -48,7 +48,7 @@ func WorkbenchRunFact(run Object) Object {
 	return Object{"nativeRunId": run["runId"], "modelState": model, "status": status, "usage": out}
 }
 
-var targetTypes = map[string]string{"post": "content-post", "reply": "content-reply", "section": "content-section", "account": "account", "public-case": "community-report", "case": "community-report", "community-report": "community-report", "chat-report": "chat-report", "feedback": "feedback", "project": "project", "projects": "project", "method": "method", "methods": "method", "chat-file": "file-chat", "forum-file": "file-forum", "file-cleanup-plan": "file-cleanup-plan", "message-plan": "messaging-plan", "messaging-plan": "messaging-plan", "recommendation-theme": "recommendation-policy", "recommendation-policy": "recommendation-policy", "search-configuration": "search-quality", "search-quality": "search-quality", "rule": "rule-key", "rule-key": "rule-key", "queue-job": "queue-job", "search-job": "search-job", "strategy": "strategy", "strategy-configuration": "strategy-configuration", "strategy-run": "strategy-run", "ai-work-account": "ai-work-account", "ai-work-prompt": "ai-work-account", "ai-role": "ai-role", "ai-role-assignment": "ai-role-assignment"}
+var targetTypes = map[string]string{"post": "content-post", "reply": "content-reply", "section": "content-section", "account": "account", "public-case": "community-report", "case": "community-report", "community-report": "community-report", "chat-report": "chat-report", "feedback": "feedback", "project": "project", "projects": "project", "method": "method", "methods": "method", "chat-file": "file-chat", "forum-file": "file-forum", "file-cleanup-plan": "file-cleanup-plan", "message-plan": "messaging-plan", "notice": "notice", "messaging-plan": "messaging-plan", "recommendation-theme": "recommendation-policy", "recommendation-policy": "recommendation-policy", "search-configuration": "search-quality", "search-quality": "search-quality", "rule": "rule-key", "rule-key": "rule-key", "queue-job": "queue-job", "search-job": "search-job", "strategy": "strategy", "strategy-configuration": "strategy-configuration", "strategy-run": "strategy-run", "ai-work-account": "ai-work-account", "ai-work-prompt": "ai-work-account", "ai-role": "ai-role", "ai-role-assignment": "ai-role-assignment"}
 
 func OriginalOperationTarget(target, request Object) Object {
 	kind := targetTypes[str(target["kind"])]
@@ -153,6 +153,22 @@ func WorkbenchCardFact(card Object) Object {
 		}
 	} else {
 		target = OriginalOperationTarget(obj(proposal["target"]), obj(proposal["request"]))
+		if has([]string{"notice-draft-create", "notice-draft-save", "notice-state"}, kind) {
+			// Notice effects are projected from the validated original receipt, never
+			// from model text or a messaging-plan identifier. Keep the original
+			// proposed ID for an unknown operation so later recovery retains its binding.
+			proposedID := str(target["targetId"])
+			if target["targetType"] != "notice" || !schemaUUID.MatchString(proposedID) || kind == "notice-draft-create" && proposedID != str(operationID) {
+				return nil
+			}
+			if state == "completed" {
+				noticeID := str(obj(result["receipt"])["noticeId"])
+				if !schemaUUID.MatchString(noticeID) || noticeID != proposedID {
+					return nil
+				}
+				target = Object{"targetType": "notice", "targetId": noticeID}
+			}
+		}
 	}
 	receipt := Object{"operationId": operationID, "action": proposal["kind"], "targetType": target["targetType"], "targetId": target["targetId"], "state": state, "basis": "workbench-original-domain-receipt"}
 	if details != nil {

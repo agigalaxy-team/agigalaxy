@@ -16,7 +16,9 @@
 
 Gateway 诊断 `ca09091` 已通过 CI 并上线；新策略准备轮 `80b8c7fe-3456-48cb-9688-f44a67baef4f` 实际返回“请确认操作”，完整草稿卡 `83219989-caa7-4aa6-b7bc-3816eebaf29e` 与已批准候选一致。但人工确认原操作 `aa0924ac-fbf7-4500-bae7-d3f309f9d1c7` 返回 `not-available / business_admin_denied`；当前策略 revision 9、paused=true，未称草稿已保存。确认阶段授权链正在按原回执检查，不重发。第三批 `dce3879` Go 与 AgentOS 已激活，Admin 与官网保持；周期仍停，两个手动只读任务待验。原 CI 仅 Admin 租约时钟测试失败，修复 `d9c6228` 本地单项通过并已推送，CI 两项均通过。
 
-第三批真实小目标 `7c1d0b9d-9c06-4b36-afb9-9e5af263d03a` 已按原工具账本精确读取受控反馈，随后 assessment 目标达成、无剩余，与独立读取的 pending/revision 1/suggestion/other/note 空一致；无业务写，native 三次模型调用、20084 tokens，任务 completed。临时配置已恢复 disabled v5。五域有界巡检任务 `760842a7-a155-424d-bfe0-f38b3ad58afe` 已单次提交，正在核其实际覆盖与结束。
+第三批真实小目标 `7c1d0b9d-9c06-4b36-afb9-9e5af263d03a` 已按原工具账本精确读取受控反馈，随后 assessment 目标达成、无剩余，与独立读取的 pending/revision 1/suggestion/other/note 空一致；无业务写，native 三次模型调用、20084 tokens，任务 completed。临时配置已恢复 disabled v5。五域有界巡检任务 `760842a7-a155-424d-bfe0-f38b3ad58afe` 自然终态为 failed / completion_incomplete；32次模型调用、1641520 tokens，原账本显示首个聚合部分覆盖、消息计划修参后成功、多次评估 stale/superseded及未解决的拒权。未发 stop，已恢复 disabled v8；原账本已交设计线分析，不判验收通过。
+
+`3cf6f20` Go/Admin/AgentOS 已上线、CI 两项通过，数据库迁移至 135；原幽灵任务 `80b8c7fe` 现投影 failed（原卡仍 not-available），历史不改。新策略准备轮 `ed08b655` 原 native `e2b1979f` 因 model-request 502 终止、1 次模型调用、无卡，策略 revision 9/paused/draft=null；同时间 Gateway 一条 overview 流报告 invalid-stream-event，精确 callId 关联尚待核。策略确认真实闭环尚未通过。
 
 聊天记录审查（五岗位现可读历史）：治理轮 `9a95f54f-67a8-42ee-abe2-3e2c8751d3b5` 与消息轮 `25936a95-11ff-4f75-a669-19e31190118c` 的普通问候回答暴露内部授权错误码；后续同岗位问候可正常回答，需核历史来源与当前修复覆盖。总控追问轮 `15718d5d-7ac9-4ef7-9b7b-0bebbf20c313` 将前次失败解释为权限或对象不可用，而相邻三轮原生记录为模型请求 502；指代与当时授权仍在核对，不先断言错拒权。已知提示词 prepared 被说成已恢复、策略类型校验和流终态失败保留上文记录。
 

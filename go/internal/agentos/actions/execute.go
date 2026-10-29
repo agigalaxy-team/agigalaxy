@@ -35,6 +35,12 @@ func (s *Service) proposal(proposal Object, operationID string) (Object, Object,
 	}
 	kind := str(x["kind"])
 	switch kind {
+	case "content-tag-create", "content-tag-update":
+		var err error
+		command, err = normalizeContentTagCommand(x, command, proposal)
+		if err != nil {
+			return nil, nil, err
+		}
 	case "recommendation-policy-save", "recommendation-theme-update":
 		var err error
 		command, err = normalizeRecommendationExtended(x, command, proposal)
@@ -271,6 +277,24 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 		}
 	}
 	kind := str(x["kind"])
+	if contentTagKind(kind) {
+		var exists bool
+		if e = s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM business_admin_audit_v1 WHERE endpoint=$1 AND operation_id=$2)`, s.Endpoint, operationID).Scan(&exists); e != nil {
+			return nil, e
+		}
+		if exists {
+			return s.RecoverPrepared(ctx, a, proposal, operationID)
+		}
+		review := preparation{impact: []any{}, basis: []any{}, expires: s.now() + 30}
+		if e = s.prepareContentTag(ctx, actor, x, &review); e != nil {
+			return nil, e
+		}
+		frozen := clone(command)
+		delete(frozen, "operationId")
+		if !same(review.command, frozen) || !same(review.impact, proposal["impact"]) || !same(review.basis, proposal["basis"]) {
+			return nil, fail("operations_agentos_review_changed", 409)
+		}
+	}
 	if recommendationExtended(kind) {
 		var exists bool
 		if e = s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations_recommendation_events_v1 WHERE endpoint=$1 AND operation_id=$2)`, s.Endpoint, operationID).Scan(&exists); e != nil {
@@ -336,6 +360,11 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 	}
 	var result Object
 	switch kind {
+	case "content-tag-create", "content-tag-update":
+		result, e = s.executeContentTag(ctx, actor, x, command)
+		if e != nil && fault.Status(e) >= 500 {
+			return unknown(operationID), nil
+		}
 	case "recommendation-policy-save", "recommendation-theme-update":
 		result, e = s.executeRecommendationExtended(ctx, actor, x, command, authorize)
 		if e != nil && fault.Status(e) >= 500 {
@@ -499,6 +528,9 @@ func safeReceipt(result Object) Object {
 	return Object{"operationId": op, "publishedVersion": count(result["publishedVersion"]), "version": count(coalesce(result["version"], content["version"], plan["version"])), "revision": count(coalesce(result["revision"], obj(result["visibility"])["version"], obj(content["visibility"])["version"], plan["revision"])), "hidden": hidden, "state": state, "phase": phase, "replayed": result["replayed"] == true}
 }
 func actionResult(kind string, result Object, operationID string, x, command Object) (Object, error) {
+	if contentTagKind(kind) {
+		return contentTagResult(kind, result, operationID, x)
+	}
 	if recommendationExtended(kind) {
 		return recommendationExtendedResult(kind, result, operationID, x, command)
 	}

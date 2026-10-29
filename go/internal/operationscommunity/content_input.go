@@ -147,3 +147,6 @@ func parseBatch(input Object, preview bool) (Object, error) {
 	}
 	return x, nil
 }
+
+// ParseTagCommand retains the owner's exact create/update validation.
+func ParseTagCommand(input Object, creating bool) (Object, error) { return parseTag(input, creating) }

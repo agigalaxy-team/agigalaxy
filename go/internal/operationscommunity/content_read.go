@@ -228,3 +228,20 @@ func (s *Service) Content(ctx context.Context, a Actor, kind, id string, input O
 		return Object{"content": view, "history": history, "permissions": Object{"canManage": contentManage(a)}, "checkedAt": s.now()}, e
 	})
 }
+
+// TagByID returns one current tag under the existing tags-read authority.
+func (s *Service) TagByID(ctx context.Context, a Actor, id string) (Object, error) {
+	if !validID(id) {
+		return nil, invalid()
+	}
+	return s.domain().Run(ctx, a, "community-tags-query", Object{"id": id}, func(tx pgx.Tx, _ Actor) (Object, error) {
+		row, e := one(ctx, tx, "SELECT to_jsonb(t) FROM operations_forum_tags_v1 t WHERE endpoint=$1 AND id=$2", s.Endpoint, id)
+		if e != nil {
+			return nil, e
+		}
+		if row == nil {
+			return nil, fail("not_found", 404)
+		}
+		return Object{"tag": tagView(row), "checkedAt": s.now()}, nil
+	})
+}

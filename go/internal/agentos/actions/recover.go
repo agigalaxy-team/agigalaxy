@@ -35,7 +35,18 @@ func (s *Service) RecoverPrepared(ctx context.Context, a Actor, proposal Object,
 	}
 	var result Object
 	var finalCard Object
-	if recommendationExtended(kind) {
+	if contentTagKind(kind) {
+		result, e = s.recoverContentTag(ctx, actor, x, command, operationID)
+		if e != nil {
+			return nil, e
+		}
+		if result == nil {
+			return missing(operationID), nil
+		}
+		if result["state"] == "unknown" {
+			return result, nil
+		}
+	} else if recommendationExtended(kind) {
 		result, e = s.recoverRecommendationExtended(ctx, actor, x, command, operationID)
 		if e != nil {
 			return nil, e

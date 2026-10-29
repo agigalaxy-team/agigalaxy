@@ -118,6 +118,19 @@ func (s *Service) community(ctx context.Context, a Actor, args arguments) (query
 	reader := &operationscommunity.Service{Pool: live.Pool, Endpoint: live.Endpoint, Authority: s.reader(a), Duty: live.Duty, PrincipalWithin: live.PrincipalWithin, ReadPrincipalWithin: live.ReadPrincipalWithin, Forum: live.Forum, Files: live.Files, Links: live.Links, Now: live.Now}
 	var value Object
 	var e error
+	if args.kind == "content-tag" {
+		value, e := reader.TagByID(ctx, a, args.id)
+		if e != nil {
+			return queryResult{}, e
+		}
+		tag := object(value["tag"])
+		if tag["id"] != args.id {
+			return queryResult{}, fail("operations_query_response_invalid", 503)
+		}
+		data := object(project(tag, merge(shape("id name createdAt updatedAt", "s"), Object{"version": "n", "enabled": "b"})))
+		data["contentTrust"], data["instructionAuthority"] = "configuration-data", "none"
+		return queryResult{source: value, data: data}, nil
+	}
 	if args.kind != "" {
 		switch args.kind {
 		case "post", "reply":

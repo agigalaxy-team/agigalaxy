@@ -7,7 +7,7 @@ export const agentOsModuleReadActions=Object.freeze({accounts:'accounts.read','r
 export function agentOsQueryReadAction(module,{view,kind}={}){
  if(module==='accounts'&&(view==='summary'||kind==='account-summary'))return 'analytics.read';
  if(module==='content'&&(view==='sections'||kind==='section'))return 'sections.read';
- if(module==='content'&&view==='tags')return 'content.tags.read';
+ if(module==='content'&&(view==='tags'||kind==='content-tag'))return 'content.tags.read';
  if(module==='maintenance'&&view==='logs')return 'maintenance.logs.read';
  return agentOsModuleReadActions[module];
 }

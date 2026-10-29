@@ -39,6 +39,8 @@ func ParseRequest(input Object) (Object, error) {
 	required := []string{"kind"}
 	optional := []string{}
 	switch kind {
+	case "content-tag-create", "content-tag-update":
+		return parseContentTagRequest(x)
 	case "notice-draft-create", "notice-draft-save", "notice-state":
 		return parseNoticeRequest(x)
 	case "recommendation-policy-save", "recommendation-theme-update":

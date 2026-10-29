@@ -159,6 +159,9 @@ var cardReadOnce sync.Once
 var cardReads map[string]string
 
 func CardReadPermission(kind string) (string, error) {
+	if contentTagKind(kind) {
+		return "content.tags.read", nil
+	}
 	if kind == "notice-draft-create" || kind == "notice-draft-save" || kind == "notice-state" {
 		return "notices.read", nil
 	}
@@ -290,6 +293,8 @@ func required(x Object) string {
 		return "content." + str(x["action"])
 	case "content-curation":
 		return "content.curate"
+	case "content-tag-create", "content-tag-update":
+		return "content.tags.manage"
 	case "public-content-batch":
 		return "content.batch." + str(x["action"])
 	case "file-scan-retry":
