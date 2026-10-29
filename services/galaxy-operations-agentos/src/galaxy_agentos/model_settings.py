@@ -138,6 +138,7 @@ def domain_model(settings, domain, gateway):
     from agno.models.openai.like import OpenAILike
     from .model_gate import with_current_authority
     from .provider_retry import with_provider_retry
+    from .model_correlation import install_model_correlation
     # Native LiteLLMOpenAI inherits this same protocol adapter, but importing
     # agno.models.litellm first imports its separate SDK-backed implementation.
     # Keep the native OpenAI-compatible adapter without another gateway SDK.
@@ -154,12 +155,14 @@ def domain_model(settings, domain, gateway):
         if current.get("execution", {}).get("domain") != domain:
             raise AuthorityDenied("agentos_model_scenario_denied")
         require_registered_alias(settings, binding.alias, expected_version=version)
+    install_model_correlation(model)
     model._galaxy_settings_version = version
     primary=with_provider_retry(with_current_authority(model, gateway, admission=admission))
     if not binding.fallbacks:return primary
     backups=[]
     for backup in binding.fallbacks:
         item=native_model(backup.runtime_profile,alias=backup.alias,base_url=gateway_base(settings),api_key=settings.model_gateway_key,headers=headers)
+        install_model_correlation(item)
         item._galaxy_settings_version=version
         item._galaxy_usage_parent=primary
         def backup_admission(current,alias=backup.alias):

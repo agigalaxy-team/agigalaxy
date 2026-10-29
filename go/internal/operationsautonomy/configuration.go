@@ -65,7 +65,7 @@ func parseConfiguration(input Object) (Object, error) {
 		plan = Object{}
 		x["plan"] = plan
 	}
-	if !closed(plan, nil, []string{"strategyIds", "grantIds", "actions", "resourceIds", "eventTypes"}) {
+	if !closed(plan, nil, []string{"strategyIds", "grantIds", "actions", "resourceIds", "eventTypes", "inspectionProfile"}) {
 		return nil, invalid()
 	}
 	for k, max := range map[string]int{"strategyIds": 50, "grantIds": 50, "actions": 200, "resourceIds": 100, "eventTypes": 50} {
@@ -86,6 +86,16 @@ func parseConfiguration(input Object) (Object, error) {
 					return nil, invalid()
 				}
 			} else if !schemaUUID.MatchString(s) {
+				return nil, invalid()
+			}
+		}
+	}
+	if profile, present := plan["inspectionProfile"]; present {
+		if profile != "current-operations-v1" || !has([]string{"ai", "ai-human"}, str(x["mode"])) {
+			return nil, invalid()
+		}
+		for _, key := range []string{"strategyIds", "grantIds", "actions", "resourceIds", "eventTypes"} {
+			if len(list(plan[key])) != 0 {
 				return nil, invalid()
 			}
 		}

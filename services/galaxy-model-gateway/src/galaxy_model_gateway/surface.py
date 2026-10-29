@@ -1,5 +1,6 @@
 import hmac
 import json
+import re
 from asyncio import to_thread
 from uuid import uuid4
 from starlette.responses import JSONResponse
@@ -61,6 +62,10 @@ class PrivateSurface:
             scene, version = header(b"x-galaxy-model-scenario"), header(b"x-galaxy-model-config-version")
             if scene not in SCENARIOS or version != self.settings.config_version:
                 return await fail("model_gateway_configuration_changed", 409)
+            run_headers = [value.decode("latin1") for key, value in headers if key.lower() == b"x-galaxy-native-run-id"]
+            if len(run_headers) > 1 or (run_headers and not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_headers[0])):
+                return await fail("model_gateway_request_invalid")
+            native_run_id = run_headers[0] if run_headers else None
             body, size = [], 0
             while True:
                 message = await receive()
@@ -119,7 +124,7 @@ class PrivateSurface:
                 encoded = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode()
             except (ValueError, UnicodeError, TypeError, RecursionError):
                 return await fail("model_gateway_request_invalid")
-            scope["headers"] = [(key, value) for key, value in headers if key.lower() not in {b"content-length", b"content-type"}]
+            scope["headers"] = [(key, value) for key, value in headers if key.lower() not in {b"content-length", b"content-type", b"x-galaxy-native-run-id"}]
             scope["headers"] += [(b"content-type", b"application/json"), (b"content-length", str(len(encoded)).encode())]
             delivered = False
             original_receive = receive
@@ -131,12 +136,14 @@ class PrivateSurface:
                 return await original_receive()
             receive = replay
             from .response_guard import ResponseGuard
+            from .output import emit
+            emit({'event': 'model-request-accepted', 'callId': metadata['galaxy_call_id'], 'nativeRunId': native_run_id})
             async def response_rejected():
                 if self.usage_store:
                     try: await to_thread(self.usage_store.reject_response, metadata["galaxy_call_id"])
                     except Exception: pass
             guard = ResponseGuard(send, stream=payload.get("stream") is True,
-                responses=is_responses, version=self.settings.config_version, rejected=response_rejected, call_id=metadata["galaxy_call_id"])
+                responses=is_responses, version=self.settings.config_version, rejected=response_rejected, call_id=metadata["galaxy_call_id"], native_run_id=native_run_id)
             try:
                 await self.app(scope, receive, guard.send)
                 await guard.complete()

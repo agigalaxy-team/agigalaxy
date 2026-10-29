@@ -223,6 +223,9 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		}
 		return s.dutyTool(ctx, row, actor, operationID, tool, args, binding.prior != nil)
 	}()
+	if e == nil && result != nil && has([]string{"query-operations", "read-operation-object"}, str(x["tool"])) && currentInspectionPlan(obj(obj(binding.row["configuration"])["plan"])) && incidentalInspectionRead(Object{"tool": x["tool"], "arguments": x["arguments"]}) {
+		result["inspectionRelevance"] = "not-required-for-current-inspection"
+	}
 	if e == nil {
 		_, e = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) {
 			current, e := s.taskWithin(ctx, tx, str(x["taskId"]), " FOR UPDATE")
@@ -262,7 +265,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 				state, code = readResultStatus(result)
 			}
 			if tool == "inspect-operations" {
-				if result["profile"] == "current-operations-v1" && result["inspectionChecked"] == true && result["availability"] == "available" {
+				if outcome := inspectionOutcome(result); outcome != nil && outcome["profileComplete"] == true && result["availability"] == "available" {
 					code = "inspection-current-complete"
 					plans := obj(obj(obj(result["segments"])["messaging"])["data"])["plans"]
 					if items, ok := plans.([]any); ok && len(items) == 0 {
@@ -289,7 +292,13 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 					code = "operations_autonomy_human_required"
 				}
 			}
-			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state=$5,code=$6,updated_at=$4 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, x["taskId"], x["callId"], s.now(), state, code); e != nil {
+			var outcome any
+			if tool == "inspect-operations" {
+				if projected := inspectionOutcome(result); projected != nil {
+					outcome = jsonText(projected)
+				}
+			}
+			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state=$5,code=$6,updated_at=$4,read_outcome=CASE WHEN $7 THEN $8::jsonb ELSE read_outcome END WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, x["taskId"], x["callId"], s.now(), state, code, tool == "inspect-operations", outcome); e != nil {
 				return false, e
 			}
 			if result["availability"] == "available" && (has([]string{"query-operations", "read-operation-object"}, tool) || has([]string{"current-summary", "inspect-operations"}, tool) && result["inspectionChecked"] == true) {

@@ -2,6 +2,9 @@ import asyncio
 import json
 import unittest
 from types import SimpleNamespace
+from dataclasses import dataclass, field
+from agno.agent import Agent
+from agno.models.base import Model as AgnoModel
 
 from agno.models.message import Message
 from agno.models.response import ModelResponse, ToolExecution
@@ -25,7 +28,49 @@ def tool(ident, paused=False):
     return ToolExecution(tool_call_id=ident, tool_name="synthetic", external_execution_required=paused)
 
 
+@dataclass
+class NativeProvider(AgnoModel):
+    id: str = "local-fixed-provider"
+    name: str = "Local"
+    provider: str = "NoNetwork"
+    calls: int = 0
+    captured: list = field(default_factory=list)
+    def invoke(self, *args, **kwargs):
+        messages = kwargs.get("messages", args[0] if args else [])
+        self.captured.append([getattr(m, "content", None) for m in messages])
+        self.calls += 1
+        return ModelResponse(role="assistant", content="done" if self.calls > 1 else "premature")
+    async def ainvoke(self, *args, **kwargs): return self.invoke(*args, **kwargs)
+    def invoke_stream(self, *args, **kwargs): yield self.invoke(*args, **kwargs)
+    async def ainvoke_stream(self, *args, **kwargs): yield self.invoke(*args, **kwargs)
+    def _parse_provider_response(self, response, **kwargs): return response
+    def _parse_provider_response_delta(self, response): return response
+
+class CompletionFactsGateway:
+    def __init__(self): self.calls = 0
+    def duty_authorize(self, _user, *, operation):
+        self.calls += 1
+        return {"task": {"completion": {"disposition": "continue" if self.calls == 1 else "completed",
+            "reasonCode": "read-coverage-incomplete", "nextAction": "核查原范围", "businessState": "not-started",
+            "modelAssessment": {"remainingWork": [{"kind":"read", "description":"核查缺段"}]},
+            "readCoverage": {"unresolved": [{"tool":"inspect-operations", "coverage":"profile-partial", "inspectionOutcome": {
+                "profile":"current-operations-v1", "profileComplete":False, "segments": {"autonomy": {
+                    "availability":"available", "profileComplete":False, "reason":"source-withheld"}}}}],
+                "unverified": [], "incidentalReadFailures": []}}}}
+
+
 class CompletionTests(unittest.TestCase):
+    def test_native_provider_receives_original_closed_completion_facts(self):
+        provider = with_duty_completion(NativeProvider(), CompletionFactsGateway())
+        agent = Agent(model=provider, telemetry=False)
+        result = agent.run("任务", user_id="autonomy:test")
+        self.assertEqual(result.content, "done")
+        self.assertEqual(provider.calls, 2)
+        actual = "\n".join(v for v in provider.captured[1] if isinstance(v, str))
+        for expected in ("read-coverage-incomplete", "核查原范围", "核查缺段", "source-withheld", "autonomy", "有界页"):
+            self.assertIn(expected, actual)
+
+
     def test_same_run_continues_and_keeps_tool_ids(self):
         model = with_duty_completion(Model([ModelResponse(content="partial", tool_executions=[tool("one")]),
             ModelResponse(content="done", tool_executions=[tool("two")])]), Gateway(["continue", "completed"]))

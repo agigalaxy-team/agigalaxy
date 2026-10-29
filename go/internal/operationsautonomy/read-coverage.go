@@ -49,15 +49,15 @@ func sameReadScope(tool string, failed, success Object) bool {
 
 // Later complete successes may cover an earlier read failure only for the same
 // original route and scope; the original failure remains in the ledger.
-func summarizeReadCoverage(calls []Object, _ Object) Object {
-	successful, unresolved, unverified := []Object{}, []Object{}, []Object{}
+func summarizeReadCoverage(calls []Object, plan Object) Object {
+	successful, unresolved, unverified, incidental := []Object{}, []Object{}, []Object{}, []Object{}
+	profile := currentInspectionPlan(plan)
 	for _, call := range calls {
 		tool := str(call["tool"])
 		if tool != "query-operations" && tool != "read-operation-object" && tool != "read-ai-delegation" && tool != "inspect-operations" {
 			continue
 		}
-		args := obj(call["arguments"])
-		fact := Object{"callId": call["call_id"], "tool": tool, "module": args["module"], "view": args["view"], "kind": args["kind"], "id": args["id"]}
+		fact := readCoverageFact(call)
 		code := str(call["code"])
 		if tool == "inspect-operations" {
 			if call["state"] == "completed" && has([]string{"inspection-current-complete", "inspection-current-complete-empty-plans"}, code) {
@@ -76,6 +76,12 @@ func summarizeReadCoverage(calls []Object, _ Object) Object {
 			if !resolved {
 				fact["coverage"] = "profile-partial"
 				fact["basis"] = "current-operations-v1"
+				outcome := obj(call["read_outcome"])
+				if outcome != nil {
+					fact["inspectionOutcome"] = outcome
+				} else {
+					fact["inspectionOutcome"] = nil
+				}
 				unresolved = append(unresolved, fact)
 			}
 			continue
@@ -116,6 +122,11 @@ func summarizeReadCoverage(calls []Object, _ Object) Object {
 		}
 
 		if !resolved {
+			if profile && incidentalInspectionRead(call) {
+				fact["reason"] = "not-required-for-current-inspection"
+				incidental = append(incidental, fact)
+				continue
+			}
 			if legacyUnverified {
 				unverified = append(unverified, fact)
 			} else {
@@ -123,7 +134,66 @@ func summarizeReadCoverage(calls []Object, _ Object) Object {
 			}
 		}
 	}
-	return Object{"successful": successful, "unresolved": unresolved, "unverified": unverified}
+	return Object{"successful": successful, "unresolved": unresolved, "unverified": unverified, "incidentalReadFailures": incidental}
+}
+
+func currentInspectionPlan(plan Object) bool {
+	if plan["inspectionProfile"] != "current-operations-v1" {
+		return false
+	}
+	for _, key := range []string{"actions", "grantIds", "strategyIds", "resourceIds", "eventTypes"} {
+		if len(list(plan[key])) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func readCoverageFact(call Object) Object {
+	tool := str(call["tool"])
+	fact := Object{"callId": call["call_id"], "tool": tool}
+	if tool == "query-operations" || tool == "read-operation-object" {
+		scope := operationsquerycontract.QueryCoverageScope(tool, obj(call["arguments"]))
+		for _, key := range []string{"module", "view", "kind", "id"} {
+			if scope[key] != nil {
+				fact[key] = scope[key]
+			}
+		}
+		safeScope := Object{"filters": scope["filters"], "missingRequired": scope["missingRequired"], "invalidFilterKeys": scope["invalidFilterKeys"], "unknownFields": scope["unknownFields"]}
+		paging := Object{}
+		for _, key := range []string{"after", "limit", "page", "pageSize"} {
+			value, exists := obj(obj(call["arguments"])["filters"])[key]
+			if exists && has(texts(scope["allowedFilterKeys"]), key) && !has(texts(scope["invalidFilterKeys"]), key) {
+				paging[key] = value
+			}
+		}
+		if len(paging) > 0 {
+			safeScope["pagination"] = paging
+		}
+		fact["scope"] = safeScope
+	} else if tool == "read-ai-delegation" {
+		id := str(obj(call["arguments"])["aiAccountId"])
+		if schemaUUID.MatchString(id) {
+			fact["scope"] = Object{"aiAccountId": id}
+		}
+	}
+	return fact
+}
+
+// An unrecognizable scope remains unresolved; it cannot safely be declared
+// outside the frozen inspection merely because its parameters were invalid.
+func incidentalInspectionRead(call Object) bool {
+	if call["code"] == "local-validation-ambiguous" {
+		return false
+	}
+	if call["tool"] != "query-operations" && call["tool"] != "read-operation-object" {
+		return false
+	}
+	scope := operationsquerycontract.QueryCoverageScope(str(call["tool"]), obj(call["arguments"]))
+	if scope["invalidRoute"] == true || scope["unknownTopLevel"] == true || scope["unknownFilterFields"] == true || scope["invalidFilters"] == true || len(list(scope["invalidFilterKeys"])) > 0 {
+		return false
+	}
+	return !inspectionCoversFailure(call, Object{"tool": "inspect-operations", "code": "inspection-current-complete"})
 }
 
 // An unfiltered, complete, empty plan list proves there is no plan whose

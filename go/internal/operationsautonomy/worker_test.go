@@ -233,7 +233,12 @@ func TestAssessmentBecomesStaleAfterBusinessTool(t *testing.T) {
 		if tool != "inspect-operations" || len(args) != 0 {
 			t.Fatal("inspect escaped closed interface")
 		}
-		return a.Object{"profile": "current-operations-v1", "availability": "available", "inspectionChecked": true, "segments": a.Object{"messaging": a.Object{"data": a.Object{"plans": []any{}}}}}, nil
+		segments := a.Object{}
+		for _, key := range []string{"workbench", "maintenance", "search", "recommendations", "analytics", "messaging", "autonomy", "delegation"} {
+			segments[key] = a.Object{"availability": "available", "collectionComplete": true, "profileComplete": true}
+		}
+		segments["messaging"].(a.Object)["data"] = a.Object{"plans": []any{}}
+		return a.Object{"profile": "current-operations-v1", "availability": "available", "inspectionChecked": true, "profileComplete": true, "segments": segments}, nil
 	}
 	inspection := uuid.NewString()
 	if _, err := s.Tool(ctx, a.Object{"taskId": id, "callId": inspection, "tool": "inspect-operations", "arguments": a.Object{}}, false); err != nil {

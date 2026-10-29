@@ -16,11 +16,9 @@ def _pointer(root, ref):
     return value if isinstance(value, dict) else None
 
 
-def _operation_variants(schema):
-    if not isinstance(schema, dict):
-        return []
-    operation = schema.get("properties", {}).get("operation")
-    if not isinstance(operation, dict):
+def _tagged_variants(schema, entry):
+    """Read discriminated branches from the actual inline/ref schema."""
+    if not isinstance(schema, dict) or not isinstance(entry, dict):
         return []
     variants, seen = [], set()
 
@@ -32,8 +30,7 @@ def _operation_variants(schema):
             if ref in seen:
                 return
             seen.add(ref)
-            target = _pointer(schema, ref)
-            visit(target, ref.rsplit("/", 1)[-1].replace("~1", "/").replace("~0", "~"))
+            visit(_pointer(schema, ref), ref.rsplit("/", 1)[-1].replace("~1", "/").replace("~0", "~"))
             return
         properties = node.get("properties")
         if isinstance(properties, dict):
@@ -47,7 +44,7 @@ def _operation_variants(schema):
                     required = []
                 variants.append((kind, tuple(sorted(k for k in required if isinstance(k, str) and k in properties)),
                     tuple(sorted(k for k in properties if isinstance(k, str))),
-                    tuple(k for k in (node.get("title"), ref_name) if isinstance(k, str) and k)))
+                    tuple(k for k in (node.get("title"), ref_name) if isinstance(k, str) and k), node))
         for branch in ("oneOf", "anyOf", "allOf"):
             values = node.get(branch)
             if isinstance(values, list):
@@ -59,22 +56,53 @@ def _operation_variants(schema):
             for ref in mapping.values():
                 visit({"$ref": ref})
 
-    visit(operation)
+    visit(entry)
     return variants
 
 
-def operation_schema_feedback(schema):
-    """Return allowed tags and per-tag fields from the actual native schema."""
-    variants = _operation_variants(schema)
+def _operation_variants(schema):
+    if not isinstance(schema, dict):
+        return []
+    operation = schema.get("properties", {}).get("operation")
+    return [row[:4] for row in _tagged_variants(schema, operation)]
+
+
+def _variant_details(variants):
     grouped = {}
-    for kind, required, allowed, _ in variants:
+    for kind, required, allowed, *_ in variants:
         grouped.setdefault(kind, set()).add((required, allowed))
     details = {}
     for kind, choices in grouped.items():
         if len(choices) == 1:
             required, allowed = next(iter(choices))
             details[kind] = {"requiredFields": list(required), "allowedFields": list(allowed)}
-    return {"allowedOperationKinds": sorted(grouped), "operationSchemas": details}
+    return sorted(grouped), details
+
+
+def operation_schema_feedback(schema, arguments=None):
+    """Project only schema facts, with nested facts for a selected outer kind."""
+    operation = schema.get("properties", {}).get("operation") if isinstance(schema, dict) else None
+    variants = _tagged_variants(schema, operation)
+    kinds, details = _variant_details(variants)
+    result = {"allowedOperationKinds": kinds, "operationSchemas": details}
+    selected = arguments.get("operation") if isinstance(arguments, dict) else None
+    selected_kind = selected.get("kind") if isinstance(selected, dict) else None
+    branches = [node for kind, _, _, _, node in variants if kind == selected_kind]
+    if branches:
+        # Duplicate inline/ref representations are harmless only if every
+        # selected branch describes exactly the same nested contract.
+        contracts = []
+        for branch in branches:
+            command = branch.get("properties", {}).get("command")
+            nested = _tagged_variants(schema, command)
+            if not nested:
+                contracts = []
+                break
+            contracts.append(_variant_details(nested))
+        if contracts and all(contract == contracts[0] for contract in contracts):
+            command_kinds, command_details = contracts[0]
+            result.update({"allowedCommandKinds": command_kinds, "commandSchemas": command_details})
+    return result
 
 
 def repair_operation_alias(arguments, schema):

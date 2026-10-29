@@ -57,6 +57,19 @@ class ResponseDiagnostics(unittest.TestCase):
             self.assertEqual(logs[0]['jsonParse'], 'ok')
             self.assertNotIn('PRIVATE_', repr(logs))
 
+    def test_error_frame_exposes_only_closed_metadata(self):
+        body = event({'error': {'type': 'rate_limit_error', 'status': 'RESOURCE_EXHAUSTED',
+            'code': 429, 'message': 'PRIVATE_CANARY'}})
+        logs, _, rejected = self.inspect(body)
+        self.assertTrue(rejected)
+        self.assertEqual((logs[0]['errorPresent'], logs[0]['errorShape'], logs[0]['errorType'],
+            logs[0]['errorStatus'], logs[0]['errorCode']), (True, 'object', 'rate_limit_error', 'RESOURCE_EXHAUSTED', 429))
+        self.assertNotIn('PRIVATE_CANARY', repr(logs))
+        logs, _, rejected = self.inspect(event({'error': {'type': 'PRIVATE_CANARY', 'status': 'PRIVATE_CANARY', 'code': 'PRIVATE_CANARY'}}))
+        self.assertTrue(rejected)
+        self.assertEqual((logs[0]['errorType'], logs[0]['errorStatus'], logs[0]['errorCode']), ('unknown', 'unknown', 'unknown'))
+        self.assertNotIn('PRIVATE_CANARY', repr(logs))
+
 
 if __name__ == '__main__':
     unittest.main()

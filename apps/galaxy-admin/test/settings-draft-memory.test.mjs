@@ -19,3 +19,10 @@ test('pending memory keeps only the original receipt coordinates and excludes se
  assert.throws(()=>session.write('models',{configuration:{models:[{apiKey:'SYNTHETIC_NOT_SECRET'}]}}),/Excluded/);
  session.write('search',{draft:null,reasons:{draft:'safe'},positions:[]});session.setPending('search',{operationId,kind:'draft'});session.clear('search');assert.equal(session.read('search'),null);assert.equal(session.pending('search').operationId,operationId);session.setPending('search',null);assert.equal(session.pending('search'),null);
 });
+
+
+test('AI duty drafts preserve the explicitly selected inspection profile',()=>{
+ const memory=createSettingsDraftMemory(),session=memory.open('principal','login');
+ const config={id:operationId,domain:'overview',revision:1,enabled:false,mode:'ai',schedule:{kind:'interval',minutes:60,timezone:'Asia/Shanghai'},purpose:'',goal:'',prompt:'',promptVersion:1,planVersion:1,delegationVersion:null,plan:{strategyIds:[],grantIds:[],actions:[],resourceIds:[],eventTypes:[],inspectionProfile:'current-operations-v1'}};
+ session.write('ai-work',{dutyDrafts:{overview:{configuration:config,base:config}}});const saved=session.read('ai-work').dutyDrafts.overview;assert.equal(saved.configuration.plan.inspectionProfile,'current-operations-v1');assert.equal(saved.base.plan.inspectionProfile,'current-operations-v1');
+});

@@ -35,10 +35,11 @@ def useful_response(value, responses=False):
 
 
 class ResponseGuard:
-    def __init__(self, send, *, stream, responses, version, rejected, call_id=None):
+    def __init__(self, send, *, stream, responses, version, rejected, call_id=None, native_run_id=None):
         self.downstream, self.stream, self.responses = send, stream, responses
         self.version, self.rejected = version, rejected
         self.call_id = call_id
+        self.native_run_id = native_run_id
         self.start = None
         self.started = self.ended = self.bad = False
         self.buffer = bytearray()
@@ -50,15 +51,39 @@ class ResponseGuard:
         self.responses_terminal = 'none'
         self.frame_count = self.choice_count = self.tool_delta_count = 0
         self.json_state = 'not-seen'
+        self.error_present = False
+        self.error_shape = 'none'
+        self.error_type = self.error_status = self.error_code = 'unknown'
+
+    def inspect_error(self, value):
+        if not isinstance(value, dict) or 'error' not in value:
+            return
+        error = value['error']
+        self.error_present = True
+        self.error_shape = 'object' if isinstance(error, dict) else 'scalar'
+        if not isinstance(error, dict):
+            return
+        error_type, status, code = error.get('type'), error.get('status'), error.get('code')
+        allowed_types = {'api_error', 'invalid_request_error', 'authentication_error', 'permission_error', 'not_found_error', 'rate_limit_error', 'server_error', 'overloaded_error', 'timeout_error'}
+        allowed_status = {'CANCELLED', 'UNKNOWN', 'INVALID_ARGUMENT', 'DEADLINE_EXCEEDED', 'NOT_FOUND', 'ALREADY_EXISTS', 'PERMISSION_DENIED', 'RESOURCE_EXHAUSTED', 'FAILED_PRECONDITION', 'ABORTED', 'OUT_OF_RANGE', 'UNIMPLEMENTED', 'INTERNAL', 'UNAVAILABLE', 'DATA_LOSS', 'UNAUTHENTICATED'}
+        if isinstance(error_type, str) and error_type in allowed_types:
+            self.error_type = error_type
+        if isinstance(status, str) and status in allowed_status:
+            self.error_status = status
+        elif type(status) is int and status in {400, 401, 402, 403, 404, 408, 409, 413, 422, 429, 500, 502, 503, 504, 529}:
+            self.error_status = status
+        if type(code) is int and 400 <= code <= 599:
+            self.error_code = code
 
     def diagnostic(self, event, **extra):
         from .output import emit
-        emit({'event': event, 'callId': self.call_id, 'stage': self.stage,
+        emit({'event': event, 'callId': self.call_id, 'nativeRunId': self.native_run_id, 'stage': self.stage,
             'stream': self.stream, 'useful': self.useful, 'sawDone': self.saw_done,
             'chatFinishReason': self.chat_finish, 'responsesTerminalEvent': self.responses_terminal,
             'frameCount': self.frame_count, 'choiceCount': self.choice_count,
             'toolDeltaCount': self.tool_delta_count, 'partialBufferBytes': len(self.buffer),
-            'jsonParse': self.json_state, **extra})
+            'jsonParse': self.json_state, 'errorPresent': self.error_present, 'errorShape': self.error_shape,
+            'errorType': self.error_type, 'errorStatus': self.error_status, 'errorCode': self.error_code, **extra})
 
     async def begin(self):
         if not self.started:
@@ -124,6 +149,7 @@ class ResponseGuard:
                 try:
                     value = json.loads(self.buffer)
                     self.json_state = 'ok'
+                    self.inspect_error(value)
                     valid = useful_response(value, self.responses)
                 except (ValueError, TypeError, RecursionError):
                     self.json_state = 'invalid'
@@ -165,6 +191,7 @@ class ResponseGuard:
             try:
                 value = json.loads(data)
                 self.json_state = 'ok'
+                self.inspect_error(value)
                 if isinstance(value, dict) and (value.get('error') or self.responses and value.get('type') in {'error','response.failed','response.incomplete'}):
                     from .metadata import provider_failure_for
                     origin=provider_failure_for(self.call_id)

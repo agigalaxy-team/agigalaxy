@@ -32,11 +32,34 @@ def with_duty_completion(model, gateway):
         return ((result.get("task") or {}).get("completion") or {})
 
     def append_prompt(messages, completion):
-        reason = completion.get("reasonCode", "task-assessment-required")
+        # The server owns this bounded, task-scoped projection. Do not copy
+        # returned source bodies or interpret an incomplete page as a full set.
+        assessment = completion.get("modelAssessment")
+        assessment = assessment if isinstance(assessment, dict) else {}
+        remaining = assessment.get("remainingWork")
+        remaining = [{"kind": item.get("kind"), "description": item.get("description")}
+            for item in remaining[:8] if isinstance(item, dict)
+            and item.get("kind") in {"read", "action", "human"}
+            and isinstance(item.get("description"), str) and len(item["description"]) <= 240] if isinstance(remaining, list) else []
+        coverage = completion.get("readCoverage")
+        coverage = coverage if isinstance(coverage, dict) else {}
+        def facts(key):
+            values = coverage.get(key)
+            if not isinstance(values, list):
+                return []
+            return [{k: item[k] for k in ("tool", "module", "view", "kind", "id", "scope", "coverage", "basis", "reason", "inspectionOutcome") if k in item}
+                for item in values[:40] if isinstance(item, dict)]
+        status = {"disposition": completion.get("disposition"), "reasonCode": completion.get("reasonCode"),
+            "nextAction": completion.get("nextAction"), "businessState": completion.get("businessState"),
+            "remainingWork": remaining, "unresolved": facts("unresolved"), "unverified": facts("unverified"),
+            "incidentalReadFailures": facts("incidentalReadFailures"),
+            "omittedCounts": {key: max(0, len(coverage.get(key)) - 40) if isinstance(coverage.get(key), list) else 0
+                for key in ("unresolved", "unverified", "incidentalReadFailures")}}
         messages.append(Message(role="user", content=(
             "系统要求继续当前原任务；以当前授权和原操作回执为准。"
-            "检查剩余目标并使用已有工具推进；未知写入只核查原操作，不能重发。"
-            "完成有效工作后调用 assess_task。当前状态：" + str(reason))))
+            "按以下程序裁决处理未决范围；取得有界页不代表全库已穷尽。"
+            "未知写入只核查原操作，不能重发；完成有效工作后调用 assess_task。"
+            "当前程序裁决：" + json.dumps(status, ensure_ascii=False, allow_nan=False, separators=(",", ":")))))
 
     def merge(parts, last):
         by_id = {}

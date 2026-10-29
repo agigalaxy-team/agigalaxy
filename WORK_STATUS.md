@@ -20,6 +20,8 @@ Gateway 诊断 `ca09091` 已通过 CI 并上线；新策略准备轮 `80b8c7fe-3
 
 `3cf6f20` Go/Admin/AgentOS 已上线、CI 两项通过，数据库迁移至 135；原幽灵任务 `80b8c7fe` 现投影 failed（原卡仍 not-available），历史不改。新策略准备轮 `ed08b655` 原 native `e2b1979f` 因 model-request 502 终止、1 次模型调用、无卡，策略 revision 9/paused/draft=null；同时间 Gateway 一条 overview 流报告 invalid-stream-event，精确 callId 关联尚待核。策略确认真实闭环尚未通过。
 
+消息岗位真实只读轮 `97acc926` 的 workbench-summary 原工具 completed，native 两次模型调用；本次历史拒权未复现，不推断历史原因。角色创建轮 `103772e8` 在参数校验 extra_forbidden 后未出卡，原生事件不保存非法字段名，未写角色；待 nested schema 反馈修复后再验。策略失败追问 `db9048a5` 如实说明模型请求失败、具体原因未明，无新卡；原工具账本待核。
+
 聊天记录审查（五岗位现可读历史）：治理轮 `9a95f54f-67a8-42ee-abe2-3e2c8751d3b5` 与消息轮 `25936a95-11ff-4f75-a669-19e31190118c` 的普通问候回答暴露内部授权错误码；后续同岗位问候可正常回答，需核历史来源与当前修复覆盖。总控追问轮 `15718d5d-7ac9-4ef7-9b7b-0bebbf20c313` 将前次失败解释为权限或对象不可用，而相邻三轮原生记录为模型请求 502；指代与当时授权仍在核对，不先断言错拒权。已知提示词 prepared 被说成已恢复、策略类型校验和流终态失败保留上文记录。
 
 首批 `f65434e` 已通过 CI `40838654493`、`40838654443` 并部署 Go、Admin、AgentOS；官网保持 `8e919ac`。业务迁移 133→134，仅额外授予 Worker 角色对原操作命令表 SELECT。部署及无头结果均记入同一 canonical 操作日志。
