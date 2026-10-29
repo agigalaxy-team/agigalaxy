@@ -117,7 +117,15 @@ func (s *Service) NoticeGet(ctx context.Context, a Actor, id string) (Object, er
 			return nil, e
 		}
 		view, e := s.noticeView(ctx, tx, row)
-		return Object{"notice": view}, e
+		if e != nil {
+			return nil, e
+		}
+		content, origin, e := s.noticeReadContentWithin(ctx, tx, row)
+		if e != nil {
+			return nil, e
+		}
+		view["readContent"], view["origin"] = content, origin
+		return Object{"notice": view}, nil
 	})
 }
 func (s *Service) noticeCommand(ctx context.Context, a Actor, kind string, input Object, execute func(pgx.Tx, Actor) (Object, Object, Object, error)) (Object, error) {

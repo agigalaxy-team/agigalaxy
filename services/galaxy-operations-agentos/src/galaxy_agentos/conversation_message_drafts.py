@@ -105,6 +105,11 @@ class MessageDraftConfig(Closed):
 
 
 class MessageDraftCreate(Closed):
+    """Create a message-plan draft with inapp, email or announcement channels and a schedule.
+
+    The inapp channel belongs to the plan; it does not create a standalone notice draft.
+    Creating the draft does not activate or deliver it; a prepared card requires human confirmation.
+    """
     kind: Literal["message-draft-create"]
     config: MessageDraftConfig
 
@@ -112,6 +117,7 @@ class MessageDraftCreate(Closed):
 class MessageDraftSave(Closed):
     """Save the selected message plan's draft configuration; this does not activate or deliver it.
 
+    A message plan may use inapp, email or announcement channels and a schedule; inapp does not make it a standalone notice.
     Read the selected message-plan lifecycle for current preparation options.
     A prepared card requires human confirmation; an unknown result is checked by its original operation.
     """
@@ -128,11 +134,19 @@ class NoticeContent(DraftContent):
 
 
 class NoticeDraftCreate(Closed):
+    """Create a standalone inapp notice draft, not a multi-channel or scheduled message plan.
+
+    Publishing requires review and human confirmation through the notice-state operation.
+    """
     kind: Literal["notice-draft-create"]
     content: NoticeContent
 
 
 class NoticeDraftSave(Closed):
+    """Save a specific standalone inapp notice draft and its expected version.
+
+    This neither publishes the notice nor creates a multi-channel or scheduled message plan.
+    """
     kind: Literal["notice-draft-save"]
     targetId: UUID
     expectedVersion: Annotated[int, Field(strict=True, ge=1, le=2147483646)]
@@ -140,6 +154,11 @@ class NoticeDraftSave(Closed):
 
 
 class NoticeState(Closed):
+    """Prepare publish or withdraw for a specific inapp notice version.
+
+    The card requires human confirmation. The notice action does not activate or stop
+    a multi-channel message plan, nor does it change the notice's parent plan.
+    """
     kind: Literal["notice-state"]
     targetId: UUID
     expectedVersion: Annotated[int, Field(strict=True, ge=1, le=2147483646)]

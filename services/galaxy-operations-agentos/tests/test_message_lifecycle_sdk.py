@@ -39,5 +39,26 @@ class MessageLifecycleSDKTest(unittest.TestCase):
         self.assertIn("original operation", state["description"])
 
 
+    def test_real_prepare_schema_separates_notice_from_plan(self):
+        prepare = next(tool for tool in conversation_tools(object()) if tool.__name__ == "prepare_operation")
+        native = Function.from_callable(prepare)
+        native.process_entrypoint()
+        expected = {
+            "message-draft-create": {"kind", "config"},
+            "message-draft-save": {"kind", "targetId", "config"},
+            "notice-draft-create": {"kind", "content"},
+            "notice-draft-save": {"kind", "targetId", "expectedVersion", "content"},
+            "notice-state": {"kind", "targetId", "expectedVersion", "action"},
+        }
+        for kind, required in expected.items():
+            with self.subTest(kind=kind):
+                schema = branch(native.parameters, kind)
+                self.assertEqual(set(schema["required"]), required)
+                self.assertIn("plan", schema["description"].lower())
+                self.assertIn("notice", schema["description"].lower())
+        state = branch(native.parameters, "notice-state")
+        self.assertEqual(state["properties"]["action"]["enum"], ["publish", "withdraw"])
+
+
 if __name__ == "__main__":
     unittest.main()

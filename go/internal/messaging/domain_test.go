@@ -112,6 +112,38 @@ func TestOriginalPostgresPlanRunAudienceInappReplayAndRevocation(t *testing.T) {
 		t.Fatal("execute", e)
 	}
 	run := obj(executed["run"])
+	// The actual inapp notice is bound to this original plan version; its
+	// attribute audience is a plan shape, not a standalone notice command.
+	generated, e := service.NoticeGet(ctx, authority.actor, str(run["id"]))
+	if e != nil {
+		t.Fatal("generated notice read", e)
+	}
+	generatedNotice := obj(generated["notice"])
+	if str(obj(generatedNotice["origin"])["kind"]) != "message-plan-run" || str(obj(generatedNotice["origin"])["runId"]) != str(run["id"]) || str(obj(obj(generatedNotice["readContent"])["audience"])["kind"]) != "attributes" || obj(generatedNotice["readContent"])["messagingRunId"] != nil {
+		t.Fatalf("generated notice origin mismatch: %v", generatedNotice["origin"])
+	}
+	var originalContent Object
+	if e = pool.QueryRow(ctx, "SELECT content FROM operations_notices_v1 WHERE id=$1", run["id"]).Scan(&originalContent); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE operations_notices_v1 SET content=jsonb_set(content,'{messagingRunId}',to_jsonb($2::text)) WHERE id=$1`, run["id"], uuid.NewString()); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = service.NoticeGet(ctx, authority.actor, str(run["id"])); e == nil {
+		t.Fatal("forged notice marker accepted")
+	}
+	if _, e = pool.Exec(ctx, "UPDATE operations_notices_v1 SET content=$2 WHERE id=$1", run["id"], originalContent); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE operations_notices_v1 SET content=jsonb_set(content,'{title}',to_jsonb('changed'::text)) WHERE id=$1`, run["id"]); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = service.NoticeGet(ctx, authority.actor, str(run["id"])); e == nil {
+		t.Fatal("notice content inconsistent with source version accepted")
+	}
+	if _, e = pool.Exec(ctx, "UPDATE operations_notices_v1 SET content=$2 WHERE id=$1", run["id"], originalContent); e != nil {
+		t.Fatal(e)
+	}
 	if num(obj(run["audience"])["accountCount"]) != 2 || str(obj(run["announcement"])["state"]) != "published" {
 		t.Fatal("audience/announcement", encode(run))
 	}

@@ -11,6 +11,9 @@ import (
 var deliveryStates = merge(shape("total pending submitting submitted delivered skipped failed unknown blocked bounced opened clicked", "n"), Object{"receipts": "s"})
 var accountShape = merge(shape("accountId uid displayName subjectType createdAt", "s"), Object{"profileRevision": "n", "restriction": Object{"active": "b", "until": "s"}})
 
+func messagePlanObjectMetadata() Object {
+	return Object{"objectType": "message-plan", "objectMechanism": "messaging-state-activate-pause-resume-stop-withdraw"}
+}
 func messagePlan(x Object) Object {
 	channels := []any{}
 	if a, ok := x["config"].(map[string]any); ok {
@@ -29,7 +32,7 @@ func messagePlan(x Object) Object {
 			}
 		}
 	}
-	return merge(object(project(x, merge(shape("id state effectiveState createdAt updatedAt", "s"), shape("version revision", "n")))), Object{"channels": channels, "purpose": text(object(object(x["config"])["content"])["purpose"]), "expiresAt": text(object(object(x["config"])["content"])["expiresAt"]), "schedule": project(object(x["config"])["schedule"], shape("kind at cron timezone", "s"))})
+	return merge(object(project(x, merge(shape("id state effectiveState createdAt updatedAt", "s"), shape("version revision", "n")))), messagePlanObjectMetadata(), Object{"channels": channels, "purpose": text(object(object(x["config"])["content"])["purpose"]), "expiresAt": text(object(object(x["config"])["content"])["expiresAt"]), "schedule": project(object(x["config"])["schedule"], shape("kind at cron timezone", "s"))})
 }
 func messageRun(x Object) Object {
 	return object(project(x, merge(shape("id planId state errorCode createdAt updatedAt completedAt", "s"), shape("revision planVersion", "n"), Object{"audience": Object{"accountCount": "n", "frozenAt": "s"}, "delivery": Object{"email": deliveryStates, "inapp": deliveryStates}, "announcement": shape("id state publishedAt expiresAt withdrawnAt", "s")})))
@@ -154,6 +157,9 @@ func (s *Service) execute(ctx context.Context, a Actor, domain string, args argu
 		resume = Object{"module": args.module, "view": args.view, "filters": merge(args.filters, Object{"after": next})}
 	}
 	data := Object{"items": rows, "coverage": "returned-page", "scanLimited": result["scanTruncated"] == true || result["scanLimited"] == true}
+	if args.view == "plans" {
+		data = merge(data, messagePlanObjectMetadata())
+	}
 	if result["summary"] != nil {
 		data["summary"] = messageSummary(object(result["summary"]))
 	}
@@ -195,7 +201,7 @@ func (s *Service) readMessage(ctx context.Context, source *messaging.Service, a 
 			runs = append(runs, messageRun(object(v)))
 		}
 	}
-	data := Object{"plan": plan, "recentRuns": runs, "lifecycle": messageLifecycle(row, lifecycleKnown)}
+	data := merge(Object{"plan": plan, "recentRuns": runs, "lifecycle": messageLifecycle(row, lifecycleKnown)}, messagePlanObjectMetadata())
 	if purpose == "message-draft-editing" {
 		data["messagePurposeMeaning"] = "message-draft-editing describes the purpose of reading draft content; it does not restrict subsequent human publication review."
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/jobs"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/messaging"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsaudit"
@@ -79,6 +80,75 @@ func TestActualMessagingQueriesCurrentHumanAIAndOriginalProjection(t *testing.T)
 	if _, e = queries.Query(ctx, actor, "messaging", "query-operations", Object{"module": "audit", "view": "list", "filters": Object{"kind": "reads", "limit": 1}}); e != nil {
 		t.Fatal(e)
 	}
+	createdNotice, e := source.NoticeCreate(ctx, actor, messaging.Object{"operationId": uuid.NewString(), "content": messaging.Object{"purpose": "maintenance", "title": "Synthetic notice", "body": "Synthetic content", "audience": messaging.Object{"kind": "all-accounts"}, "expiresAt": now().Add(time.Hour).Format(time.RFC3339)}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	noticeID := str(object(createdNotice["notice"])["id"])
+	for _, entry := range []struct {
+		tool  string
+		input Object
+	}{
+		{"query-operations", Object{"module": "messaging", "view": "notices"}},
+		{"read-operation-object", Object{"kind": "notice", "id": noticeID}},
+	} {
+		value, err := queries.Query(ctx, actor, "messaging", entry.tool, entry.input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data := object(value["data"])
+		if data["objectType"] != "notice" || data["objectMechanism"] != "notice-state-publish-withdraw" {
+			t.Fatalf("notice object metadata: %v", data)
+		}
+		if entry.tool == "query-operations" {
+			rows := anyArray(data["items"])
+			if len(rows) == 0 || object(rows[0])["objectType"] != "notice" {
+				t.Fatal("notice list metadata missing")
+			}
+		}
+	}
+	// Generate a notice through the real plan execution path, then read it
+	// through the same current-human/AI query service as other source data.
+	tx, e := owner.Begin(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = jobs.MigrateWithin(ctx, owner, tx); e != nil {
+		tx.Rollback(ctx)
+		t.Fatal(e)
+	}
+	if e = tx.Commit(ctx); e != nil {
+		t.Fatal(e)
+	}
+	queue, e := jobs.New(owner, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	source.Pool, source.Jobs, source.Approver = owner, queue, gateway
+	generatedPlan, e := source.Create(ctx, actor, messaging.Object{"operationId": uuid.NewString(), "config": messaging.Object{"channels": []any{"inapp"}, "content": messaging.Object{"purpose": "service-update", "title": "Synthetic plan", "body": "Synthetic body", "expiresAt": now().Add(time.Hour).Format(time.RFC3339)}, "audience": messaging.Object{"kind": "attributes", "subjectTypes": []any{"person"}}, "schedule": messaging.Object{"kind": "immediate"}}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	generatedPlanID := str(object(generatedPlan["plan"])["id"])
+	activated, e := source.Action(ctx, actor, generatedPlanID, "activate", messaging.Object{"operationId": uuid.NewString(), "expectedVersion": 1, "expectedRevision": 1})
+	if e != nil {
+		t.Fatal(e)
+	}
+	jobID := str(object(activated["plan"])["jobId"])
+	executed, e := source.ExecutePlan(ctx, jobs.Task{ID: jobID, Endpoint: endpoint, Action: jobs.MessagingRun, SourceID: generatedPlanID, OperationID: jobID, PlanVersion: 1})
+	if e != nil {
+		t.Fatal(e)
+	}
+	generatedNoticeID := str(object(executed["run"])["id"])
+	source.Pool = pool
+	generatedRead, e := queries.Query(ctx, actor, "messaging", "read-operation-object", Object{"kind": "notice", "id": generatedNoticeID})
+	if e != nil {
+		t.Fatal(e)
+	}
+	generatedData := object(generatedRead["data"])
+	if object(generatedData["origin"])["kind"] != "message-plan-run" || object(generatedData["origin"])["runId"] != generatedNoticeID || object(object(generatedData["content"])["audience"])["kind"] != "attributes" {
+		t.Fatalf("generated notice origin not retained: %v", generatedData["origin"])
+	}
 	requests := []Object{{"module": "messaging", "view": "plans"}, {"module": "messaging", "view": "history", "filters": Object{"planId": planID}}, {"module": "messaging", "view": "runs"}, {"kind": "message-plan", "id": planID}, {"module": "audit", "view": "list", "filters": Object{"kind": "business", "limit": 3}}}
 	var draftRefs []Object
 	for index, input := range requests {
@@ -95,6 +165,12 @@ func TestActualMessagingQueriesCurrentHumanAIAndOriginalProjection(t *testing.T)
 		}
 		if index == 4 && (object(result["pagination"])["complete"] != false || object(result["pagination"])["next"] == nil) {
 			t.Fatalf("audit pagination did not expose continuation: %s", encoded(result))
+		}
+		if input["view"] == "plans" || input["kind"] == "message-plan" {
+			data := object(result["data"])
+			if data["objectType"] != "message-plan" || data["objectMechanism"] != "messaging-state-activate-pause-resume-stop-withdraw" {
+				t.Fatalf("plan object metadata: %v", data)
+			}
 		}
 		if tool == "query-operations" && strings.Contains(encoded(result), "Untrusted selected") {
 			t.Fatal("directory copied private draft body")
