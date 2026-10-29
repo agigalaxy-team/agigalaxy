@@ -15,7 +15,39 @@ import (
 // OriginalAIReceiptWithin reads only the audit belonging to the original
 // frozen AI operation, under the current human's feedback read authority.
 func (o *Operations) OriginalAIReceiptWithin(ctx context.Context, tx pgx.Tx, human operationspermissions.Actor, src businessadmin.OriginalAIReceiptSource) (Object, error) {
-	if o == nil || o.Domain == nil || o.Service == nil || o.Service.Endpoint != o.Domain.Endpoint || human.AIProof != nil || o.Domain.IsDuty(human) || o.Domain.IsExecution(human) {
+	return o.originalAIReceiptWithin(ctx, tx, human, src, false)
+}
+
+// OriginalAIReceiptQueryWithin accepts only the service-owned query reader and
+// keeps its original human×fixed-AI proof through the same receipt checks.
+func (o *Operations) OriginalAIReceiptQueryWithin(ctx context.Context, tx pgx.Tx, actor operationspermissions.Actor, authority operationspermissions.Authority, src businessadmin.OriginalAIReceiptSource) (Object, error) {
+	if o == nil || o.Domain == nil || !operationspermissions.OriginalAIReceiptQueryReaderMatches(authority, actor) {
+		return nil, fault.New("business_admin_denied", 403)
+	}
+	fresh, e := authority.RequireWithin(ctx, tx, actor, "autonomy.read")
+	if e != nil {
+		return nil, e
+	}
+	fresh, e = authority.RequireWithin(ctx, tx, fresh, "feedback.read")
+	if e != nil {
+		return nil, e
+	}
+	result, e := o.WithAuthority(authority).originalAIReceiptWithin(ctx, tx, fresh, src, true)
+	if e != nil {
+		return nil, e
+	}
+	fresh, e = authority.RequireWithin(ctx, tx, fresh, "autonomy.read")
+	if e != nil {
+		return nil, e
+	}
+	if _, e = authority.RequireWithin(ctx, tx, fresh, "feedback.read"); e != nil {
+		return nil, e
+	}
+	return result, nil
+}
+
+func (o *Operations) originalAIReceiptWithin(ctx context.Context, tx pgx.Tx, human operationspermissions.Actor, src businessadmin.OriginalAIReceiptSource, query bool) (Object, error) {
+	if o == nil || o.Domain == nil || o.Service == nil || o.Service.Endpoint != o.Domain.Endpoint || (!query && human.AIProof != nil) || o.Domain.IsDuty(human) || o.Domain.IsExecution(human) {
 		return nil, fault.New("business_admin_denied", 403)
 	}
 	fresh, e := o.Domain.Fresh(ctx, tx, human, "feedback.read")

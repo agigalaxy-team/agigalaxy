@@ -113,7 +113,7 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 }
 
 func (t *ConversationTools) priorSummaryReads(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand) (Object, error) {
-	rows, e := t.Conversations.Pool.Query(ctx, `WITH previous_turns AS (SELECT id FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND created_at<$4 ORDER BY created_at DESC,id DESC LIMIT 10) SELECT t.tool,t.state,t.metadata,t.created_at,t.updated_at FROM operations_agentos_conversation_tool_calls_v1 t JOIN previous_turns p ON p.id=t.turn_id WHERE t.endpoint=$1 AND t.conversation_id=$2 AND t.tool IN ('workbench-summary','query-operations','read-operation-object','read-ai-delegation') ORDER BY t.created_at DESC,t.id DESC LIMIT 80`, t.Conversations.Endpoint, row.ID, a.ID, command.CreatedAt)
+	rows, e := t.Conversations.Pool.Query(ctx, `WITH previous_turns AS (SELECT id FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND created_at<$4 ORDER BY created_at DESC,id DESC LIMIT 10) SELECT t.tool,t.state,t.metadata,t.created_at,t.updated_at FROM operations_agentos_conversation_tool_calls_v1 t JOIN previous_turns p ON p.id=t.turn_id WHERE t.endpoint=$1 AND t.conversation_id=$2 AND t.tool IN ('workbench-summary','query-operations','read-operation-object','read-ai-delegation','read-task-operation') ORDER BY t.created_at DESC,t.id DESC LIMIT 80`, t.Conversations.Endpoint, row.ID, a.ID, command.CreatedAt)
 	if e != nil {
 		return nil, e
 	}
@@ -143,7 +143,7 @@ func (t *ConversationTools) priorSummaryReads(ctx context.Context, a operationsp
 
 // Current-turn tool receipts are independent of historical turn receipts.
 func (t *ConversationTools) currentSummaryReads(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand) (Object, error) {
-	rows, e := t.Conversations.Pool.Query(ctx, `SELECT tool,state,metadata,created_at,updated_at FROM operations_agentos_conversation_tool_calls_v1 WHERE endpoint=$1 AND conversation_id=$2 AND turn_id=$3 AND tool IN ('workbench-summary','query-operations','read-operation-object','read-ai-delegation') AND NOT (tool='workbench-summary' AND state='started') ORDER BY created_at,id LIMIT 80`, t.Conversations.Endpoint, row.ID, command.ID)
+	rows, e := t.Conversations.Pool.Query(ctx, `SELECT tool,state,metadata,created_at,updated_at FROM operations_agentos_conversation_tool_calls_v1 WHERE endpoint=$1 AND conversation_id=$2 AND turn_id=$3 AND tool IN ('workbench-summary','query-operations','read-operation-object','read-ai-delegation','read-task-operation') AND NOT (tool='workbench-summary' AND state='started') ORDER BY created_at,id LIMIT 80`, t.Conversations.Endpoint, row.ID, command.ID)
 	if e != nil {
 		return nil, e
 	}

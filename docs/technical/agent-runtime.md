@@ -30,7 +30,7 @@ Go通过 `GALAXY_AGENTOS_CONFIG_FILE` 读取严格 `{version:1,endpoint,url,sign
 | `execution:<UUID>` | 已准备的grant、领域、对象、revision和intent，沿专项事项及真实HumanReview等待 |
 | `autonomy:<UUID>` | Go的稳定AI账户、计划、task、purpose/versions；不携带管理浏览器会话，River调度原任务 |
 
-conversation工具源为 `conversation_tools.py`、共享 `galaxy-contracts/src/operations-agentos-query-schema.mjs` / action catalog：current_summary、query_operations、read_operation_object、list_authorized_work、run_authorized_work、prepare_operation分别对应当前摘要、闭合查询、精确对象、获准事项、原事项接续和操作卡准备。Go收到 `{conversationId,sessionId,turnId,runId,callId,tool,arguments}`，这些可信坐标不是模型参数。字段/动作随代码维护，不复制固定工具数；通用查询不接受任意SQL/HTTP或整项command。
+conversation工具源为 `conversation_tools.py`、共享 `galaxy-contracts/src/operations-agentos-query-schema.mjs` / action catalog：current_summary、query_operations、read_operation_object、list_authorized_work、run_authorized_work、prepare_operation分别对应当前摘要、闭合查询、精确对象、获准事项、原事项接续和操作卡准备；read_task_operation读取原AI业务操作的闭合历史回执。Go收到 `{conversationId,sessionId,turnId,runId,callId,tool,arguments}`，这些可信坐标不是模型参数。字段/动作随代码维护，不复制固定工具数；通用查询不接受任意SQL/HTTP或整项command。
 
 浏览器 `/v1/operations/agentos` dispatcher提供status/options/executions；原execution的events/runs/review/continue；按domain的conversations/runs、operations/:uuid、cards/:uuid及confirm；全局runs仅audit元数据。实际方法/DTO由dispatcher/schema定义。准备卡必须同时有 `state=prepared`、`card.state=prepared`、真实cardId，preparationFeedback只扩充原结果说明。一般查询仅返回显式安全投影；公开帖子/回复仍带受控来源，私聊/案件/反馈/邮件正文不因模块名或workbench.read进入通用对话。选定内容工具从execution当前选集取引用，不把空集合扩大为全站，不产生画像事件。
 
@@ -75,7 +75,9 @@ API能够连接AgentOS不证明Worker已加载相同运行配置。原health记�
 
 随机新建业务对象不能以operationId冒充对象ID。137沿原安全回执函数，把已验证卡的标签创建/更新、清理计划创建/取消回执关联到实际tagId/planId；只补当前任务原unknown且目标双空的可证定位，再沿原回执推进，不能改已有非空或终结记录。它不增加事件订阅、Duty授权或自动grant。标签修改与清理计划仍是完整人工卡；创建清理计划仅进入awaiting-approval，取消不恢复已移除文件。该源码批已完成定向检查，实际业务验收另记。
 
-原AI业务操作的人工追查入口源码增加`GET /v1/operations/autonomy/tasks/:taskId/operations/:operationId`，从原任务、工具调用和冻结命令构造描述符，在同事务核当前人员的来源及业务读取权限，再由原领域核AI审计身份、完整selection和回执。仅返回闭合元数据；不要求旧任务仍running，不借人类业务操作GET冒充AI操作，也不改任务终态或重发writer。无原记录、证据不足和有效原回执分别表达，当前对象状态不能代替原操作结果。此入口的普通会话模型工具消费者仍需单独接线及实际验收，不把人工HTTP可查称为AI自动恢复已完成。
+原AI业务操作的人工追查入口为`GET /v1/operations/autonomy/tasks/:taskId/operations/:operationId`，从原任务、工具调用和冻结命令构造描述符，在同事务核当前人员的来源及业务读取权限，再由原领域核AI审计身份、完整selection和回执。仅返回闭合元数据；不要求旧任务仍running，不借人类业务操作GET冒充AI操作，也不改任务终态或重发writer。无原记录、证据不足和有效原回执分别表达，当前对象状态不能代替原操作结果。
+
+普通会话消费者`read_task_operation(task_id,operation_id)`已在源码接线，待发布及真实模型验收；138只把该工具名加入原会话工具账本CHECK。它沿当前conversation/session/turn/run/call绑定，在同事务把当前人×固定会话AI转换为query-purpose proof，首尾核`autonomy.read`和原业务对应的`feedback.read/content.read`，复用现QueryReader及ScopedPrincipalAuthority进入同领域原回执读取。当前会话AI可读取其它岗位的原任务，但必须通过当前双方权限及原任务全部来源，不能借原执行AI身份或伪造portal人员。初始owner范围仅反馈更新和公开post/reply可见性操作。历史回执版本不冒充当前对象版本，无正文结果不新增version-pinned材料引用；需要正文仍另走当前精确对象读取。工具记录及摘要只保原task/op坐标和闭合回执态，unknown不变成业务成功，GET或该工具都不自动恢复旧任务终态。
 
 provider工具ID/UUID5配对规则见[接口](interfaces.md#管理身份与原操作)。调用计数在实际provider入口、current authority后、attempt fence内记账，包含follow-up；metrics.details分组不是次数，token取SDK累计值，旧无计数行未知。暂停续接duration累计活动时段，排除等待。async admission/history/model授权以threads卸载阻塞IO且保ContextVars，同步模型入口沿原线程；调用前后均查当前session/source。模型版本在provider调用前与attempt/owner/status CAS共同保存，缺版本不以当前配置回填。
 

@@ -233,7 +233,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             agents = conversation_agents(settings=settings(), db=db, gateway=gateway,
                 domains={"overview": "运营概览"}, active_domains={"overview"}, model_factory=lambda: model)
             names = {tool.name for tool in agents[0].tools}
-            self.assertEqual(names, {"current_summary", "read_ai_delegation", *(name for name, _ in plan)})
+            self.assertEqual(names, {"current_summary", "read_ai_delegation", "read_task_operation", *(name for name, _ in plan)})
             for tool in agents[0].tools:
                 function = tool if isinstance(tool, Function) else Function.from_callable(tool)
                 self.assertNotIn("run_context", function.parameters["properties"])

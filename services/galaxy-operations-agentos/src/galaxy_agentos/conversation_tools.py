@@ -9,6 +9,7 @@ from agno.tools.function import FunctionCall
 
 from .gateway import AuthorityDenied
 from .conversation_references import selected_query_reference, tool_public_reference, current_public_references
+from .conversation_task_operations import task_operation_tool
 
 # Retain the established import surface for runtime callers and contract consumers.
 from .conversation_tool_contracts import (
@@ -387,4 +388,4 @@ def conversation_tools(gateway, *, domain=None):
     query_operations.__doc__ += "\nExact module views: " + "; ".join(
         name + " " + "/".join(sorted(views)) for name, views in VIEWS.items()) + "."
     return [query_operations, read_operation_object, list_authorized_work,
-        run_authorized_work, read_ai_delegation, prepare_operation]
+        run_authorized_work, task_operation_tool(send), read_ai_delegation, prepare_operation]

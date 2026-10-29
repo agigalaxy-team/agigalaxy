@@ -22,7 +22,7 @@ PREPARED_CARD_IDS = "_galaxyPreparedCardIds"
 
 EFFECT_TOOLS = frozenset({"run_authorized_work", "execute_operation", "manage_ai_role", "manage_ai_prompt"})
 
-READ_TOOLS = frozenset({"current_summary", "query_operations", "read_operation_object", "list_authorized_work", "inspect_operations"})
+READ_TOOLS = frozenset({"current_summary", "query_operations", "read_operation_object", "list_authorized_work", "inspect_operations", "read_task_operation"})
 
 
 def _closed_failure(name, error):

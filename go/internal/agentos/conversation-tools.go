@@ -19,6 +19,7 @@ import (
 type ConversationTools struct {
 	Conversations         *Conversations
 	Query                 func(context.Context, operationspermissions.Actor, string, string, Object) (Object, error)
+	ReadTaskOperation     func(context.Context, operationspermissions.Actor, Conversation, Object) (Object, error)
 	Summary               func(context.Context, operationspermissions.Actor, string, Object) (Object, error)
 	Prepare               func(context.Context, operationspermissions.Actor, Conversation, Object, string) (Object, error)
 	PrepareWithReference  func(context.Context, operationspermissions.Actor, Conversation, Object, string, Object) (Object, error)
@@ -48,7 +49,7 @@ var toolRoute = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,79}$`)
 // descriptors are still recorded, but they cannot prepare or execute a command.
 func conversationReadTool(tool string) bool {
 	switch tool {
-	case "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work":
+	case "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "read-task-operation":
 		return true
 	}
 	return false
@@ -72,7 +73,7 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
 	switch tool {
-	case "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "run-authorized-work", "prepare-operation":
+	case "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "run-authorized-work", "prepare-operation", "read-task-operation":
 	default:
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
@@ -162,6 +163,14 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 	s := t.Conversations
 	var result Object
 	switch bound.tool {
+	case "read-task-operation":
+		if len(bound.args) != 2 || !validOperationID(text(bound.args, "taskId")) || !validOperationID(text(bound.args, "operationId")) {
+			err = fail("invalid_operations_agentos_request", 400)
+		} else if t.ReadTaskOperation == nil {
+			err = fail("operations_agentos_conversation_not_ready", 503)
+		} else {
+			result, err = t.ReadTaskOperation(ctx, bound.actor, bound.row, bound.args)
+		}
 	case "read-ai-delegation":
 		result, err = s.Permissions.ReadManagementTool(ctx, bound.actor, bound.row.Domain, bound.args)
 	case "query-operations", "read-operation-object":
@@ -194,7 +203,7 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 	if err == nil && bound.publicReference != nil && bound.tool == "read-operation-object" {
 		err = checkConversationPublicReference(bound.publicReference, bound.args, object(result["data"]))
 	}
-	if err == nil && (bound.tool == "query-operations" || bound.tool == "read-operation-object" || bound.tool == "read-ai-delegation") {
+	if err == nil && (bound.tool == "query-operations" || bound.tool == "read-operation-object" || bound.tool == "read-ai-delegation" || bound.tool == "read-task-operation") {
 		err = t.rememberSources(ctx, bound.row, result["evidenceRefs"])
 	}
 	if err == nil {
@@ -206,6 +215,12 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 	}
 	metadata := Object{"tool": bound.tool}
 	metadata["module"], metadata["view"] = nil, nil
+	if bound.tool == "read-task-operation" {
+		metadata["module"], metadata["view"] = "autonomy", "original-operation"
+		if len(bound.args) == 2 && validOperationID(text(bound.args, "taskId")) && validOperationID(text(bound.args, "operationId")) {
+			metadata["taskId"], metadata["operationId"] = bound.args["taskId"], bound.args["operationId"]
+		}
+	}
 	if err == nil && (bound.tool == "query-operations" || bound.tool == "read-operation-object") && result["tool"] == bound.tool {
 		if module, _ := result["module"].(string); toolRoute.MatchString(module) {
 			metadata["module"] = module
@@ -238,6 +253,10 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 		}
 	} else {
 		metadata["cardId"] = nil
+		if bound.tool == "read-task-operation" {
+			metadata["taskId"], metadata["operationId"] = bound.args["taskId"], bound.args["operationId"]
+			metadata["receiptState"] = object(result["receipt"])["state"]
+		}
 		if card := object(result["card"]); card != nil {
 			metadata["cardId"] = card["cardId"]
 		}

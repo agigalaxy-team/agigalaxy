@@ -14,6 +14,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/feedback"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
+	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/operationsfixture"
@@ -21,6 +22,76 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
+
+type filteredReceiptHuman struct {
+	p.StoredPersonAuthority
+	principal interface {
+		ReadStoredPersonPrincipalWithin(context.Context, pgx.Tx, string) (map[string]string, error)
+	}
+	denied string
+}
+
+type filteredPortalReceiptHuman struct {
+	p.Authority
+	reader interface {
+		ReadHumanSnapshotWithin(context.Context, pgx.Tx, p.Actor) (p.Actor, error)
+		ReadOperationsPrincipalWithin(context.Context, pgx.Tx, p.Actor) (map[string]string, error)
+	}
+}
+
+func (a *filteredPortalReceiptHuman) ReadHumanSnapshotWithin(ctx context.Context, tx pgx.Tx, actor p.Actor) (p.Actor, error) {
+	result, err := a.reader.ReadHumanSnapshotWithin(ctx, tx, actor)
+	if err == nil {
+		permissions := []string{}
+		for _, code := range result.Permissions {
+			if code != "feedback.read" {
+				permissions = append(permissions, code)
+			}
+		}
+		result.Permissions = permissions
+	}
+	return result, err
+}
+func (a *filteredPortalReceiptHuman) EffectiveWithin(ctx context.Context, tx pgx.Tx, actor p.Actor) (p.Actor, error) {
+	result, err := a.Authority.EffectiveWithin(ctx, tx, actor)
+	if err == nil {
+		permissions := []string{}
+		for _, code := range result.Permissions {
+			if code != "feedback.read" {
+				permissions = append(permissions, code)
+			}
+		}
+		result.Permissions = permissions
+	}
+	return result, err
+}
+func (a *filteredPortalReceiptHuman) ReadOperationsPrincipalWithin(ctx context.Context, tx pgx.Tx, actor p.Actor) (map[string]string, error) {
+	return a.reader.ReadOperationsPrincipalWithin(ctx, tx, actor)
+}
+
+func (a *filteredPortalReceiptHuman) RequireWithin(ctx context.Context, tx pgx.Tx, actor p.Actor, action string) (p.Actor, error) {
+	if action == "feedback.read" {
+		return p.Actor{}, fault.New("operations_permission_denied", 403)
+	}
+	return a.Authority.RequireWithin(ctx, tx, actor, action)
+}
+
+func (a *filteredReceiptHuman) PersonWithin(ctx context.Context, tx pgx.Tx, id string, eligibility bool) (p.Actor, error) {
+	v, err := a.StoredPersonAuthority.PersonWithin(ctx, tx, id, eligibility)
+	if err == nil && a.denied != "" {
+		filtered := []string{}
+		for _, permission := range v.Permissions {
+			if permission != a.denied {
+				filtered = append(filtered, permission)
+			}
+		}
+		v.Permissions = filtered
+	}
+	return v, err
+}
+func (a *filteredReceiptHuman) ReadStoredPersonPrincipalWithin(ctx context.Context, tx pgx.Tx, id string) (map[string]string, error) {
+	return a.principal.ReadStoredPersonPrincipalWithin(ctx, tx, id)
+}
 
 type receiptPublicationAuthority struct{}
 
@@ -112,5 +183,63 @@ func TestOriginalAIReceiptNormalizesAndBindsWholeCall(t *testing.T) {
 	src.CallArguments = map[string]any{"kind": "feedback-update", "targetId": target, "state": "processing", "unrecognized": "private"}
 	if _, e := normalizeOriginalAIReceiptSource(src); fault.Status(e) != 404 {
 		t.Fatalf("extra input accepted: %v", e)
+	}
+}
+
+func TestConversationOriginalAIReceiptCrossRoleAndHumanRevocation(t *testing.T) {
+	owner, _ := testsupport.PostgreSQL(t)
+	f := operationsfixture.New(t, owner)
+	ctx := context.Background()
+	automation := f.Automation(t)
+	accountsByDomain := automation["accounts"].(map[string]any)
+	role := automation["role"].(map[string]any)["id"]
+	if _, err := owner.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=array_append(permissions,'autonomy.read') WHERE id=$1`, role); err != nil {
+		t.Fatal(err)
+	}
+	account, err := postgres.InTx(ctx, f.Pool, func(tx pgx.Tx) (accounts.Account, error) {
+		return (&accounts.Service{Endpoint: f.Endpoint, Now: f.Now}).EnsureAccountWithin(ctx, tx, accounts.VerifiedIdentity{Issuer: "https://source.example.invalid", ExternalSubject: "cross-role", VerificationMethod: "external-account", VerifiedAt: f.Now()})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, task, operation, call := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+	if _, err = owner.Exec(ctx, `INSERT INTO operations_feedback_v1(id,endpoint,account_id,submission_operation_id,request_hash,title,body,submitted_module,module,state,revision,created_at,updated_at) VALUES($1,$2,$3,$4,$5,'Synthetic feedback','Synthetic detail','other','other','pending',1,$6,$6)`, target, f.Endpoint, account.ID, uuid.NewString(), strings.Repeat("a", 64), f.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = owner.Exec(ctx, `INSERT INTO operations_autonomy_tasks_v1(id,endpoint,domain,source,source_key,title,mode,state,model_state,business_state,ai_account_id,configuration,prompt_version,plan_version,session_id,due_at,created_at,updated_at) VALUES($1,$2,'overview','routine',$1::uuid::text,'fixture','ai','unknown','failed','unknown',$3,'{}',1,1,$4,now(),now(),now())`, task, f.Endpoint, accountsByDomain["overview"], uuid.NewString()); err != nil {
+		t.Fatal(err)
+	}
+	args := map[string]any{"kind": "feedback-update", "targetId": target, "state": "processing"}
+	if _, err = owner.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,created_at,updated_at) VALUES($1,$2,$3,'execute-operation',$4,$5,'unknown',now(),now())`, f.Endpoint, task, call, args, operation); err != nil {
+		t.Fatal(err)
+	}
+	conversations := &agentos.Conversations{Pool: f.Pool, Endpoint: f.Endpoint, Permissions: f.Permissions, Now: f.Now, Tools: &agentos.ConversationTools{}}
+	current, err := conversations.Session(ctx, f.Root, "governance", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	autonomy := &operationsautonomy.Service{Pool: f.Pool, Endpoint: f.Endpoint, Authority: f.Gateway, Now: f.Now}
+	service := connectWorkbenchActions(conversations, autonomy, nil, nil)
+	service.Feedback = &feedback.Operations{Service: &feedback.Service{Pool: f.Pool, Endpoint: f.Endpoint}, Domain: &businessadmin.Domain{Pool: f.Pool, Endpoint: f.Endpoint, Authority: f.Gateway, PrincipalWithin: f.Gateway.LockOperationsPrincipalWithin, Now: f.Now}}
+	request := map[string]any{"taskId": task, "operationId": operation}
+	result, err := conversations.Tools.ReadTaskOperation(ctx, current.Actor, *current.Row, request)
+	if err != nil || result["availability"] != "available" || result["receipt"].(map[string]any)["state"] != "not-recorded" {
+		t.Fatalf("cross-role original read %#v %v", result, err)
+	}
+	if _, err = owner.Exec(ctx, `INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,action,operation_id,selection,result,created_at,actor_kind,actor_context) VALUES($1,$2,$3,'feedback-update',$4,'{}','{}',$5,'operations-ai-service',NULL)`, uuid.NewString(), f.Endpoint, "ai:"+accountsByDomain["overview"].(string), operation, f.Now()); err != nil {
+		t.Fatal(err)
+	}
+	result, err = conversations.Tools.ReadTaskOperation(ctx, current.Actor, *current.Row, request)
+	if err != nil || result["receipt"].(map[string]any)["state"] != "unknown" {
+		t.Fatalf("missing original binding must stay unknown %#v %v", result, err)
+	}
+	if _, err = conversations.Tools.ReadTaskOperation(ctx, current.Actor, *current.Row, map[string]any{"taskId": uuid.NewString(), "operationId": operation}); fault.Status(err) != 404 {
+		t.Fatalf("wrong task accepted: %v", err)
+	}
+	stored := f.Gateway.StoredOperators()
+	f.Permissions.StoredAuthority = &filteredReceiptHuman{StoredPersonAuthority: stored, principal: stored, denied: "feedback.read"}
+	f.Permissions.Authority = &filteredPortalReceiptHuman{Authority: f.Gateway, reader: f.Gateway}
+	if _, err = conversations.Tools.ReadTaskOperation(ctx, current.Actor, *current.Row, request); fault.Status(err) != 403 {
+		t.Fatalf("human revoked feedback read: %v", err)
 	}
 }

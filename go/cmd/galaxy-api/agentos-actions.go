@@ -11,6 +11,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
 	p "github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -83,6 +84,49 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 			}
 		}
 		return nil, fault.New("operations_autonomy_receipt_unavailable", 503)
+	}
+	autonomy.OriginalAIReceiptQueryWithin = func(ctx context.Context, tx pgx.Tx, actor p.Actor, authority p.Authority, src businessadmin.OriginalAIReceiptSource) (agentos.Object, error) {
+		var err error
+		src, err = normalizeOriginalAIReceiptSource(src)
+		if err != nil {
+			return nil, err
+		}
+		switch src.Request["kind"] {
+		case "feedback-update":
+			if service.Feedback != nil {
+				return service.Feedback.OriginalAIReceiptQueryWithin(ctx, tx, actor, authority, src)
+			}
+		case "content-visibility":
+			if service.Content != nil {
+				return service.Content.OriginalAIReceiptQueryWithin(ctx, tx, actor, authority, src)
+			}
+		}
+		return nil, fault.New("operations_autonomy_receipt_unavailable", 503)
+	}
+	tools.ReadTaskOperation = func(ctx context.Context, actor p.Actor, row agentos.Conversation, args agentos.Object) (agentos.Object, error) {
+		if row.AIAccountID == nil || conversations.Permissions == nil {
+			return nil, fault.New("operations_agentos_conversation_not_ready", 503)
+		}
+		taskID, _ := args["taskId"].(string)
+		operationID, _ := args["operationId"].(string)
+		return postgres.InTx(ctx, conversations.Pool, func(tx pgx.Tx) (agentos.Object, error) {
+			queryActor, err := conversations.Permissions.HumanAIAccountReadWithin(ctx, tx, actor, row.Domain, *row.AIAccountID, "query", "autonomy.read")
+			if err != nil {
+				return nil, err
+			}
+			businessRead, err := autonomy.OriginalAIReceiptReadPermissionWithin(ctx, tx, taskID, operationID)
+			if err != nil {
+				return nil, err
+			}
+			return conversations.Permissions.WithOriginalAIReceiptReadWithin(ctx, tx, queryActor, businessRead, func(queryActor p.Actor, authority p.Authority) (agentos.Object, error) {
+				result, err := autonomy.OriginalAIReceiptWithQueryWithin(ctx, tx, queryActor, authority, taskID, operationID)
+				if err != nil {
+					return nil, err
+				}
+				result["tool"], result["availability"], result["dataRead"], result["evidenceRefs"] = "read-task-operation", "available", true, []any{}
+				return result, nil
+			})
+		})
 	}
 	priorSource := autonomy.PersistedSourceWithin
 	autonomy.PersistedSourceWithin = func(ctx context.Context, tx pgx.Tx, metadata agentos.Object) (bool, error) {

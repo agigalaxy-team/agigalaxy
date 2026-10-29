@@ -20,30 +20,31 @@ import (
 type Object = map[string]any
 type Actor = perms.Actor
 type Service struct {
-	Pool                      *pgxpool.Pool
-	Endpoint                  string
-	Authority                 perms.Authority
-	AIWork                    *operationsai.Service
-	Now                       func() time.Time
-	QualifyTargetWithin       func(context.Context, pgx.Tx, Actor, string, string, Object, Object, string) error
-	CurrentPublicSourceWithin func(context.Context, pgx.Tx, string, string) (Object, error)
-	PersistedSourceWithin     func(context.Context, pgx.Tx, Object) (bool, error)
-	RuntimeStatus             func(context.Context) (Object, error)
-	NativeConfigured          func() bool
-	CodeRunner                func(context.Context, string) (Object, error)
-	OriginalAIReceiptWithin   func(context.Context, pgx.Tx, Actor, businessadmin.OriginalAIReceiptSource) (Object, error)
-	ReadTargetWithin          func(context.Context, pgx.Tx, Actor, string, string, string) (Object, error)
-	Native                    Native
-	EnqueueWithin             func(context.Context, pgx.Tx, string, Object, string, *time.Time) error
-	Permissions               *perms.Service
-	QueryTool                 func(context.Context, Actor, string, string, Object) (Object, error)
-	ActionReady               func(string) bool
-	ExecuteDutyOperation      func(context.Context, Actor, string, Object, bool) (Object, error)
-	SummaryForTask            func(context.Context, Actor, Object) (Object, error)
-	WorkbenchRunDetail        func(context.Context, string) (Object, error)
-	Log                       func(Object)
-	defaultsMu                sync.RWMutex
-	defaults                  Object
+	Pool                         *pgxpool.Pool
+	Endpoint                     string
+	Authority                    perms.Authority
+	AIWork                       *operationsai.Service
+	Now                          func() time.Time
+	QualifyTargetWithin          func(context.Context, pgx.Tx, Actor, string, string, Object, Object, string) error
+	CurrentPublicSourceWithin    func(context.Context, pgx.Tx, string, string) (Object, error)
+	PersistedSourceWithin        func(context.Context, pgx.Tx, Object) (bool, error)
+	RuntimeStatus                func(context.Context) (Object, error)
+	NativeConfigured             func() bool
+	CodeRunner                   func(context.Context, string) (Object, error)
+	OriginalAIReceiptWithin      func(context.Context, pgx.Tx, Actor, businessadmin.OriginalAIReceiptSource) (Object, error)
+	OriginalAIReceiptQueryWithin func(context.Context, pgx.Tx, Actor, perms.Authority, businessadmin.OriginalAIReceiptSource) (Object, error)
+	ReadTargetWithin             func(context.Context, pgx.Tx, Actor, string, string, string) (Object, error)
+	Native                       Native
+	EnqueueWithin                func(context.Context, pgx.Tx, string, Object, string, *time.Time) error
+	Permissions                  *perms.Service
+	QueryTool                    func(context.Context, Actor, string, string, Object) (Object, error)
+	ActionReady                  func(string) bool
+	ExecuteDutyOperation         func(context.Context, Actor, string, Object, bool) (Object, error)
+	SummaryForTask               func(context.Context, Actor, Object) (Object, error)
+	WorkbenchRunDetail           func(context.Context, string) (Object, error)
+	Log                          func(Object)
+	defaultsMu                   sync.RWMutex
+	defaults                     Object
 }
 
 func (s *Service) defaultNumber(key string) int64 {

@@ -182,3 +182,37 @@ func TestConversationReadToolSnapshotsKeepFinalRevocationAndWriteFences(t *testi
 		}
 	}
 }
+
+func TestConversationTaskOperationBindsOriginalRunAndArguments(t *testing.T) {
+	owner, _ := testsupport.PostgreSQL(t)
+	ctx := context.Background()
+	f := operationsfixture.New(t, owner)
+	f.Automation(t)
+	s := &Conversations{Pool: f.Pool, Endpoint: f.Endpoint, Permissions: f.Permissions, Now: f.Now}
+	current, err := s.Session(ctx, f.Root, "overview", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	turn := uuid.NewString()
+	if _, err = owner.Exec(ctx, `INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,native_run_id,result,created_at) VALUES($1,$2,$3,$4,$5,'accepted','task-read-run','{}',$6)`, turn, f.Endpoint, current.Row.ID, f.Root.ID, strings.Repeat("d", 64), f.Now()); err != nil {
+		t.Fatal(err)
+	}
+	task, operation := uuid.NewString(), uuid.NewString()
+	called := 0
+	tools := &ConversationTools{Conversations: s, ReadTaskOperation: func(_ context.Context, _ operationspermissions.Actor, row Conversation, args Object) (Object, error) {
+		called++
+		if row.ID != current.Row.ID || args["taskId"] != task || args["operationId"] != operation {
+			t.Fatal("wrong original coordinates")
+		}
+		return Object{"availability": "available", "receipt": Object{"state": "unknown"}, "evidenceRefs": []any{}}, nil
+	}}
+	input := Object{"conversationId": current.Row.ID, "sessionId": current.Row.SessionID, "turnId": turn, "runId": "task-read-run", "callId": "receipt-1", "tool": "read-task-operation", "arguments": Object{"taskId": task, "operationId": operation}}
+	result, err := tools.Execute(ctx, input)
+	if err != nil || object(result["receipt"])["state"] != "unknown" || called != 1 {
+		t.Fatalf("original read %#v %v", result, err)
+	}
+	input["arguments"] = Object{"taskId": task, "operationId": uuid.NewString()}
+	if _, err = tools.Execute(ctx, input); fault.Status(err) != 409 || called != 1 {
+		t.Fatalf("changed call binding accepted: %v", err)
+	}
+}

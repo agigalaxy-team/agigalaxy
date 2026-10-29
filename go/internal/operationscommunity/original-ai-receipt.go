@@ -4,14 +4,49 @@ import (
 	"context"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/jackc/pgx/v5"
 )
 
 // OriginalAIReceiptWithin projects only the validated original AI visibility
 // receipt after current human authorization; it cannot execute a command.
 func (s *Service) OriginalAIReceiptWithin(ctx context.Context, tx pgx.Tx, human Actor, src businessadmin.OriginalAIReceiptSource) (Object, error) {
+	return s.originalAIReceiptWithin(ctx, tx, human, src, false)
+}
+
+// OriginalAIReceiptQueryWithin uses a per-call query facade and retains the
+// original human×fixed-AI proof; it never mutates the shared service.
+func (s *Service) OriginalAIReceiptQueryWithin(ctx context.Context, tx pgx.Tx, actor Actor, authority operationspermissions.Authority, src businessadmin.OriginalAIReceiptSource) (Object, error) {
+	if s == nil || !operationspermissions.OriginalAIReceiptQueryReaderMatches(authority, actor) {
+		return nil, fail("business_admin_denied", 403)
+	}
+	fresh, e := authority.RequireWithin(ctx, tx, actor, "autonomy.read")
+	if e != nil {
+		return nil, e
+	}
+	fresh, e = authority.RequireWithin(ctx, tx, fresh, "content.read")
+	if e != nil {
+		return nil, e
+	}
+	clone := *s
+	clone.Authority, clone.Duty = authority, nil
+	result, e := clone.originalAIReceiptWithin(ctx, tx, fresh, src, true)
+	if e != nil {
+		return nil, e
+	}
+	fresh, e = authority.RequireWithin(ctx, tx, fresh, "autonomy.read")
+	if e != nil {
+		return nil, e
+	}
+	if _, e = authority.RequireWithin(ctx, tx, fresh, "content.read"); e != nil {
+		return nil, e
+	}
+	return result, nil
+}
+
+func (s *Service) originalAIReceiptWithin(ctx context.Context, tx pgx.Tx, human Actor, src businessadmin.OriginalAIReceiptSource, query bool) (Object, error) {
 	d := s.domain()
-	if human.AIProof != nil || d.IsDuty(human) || d.IsExecution(human) {
+	if (!query && human.AIProof != nil) || d.IsDuty(human) || d.IsExecution(human) {
 		return nil, fail("business_admin_denied", 403)
 	}
 	current, e := d.Operation(ctx, tx, human, "community-content-read", Object{})

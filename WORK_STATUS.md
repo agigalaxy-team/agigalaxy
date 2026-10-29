@@ -22,7 +22,7 @@ Gateway 诊断 `ca09091` 已通过 CI 并上线；新策略准备轮 `80b8c7fe-3
 
 消息岗位真实只读轮 `97acc926` 的 workbench-summary 原工具 completed，native 两次模型调用；本次历史拒权未复现，不推断历史原因。角色创建轮 `103772e8` 在参数校验 extra_forbidden 后未出卡，原生事件不保存非法字段名，未写角色；待 nested schema 反馈修复后再验。策略失败追问 `db9048a5` 如实说明模型请求失败、具体原因未明，无新卡；原工具账本待核。
 
-搜索真实链：草稿保存及应用已通过原回执并核 native 采用；恢复原active内容的原业务操作 `1f80c7e9` 已 applied，active/native 等原v2，但卡 `59d8f9bb` 仍 unknown/conflict。模型同轮额外生成的 apply 卡已取消、未执行。当前 draft 仍是本轮测试 v7，待原卡同操作恢复后以新操作恢复原v6草稿内容；不能称全部恢复。
+搜索真实链已按原回执闭合：草稿保存/应用及 native 采用均核实；恢复原active业务成功后卡曾unknown，89上线后沿原卡/原operation GET恢复completed，无重投。原v6草稿内容由新卡保存为新draft `1452b042-1881-464d-9090-4ab3ca53b501`，独立回读 draft内容、active及native均与原前像一致；版本ID改变、历史保留。恢复轮多余apply卡已取消未执行，多制卡问题仍待真实复测。
 
 `64f5adf` Go/Admin/AgentOS 与源码等价的 `3866fc4` Gateway 已分别通过相应 CI 并上线；数据库已至137，受保护配置与官网保持。profile巡检、角色 nested 反馈、Gateway原run关联及清理/标签完整卡须以下一轮真实路径验收。
 
