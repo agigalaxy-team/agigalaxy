@@ -46,6 +46,14 @@ func messageAudience(config Object, draft bool) string {
 	}
 	return "未记录"
 }
+func messagePurpose(config Object) string {
+	value := str(obj(config["content"])["purpose"])
+	name := map[string]string{"maintenance": "维护通知", "service-update": "服务更新", "community-update": "社区更新"}[value]
+	if name == "" {
+		return "未记录"
+	}
+	return name + "（" + value + "）"
+}
 func (s *Service) prepareMessaging(ctx context.Context, a Actor, x Object, operation string, p *preparation) error {
 	service, e := s.messages(a)
 	if e != nil {
@@ -85,7 +93,7 @@ func (s *Service) prepareMessaging(ctx context.Context, a Actor, x Object, opera
 			}
 			p.command = Object{"expectedVersion": plan["version"], "expectedRevision": plan["revision"], "config": config}
 		}
-		content, schedule := obj(config["content"]), obj(config["schedule"])
+		content := obj(config["content"])
 		expiry, _ := time.Parse(time.RFC3339Nano, str(content["expiresAt"]))
 		p.expiry(expiry.Unix())
 		p.target = Object{"kind": "message-plan", "id": id, "label": label(content["title"], "待核实消息草稿"), "href": "/admin/operations/messaging?id=" + id}
@@ -93,19 +101,8 @@ func (s *Service) prepareMessaging(ctx context.Context, a Actor, x Object, opera
 		if create {
 			p.title = "生成待人工核实的消息草稿"
 		}
-		p.basis = []any{basis("事实与受众", "待人工核实；本操作不批准发布"), basis("渠道", messageChannels(config)), basis("受众草案", messageAudience(config, true))}
-		timing := "发布批准后立即执行"
-		if schedule["kind"] == "once" {
-			timing = str(schedule["at"])
-		} else if schedule["kind"] == "recurring" {
-			timing = str(schedule["cron"]) + " · " + str(schedule["timezone"])
-		}
-		href := str(content["href"])
-		if href == "" {
-			href = "无"
-		}
-		p.impact = []any{"仅保存草稿，保存后仍需人工核实事实与受众；本操作不发布、不发送。", "标题：" + str(content["title"]), "正文：", content["body"], "正文链接：" + href, "截止时间：" + str(content["expiresAt"]), "时间草案：" + timing}
-		return nil
+		p.basis = []any{basis("事实与受众", "待人工核实；本操作不批准发布"), basis("用途", messagePurpose(config)), basis("渠道", messageChannels(config)), basis("受众草案", messageAudience(config, true))}
+		return messageDraftReview(p, config)
 	}
 	response, e := service.Get(ctx, a, id)
 	if e != nil {
@@ -131,7 +128,7 @@ func (s *Service) prepareMessaging(ctx context.Context, a Actor, x Object, opera
 	if channels == "" {
 		channels = "未记录"
 	}
-	p.basis = []any{basis("当前计划", state), basis("渠道", channels), basis("受众", messageAudience(config, false))}
+	p.basis = []any{basis("当前计划", state), basis("用途", messagePurpose(config)), basis("渠道", channels), basis("受众", messageAudience(config, false))}
 	switch action {
 	case "activate", "resume":
 		if e = messagePublicationReview(p, config); e != nil {
@@ -147,12 +144,23 @@ func (s *Service) prepareMessaging(ctx context.Context, a Actor, x Object, opera
 	return nil
 }
 
+func messageDraftReview(p *preparation, config Object) error {
+	p.impact = []any{"仅保存草稿，保存后仍需人工核实事实与受众；本操作不发布、不发送。"}
+	return messageConfigReviewFields(p, config)
+}
+
 func messagePublicationReview(p *preparation, config Object) error {
 	validated, e := messaging.ParseConfiguration(config)
 	if e != nil {
 		return e
 	}
 	p.impact = []any{"按这份计划的内容、渠道和时间发布或发送；每次执行时确定并保留当次符合条件的受众。", "邮件提交后是否送达，以实际回执为准。"}
+	return messageConfigReviewFields(p, validated)
+}
+
+// messageConfigReviewFields receives the already-normalized original config.
+// Never silently truncate content or recipients to fit the human review card.
+func messageConfigReviewFields(p *preparation, validated Object) error {
 	p.impact = append(p.impact, "发送身份："+messaging.OfficialMailIdentities[str(validated["senderKey"])].Name)
 	for _, field := range []string{"content", "channels", "audience", "schedule", "senderKey", "automation"} {
 		raw, e := json.Marshal(validated[field])

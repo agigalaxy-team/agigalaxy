@@ -355,10 +355,11 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 			return nil, fail("operations_agentos_review_changed", 409)
 		}
 	}
-	if kind == "search-apply" || kind == "search-restore" || kind == "search-draft-save" || kind == "messaging-state" && (x["action"] == "activate" || x["action"] == "resume") {
+	messageReview := kind == "message-draft-create" || kind == "message-draft-save" || kind == "messaging-state" && (x["action"] == "activate" || x["action"] == "resume")
+	if kind == "search-apply" || kind == "search-restore" || kind == "search-draft-save" || messageReview {
 		var exists bool
 		query := `SELECT EXISTS(SELECT 1 FROM operations_search_quality_operations_v1 WHERE endpoint=$1 AND operation_id=$2)`
-		if kind == "messaging-state" {
+		if messageReview {
 			query = `SELECT EXISTS(SELECT 1 FROM operations_messaging_commands_v1 WHERE endpoint=$1 AND operation_id=$2)`
 		}
 		if e = s.Pool.QueryRow(ctx, query, s.Endpoint, operationID).Scan(&exists); e != nil {
@@ -368,7 +369,7 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 			return s.RecoverPrepared(ctx, a, proposal, operationID)
 		}
 		review := preparation{impact: []any{}, basis: []any{}, expires: s.now() + 30}
-		if kind == "messaging-state" {
+		if messageReview {
 			e = s.prepareMessaging(ctx, actor, x, operationID, &review)
 		} else {
 			e = s.prepareDiscovery(ctx, actor, x, operationID, &review)

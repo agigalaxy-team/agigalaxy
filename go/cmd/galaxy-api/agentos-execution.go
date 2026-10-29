@@ -7,6 +7,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/discovery"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/feedback"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/filegovernance"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationscommunity"
@@ -50,7 +51,7 @@ func previewScanFile(ctx context.Context, tx pgx.Tx, id string, lookup func(cont
 
 // One execution authority is shared by qualification, the native gateway and
 // the actual content writer. A role/catalog entry alone is never readiness.
-func connectExecutions(gateway *access.Gateway, permissions *p.Service, autonomy *operationsautonomy.Service, content *operationscommunity.Service, files *filegovernance.Service, client *agentos.Client, search func() *discovery.Runtime) (*agentos.ExecutionGateway, *operationsstrategies.Service) {
+func connectExecutions(gateway *access.Gateway, permissions *p.Service, autonomy *operationsautonomy.Service, content *operationscommunity.Service, files *filegovernance.Service, feedbackSource *feedback.Operations, client *agentos.Client, search func() *discovery.Runtime) (*agentos.ExecutionGateway, *operationsstrategies.Service) {
 	executions := &agentos.Executions{Pool: permissions.Pool, Endpoint: permissions.Endpoint, Permissions: permissions,
 		Supported: []string{"strategies.read", "strategies.ordinary.configure", "strategies.ordinary.publish"}}
 	authority := &p.BusinessAuthority{Human: gateway, Duty: autonomy, Execution: executions}
@@ -78,12 +79,24 @@ func connectExecutions(gateway *access.Gateway, permissions *p.Service, autonomy
 		Gateway: executionGateway, Content: content, PriorPreparedEffect: executionGateway.PreparedEffect}
 	strategies.ActionReady = func(code, mode string) bool {
 		if mode == "code" {
-			return code == "content.restore" && autonomy.ExecuteDutyOperation != nil && autonomy.ActionReady != nil && autonomy.ActionReady(code)
+			return (code == "content.restore" || code == "files.scan.retry") && autonomy.ExecuteDutyOperation != nil && autonomy.ActionReady != nil && autonomy.ActionReady(code)
 		}
-		return code == "content.read" || code == "content.hide" || code == "content.restore"
+		return autonomy.ActionReady != nil && autonomy.ActionReady(code)
 	}
 	strategies.PreviewObjectWithin = func(ctx context.Context, tx pgx.Tx, a p.Actor, kind, id string) (operationsstrategies.Object, error) {
 		switch kind {
+		case "feedback-update":
+			if feedbackSource == nil {
+				return operationsstrategies.Object{"available": false, "version": nil}, nil
+			}
+			head, err := feedbackSource.HeadWithin(ctx, tx, id)
+			if fault.Status(err) == 404 {
+				return operationsstrategies.Object{"available": false, "version": nil}, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			return operationsstrategies.Object{"kind": "feedback", "available": true, "version": head["revision"]}, nil
 		case "file-scan-retry":
 			if files == nil {
 				return operationsstrategies.Object{"available": false, "version": nil}, nil

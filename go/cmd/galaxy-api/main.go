@@ -531,7 +531,8 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	permissionService.Duty = autonomy
 	forumOperations := &operationscommunity.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, Duty: autonomy, PrincipalWithin: gateway.LockOperationsPrincipalWithin, ReadPrincipalWithin: gateway.ReadOperationsPrincipalWithin, Forum: forum, Files: forumFiles, Links: links}
 	var executionDiscovery *discovery.Runtime
-	executionGateway, strategies := connectExecutions(gateway, permissionService, autonomy, forumOperations, fileGovernance, agentClient, func() *discovery.Runtime { return executionDiscovery })
+	feedbackOperations := &feedback.Operations{Service: service, Domain: operationsDomain}
+	executionGateway, strategies := connectExecutions(gateway, permissionService, autonomy, forumOperations, fileGovernance, feedbackOperations, agentClient, func() *discovery.Runtime { return executionDiscovery })
 	autonomy.OriginalStrategyArtifactWithin = strategies.OriginalCreationArtifactWithin
 	agentConversations.Tools.AuthorizedWork = (&actions.AuthorizedWork{Gateway: executionGateway}).Execute
 	forumPolicy, _ := forum.PolicySnapshot()
@@ -551,7 +552,6 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	}
 	chatReports := chatReportService(gateway, operationsDomain, chatService, chatFiles)
 	accountGovernance := businessAccountsService(operationsDomain, accountService, messageConfiguration.Directory)
-	feedbackOperations := &feedback.Operations{Service: service, Domain: operationsDomain}
 	queries.Feedback = feedbackOperations
 	accountAnalytics := &operationsanalytics.Service{Domain: operationsDomain, AccountWithin: accountGovernance.AccountWithin, PublicActivityWithin: workbench.PublicActivityWithin}
 	accountGovernance.DirectorySummary, accountGovernance.AccountSummary = accountAnalytics.DirectorySummary, accountAnalytics.AccountSummary
