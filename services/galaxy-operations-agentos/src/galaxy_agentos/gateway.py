@@ -130,6 +130,12 @@ class GalaxyGateway:
             if not isinstance(result, dict):
                 raise AuthorityUnavailable("agentos_authority_unavailable")
             return result
+        except httpx.TimeoutException:
+            # The original call may already be running. Do not immediately
+            # repeat an entire slow read with the same provider call identity.
+            error = AuthorityUnavailable("agentos_authority_timeout")
+            error.retry_read = False
+            raise error from None
         except (httpx.HTTPError, ValueError):
             # Neither network URLs nor upstream body/error prose reaches Agno.
             raise AuthorityUnavailable("agentos_authority_unavailable") from None

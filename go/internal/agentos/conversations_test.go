@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -197,6 +198,36 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 	if err = owner.QueryRow(ctx, `SELECT metadata FROM operations_agentos_conversation_tool_calls_v1 WHERE conversation_id=$1 AND call_id=$2`, id, toolInput["callId"]).Scan(&metadata); err != nil || len(metadata) != 5 || metadata["tool"] != "read-ai-delegation" {
 		t.Fatal("tool ledger contains unexpected result or arguments", metadata, err)
 	}
+	cancelledInput := copyObject(toolInput)
+	cancelledInput["tool"], cancelledInput["callId"], cancelledInput["arguments"] = "query-operations", "cancelled-current-read", Object{}
+	cancelled, cancelRead := context.WithCancel(ctx)
+	service.Tools.Query = func(ctx context.Context, _ operationspermissions.Actor, _, _ string, _ Object) (Object, error) {
+		cancelRead()
+		return nil, ctx.Err()
+	}
+	if _, err = service.Tools.Execute(cancelled, cancelledInput); !errors.Is(err, context.Canceled) {
+		t.Fatal("cancelled read continued or lost its actual error", err)
+	}
+	var toolState string
+	if err = owner.QueryRow(ctx, `SELECT state,metadata FROM operations_agentos_conversation_tool_calls_v1 WHERE conversation_id=$1 AND call_id=$2`, id, cancelledInput["callId"]).Scan(&toolState, &metadata); err != nil || toolState != "unavailable" || metadata["code"] != "operations_agentos_tool_request_cancelled" {
+		t.Fatal("cancelled HTTP context left tool ledger started", toolState, metadata, err)
+	}
+	service.Tools.Query = func(context.Context, operationspermissions.Actor, string, string, Object) (Object, error) {
+		return Object{"tool": "query-operations", "module": "feedback", "view": "list", "evidenceRefs": []any{}}, nil
+	}
+	if _, err = service.Tools.Execute(ctx, cancelledInput); err != nil {
+		t.Fatal(err)
+	}
+	service.Tools.Query = func(context.Context, operationspermissions.Actor, string, string, Object) (Object, error) {
+		return nil, fail("operations_query_not_configured", 503)
+	}
+	if _, err = service.Tools.Execute(ctx, cancelledInput); fault.Status(err) != 503 {
+		t.Fatal("late failed read did not retain its own failure", err)
+	}
+	if err = owner.QueryRow(ctx, `SELECT state FROM operations_agentos_conversation_tool_calls_v1 WHERE conversation_id=$1 AND call_id=$2`, id, cancelledInput["callId"]).Scan(&toolState); err != nil || toolState != "completed" {
+		t.Fatal("late failed retry replaced a completed observation", toolState, err)
+	}
+	service.Tools.Query = nil
 
 	service.Tools.Prepare = func(ctx context.Context, actor operationspermissions.Actor, row Conversation, args Object, operation string) (Object, error) {
 		return permissions.PrepareManagementAction(ctx, actor, row.Domain, args, operation)

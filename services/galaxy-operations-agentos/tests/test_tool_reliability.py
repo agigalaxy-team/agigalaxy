@@ -95,8 +95,44 @@ class ToolReliability(unittest.TestCase):
                 self.assertNotIn('UPSTREAM_PRIVATE_PROSE', output.getvalue() + call.result)
                 self.assertNotIn('授权', result['message'])
                 self.assertNotEqual(result.get('nextStep'), 'read-original-operation')
+                self.assertFalse(result['dataRead'])
+                self.assertFalse(result['valuesCurrent'])
+                if state in {'denied', 'unavailable'}:
+                    self.assertIn('旧记录不代表本次结果', result['message'])
                 if status in {403, 503}:
                     self.assertIn(code, output.getvalue())
+
+    def test_slow_read_timeouts_do_not_repeat_the_same_entire_call(self):
+        for error_type in (httpx.ReadTimeout, httpx.PoolTimeout):
+            with self.subTest(error=error_type.__name__):
+                requests = []
+                def timeout(request):
+                    requests.append(request)
+                    raise error_type('UPSTREAM_PRIVATE_PROSE', request=request)
+                gateway = GalaxyGateway(SimpleNamespace(service_key='explicit-synthetic-key',
+                    authority_url='http://127.0.0.1:1/v1/internal/agentos/'),
+                    transport=httpx.MockTransport(timeout))
+                self.addCleanup(gateway.close)
+                def current_summary(run_context: RunContext, fc: FunctionCall):
+                    return json.dumps(gateway.conversation_summary(run_context.user_id,
+                        run_id=run_context.run_id, call_id=fc.call_id,
+                        session_id=run_context.session_id, turn_id=run_context.metadata['operationId']))
+                function = reliable_function(current_summary)
+                function._run_context = self.context()
+                output = StringIO()
+                with redirect_stdout(output):
+                    call = FunctionCall(function=function, call_id='one-timeout-read', arguments={})
+                    call.execute()
+                result = json.loads(call.result)
+                self.assertEqual(len(requests), 1)
+                self.assertEqual(result['state'], 'unavailable')
+                self.assertIn('本次读取超时', result['message'])
+                self.assertIn('旧记录不代表本次结果', result['message'])
+                self.assertFalse(result['dataRead'])
+                self.assertFalse(result['valuesCurrent'])
+                self.assertNotIn('UPSTREAM_PRIVATE_PROSE', output.getvalue() + call.result)
+                self.assertNotIn('agentos_', call.result)
+                self.assertIn('agentos_authority_timeout', output.getvalue())
 
     def test_native_binding_shape_failure_is_not_reported_as_user_permission_loss(self):
         def query_operations(run_context: RunContext, fc: FunctionCall):

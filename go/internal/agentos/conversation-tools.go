@@ -2,7 +2,9 @@ package agentos
 
 import (
 	"context"
+	"errors"
 	"regexp"
+	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
@@ -207,6 +209,11 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 			code = "operations_agentos_tool_unavailable"
 		}
 		metadata["code"] = code
+		if errors.Is(err, context.Canceled) {
+			metadata["code"] = "operations_agentos_tool_request_cancelled"
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			metadata["code"] = "operations_agentos_tool_request_timeout"
+		}
 	} else {
 		metadata["cardId"] = nil
 		if card := object(result["card"]); card != nil {
@@ -219,7 +226,13 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 			metadata["state"] = result["availability"]
 		}
 	}
-	_, saveErr := s.Pool.Exec(ctx, `UPDATE operations_agentos_conversation_tool_calls_v1 SET state=$3,metadata=$4,updated_at=$5 WHERE endpoint=$1 AND id=$2`, s.Endpoint, bound.callID, state, metadata, s.now())
+	// Cancellation ends the actual read immediately. Only its already observed,
+	// closed outcome is persisted independently, so a timed-out client cannot
+	// leave the durable call permanently started. A late failed retry cannot
+	// replace an earlier successful observation of this same exact call.
+	settle, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+	defer cancel()
+	_, saveErr := s.Pool.Exec(settle, `UPDATE operations_agentos_conversation_tool_calls_v1 SET state=$3,metadata=$4,updated_at=$5 WHERE endpoint=$1 AND id=$2 AND (state='started' OR state='unavailable' AND $3='completed')`, s.Endpoint, bound.callID, state, metadata, s.now())
 	if saveErr != nil {
 		return nil, saveErr
 	}

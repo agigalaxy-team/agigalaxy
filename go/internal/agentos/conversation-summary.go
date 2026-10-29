@@ -55,26 +55,6 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 	if e != nil {
 		return nil, e
 	}
-	// Both projections use the exact owning receipt. Reuse that I/O only within
-	// this summary; each projection still performs its own current card checks.
-	readOriginal := readers.OriginalOperation
-	if readOriginal == nil {
-		readOriginal = t.recoverPrepared
-	}
-	type originalReceipt struct {
-		proposal, value Object
-		err             error
-	}
-	originals := map[[3]string]originalReceipt{}
-	readers.OriginalOperation = func(ctx context.Context, actor operationspermissions.Actor, proposal Object, operation string) (Object, error) {
-		key := [3]string{actor.ID, actor.Version, operation}
-		if saved, ok := originals[key]; ok && sameConversationJSON(saved.proposal, proposal) {
-			return saved.value, saved.err
-		}
-		value, err := readOriginal(ctx, actor, proposal, operation)
-		originals[key] = originalReceipt{proposal: proposal, value: value, err: err}
-		return value, err
-	}
 	prior, e := t.priorSummaryReads(ctx, a, row, command)
 	if e != nil {
 		return nil, e
@@ -101,11 +81,20 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 			return nil, fail("operations_agentos_conversation_not_ready", 503)
 		}
 	}
-	operations, e := t.priorSummaryOperations(ctx, a, row, command, readers)
+	cards, e := t.summaryCards(ctx, a, row, command, false)
 	if e != nil {
 		return nil, e
 	}
-	actions, e := t.priorSummaryActions(ctx, a, row, command, readers)
+	actionCards, e := t.summaryCards(ctx, a, row, command, true)
+	if e != nil {
+		return nil, e
+	}
+	observed, e := t.summaryCardBatch(ctx, a, row, cards, actionCards, readers)
+	if e != nil {
+		return nil, e
+	}
+	operations := t.priorSummaryOperations(cards, observed)
+	actions, e := t.priorSummaryActions(ctx, a, row, command, readers, actionCards, observed)
 	if e != nil {
 		return nil, e
 	}
@@ -168,13 +157,9 @@ func (t *ConversationTools) summaryCards(ctx context.Context, a operationspermis
 	}
 	return out, rows.Err()
 }
-func (t *ConversationTools) priorSummaryActions(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand, r SummaryContextReaders) (Object, error) {
+func (t *ConversationTools) priorSummaryActions(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand, r SummaryContextReaders, cards []*conversationCard, observed map[string]Object) (Object, error) {
 	at := t.Conversations.now().Unix()
 	out := Object{"basis": "same-owner-current-fixed-ai-completed-action-ledger", "scope": "latest-20-completed-content-feedback-and-account-cards", "absenceMeaning": "not-evidence-of-no-previous-effect", "valuesCurrent": false, "availability": "available", "items": []any{}, "checkedAt": at, "readExpiresAt": at + 30}
-	cards, e := t.summaryCards(ctx, a, row, command, true)
-	if e != nil {
-		return nil, e
-	}
 	if len(cards) > 0 && r.PriorAction != nil {
 		return r.PriorAction(ctx, a, row.Domain, Object{"conversationId": row.ID, "turnId": command.ID})
 	}
@@ -183,13 +168,8 @@ func (t *ConversationTools) priorSummaryActions(ctx context.Context, a operation
 	// narrow this projection, never fabricate a successful or empty history.
 	items := []any{}
 	for _, card := range cards {
-		actor, err := t.cardActor(ctx, a, card)
-		if err != nil {
-			out["availability"] = "partial"
-			continue
-		}
-		original, err := r.OriginalOperation(ctx, actor, card.Proposal, card.OperationID)
-		if err != nil || original["operationId"] != card.OperationID || original["state"] != "completed" {
+		original := observed[card.ID]
+		if original == nil || original["operationId"] != card.OperationID || original["state"] != "completed" || original["effectExecuted"] != true {
 			out["availability"] = "partial"
 			continue
 		}
@@ -198,11 +178,7 @@ func (t *ConversationTools) priorSummaryActions(ctx context.Context, a operation
 			out["availability"] = "partial"
 			continue
 		}
-		if _, e = t.cardActor(ctx, a, card); e != nil {
-			out["availability"] = "partial"
-			continue
-		}
-		items = append(items, Object{"cardId": card.ID, "operationId": card.OperationID, "kind": card.Proposal["kind"], "state": "completed", "effectExecuted": true, "recordedEffect": summaryRecordedEffect(original), "reference": reference, "currentRead": nil})
+		items = append(items, Object{"cardId": card.ID, "operationId": card.OperationID, "kind": card.Proposal["kind"], "state": "completed", "effectExecuted": true, "recordedEffect": original["recordedEffect"], "reference": reference, "currentRead": nil})
 	}
 	out["items"] = items
 	at = t.Conversations.now().Unix()
@@ -248,67 +224,20 @@ func summaryRecordedEffect(original Object) Object {
 	}
 	return effect
 }
-func (t *ConversationTools) priorSummaryOperations(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand, r SummaryContextReaders) (Object, error) {
+func (t *ConversationTools) priorSummaryOperations(cards []*conversationCard, observed map[string]Object) Object {
 	at := t.Conversations.now().Unix()
 	items := []any{}
 	out := Object{"basis": "same-owner-fixed-ai-original-domain-receipts", "valuesCurrent": false, "availability": "available", "items": items, "checkedAt": at, "readExpiresAt": at + 30}
-	cards, e := t.summaryCards(ctx, a, row, command, false)
-	if e != nil {
-		return nil, e
-	}
-	readonly := *t
-	readonly.SyncCardWithin = nil
 	for _, card := range cards {
-		kind := text(card.Proposal, "kind")
-		if _, e = t.cardReadPermission(kind); e != nil && r.OriginalOperation == nil {
-			return nil, e
-		}
-		actor, e := t.cardActor(ctx, a, card)
-		if e != nil {
+		item := observed[card.ID]
+		if item == nil {
 			out["availability"] = "partial"
 			continue
-		}
-		item := Object{"cardId": card.ID, "operationId": card.OperationID, "kind": kind}
-		if card.State == "prepared" {
-			view, e := readonly.cardView(ctx, a, card)
-			if e != nil {
-				out["availability"] = "partial"
-				continue
-			}
-			item["state"], item["canConfirm"], item["effectExecuted"] = view["state"], object(view["capability"])["canConfirm"], false
-		} else if card.Result["state"] == "cancelled" {
-			item["state"], item["effectExecuted"] = "cancelled", false
-		} else {
-			var original Object
-			if r.OriginalOperation != nil {
-				original, e = r.OriginalOperation(ctx, actor, card.Proposal, card.OperationID)
-			} else {
-				original, e = t.recoverPrepared(ctx, actor, card.Proposal, card.OperationID)
-			}
-			if e == nil {
-				_, e = t.cardActor(ctx, a, card)
-			}
-			if e != nil {
-				out["availability"] = "partial"
-				continue
-			}
-			if original["operationId"] != card.OperationID {
-				out["availability"] = "partial"
-				continue
-			}
-			item["state"], item["summary"] = original["state"], original["summary"]
-			item["recordedEffect"] = summaryRecordedEffect(original)
-			item["currentRead"] = nil
-			if original["state"] == "completed" {
-				item["effectExecuted"] = true
-			} else if original["state"] == "not-recorded" {
-				item["effectExecuted"] = nil
-			}
 		}
 		items = append(items, item)
 	}
 	out["items"] = items
 	at = t.Conversations.now().Unix()
 	out["checkedAt"], out["readExpiresAt"] = at, at+30
-	return out, nil
+	return out
 }

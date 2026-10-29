@@ -24,23 +24,25 @@ def _closed_failure(name, error):
     """Describe the actual failure category without handing the model raw codes."""
     diagnostic = failure_diagnostic(error)
     code, status = diagnostic.get("code"), diagnostic.get("status")
-    state, message = "denied", "该项读取未获允许。"
+    state, message = "denied", "本次读取未获允许，旧记录不代表本次结果。"
     if isinstance(error, AuthorityUnavailable):
-        state, message = "unavailable", "该项暂时读取失败。"
+        state, message = "unavailable", "本次读取暂时失败，旧记录不代表本次结果。"
         if code in {"operations_agentos_conversation_not_ready", "operations_agentos_action_not_connected"}:
-            message = "该项读取暂未就绪。"
+            message = "本次读取暂未就绪，旧记录不代表本次结果。"
+        elif code == "agentos_authority_timeout":
+            message = "本次读取超时，旧记录不代表本次结果。"
     elif status in {400, 422} or code in {"agentos_tool_arguments_invalid", "agentos_tool_call_id_invalid",
             "agentos_native_tool_call_id_invalid", "agentos_native_tool_call_required",
             "agentos_conversation_context_required", "agentos_injected_arguments_forbidden"}:
         state, message = "invalid-request", "工具调用参数不符。"
     elif status in {404, 410}:
-        state, message = "unavailable", "该项当前不可读取。"
+        state, message = "unavailable", "本次对象不可读取，旧记录不代表本次结果。"
     elif status == 409 or code == "agentos_conversation_context_changed":
         state, message = "changed", "该项状态已变化。"
     elif status == 401:
-        message = "当前会话认证未通过。"
+        message = "本次会话认证未通过，旧记录不代表本次结果。"
     uncertain = name in EFFECT_TOOLS
-    result = {"state": state, "message": message, "effectExecuted": None if uncertain else False,
+    result = {"state": state, "message": message, "dataRead": False, "valuesCurrent": False, "effectExecuted": None if uncertain else False,
         "cardPrepared": False, "retryable": False}
     if uncertain:
         result["nextStep"] = "read-original-operation"
@@ -63,6 +65,9 @@ def _model_feedback(value):
         if diagnostic:
             result.setdefault("message", {"denied": "该项读取未获允许。", "unavailable": "该项当前不可读取。",
                 "invalid-request": "工具调用参数不符。", "changed": "该项状态已变化。"}[result["state"]])
+            result["dataRead"], result["valuesCurrent"] = False, False
+            if result["state"] in {"denied", "unavailable"}:
+                result["message"] = "本次读取未成功，旧记录不代表本次结果。"
     # These are historical read outcomes, not a new denial in this turn. Keep
     # the recorded state and route; an old internal code must not become the
     # explanation for an ordinary current reply.
@@ -215,7 +220,7 @@ def reliable_function(fn):
                         return json.dumps(feedback, ensure_ascii=False)
                     return result
                 except AuthorityUnavailable as error:
-                    if native.name not in READ_TOOLS or attempt:
+                    if native.name not in READ_TOOLS or attempt or getattr(error, "retry_read", True) is False:
                         uncertain = native.name in EFFECT_TOOLS
                         _event(native.name, run_context, "unavailable", outcome="unknown" if uncertain else "not-started", diagnostic=failure_diagnostic(error))
                         return json.dumps(_closed_failure(native.name, error), ensure_ascii=False)
@@ -235,7 +240,7 @@ def reliable_function(fn):
             counters[key] = counters.get(key, 0) + 1
             exhausted = counters[key] > 2
             _event(native.name, run_context, "invalid-request", errors=errors, exhausted=exhausted)
-            return json.dumps({"state": "invalid-request", "message": "工具调用参数不符。", "errors": errors,
+            return json.dumps({"state": "invalid-request", "message": "工具调用参数不符。", "dataRead": False, "valuesCurrent": False, "errors": errors,
                 "allowedFields": sorted(schema.get('properties',{})),
                 "effectExecuted": False, "cardPrepared": False, "retryable": not exhausted,
                 "nextStep": "report-blocked" if exhausted else "correct-arguments",

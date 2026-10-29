@@ -13,13 +13,17 @@ if(browserExecutable){assert.ok(path.isAbsolute(browserExecutable));assert.match
 const require=createRequire(import.meta.url),app=fileURLToPath(new URL('..',import.meta.url));
 const conversationId='11111111-1111-4111-8111-111111111111',oldTurn='22222222-2222-4222-8222-222222222222',newTurn='33333333-3333-4333-8333-333333333333',replacementConversation='44444444-4444-4444-8444-444444444444';
 
-test('workbench conversation resources read independently and clear together on denied authority',async()=>{
+test('workbench conversation resources read independently and clear together on denied authority',async(t)=>{
  const source=`import React,{useState} from 'react';
  import {createRoot} from 'react-dom/client';
  import {AdminQueryProvider} from './src/components/AdminQueryProvider';
- import {useWorkbenchConversationData} from './src/lib/workbench/use-workbench-conversation-data';
+ import {useActiveConversationReconciliation,useWorkbenchConversationData} from './src/lib/workbench/use-workbench-conversation-data';
+ import {useConversationStream} from './src/lib/workbench/use-conversation-stream';
  function Probe(){
-  const data=useWorkbenchConversationData('overview',true),[historyDone,setHistoryDone]=useState(0);
+  const [domain,setDomain]=useState('overview'),[active,setActive]=useState(false),data=useWorkbenchConversationData(domain,true),[historyDone,setHistoryDone]=useState(0),[operationDone,setOperationDone]=useState(0);
+  const current=data.conversation?.runs.find(run=>run.operationId==='${newTurn}'),activeOperation=active&&!['COMPLETED','ERROR','CANCELLED','PAUSED','REGENERATED'].includes(current?.status??'')?'${newTurn}':null;
+  useActiveConversationReconciliation({enabled:!!activeOperation&&data.contextUsable,operationId:activeOperation,readOperation:data.readOperation,clear:data.clear});
+  const stream=useConversationStream({operatorId:'fixture-operator',csrfToken:'fixture',domain,operationId:activeOperation,enabled:!!activeOperation&&data.contextUsable,readExpiresAt:data.context.value?.readExpiresAt??0,onResync:()=>activeOperation?data.readOperation(activeOperation):Promise.resolve(),onRenew:data.context.renew,onDenied:()=>data.clear(403),onContextChanged:()=>{}});
   return <main>
    <div id="conversation">{data.conversation?.runs.map(run=><p id={run.operationId==='${oldTurn}'?'old-run':undefined} key={run.operationId}>{run.content}</p>)}</div>
    <output id="history-raw">{data.history.value?.runs.map(run=>run.content).join('|')??'empty'}</output>
@@ -27,11 +31,14 @@ test('workbench conversation resources read independently and clear together on 
    <output id="blocked-reason">{data.conversation?.blockedReason??'none'}</output>
    <output id="context">{data.context.value?.conversationId??'empty'}</output>
    <output id="management">{data.management.value?.managementCapabilities?'present':'empty'}</output>
-   <output id="denied">{String(data.denied)}</output><output id="history-done">{historyDone}</output>
+   <output id="denied">{String(data.denied)}</output><output id="history-done">{historyDone}</output><output id="operation-done">{operationDone}</output><output id="stream-finished">{String(stream.finished)}</output><output id="active-operation">{activeOperation??'none'}</output>
    <output id="history-error">{data.history.error}</output><output id="cards-error">{data.cards.error}</output><output id="context-error">{data.context.error}</output><output id="context-invalidated">{String(data.contextInvalidated)}</output>
    <button onClick={()=>{void data.history.read().finally(()=>setHistoryDone(value=>value+1));}}>Read history</button>
    <button onClick={()=>void data.cards.read()}>Read cards</button>
    <button onClick={()=>void data.context.read()}>Read context</button>
+   <button onClick={()=>setActive(true)}>Start stream</button>
+   <button onClick={()=>setDomain('governance')}>Switch domain</button>
+   <button onClick={()=>void (async()=>{try{const value=await data.readOperation('${newTurn}');if(value)await data.context.renew();}finally{setOperationDone(value=>value+1);}})()}>Read and renew</button>
   </main>;
  }
  createRoot(document.getElementById('root')).render(<AdminQueryProvider><Probe/></AdminQueryProvider>);`;
@@ -41,8 +48,8 @@ test('workbench conversation resources read independently and clear together on 
   b.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path==='auth'?"export const useAuth=()=>({user:{externalId:'fixture-operator'}});":"export const settingsOperatorId=user=>user.externalId;",loader:'js'}));
   b.onResolve({filter:/^(react|react\/jsx-runtime|react-dom\/client)$/},args=>({path:require.resolve(args.path)}));
  }}]});
- const counts={history:0,cards:0,context:0,management:0,operation:0},streams=new Set(),heldResponses=new Set();
- let hold=null,releaseHeld=null,notifyHeld=null,fail=null,operationMode='normal',historyConversationId=conversationId,contextConversationId=conversationId;
+ const counts={history:0,cards:0,context:0,management:0,operation:0,stream:0},streams=new Set(),heldResponses=new Set(),operationMethods=[];
+ let hold=null,releaseHeld=null,notifyHeld=null,fail=null,operationMode='normal',operationStart=0,contextLatest=null,historyConversationId=conversationId,contextConversationId=conversationId;
  const run=(id,text)=>({runId:'run-'+id,operationId:id,status:'COMPLETED',content:text,userInput:'question',createdAt:1,events:[],awaitingHuman:false});
  const server=http.createServer((req,res)=>{
   res.setHeader('Cache-Control','no-store');
@@ -51,17 +58,20 @@ test('workbench conversation resources read independently and clear together on 
   if(req.url==='/v1/operations/session'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({state:'signed-in',operator:{id:'fixture-operator'},csrfToken:'fixture',expiresAt:Math.floor(Date.now()/1000)+300}));return;}
   const base='/v1/operations/agentos/conversations/overview/';
   if(req.url.startsWith(base)){
-   const suffix=req.url.slice(base.length),kind=suffix==='management-capabilities'?'management':suffix.startsWith('operations/')?'operation':suffix;
+   const suffix=req.url.slice(base.length),kind=suffix==='management-capabilities'?'management':suffix.startsWith('operations/')&&/\/events(?:\?|$)/.test(suffix)?'stream':suffix.startsWith('operations/')?'operation':suffix;
    if(!Object.hasOwn(counts,kind)){res.writeHead(404);res.end();return;}
-   counts[kind]++;res.setHeader('Content-Type','application/json');
+   counts[kind]++;if(kind==='operation'||kind==='stream')operationMethods.push(req.method);
+   if(kind==='stream'){const checkedAt=Math.floor(Date.now()/1000);res.setHeader('Content-Type','text/event-stream');res.end('data: '+JSON.stringify({kind:'lease',operationId:newTurn,readExpiresAt:checkedAt+300,stopAvailable:false})+'\n\ndata: '+JSON.stringify({kind:'terminal',operationId:newTurn,eventIndex:null,status:'COMPLETED'})+'\n\n');return;}
+   res.setHeader('Content-Type','application/json');
+   if(kind==='operation'&&['single-flight','terminal-retry'].includes(operationMode)&&counts.operation-operationStart===(operationMode==='single-flight'?2:1)){res.statusCode=503;res.end(JSON.stringify({error:'operations_unavailable'}));return;}
    if(fail?.kind===kind){res.statusCode=fail.status;res.end(JSON.stringify({error:fail.status===401?'operations_access_denied':'operations_unavailable'}));return;}
    if(kind==='operation'&&operationMode==='http409'){res.statusCode=409;res.end(JSON.stringify({error:'operations_agentos_source_changed'}));return;}
    const checkedAt=Math.floor(Date.now()/1000),common={domain:'overview',checkedAt,readExpiresAt:checkedAt+300};
    const body=kind==='history'?{...common,conversationId:historyConversationId,runs:[run(oldTurn,historyConversationId===conversationId?'completed original':'replacement conversation')],contextChanged:false}
     :kind==='cards'?{...common,items:[{title:'existing card'}]}
-    :kind==='context'?{...common,conversationId:contextConversationId,contextChanged:false,runtimeState:'connected',modelState:'configured',capabilities:{canSend:true,canStream:true},blockedReason:null,latestOperation:null}
+    :kind==='context'?{...common,conversationId:contextConversationId,contextChanged:false,runtimeState:'connected',modelState:'configured',capabilities:{canSend:true,canStream:true},blockedReason:null,latestOperation:contextLatest}
     :kind==='management'?{...common,managementCapabilities:{canRead:true}}
-    :operationMode==='context-changed'?{operationId:newTurn,state:'context-changed'}:{operationId:newTurn,runId:'run-'+newTurn,state:'accepted',native:run(newTurn,'new event turn')};
+    :operationMode==='context-changed'?{operationId:newTurn,state:'context-changed'}:{operationId:newTurn,runId:'run-'+newTurn,state:'accepted',native:operationMode==='unknown-then-completed'&&counts.operation-operationStart===1?{...run(newTurn,'new event turn'),status:'unknown',content:null}:run(newTurn,'new event turn')};
    const finish=()=>{heldResponses.delete(res);if(!res.destroyed&&!res.writableEnded)res.end(JSON.stringify(body));};
    if(hold===kind){hold=null;heldResponses.add(res);releaseHeld=finish;notifyHeld?.();return;}finish();return;
   }
@@ -130,6 +140,47 @@ test('workbench conversation resources read independently and clear together on 
    assert.equal(await retiredPage.locator('#cards').textContent(),'existing card',mode+': cards survive context replacement');
    await current.context.close();
   }
+  await t.test('same-operation single flight retains completed response when trailing GET fails',async()=>{
+   fail=null;contextLatest=null;historyConversationId=conversationId;contextConversationId=conversationId;operationMode='single-flight';operationStart=counts.operation;hold=null;
+   current=await freshPage();const probe=current.page;
+   await waitOutput(probe,'context',conversationId);await waitOutput(probe,'history-raw','completed original');
+   hold='operation';const held=new Promise(resolve=>{notifyHeld=resolve;});
+   const changed=()=>probe.evaluate(({parentId,turnId})=>window.dispatchEvent(new CustomEvent('galaxy:admin-agentos-change',{detail:{kind:'conversation-operation',objectId:turnId,parentId,turnId}})),{parentId:conversationId,turnId:newTurn});
+   await changed();await held;await changed();assert.equal(counts.operation-operationStart,1,'a second event joins the original in-flight GET');
+   const trailingFailure=probe.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/operations/'+newTurn)&&response.status()===503);
+   releaseHeld();await probe.getByText('new event turn',{exact:true}).waitFor();await trailingFailure;
+   assert.equal(await probe.getByText('new event turn',{exact:true}).count(),1,'later failure must not discard the earlier completed snapshot');
+   assert.equal(counts.operation-operationStart,2,'an event received during a GET causes one follow-up GET');await current.context.close();
+  });
+
+  await t.test('stream terminal with failed original GET keeps reconciling by GET until completed',async()=>{
+   fail=null;hold=null;contextLatest=null;historyConversationId=conversationId;contextConversationId=conversationId;operationMode='terminal-retry';operationStart=counts.operation;
+   current=await freshPage();const probe=current.page;
+   await waitOutput(probe,'context',conversationId);await waitOutput(probe,'history-raw','completed original');
+   const failedOriginal=probe.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/operations/'+newTurn)&&response.status()===503);
+   await probe.getByRole('button',{name:'Start stream'}).click();await failedOriginal;await waitOutput(probe,'stream-finished','true');
+   await probe.getByText('new event turn',{exact:true}).waitFor();await waitOutput(probe,'active-operation','none');
+   assert.ok(counts.operation-operationStart>=2,'failed terminal reconciliation must retry the same original GET');await current.context.close();
+  });
+
+  await t.test('unknown original native placeholder continues to completed',async()=>{
+   fail=null;hold=null;historyConversationId=conversationId;contextConversationId=conversationId;operationMode='unknown-then-completed';operationStart=counts.operation;
+   contextLatest={operationId:newTurn,runId:'run-'+newTurn,state:'accepted',knownNativeStatus:null,requiresOriginalLookup:true};
+   current=await freshPage();const probe=current.page;
+   await probe.getByText('new event turn',{exact:true}).waitFor();
+   assert.ok(counts.operation-operationStart>=2,'unknown is not a terminal or live native status');await current.context.close();contextLatest=null;
+  });
+
+  await t.test('a late original GET cannot renew or apply after switching domain',async()=>{
+   fail=null;contextLatest=null;historyConversationId=conversationId;contextConversationId=conversationId;operationMode='normal';hold=null;
+   current=await freshPage();const probe=current.page;
+   await waitOutput(probe,'context',conversationId);await waitOutput(probe,'history-raw','completed original');
+   hold='operation';const held=new Promise(resolve=>{notifyHeld=resolve;});await probe.getByRole('button',{name:'Read and renew'}).click();await held;
+   await probe.getByRole('button',{name:'Switch domain'}).click();await waitOutput(probe,'context','empty');const oldContextRequests=counts.context;
+   releaseHeld();await waitOutput(probe,'operation-done','1');
+   assert.equal(counts.context,oldContextRequests,'late original GET must not renew the old domain');assert.equal(await probe.locator('#conversation').textContent(),'','late original result must not populate the new domain');await current.context.close();
+  });
+  assert.ok(operationMethods.length>0);assert.ok(operationMethods.every(method=>method==='GET'),'stream and original reconciliation never POST');
   assert.deepEqual(errors,[]);
  }finally{
   for(const res of heldResponses)res.destroy();for(const res of streams)res.end();

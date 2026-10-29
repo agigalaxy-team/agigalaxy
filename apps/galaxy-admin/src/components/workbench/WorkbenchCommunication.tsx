@@ -21,7 +21,7 @@ import {useWorkbenchCommand} from "../../lib/workbench/use-workbench-command";
 import {WorkbenchReplyProgress,WorkbenchAnswer,replyProgressLabel} from './WorkbenchReply';
 import {useConversationScroll} from '../../lib/workbench/use-conversation-scroll';
 import {useConversationStream} from "../../lib/workbench/use-conversation-stream";
-import {useWorkbenchConversationData} from '../../lib/workbench/use-workbench-conversation-data';
+import {useActiveConversationReconciliation,useWorkbenchConversationData} from '../../lib/workbench/use-workbench-conversation-data';
 import {agentOsCanUseDomain,agentOsConversationPath,agentOsConversationOperationPath,agentOsConversationCancelPath,nativeConversationFailure,nativeConversationRetryMessage,nativeConversationDisplayRuns,nativeConversationPreviousAttempts,nativeConversationFailureLabel,type AgentOsDomain,type AgentOsSession} from "../../lib/workbench/agentos-client";
 
 const domains=[{id:'overview',label:'总控'},{id:'governance',label:'治理'},{id:'messaging',label:'消息'},{id:'discovery',label:'数据与发现'},{id:'maintenance',label:'运维'}];
@@ -140,7 +140,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     onCommitted:async(value,path,body)=>{
       const stoppedDomain=domains.find(item=>path.startsWith(agentOsConversationPath(item.id as AgentOsDomain)+'/operations/'))?.id as AgentOsDomain|undefined;
       if(stoppedDomain&&value.cancelledOperationId){setStopping(previous=>{const next={...previous};if(value.state==='context-changed'||['COMPLETED','ERROR','CANCELLED','PAUSED'].includes(value.state??''))delete next[stoppedDomain];else next[stoppedDomain]={operationId:String(body.operationId),parentOperationId:value.cancelledOperationId!,csrfToken:verifiedSession?.csrfToken??''};memory.current.stopping=next;return next;});}
-      if(stoppedDomain&&value.cancelledOperationId&&stoppedDomain===domain)await data.readOperation(value.cancelledOperationId);
+      if(!stoppedDomain||!value.cancelledOperationId||stoppedDomain!==domain||!await data.readOperation(value.cancelledOperationId))return;
       await data.context.renew();
     }});
   const activeRun=[...(currentConversation?.runs??[])].reverse().find(run=>['PENDING','RUNNING'].includes(run.status));
@@ -149,10 +149,11 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const activeTurn=activeRun?.operationId??waitingReply?.operationId??null;
   const refreshActiveTurn=useCallback(async()=>{
     if(!activeTurn)return data.context.refresh();
-    await data.readOperation(activeTurn,waiting[domain]?.text);
-    return data.context.renew();
+    const value=await data.readOperation(activeTurn,waiting[domain]?.text);
+    if(value)return data.context.renew();
   },[activeTurn,domain,data.context.refresh,data.context.renew,data.readOperation,waiting]);
   const stream=useConversationStream({operatorId,csrfToken:verifiedSession?.csrfToken??'',domain,operationId:activeTurn,enabled:focused&&canUseDomain&&data.contextUsable&&!!currentConversation?.capabilities.canStream&&!currentConversation?.contextChanged&&!!activeTurn,readExpiresAt:Math.min(currentConversation?.readExpiresAt??0,session.value?.state==='signed-in'?session.value.expiresAt:Number.MAX_SAFE_INTEGER),onResync:refreshActiveTurn,onRenew:conversation.renew,onDenied:denyConversation,onContextChanged:()=>{setWaiting(previous=>{const next={...previous};delete next[domain];memory.current.waiting=next;return next;});setContextNotices(previous=>({...previous,[domain]:true}));}});
+  useActiveConversationReconciliation({enabled:focused&&canUseDomain&&data.contextUsable,operationId:activeTurn,readOperation:data.readOperation,clear:data.clear});
   const storedStop=stopping[domain]?.csrfToken===verifiedSession?.csrfToken&&stopping[domain]?.parentOperationId===activeTurn?stopping[domain]:undefined;
   const stopInProgress=!!activeRun?.cancellation||!!storedStop||stopCommand.pending?.domain===domain;
   const canStop=canUseDomain&&data.contextUsable&&!!currentConversation?.capabilities.canCancel&&!!activeTurn&&!stream.finished&&(stream.stopAvailable||!!activeRun?.runId)&&!stopInProgress&&!stopCommand.locked;

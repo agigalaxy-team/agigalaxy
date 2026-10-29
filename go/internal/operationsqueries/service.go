@@ -187,13 +187,15 @@ func (s *Service) human(ctx context.Context, a Actor, domain, action string) (Ac
 			if e != nil {
 				return Actor{}, e
 			}
+			if action == "workbench.read" {
+				return fresh, nil
+			}
 			return duty.RequireDutyAction(ctx, tx, fresh, action, "query")
 		}
-		fresh, e := s.Permissions.HumanAIWithin(ctx, tx, a, domain, "query", "workbench.read")
-		if e != nil {
-			return Actor{}, e
-		}
-		return s.Permissions.HumanAIWithin(ctx, tx, fresh, domain, "query", action)
+		// One current human × fixed-AI projection validates workbench, AI use,
+		// and the requested read action within this transaction. Each caller's
+		// later publication barrier remains a separate fresh transaction.
+		return s.Permissions.HumanAIReadWithin(ctx, tx, a, domain, "query", action)
 	})
 }
 func (s *Service) reader(a Actor) operationspermissions.Authority {

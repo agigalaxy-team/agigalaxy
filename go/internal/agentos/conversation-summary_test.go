@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -24,8 +25,12 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
 	f := operationsfixture.New(t, owner)
-	automation := f.Automation(t)
-	if _, err := f.Permissions.AIWorkAssignment(ctx, f.Root, "overview", Object{"operationId": uuid.NewString(), "expectedVersion": 0, "roleId": object(automation["role"])["id"], "enabled": true}); err != nil {
+	f.Automation(t)
+	role, err := f.Permissions.SaveRole(ctx, f.Root, Object{"operationId": uuid.NewString(), "expectedVersion": 0, "name": "Summary original receipt reads", "description": "Explicit read scope for the three synthetic card kinds", "subjectScope": "ai-only", "enabled": true, "permissions": []any{"feedback.read", "content.read", "accounts.read"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Permissions.AIWorkAssignment(ctx, f.Root, "overview", Object{"operationId": uuid.NewString(), "expectedVersion": 0, "roleId": object(role["role"])["id"], "enabled": true}); err != nil {
 		t.Fatal(err)
 	}
 	endpoint, issuer, idRoot := f.Endpoint, f.Issuer, f.IDs["root"]
@@ -101,12 +106,10 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 	}
 	// The production reader set has no bespoke PriorAction callback. Completed
 	// cards must use the owning exact receipt, not make the whole summary fail.
-	operations := map[string]int{}
-	states := map[string]int{}
+	var operations atomic.Int32
 	var expectedTarget string
 	for i, kind := range []string{"feedback-update", "content-visibility", "account-restriction", "feedback-update"} {
 		cardID, toolID, operationID, target := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
-		states[operationID] = i
 		if i == 0 {
 			expectedTarget = target
 		}
@@ -118,7 +121,11 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 		if _, e = pool.Exec(ctx, `INSERT INTO operations_agentos_conversation_tool_calls_v1(id,endpoint,conversation_id,turn_id,native_run_id,call_id,tool,arguments_digest,state,metadata,created_at,updated_at) VALUES($1,$2,$3,$4,'native-summary',($1::uuid)::text,'prepare-operation',$5,'completed','{}',$6,$6)`, toolID, endpoint, current.Row.ID, prior, strings.Repeat("e", 64), now().Add(-45*time.Second)); e != nil {
 			t.Fatal(e)
 		}
-		if _, e = pool.Exec(ctx, `INSERT INTO operations_agentos_conversation_cards_v1(id,endpoint,conversation_id,turn_id,tool_call_id,operator_id,domain,operation_id,request_digest,proposal,state,result,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'overview',$7,$8,$9,'completed',$10,$11,$11)`, cardID, endpoint, current.Row.ID, prior, toolID, human.ID, operationID, strings.Repeat(strings.ReplaceAll(cardID, "-", ""), 2), proposal, Object{"operationId": operationID, "state": "completed"}, now().Add(-40*time.Second)); e != nil {
+		receipt := Object{"operationId": operationID, "state": "completed"}
+		if i == 0 {
+			receipt["receipt"] = Object{"operationId": operationID, "revision": 2, "title": "synthetic private prose"}
+		}
+		if _, e = pool.Exec(ctx, `INSERT INTO operations_agentos_conversation_cards_v1(id,endpoint,conversation_id,turn_id,tool_call_id,operator_id,domain,operation_id,request_digest,proposal,state,result,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'overview',$7,$8,$9,'completed',$10,$11,$11)`, cardID, endpoint, current.Row.ID, prior, toolID, human.ID, operationID, strings.Repeat(strings.ReplaceAll(cardID, "-", ""), 2), proposal, receipt, now().Add(-40*time.Second)); e != nil {
 			t.Fatal(e)
 		}
 	}
@@ -130,19 +137,11 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 		return permission, nil
 	}
 	tools.RecoverPrepared = func(ctx context.Context, actor operationspermissions.Actor, proposal Object, operation string) (Object, error) {
-		operations[operation]++
+		operations.Add(1)
 		if actor.ID != human.ID || actor.AIProof == nil {
 			t.Fatal("original receipt lost current human/fixed-AI scope")
 		}
-		switch states[operation] {
-		case 1:
-			return nil, fail("business_admin_denied", 403)
-		case 2:
-			return nil, fail("operations_agentos_action_not_connected", 503)
-		case 3:
-			return Object{"operationId": operation, "state": "not-recorded"}, nil
-		}
-		return Object{"operationId": operation, "state": "completed", "summary": "合成原处理已记录。", "receipt": Object{"operationId": operation, "revision": 2, "title": "synthetic private prose"}}, nil
+		return nil, fail("operations_agentos_action_not_connected", 503)
 	}
 	result, e = q.Summary(ctx, human, "overview", bound)
 	if e != nil {
@@ -157,10 +156,8 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 	if reference["kind"] != "feedback" || reference["id"] != expectedTarget || object(reference["read"])["tool"] != "read-operation-object" || object(actionItems[0])["currentRead"] != nil {
 		t.Fatal("original action did not retain its minimal current-read locator", actionItems)
 	}
-	for operation, count := range operations {
-		if count != 1 {
-			t.Fatal("summary projections re-read the same original operation", operation, count)
-		}
+	if operations.Load() != 3 {
+		t.Fatal("summary re-read a verifiable terminal receipt or skipped legacy recovery", operations.Load())
 	}
 	raw, _ = json.Marshal(result)
 	if strings.Contains(string(raw), "synthetic private prose") {
@@ -195,5 +192,111 @@ func TestPriorActionReferenceUsesOnlyOriginalLocator(t *testing.T) {
 		if priorActionReference(proposal) != nil {
 			t.Fatal("invalid durable locator accepted")
 		}
+	}
+}
+
+func TestSummaryCardBatchTerminalReceiptsBoundedRecoveryAndRevocation(t *testing.T) {
+	owner, _ := testsupport.PostgreSQL(t)
+	ctx := context.Background()
+	f := operationsfixture.New(t, owner)
+	automation := f.Automation(t)
+	if _, err := f.Permissions.AIWorkAssignment(ctx, f.Root, "overview", Object{"operationId": uuid.NewString(), "expectedVersion": 0, "roleId": object(automation["role"])["id"], "enabled": true}); err != nil {
+		t.Fatal(err)
+	}
+	s := &Conversations{Pool: f.Pool, Endpoint: f.Endpoint, Permissions: f.Permissions, Now: f.Now}
+	current, err := s.Session(ctx, f.Root, "overview", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cards := []*conversationCard{}
+	var legacy, unrelated string
+	for i := range 7 {
+		operation := uuid.NewString()
+		card := &conversationCard{ID: uuid.NewString(), ConversationID: current.Row.ID, OperatorID: f.Root.ID, Domain: "overview", OperationID: operation, State: "unknown", Proposal: Object{"kind": "feedback-update"}, Result: Object{}}
+		if i >= 4 {
+			card.State = "completed"
+			card.Result = Object{"operationId": operation, "state": "completed", "receipt": Object{"operationId": operation, "revision": 2}}
+			if i == 5 {
+				legacy = operation
+				delete(object(card.Result["receipt"]), "operationId")
+			}
+			if i == 6 {
+				unrelated = operation
+				object(card.Result["receipt"])["operationId"] = uuid.NewString()
+			}
+		}
+		cards = append(cards, card)
+	}
+	var calls, active, peak atomic.Int32
+	var revoke atomic.Bool
+	entered, release := make(chan struct{}, 4), make(chan struct{})
+	defer func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	}()
+	tools := &ConversationTools{Conversations: s, CardReadPermission: func(string) (string, error) { return "feedback.read", nil }}
+	tools.RecoverPrepared = func(ctx context.Context, _ operationspermissions.Actor, _ Object, operation string) (Object, error) {
+		calls.Add(1)
+		n := active.Add(1)
+		defer active.Add(-1)
+		for {
+			previous := peak.Load()
+			if n <= previous || peak.CompareAndSwap(previous, n) {
+				break
+			}
+		}
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		select {
+		case <-release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		if revoke.CompareAndSwap(true, false) {
+			if _, err := owner.Exec(ctx, `UPDATE operations_ai_work_accounts_v1 SET enabled=false WHERE endpoint=$1 AND domain='overview'`, f.Endpoint); err != nil {
+				return nil, err
+			}
+		}
+		if operation == unrelated {
+			return Object{"operationId": uuid.NewString(), "state": "completed", "receipt": Object{"operationId": operation}}, nil
+		}
+		receipt := Object{"operationId": operation, "revision": 1}
+		if operation == legacy {
+			delete(receipt, "operationId")
+		}
+		return Object{"operationId": operation, "state": "completed", "receipt": receipt}, nil
+	}
+	type response struct {
+		values map[string]Object
+		err    error
+	}
+	finished := make(chan response, 1)
+	go func() {
+		values, err := tools.summaryCardBatch(ctx, f.Root, current.Row, cards, cards, SummaryContextReaders{})
+		finished <- response{values, err}
+	}()
+	for range 4 {
+		select {
+		case <-entered:
+		case early := <-finished:
+			t.Fatal("summary batch ended before four original reads; check fixture scope", len(early.values), early.err)
+		case <-time.After(3 * time.Second):
+			t.Fatal("unresolved summary receipts remained serial")
+		}
+	}
+	close(release)
+	first := <-finished
+	if first.err != nil || len(first.values) != 6 || calls.Load() != 6 || peak.Load() != 4 || first.values[cards[6].ID] != nil || first.values[cards[5].ID] == nil {
+		t.Fatal("summary re-read terminal cards, accepted an unrelated receipt, or duplicated recovery", len(first.values), first.err, calls.Load(), peak.Load())
+	}
+	revoke.Store(true)
+	values, err := tools.summaryCardBatch(ctx, f.Root, current.Row, cards, cards, SummaryContextReaders{})
+	if err != nil || len(values) != 0 {
+		t.Fatal("summary released receipts after fixed-AI withdrawal", values, err)
 	}
 }
