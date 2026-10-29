@@ -188,7 +188,9 @@
         "docs/operations/examples/slo/pilot.rules.test.json",
         "scripts/build-go-core.mjs",
         "scripts/hub-runtime.mjs",
-        "docs/technical/go-core-plan.md"
+        "docs/technical/go-core-plan.md",
+        "scripts/reference/http-api-entries.mjs",
+        "scripts/test/api-reference.test.mjs"
       ],
       "buildLimit": "Local Go server candidate; no service activation, schema changes or queue adoption. Necessary integration checks are run after development batches."
     },
