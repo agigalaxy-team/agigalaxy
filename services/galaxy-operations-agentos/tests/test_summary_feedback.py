@@ -10,10 +10,24 @@ class SummaryFeedbackTests(unittest.TestCase):
         before=deepcopy(source)
         result=_summary_feedback(source)
         self.assertEqual(source,before)
-        self.assertEqual({key:result[key] for key in source},before)
+        self.assertNotIn("managementCapabilities", result)
+        self.assertNotIn("checkedAt", result)
+        self.assertNotIn("readExpiresAt", result)
+        self.assertNotIn("permissionAllowed", str(result))
         text=result["summaryFeedback"]["capabilityFacts"]["岗位工作提示词"]["修改"]
         self.assertEqual(text,"功能已接通；权限未分配；尚未委派；当前不可办理")
         self.assertEqual(result["summaryFeedback"]["observedAt"],"1970-01-01T08:00:00+08:00")
+
+    def test_non_capability_business_values_and_receipts_stay_intact(self):
+        source={"managementCapabilities":{"sourceAiAccountId":"fixed-ai","targetAiAccounts":[{"id":"target-ai"}],"modelConfiguration":{"systemSupport":"human-only"}},
+            "counts":{"feedback":{"pending":0}},"priorReadReceipts":{"items":[{"state":"unavailable"}]},"checkedAt":1793250000,"readExpiresAt":1793250030}
+        before=deepcopy(source)
+        value=_summary_feedback(source)
+        self.assertEqual(source,before)
+        self.assertEqual(value["counts"],before["counts"])
+        self.assertEqual(value["priorReadReceipts"],before["priorReadReceipts"])
+        self.assertEqual(value["summaryFeedback"]["targetAiAccounts"],before["managementCapabilities"]["targetAiAccounts"])
+        self.assertEqual(value["summaryFeedback"]["capabilityFacts"]["模型配置"],"仅由人工办理")
 
     def test_each_status_uses_its_original_field_without_guessing(self):
         combinations=[

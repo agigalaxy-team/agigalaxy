@@ -193,4 +193,15 @@ def _summary_feedback(result):
             feedback["observedAt"] = datetime.fromtimestamp(checked, timezone(timedelta(hours=8))).isoformat()
         except (ValueError, OverflowError, OSError):
             pass
-    return {**result, "summaryFeedback": feedback}
+    # This is the model's business view, not the server/API authorization
+    # contract. Do not offer two competing representations of the same facts.
+    # The input and durable Go receipt remain unchanged.
+    projected = {key: value for key, value in result.items()
+        if key not in {"managementCapabilities", "checkedAt", "readExpiresAt"}}
+    feedback["sourceAiAccountId"] = capabilities.get("sourceAiAccountId")
+    feedback["targetAiAccounts"] = capabilities.get("targetAiAccounts", [])
+    for label, key in (("模型配置", "modelConfiguration"), ("授权边界", "authorityBoundaries")):
+        value = capabilities.get(key)
+        if isinstance(value, dict) and value.get("systemSupport") == "human-only":
+            facts[label] = "仅由人工办理"
+    return {**projected, "summaryFeedback": feedback}
