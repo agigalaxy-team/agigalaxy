@@ -39,6 +39,8 @@ func (s *Service) OriginalAIReceiptReadPermissionWithin(ctx context.Context, tx 
 		return "feedback.read", nil
 	case "content-visibility":
 		return "content.read", nil
+	case "file-access":
+		return "files.read", nil
 	default:
 		return "", fault.New("operations_autonomy_operation_not_found", 404)
 	}
@@ -95,6 +97,11 @@ func (s *Service) originalAIReceiptWithin(ctx context.Context, tx pgx.Tx, a Acto
 			return nil, fault.New("operations_autonomy_operation_not_found", 404)
 		}
 		targetType, permission = map[string]string{"post": "content-post", "reply": "content-reply"}[str(args["targetKind"])], "content."+str(args["action"])
+	case "file-access":
+		if !has([]string{"stop", "restore"}, str(args["action"])) {
+			return nil, fault.New("operations_autonomy_operation_not_found", 404)
+		}
+		targetType, permission = map[string]string{"chat": "file-chat", "forum": "file-forum"}[str(args["targetKind"])], "files.access."+str(args["action"])
 	}
 	if targetType == "" {
 		return nil, fault.New("operations_autonomy_operation_not_found", 404)
@@ -115,16 +122,21 @@ func (s *Service) originalAIReceiptWithin(ctx context.Context, tx pgx.Tx, a Acto
 			return nil, fault.New("operations_autonomy_operation_not_found", 404)
 		}
 		proposalTarget := obj(proposal["target"])
+		if kind == "file-access" && (proposalTarget == nil || proposalTarget["kind"] != "file") {
+			return nil, fault.New("operations_autonomy_operation_not_found", 404)
+		}
 		if proposalTarget != nil {
 			expectedKind := "feedback"
 			if kind == "content-visibility" {
 				expectedKind = str(request["targetKind"])
+			} else if kind == "file-access" {
+				expectedKind = "file"
 			}
 			if proposalTarget["kind"] != expectedKind {
 				return nil, fault.New("operations_autonomy_operation_not_found", 404)
 			}
 		}
-		if kind == "content-visibility" && (request["targetKind"] != args["targetKind"] || request["action"] != args["action"]) {
+		if (kind == "content-visibility" || kind == "file-access") && (request["targetKind"] != args["targetKind"] || request["action"] != args["action"]) {
 			return nil, fault.New("operations_autonomy_operation_not_found", 404)
 		}
 		src.Request, src.Command, src.Binding = request, obj(proposal["command"]), binding
@@ -145,6 +157,8 @@ func (s *Service) originalAIReceiptWithin(ctx context.Context, tx pgx.Tx, a Acto
 		action := "feedback.update"
 		if kind == "content-visibility" {
 			action = "content." + str(args["action"])
+		} else if kind == "file-access" {
+			action = "files.access." + str(args["action"])
 		}
 		if result["action"] != action || result["targetType"] != targetType || result["targetId"] != target || !integer(result["version"], 1, 9007199254740991) {
 			return nil, fault.New("operations_autonomy_receipt_unavailable", 503)

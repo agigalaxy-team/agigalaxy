@@ -100,6 +100,10 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 			if service.Content != nil {
 				return service.Content.OriginalAIReceiptWithin(ctx, tx, human, src)
 			}
+		case "file-access":
+			if service.Files != nil {
+				return service.Files.OriginalAIReceiptWithin(ctx, tx, human, src)
+			}
 		}
 		return nil, fault.New("operations_autonomy_receipt_unavailable", 503)
 	}
@@ -117,6 +121,10 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 		case "content-visibility":
 			if service.Content != nil {
 				return service.Content.OriginalAIReceiptQueryWithin(ctx, tx, actor, authority, src)
+			}
+		case "file-access":
+			if service.Files != nil {
+				return service.Files.OriginalAIReceiptQueryWithin(ctx, tx, actor, authority, src)
 			}
 		}
 		return nil, fault.New("operations_autonomy_receipt_unavailable", 503)

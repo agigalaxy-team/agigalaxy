@@ -186,6 +186,19 @@ func TestOriginalAIReceiptNormalizesAndBindsWholeCall(t *testing.T) {
 	}
 }
 
+func TestFileOriginalAIReceiptBindsWholeCall(t *testing.T) {
+	target := uuid.NewString()
+	call := map[string]any{"kind": "file-access", "targetKind": "forum", "targetId": target, "action": "stop", "until": int64(2000001800), "reason": "Synthetic reason"}
+	src := businessadmin.OriginalAIReceiptSource{CallArguments: call, Request: call, Command: map[string]any{"expectedRevision": 1}}
+	if _, err := normalizeOriginalAIReceiptSource(src); err != nil {
+		t.Fatal(err)
+	}
+	src.Request = map[string]any{"kind": "file-access", "targetKind": "forum", "targetId": target, "action": "stop", "until": int64(2000001800), "reason": "Changed reason"}
+	if _, err := normalizeOriginalAIReceiptSource(src); fault.Status(err) != 404 {
+		t.Fatalf("changed reason accepted: %v", err)
+	}
+}
+
 func TestConversationOriginalAIReceiptCrossRoleAndHumanRevocation(t *testing.T) {
 	owner, _ := testsupport.PostgreSQL(t)
 	f := operationsfixture.New(t, owner)

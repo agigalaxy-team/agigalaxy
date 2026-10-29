@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/filegovernance"
@@ -57,10 +58,10 @@ func TestFileAccessThroughOpaqueDutyOriginalOperation(t *testing.T) {
 		t.Fatal(e)
 	}
 	duty := &operationsautonomy.Service{Pool: f.Pool, Endpoint: f.Endpoint, AIWork: &operationsai.Service{Endpoint: f.Endpoint}, Now: now}
-	permissions := &operationspermissions.Service{Pool: f.Pool, Endpoint: f.Endpoint, AIWork: duty.AIWork, Duty: duty, Now: now}
+	permissions := &operationspermissions.Service{Pool: f.Pool, Endpoint: f.Endpoint, Authority: f.Gateway, StoredAuthority: f.Gateway, AIWork: duty.AIWork, Duty: duty, Now: now}
 	forum := &community.Service{Pool: f.Pool, Endpoint: f.Endpoint, Now: now}
 	adapter := (&community.AttachmentService{Forum: forum}).GovernanceAdapter()
-	files := &filegovernance.Service{Pool: f.Pool, Endpoint: f.Endpoint, Duty: duty, Now: now, Forum: adapter}
+	files := &filegovernance.Service{Pool: f.Pool, Endpoint: f.Endpoint, Duty: duty, Authority: f.Gateway, StoredAuthority: f.Gateway, PrincipalWithin: f.Gateway.LockOperationsPrincipalWithin, Now: now, Forum: adapter}
 	service := &Service{Pool: f.Pool, Endpoint: f.Endpoint, Permissions: permissions, Autonomy: duty, Files: files, Now: now}
 	duty.Permissions, duty.ActionReady, duty.QualifyTargetWithin, duty.ExecuteDutyOperation = permissions, service.ActionReady, service.QualifyTargetWithin, service.ExecuteDutyOperation
 	taskID := uuid.NewString()
@@ -76,7 +77,7 @@ func TestFileAccessThroughOpaqueDutyOriginalOperation(t *testing.T) {
 		t.Fatal(e)
 	}
 	policy := autonomyfixture.Operation(t, owner, f.Endpoint, f.IDs["root"], taskID, str(base["aiAccountId"]), fileID, "files.access.stop", false)
-	if _, e = owner.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=ARRAY['files.read','files.access.stop','files.access.restore'] WHERE endpoint=$1 AND id=$2`, f.Endpoint, base["role"]); e != nil {
+	if _, e = owner.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=ARRAY['autonomy.read','files.read','files.access.stop','files.access.restore'] WHERE endpoint=$1 AND id=$2`, f.Endpoint, base["role"]); e != nil {
 		t.Fatal(e)
 	}
 	if _, e = owner.Exec(ctx, `UPDATE operations_automation_grants_v1 SET permissions=ARRAY['files.access.stop','files.access.restore'] WHERE endpoint=$1 AND id=$2`, f.Endpoint, policy["grantId"]); e != nil {
@@ -97,22 +98,79 @@ func TestFileAccessThroughOpaqueDutyOriginalOperation(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	op := uuid.NewString()
 	request := Object{"kind": "file-access", "targetKind": "forum", "targetId": fileID, "action": "stop", "until": now().Add(30 * time.Minute).Unix(), "reason": "Synthetic authorized file test"}
 	outside := Object{"kind": "file-access", "targetKind": "forum", "targetId": otherFileID, "action": "stop", "until": now().Add(30 * time.Minute).Unix(), "reason": "Outside selected grant"}
 	if _, e = service.ExecuteDutyOperation(ctx, actor, uuid.NewString(), outside, false); e == nil {
 		t.Fatal("file outside selected grant accepted")
 	}
-	result, e := service.ExecuteDutyOperation(ctx, actor, op, request, false)
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET dispatch_started_at=$3,native_run_id='synthetic-run' WHERE endpoint=$1 AND id=$2`, f.Endpoint, taskID, now()); e != nil {
+		t.Fatal(e)
+	}
+	callID := uuid.NewString()
+	result, e := duty.Tool(ctx, Object{"taskId": taskID, "nativeRunId": "synthetic-run", "callId": callID, "tool": "execute-operation", "arguments": request}, false)
 	if e != nil {
 		t.Fatal(e)
 	}
 	if result["state"] != "completed" {
 		t.Fatalf("stop %#v", result)
 	}
+	op := str(result["operationId"])
 	recovered, e := service.ExecuteDutyOperation(ctx, actor, op, request, true)
 	if e != nil || recovered["state"] != "completed" {
 		t.Fatalf("original %#v %v", recovered, e)
+	}
+	duty.Authority = f.Gateway
+	duty.ReadTargetWithin = func(ctx context.Context, tx pgx.Tx, a Actor, domain, kind, id string) (Object, error) {
+		if kind != "forum-file" {
+			t.Fatalf("unexpected target kind %s", kind)
+		}
+		if _, err := files.ScopeFileAccessWithin(ctx, tx, "forum", id, false); err != nil {
+			return nil, err
+		}
+		return Object{"availability": "available"}, nil
+	}
+	duty.OriginalAIReceiptWithin = func(ctx context.Context, tx pgx.Tx, a Actor, src businessadmin.OriginalAIReceiptSource) (Object, error) {
+		return files.OriginalAIReceiptWithin(ctx, tx, a, src)
+	}
+	duty.OriginalAIReceiptQueryWithin = func(ctx context.Context, tx pgx.Tx, a Actor, authority operationspermissions.Authority, src businessadmin.OriginalAIReceiptSource) (Object, error) {
+		return files.OriginalAIReceiptQueryWithin(ctx, tx, a, authority, src)
+	}
+	checkReceipt := func(value Object, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatalf("original receipt: %v", err)
+		}
+		r := obj(value["receipt"])
+		if r["state"] != "recorded" || r["operationId"] != op || r["action"] != "files.access.stop" || r["targetType"] != "file-forum" || r["targetId"] != fileID || r["metadataOnly"] != true || r["version"] == nil {
+			t.Fatalf("invalid original metadata: %#v", r)
+		}
+	}
+	checkReceipt(duty.OriginalAIReceipt(ctx, f.Root, taskID, op))
+	queryReceipt := func() (Object, error) {
+		return postgres.InTx(ctx, f.Pool, func(tx pgx.Tx) (Object, error) {
+			queryActor, err := permissions.HumanAIAccountReadWithin(ctx, tx, f.Root, "overview", str(base["aiAccountId"]), "query", "autonomy.read")
+			if err != nil {
+				return nil, err
+			}
+			return permissions.WithOriginalAIReceiptReadWithin(ctx, tx, queryActor, "files.read", func(a Actor, auth operationspermissions.Authority) (Object, error) {
+				return duty.OriginalAIReceiptWithQueryWithin(ctx, tx, a, auth, taskID, op)
+			})
+		})
+	}
+	checkReceipt(queryReceipt())
+	// A changed frozen request must not be accepted as the original operation.
+	if _, e = owner.Exec(ctx, `UPDATE operations_ai_duty_operations_v1 SET request=jsonb_set(request,'{reason}',to_jsonb('tampered'::text)) WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, f.Endpoint, taskID, op); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = duty.OriginalAIReceipt(ctx, f.Root, taskID, op); e == nil {
+		t.Fatal("tampered original request accepted")
+	}
+	if _, e = owner.Exec(ctx, `UPDATE operations_ai_duty_operations_v1 SET request=jsonb_set(request,'{reason}',to_jsonb('Synthetic authorized file test'::text)) WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, f.Endpoint, taskID, op); e != nil {
+		t.Fatal(e)
+	}
+	checkReceipt(duty.OriginalAIReceipt(ctx, f.Root, taskID, op))
+	if _, err := duty.OriginalAIReceipt(ctx, f.Root, uuid.NewString(), op); err == nil {
+		t.Fatal("cross-task receipt accepted")
 	}
 	restore := Object{"kind": "file-access", "targetKind": "forum", "targetId": fileID, "action": "restore", "reason": "Synthetic original restore"}
 	// Model a prior decision from a different grant or AI in this isolated DB;
@@ -210,5 +268,16 @@ func TestFileAccessThroughOpaqueDutyOriginalOperation(t *testing.T) {
 	humanRestored, e := service.ExecutePrepared(ctx, f.Root, humanRestore, humanRestoreOp, func(context.Context, pgx.Tx) (Actor, error) { return f.Root, nil })
 	if e != nil || humanRestored["state"] != "completed" {
 		t.Fatalf("human restored %#v %v", humanRestored, e)
+	}
+	// Historical metadata remains readable after the original grant is disabled.
+	if _, e = owner.Exec(ctx, `UPDATE operations_automation_grants_v1 SET enabled=false WHERE endpoint=$1 AND id=$2`, f.Endpoint, policy["grantId"]); e != nil {
+		t.Fatal(e)
+	}
+	checkReceipt(queryReceipt())
+	if _, e = owner.Exec(ctx, `UPDATE operations_business_roles_v1 SET permissions=ARRAY['autonomy.read','files.access.stop','files.access.restore'] WHERE endpoint=$1 AND id=$2`, f.Endpoint, base["role"]); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = queryReceipt(); e == nil {
+		t.Fatal("receipt exposed after fixed AI files.read revoked")
 	}
 }
