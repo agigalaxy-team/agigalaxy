@@ -3,6 +3,7 @@ package operationsautonomy
 import (
 	"context"
 	"github.com/jackc/pgx/v5"
+	"sort"
 )
 
 var dutyWriters = []string{"execute-operation", "manage-ai-role", "manage-ai-prompt"}
@@ -58,7 +59,7 @@ func parseAssessment(args Object) error {
 // completionWithin only uses the persisted original task, receipts and call IDs.
 // The caller holds the task lock when writing a terminal decision.
 func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, requireAssessment bool) (Object, error) {
-	receipts, e := many(ctx, tx, `SELECT to_jsonb(r) FROM (SELECT operation_id,state,basis FROM operations_autonomy_receipts_v1 WHERE endpoint=$1 AND task_id=$2) r`, s.Endpoint, row["id"])
+	receipts, e := many(ctx, tx, `SELECT to_jsonb(r) FROM (SELECT operation_id,action,target_id,state,basis FROM operations_autonomy_receipts_v1 WHERE endpoint=$1 AND task_id=$2) r`, s.Endpoint, row["id"])
 	if e != nil {
 		return nil, e
 	}
@@ -117,7 +118,8 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, r
 		}
 	}
 	plan := obj(obj(row["configuration"])["plan"])
-	readCoverage := summarizeReadCoverage(calls, plan)
+	resolutionEvidence := selectedReceiptEvidence(calls, receipts, plan)
+	readCoverage := summarizeReadCoverage(calls, plan, assessment, Object{"receipts": resolutionEvidence})
 	disposition, reason, next := "continue", "task-assessment-required", "继续当前任务并评估目标"
 	if assessment != nil {
 		reason = "task-work-remaining"
@@ -167,5 +169,32 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, r
 		disposition, reason, next = "unknown", "original-operation-unknown", "核查原操作结果"
 		business = "unknown"
 	}
-	return Object{"modelAssessment": assessment, "readCoverage": readCoverage, "businessState": business, "eligibleToComplete": disposition == "completed", "disposition": disposition, "reasonCode": reason, "nextAction": next}, nil
+	omittedEvidence := 0
+	if len(resolutionEvidence) > 40 {
+		omittedEvidence = len(resolutionEvidence) - 40
+		resolutionEvidence = resolutionEvidence[:40]
+	}
+	return Object{"modelAssessment": assessment, "readCoverage": readCoverage, "resolutionEvidence": resolutionEvidence, "resolutionEvidenceOmitted": omittedEvidence, "businessState": business, "eligibleToComplete": disposition == "completed", "disposition": disposition, "reasonCode": reason, "nextAction": next}, nil
+}
+
+// Only persisted receipts tied to this task's writer call establish an already
+// handled selected target. They do not grant a future write or prove the goal.
+func selectedReceiptEvidence(calls, receipts []Object, plan Object) []Object {
+	selected := texts(plan["resourceIds"])
+	out := []Object{}
+	for _, call := range calls {
+		if !has(dutyWriters, str(call["tool"])) {
+			continue
+		}
+		for _, receipt := range receipts {
+			if receipt["operation_id"] != call["operation_id"] || !has(selected, str(receipt["target_id"])) ||
+				!has([]string{"completed", "no-action"}, str(receipt["state"])) ||
+				!has([]string{"persisted-domain-operation-receipt", "original-operation-query", "persisted-ai-role-delegation-event"}, str(receipt["basis"])) {
+				continue
+			}
+			out = append(out, Object{"callId": call["call_id"], "operationId": receipt["operation_id"], "targetId": receipt["target_id"], "action": receipt["action"], "state": receipt["state"], "basis": receipt["basis"]})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return str(out[i]["callId"]) < str(out[j]["callId"]) })
+	return out
 }

@@ -50,11 +50,25 @@ class RemainingWork(BaseModel):
     description: str = Field(min_length=1, max_length=240)
 
 
+class ReadResolution(BaseModel):
+    """Cite original task calls for a read that needs scope-specific resolution.
+
+    Superseded requires a later complete read of the same scope. Not-applicable
+    is for an unrelated extra read in a selected-resource task and requires
+    original evidence of the selected object; it never makes the read succeed.
+    """
+    model_config = ConfigDict(extra="forbid")
+    failedCallId: UUID = Field(description="Original unresolved read callId from the current task's program coverage.")
+    resolution: Literal["superseded", "not-applicable"]
+    evidenceCallIds: list[UUID] = Field(min_length=1, max_length=20, description="Original task callIds from successful read or verified selected-target receipt evidence.")
+
+
 class TaskAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid")
     goalSatisfied: bool
     remainingWork: list[RemainingWork] = Field(max_length=8)
     summary: str = Field(max_length=1000)
+    readResolutions: list[ReadResolution] | None = Field(default=None, max_length=20, description="Optional original-call evidence for unresolved extra reads; server verifies scope and eligibility.")
 
     @model_validator(mode="after")
     def consistent(self):
@@ -118,10 +132,11 @@ def duty_tools(gateway, allowed):
     def assess_task(run_context: RunContext, fc: FunctionCall, assessment: TaskAssessment) -> str:
         """Assess the frozen goal; never treat an assessment as evidence of effects.
 
-        The server checks original read and business evidence automatically;
-        no tool call IDs are required from the model.
+        The server checks original read and business evidence automatically.
+        The main assessment needs no call IDs; an optional read resolution may
+        cite only the original call IDs supplied by the program.
         """
-        return _call(gateway, run_context, fc, "assess-task", assessment.model_dump(mode="json"))
+        return _call(gateway, run_context, fc, "assess-task", assessment.model_dump(mode="json", exclude_none=True))
 
     def reconcile_task_operations(run_context: RunContext, fc: FunctionCall) -> str:
         """Query original uncertain write operations without resending them."""

@@ -49,9 +49,17 @@ func sameReadScope(tool string, failed, success Object) bool {
 
 // Later complete successes may cover an earlier read failure only for the same
 // original route and scope; the original failure remains in the ledger.
-func summarizeReadCoverage(calls []Object, plan Object) Object {
+func summarizeReadCoverage(calls []Object, plan Object, assessments ...Object) Object {
 	successful, unresolved, unverified, incidental := []Object{}, []Object{}, []Object{}, []Object{}
 	profile := currentInspectionPlan(plan)
+	var assessment Object
+	var receiptFacts []Object
+	if len(assessments) > 0 {
+		assessment = assessments[0]
+	}
+	if len(assessments) > 1 {
+		receiptFacts, _ = assessments[1]["receipts"].([]Object)
+	}
 	for _, call := range calls {
 		tool := str(call["tool"])
 		if tool != "query-operations" && tool != "read-operation-object" && tool != "read-ai-delegation" && tool != "inspect-operations" {
@@ -82,7 +90,13 @@ func summarizeReadCoverage(calls []Object, plan Object) Object {
 				} else {
 					fact["inspectionOutcome"] = nil
 				}
-				unresolved = append(unresolved, fact)
+				if evidence := selectedReadResolution(call, calls, plan, assessment, receiptFacts); evidence != nil {
+					fact["reason"] = "not-applicable-to-selected-resources"
+					fact["evidenceCallIds"] = evidence
+					incidental = append(incidental, fact)
+				} else {
+					unresolved = append(unresolved, fact)
+				}
 			}
 			continue
 		}
@@ -122,6 +136,15 @@ func summarizeReadCoverage(calls []Object, plan Object) Object {
 		}
 
 		if !resolved {
+			if evidence := selectedReadResolution(call, calls, plan, assessment, receiptFacts); evidence != nil {
+				fact["reason"] = "not-applicable-to-selected-resources"
+				fact["evidenceCallIds"] = evidence
+				incidental = append(incidental, fact)
+				continue
+			}
+			if supersededReadResolution(call, calls, assessment) {
+				continue
+			}
 			if profile && incidentalInspectionRead(call) {
 				fact["reason"] = "not-required-for-current-inspection"
 				incidental = append(incidental, fact)
@@ -135,6 +158,135 @@ func summarizeReadCoverage(calls []Object, plan Object) Object {
 		}
 	}
 	return Object{"successful": successful, "unresolved": unresolved, "unverified": unverified, "incidentalReadFailures": incidental}
+}
+
+// A model may cite only this task's original later calls; a declaration itself
+// never turns a failed or partial read into a successful source.
+func citedReadEvidence(call Object, calls []Object, assessment Object, resolution string) []Object {
+	for _, value := range list(assessment["readResolutions"]) {
+		r := obj(value)
+		if str(r["failedCallId"]) != str(call["call_id"]) || r["resolution"] != resolution {
+			continue
+		}
+		ids := texts(r["evidenceCallIds"])
+		if len(ids) == 0 {
+			return nil
+		}
+		found := make([]Object, 0, len(ids))
+		for _, id := range ids {
+			var match Object
+			for _, candidate := range calls {
+				if candidate["call_id"] == id && candidate["state"] == "completed" &&
+					has([]string{"read-success-complete", "read-success-empty-complete"}, str(candidate["code"])) &&
+					date(candidate["updated_at"]).After(date(call["updated_at"])) {
+					match = candidate
+					break
+				}
+			}
+			if match == nil {
+				return nil
+			}
+			found = append(found, match)
+		}
+		return found
+	}
+	return nil
+}
+
+func supersededReadResolution(call Object, calls []Object, assessment Object) bool {
+	if call["code"] == "local-validation-ambiguous" {
+		return false
+	}
+	for _, evidence := range citedReadEvidence(call, calls, assessment, "superseded") {
+		if evidence["tool"] == call["tool"] && sameReadScope(str(call["tool"]), obj(call["arguments"]), obj(evidence["arguments"])) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsSelected(value any, selected []string) bool {
+	switch value := value.(type) {
+	case string:
+		return has(selected, value)
+	case map[string]any:
+		for _, item := range value {
+			if containsSelected(item, selected) {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range value {
+			if containsSelected(item, selected) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func selectedReadResolution(call Object, calls []Object, plan, assessment Object, receipts []Object) []string {
+	selected := texts(plan["resourceIds"])
+	if len(selected) == 0 || plan["inspectionProfile"] != nil || call["state"] == "started" || call["code"] == "local-validation-ambiguous" {
+		return nil
+	}
+	for _, id := range selected {
+		if !schemaUUID.MatchString(id) {
+			return nil
+		}
+	}
+	tool := str(call["tool"])
+	if tool != "inspect-operations" {
+		if tool != "query-operations" && tool != "read-operation-object" {
+			return nil
+		}
+		scope := operationsquerycontract.QueryCoverageScope(tool, obj(call["arguments"]))
+		if scope["invalidRoute"] == true || scope["invalidFilters"] == true || scope["unknownTopLevel"] == true || scope["unknownFilterFields"] == true || len(list(scope["invalidFilterKeys"])) > 0 || containsSelected(scope["id"], selected) || containsSelected(scope["filters"], selected) {
+			return nil
+		}
+	}
+	for _, value := range list(assessment["readResolutions"]) {
+		r := obj(value)
+		if str(r["failedCallId"]) != str(call["call_id"]) || r["resolution"] != "not-applicable" {
+			continue
+		}
+		ids, provesSelected := texts(r["evidenceCallIds"]), false
+		if len(ids) == 0 {
+			return nil
+		}
+		for _, id := range ids {
+			verified := false
+			for _, receipt := range receipts {
+				if receipt["callId"] == id && has(selected, str(receipt["targetId"])) {
+					verified, provesSelected = true, true
+					break
+				}
+			}
+			for _, read := range calls {
+				if read["call_id"] != id || read["state"] != "completed" || !has([]string{"read-success-complete", "read-success-empty-complete"}, str(read["code"])) || !date(read["updated_at"]).After(date(call["updated_at"])) {
+					continue
+				}
+				if !has([]string{"query-operations", "read-operation-object", "read-ai-delegation"}, str(read["tool"])) {
+					continue
+				}
+				verified = true
+				if read["tool"] == "read-operation-object" && read["code"] == "read-success-complete" {
+					scope := operationsquerycontract.QueryCoverageScope("read-operation-object", obj(read["arguments"]))
+					if scope["valid"] == true && has(selected, str(scope["id"])) {
+						provesSelected = true
+					}
+				}
+			}
+			if !verified {
+				return nil
+			}
+		}
+		if provesSelected {
+			return ids
+		}
+		return nil
+	}
+	return nil
 }
 
 func currentInspectionPlan(plan Object) bool {

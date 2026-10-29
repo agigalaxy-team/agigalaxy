@@ -3,6 +3,7 @@ import asyncio
 import json
 import hashlib
 from functools import wraps
+from uuid import UUID
 
 from agno.models.message import Message
 
@@ -43,22 +44,42 @@ def with_duty_completion(model, gateway):
             and isinstance(item.get("description"), str) and len(item["description"]) <= 240] if isinstance(remaining, list) else []
         coverage = completion.get("readCoverage")
         coverage = coverage if isinstance(coverage, dict) else {}
+        receipt_evidence = completion.get("resolutionEvidence")
+        receipt_evidence = receipt_evidence if isinstance(receipt_evidence, list) else []
         def facts(key):
             values = coverage.get(key)
             if not isinstance(values, list):
                 return []
-            return [{k: item[k] for k in ("tool", "module", "view", "kind", "id", "scope", "coverage", "basis", "reason", "inspectionOutcome") if k in item}
-                for item in values[:40] if isinstance(item, dict)]
+            result = []
+            for item in values[:40]:
+                if not isinstance(item, dict):
+                    continue
+                fact = {k: item[k] for k in ("tool", "module", "view", "kind", "id", "scope", "coverage", "basis", "reason", "inspectionOutcome") if k in item}
+                try:
+                    call_id = item.get("callId")
+                    if isinstance(call_id, str) and str(UUID(call_id)) == call_id:
+                        fact["callId"] = call_id
+                except (ValueError, TypeError, AttributeError):
+                    pass
+                result.append(fact)
+            return result
         status = {"disposition": completion.get("disposition"), "reasonCode": completion.get("reasonCode"),
             "nextAction": completion.get("nextAction"), "businessState": completion.get("businessState"),
             "remainingWork": remaining, "unresolved": facts("unresolved"), "unverified": facts("unverified"),
+            "successful": facts("successful"),
+            "resolutionEvidence": [{k: item[k] for k in ("callId", "operationId", "targetId", "action", "state", "basis") if k in item}
+                for item in receipt_evidence[:40] if isinstance(item, dict)],
             "incidentalReadFailures": facts("incidentalReadFailures"),
             "omittedCounts": {key: max(0, len(coverage.get(key)) - 40) if isinstance(coverage.get(key), list) else 0
-                for key in ("unresolved", "unverified", "incidentalReadFailures")}}
+                for key in ("successful", "unresolved", "unverified", "incidentalReadFailures")},
+            "omittedResolutionEvidence": max(0, len(receipt_evidence) - 40) + (
+                completion.get("resolutionEvidenceOmitted") if type(completion.get("resolutionEvidenceOmitted")) is int
+                and completion.get("resolutionEvidenceOmitted") >= 0 else 0)}
         messages.append(Message(role="user", content=(
             "系统要求继续当前原任务；以当前授权和原操作回执为准。"
             "按以下程序裁决处理未决范围；取得有界页不代表全库已穷尽。"
             "未知写入只核查原操作，不能重发；完成有效工作后调用 assess_task。"
+            "可用原callId和后续成功证据提出readResolutions；程序仍核原范围及证据，旁读不变成成功。"
             "当前程序裁决：" + json.dumps(status, ensure_ascii=False, allow_nan=False, separators=(",", ":")))))
 
     def merge(parts, last):
