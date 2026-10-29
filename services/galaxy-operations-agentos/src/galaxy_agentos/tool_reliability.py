@@ -261,9 +261,9 @@ def reliable_function(fn, *, on_read_validation_failure=None):
             return json.dumps({"state": "invalid-request", "message": "工具调用参数不符。", "dataRead": False, "valuesCurrent": False, "errors": errors,
                 "allowedFields": sorted(schema.get('properties',{})),
                 **(operation_schema_feedback(schema, values) if native.name in {"prepare_operation", "execute_operation"} else {}),
-                "effectExecuted": False, "cardPrepared": False, "retryable": not exhausted,
-                "nextStep": "report-blocked" if exhausted else "correct-arguments",
-                "instruction": "No card exists from this failed call. Correct the fields against this tool's schema and call again; never report success."}, ensure_ascii=False)
+                "effectExecuted": False, "cardPrepared": False, "retryable": True,
+                "nextStep": "correct-arguments", "repeatedValidationFailure": exhausted,
+                "instruction": "No card exists from this failed call. Correct the fields against this tool's schema without changing the requested operation; never report success."}, ensure_ascii=False)
 
     return Function(name=native.name, description=native.description, parameters=schema,
         entrypoint=invoke, skip_entrypoint_processing=True)

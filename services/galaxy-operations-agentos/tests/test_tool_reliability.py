@@ -210,7 +210,7 @@ class ToolReliability(unittest.TestCase):
             call=FunctionCall(function=fn,call_id='call_bad'+str(attempt),arguments={'module':'CANARY_PRIVATE','view':'overview'})
             call.execute();result=json.loads(call.result)
             self.assertFalse(result['effectExecuted']);self.assertFalse(result['cardPrepared']);self.assertNotIn('CANARY_PRIVATE',call.result)
-        self.assertFalse(result['retryable']);self.assertEqual(result['nextStep'],'report-blocked');self.assertEqual(calls,[])
+        self.assertTrue(result['retryable']);self.assertTrue(result['repeatedValidationFailure']);self.assertEqual(result['nextStep'],'correct-arguments');self.assertEqual(calls,[])
 
     def test_conflicting_filter_is_not_silently_overridden(self):
         class Gateway:
