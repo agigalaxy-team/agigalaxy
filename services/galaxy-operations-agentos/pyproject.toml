@@ -23,3 +23,6 @@ galaxy-agentos = "galaxy_agentos.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+galaxy_agentos = ["p13_configuration_schema.json"]

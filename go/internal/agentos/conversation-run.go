@@ -174,6 +174,11 @@ func (s *Conversations) Run(ctx context.Context, operator operationspermissions.
 		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,734912421))", s.Endpoint+":conversation:"+turn.ID); err != nil {
 			return false, err
 		}
+		// Serialize admission across different operations in the same conversation.
+		// The lock is held only for local ledger work, never for a native request.
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,734912421))", s.Endpoint+":conversation-admission:"+row.ID); err != nil {
+			return false, err
+		}
 		if turn.RetryID != "" {
 			if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,734912421))", s.Endpoint+":conversation-retry:"+turn.RetryID); err != nil {
 				return false, err
@@ -195,6 +200,9 @@ func (s *Conversations) Run(ctx context.Context, operator operationspermissions.
 			return false, nil
 		}
 		if err != pgx.ErrNoRows {
+			return false, err
+		}
+		if err := s.requireConversationAvailableWithin(ctx, tx, row, turn.ID); err != nil {
 			return false, err
 		}
 		if _, err = tx.Exec(ctx, `INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,result,created_at) VALUES($1,$2,$3,$4,$5,'dispatching',$6,$7)`, turn.ID, s.Endpoint, row.ID, fresh.ID, turnDigest(turn.Message, turn.TaskID, turn.RetryID), receipt, s.now()); err != nil {

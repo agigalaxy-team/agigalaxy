@@ -297,3 +297,10 @@
 .galaxy-workbench .wb-send{display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:8px}
 @keyframes wb-soft-enter{from{opacity:.6;translate:0 3px}to{opacity:1;translate:0 0}}
 @media(prefers-reduced-motion:reduce){.galaxy-workbench .wb-jump-latest{animation:none}.galaxy-workbench .wb-compose{transition:none}}
+.wb-message-queue{max-height:14rem;overflow:auto;margin:.5rem 0;padding:.65rem;border:1px solid var(--border-color,#d5dae3);border-radius:.5rem}
+.wb-message-queue ol{margin:.4rem 0 0;padding-left:1.5rem}
+.wb-message-queue li{padding:.35rem 0}
+.wb-message-queue li p{margin:.2rem 0;overflow-wrap:anywhere}
+.wb-message-queue li button{margin-right:.5rem}
+.wb-message-queue li span{display:block;font-size:.85em}
+.wb-message-queue textarea{display:block;width:100%;min-height:4rem}

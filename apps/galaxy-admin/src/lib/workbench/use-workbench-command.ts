@@ -4,19 +4,20 @@ import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {operationsFailure,operationsRequest,OperationsRequestError} from "../operations-client";
 import {agentOsErrors,type AgentOsCommand,type AgentOsDomain} from './agentos-client';
 
-export type WorkbenchIntent={path:string;body:Record<string,unknown>;label:string;csrfToken:string;domain:AgentOsDomain;lookupPath?:string;attempted:boolean};
+export type WorkbenchIntent={path:string;body:Record<string,unknown>;label:string;csrfToken:string;domain:AgentOsDomain;lookupPath?:string;attempted:boolean;queueItemId?:string};
 // Same-tab memory only. No original message, CSRF or command body is persisted.
 const retainedIntents=new Map<string,WorkbenchIntent>();
-type Props={operatorId:string|null;csrfToken:string;canWrite:boolean;domain:AgentOsDomain;permittedDomains:AgentOsDomain[];memoryLane?:string;currentToken:(domain:AgentOsDomain)=>Promise<string|null>;validateResult?:(value:AgentOsCommand,intent:WorkbenchIntent)=>boolean;onQueued?:(intent:WorkbenchIntent)=>void;onRejected?:(intent:WorkbenchIntent)=>void;onCommitted:(value:AgentOsCommand,path:string,body:Record<string,unknown>)=>void|Promise<void>;onProgress?:()=>void|Promise<unknown>;onConflict:()=>void;onDenied:()=>void};
+export function clearWorkbenchIntents(operatorId:string){for(const key of retainedIntents.keys())if(key===operatorId||key.startsWith(operatorId+':'))retainedIntents.delete(key);}
+type Props={operatorId:string|null;csrfToken:string;canWrite:boolean;domain:AgentOsDomain;permittedDomains:AgentOsDomain[];memoryLane?:string;currentToken:(domain:AgentOsDomain)=>Promise<string|null>;validateResult?:(value:AgentOsCommand,intent:WorkbenchIntent)=>boolean;onQueued?:(intent:WorkbenchIntent)=>void;onRejected?:(intent:WorkbenchIntent,originalWriteRejected?:boolean)=>void;beforePost?:(intent:WorkbenchIntent)=>boolean;onConversationBusy?:(intent:WorkbenchIntent,busy:NonNullable<OperationsRequestError['conversationBusy']>)=>boolean;onCommitted:(value:AgentOsCommand,path:string,body:Record<string,unknown>)=>void|Promise<void>;onProgress?:()=>void|Promise<unknown>;onConflict:()=>void;onDenied:()=>void};
 
-export function useWorkbenchCommand({operatorId,csrfToken,canWrite,domain,permittedDomains,memoryLane='',currentToken,validateResult,onQueued,onRejected,onCommitted,onProgress,onConflict,onDenied}:Props){
+export function useWorkbenchCommand({operatorId,csrfToken,canWrite,domain,permittedDomains,memoryLane='',currentToken,validateResult,onQueued,onRejected,beforePost,onConversationBusy,onCommitted,onProgress,onConflict,onDenied}:Props){
  const memoryKey=operatorId?operatorId+(memoryLane?':'+memoryLane:''):null;
  const restored=useRef(memoryKey?retainedIntents.get(memoryKey):undefined);
  const [pending,setPending]=useState<WorkbenchIntent|null>(restored.current??null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[attempt,setAttempt]=useState(0);
  const ambiguous=useRef(!!restored.current),requestToken=useRef(csrfToken||restored.current?.csrfToken||'');
- const alive=useRef(false),inFlight=useRef(false),active=useRef<AbortController|null>(null),intent=useRef<WorkbenchIntent|null>(restored.current??null),callbacks=useRef({canWrite,permittedDomains,currentToken,validateResult,onQueued,onRejected,onCommitted,onProgress,onConflict,onDenied}),sendRef=useRef<(value:WorkbenchIntent)=>Promise<AgentOsCommand|undefined>>(async()=>undefined);
+ const alive=useRef(false),inFlight=useRef(false),active=useRef<AbortController|null>(null),intent=useRef<WorkbenchIntent|null>(restored.current??null),callbacks=useRef({canWrite,permittedDomains,currentToken,validateResult,onQueued,onRejected,beforePost,onConversationBusy,onCommitted,onProgress,onConflict,onDenied}),sendRef=useRef<(value:WorkbenchIntent)=>Promise<AgentOsCommand|undefined>>(async()=>undefined);
  const permissionKey=permittedDomains.join(',');
- useLayoutEffect(()=>{callbacks.current={canWrite,permittedDomains,currentToken,validateResult,onQueued,onRejected,onCommitted,onProgress,onConflict,onDenied};});
+ useLayoutEffect(()=>{callbacks.current={canWrite,permittedDomains,currentToken,validateResult,onQueued,onRejected,beforePost,onConversationBusy,onCommitted,onProgress,onConflict,onDenied};});
  useLayoutEffect(()=>{
   if(!intent.current||permittedDomains.includes(intent.current.domain))return;
   ambiguous.current=true;active.current?.abort();active.current=null;inFlight.current=false;setBusy(false);
@@ -34,6 +35,7 @@ export function useWorkbenchCommand({operatorId,csrfToken,canWrite,domain,permit
    const current=await callbacks.current.currentToken(value.domain);
    if(controller.signal.aborted||!alive.current||current!==value.csrfToken||requestToken.current!==value.csrfToken||!callbacks.current.permittedDomains.includes(value.domain)||!navigator.onLine||document.visibilityState==='hidden')return undefined;
    // This flag is set before fetch, including network failures with no ACK.
+   if(value.queueItemId&&!callbacks.current.beforePost?.(value))throw new QueueJournalError();
    value.attempted=true;
    return operationsRequest<AgentOsCommand>(value.path,{csrfToken:value.csrfToken,body:value.body,signal:controller.signal});
   };
@@ -63,9 +65,12 @@ export function useWorkbenchCommand({operatorId,csrfToken,canWrite,domain,permit
    await callbacks.current.onCommitted(result,value.path,value.body);return result;
   }catch(failure){
    if(controller.signal.aborted||!alive.current)return;
+   if(failure instanceof QueueJournalError){intent.current=null;ambiguous.current=false;if(memoryKey)retainedIntents.delete(memoryKey);setPending(null);callbacks.current.onRejected?.(value,true);setError('待发队列保存失败，未发送。');return;}
    if(accepted){setError('结果加载失败');return;}
+   if(!readingOriginal&&value.queueItemId&&failure instanceof OperationsRequestError&&failure.conversationBusy&&failure.conversationBusy.operationId===value.body.operationId&&callbacks.current.onConversationBusy?.(value,failure.conversationBusy)){intent.current=null;ambiguous.current=false;if(memoryKey)retainedIntents.delete(memoryKey);setPending(null);setError('');return;}
+   if(!readingOriginal&&value.queueItemId&&failure instanceof OperationsRequestError&&failure.code==='operations_agentos_conversation_busy'){ambiguous.current=true;setError('');setAttempt(previous=>previous+1);return;}
    const known=failure instanceof OperationsRequestError&&((failure.status<500&&![408,429].includes(failure.status)&&!(readingOriginal&&failure.status===404))||!readingOriginal&&['operations_agentos_not_configured','operations_agentos_model_not_configured','operations_agentos_conversation_not_ready','operations_agentos_conversation_transport_unavailable'].includes(failure.code));
-   if(known){intent.current=null;if(memoryKey)retainedIntents.delete(memoryKey);setPending(null);callbacks.current.onRejected?.(value);if(failure.status===409)callbacks.current.onConflict();if([401,403].includes(failure.status))callbacks.current.onDenied();setError(agentOsErrors[failure.code]??operationsFailure(failure,'这次操作未能完成。'));}
+   if(known){intent.current=null;if(memoryKey)retainedIntents.delete(memoryKey);setPending(null);callbacks.current.onRejected?.(value,!readingOriginal);if(failure.status===409)callbacks.current.onConflict();if([401,403].includes(failure.status))callbacks.current.onDenied();setError(agentOsErrors[failure.code]??operationsFailure(failure,'这次操作未能完成。'));}
    else{ambiguous.current=true;setError('');setAttempt(previous=>previous+1);}
   }finally{if(active.current===controller){active.current=null;inFlight.current=false;if(alive.current)setBusy(false);}}
  },[csrfToken,memoryKey]);
@@ -79,9 +84,15 @@ export function useWorkbenchCommand({operatorId,csrfToken,canWrite,domain,permit
   return()=>{alive.current=false;active.current?.abort();window.removeEventListener('offline',offline);window.removeEventListener('online',resume);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume);};
  },[]);
  useEffect(()=>{if(!pending||busy||!permittedDomains.includes(pending.domain))return;const timer=setTimeout(()=>void sendRef.current(pending),Math.min(10000,1500*2**Math.min(attempt,3)));return()=>clearTimeout(timer);},[pending,busy,attempt,permissionKey]);
- return{pending,busy,error,message,cancel,locked:busy||pending!==null,submit:(path:string,body:Record<string,unknown>,label:string,lookup?:(operationId:string)=>string,fixedOperationId?:string)=>{
-  if(intent.current||!callbacks.current.canWrite||!csrfToken||!navigator.onLine)return Promise.resolve(undefined);
-  const operationId=fixedOperationId??crypto.randomUUID(),value:WorkbenchIntent={path,body:{...structuredClone(body),operationId},label,csrfToken,domain,lookupPath:lookup?.(operationId),attempted:false};
-  ambiguous.current=false;intent.current=value;if(memoryKey)retainedIntents.set(memoryKey,value);setPending(value);setAttempt(0);setError('');setMessage('');callbacks.current.onQueued?.(value);return sendRef.current(value);
- }};
+ const trySubmit=(path:string,body:Record<string,unknown>,label:string,lookup?:(operationId:string)=>string,fixedOperationId?:string,options?:{queueItemId:string;attempted:boolean})=>{
+  if(intent.current||!callbacks.current.canWrite||!csrfToken||!navigator.onLine)return {admitted:false,promise:Promise.resolve(undefined)};
+  const operationId=fixedOperationId??crypto.randomUUID(),value:WorkbenchIntent={path,body:{...structuredClone(body),operationId},label,csrfToken,domain,lookupPath:lookup?.(operationId),attempted:options?.attempted??false,...(options?{queueItemId:options.queueItemId}:{})};
+  if(value.attempted&&!value.lookupPath)return {admitted:false,promise:Promise.resolve(undefined)};
+  // Queue attempts have their own durable journal; never create a second
+  // retained intent that could race with its unattempted-reservation recovery.
+  ambiguous.current=value.attempted;intent.current=value;if(memoryKey&&!value.queueItemId)retainedIntents.set(memoryKey,value);setPending(value);setAttempt(0);setError('');setMessage('');callbacks.current.onQueued?.(value);return {admitted:true,promise:sendRef.current(value)};
+ };
+ return{pending,busy,error,message,cancel,locked:busy||pending!==null,trySubmit,submit:(path:string,body:Record<string,unknown>,label:string,lookup?:(operationId:string)=>string,fixedOperationId?:string)=>trySubmit(path,body,label,lookup,fixedOperationId).promise};
 }
+
+class QueueJournalError extends Error {}

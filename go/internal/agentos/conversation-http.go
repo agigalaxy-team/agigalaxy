@@ -158,6 +158,13 @@ func (h ConversationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		out, err = h.Service.ReadConversation(r.Context(), actor, domain)
 	}
 	if err != nil {
+		var busy *ConversationBusyError
+		if sending && errors.As(err, &busy) && validOperationID(busy.OperationID) && validOperationID(busy.BlockingOperationID) && validOperationID(busy.ConversationID) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(Object{"error": "operations_agentos_conversation_busy", "requestId": id, "operationId": busy.OperationID, "blockingOperationId": busy.BlockingOperationID, "conversationId": busy.ConversationID, "admitted": false})
+			return
+		}
 		writeError(err)
 		return
 	}

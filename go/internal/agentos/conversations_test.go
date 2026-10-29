@@ -198,6 +198,15 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 		t.Fatal(err)
 	}
 	retryMode.Store(true)
+	// The retry follows a verified terminal original. Production sync records
+	// this same turn/run/AI evidence even if its original ACK stayed unknown.
+	cfg := Object{"externalWorkbench": Object{"conversationId": id, "operatorId": idRoot, "turnOperationId": operationID}}
+	if _, err = owner.Exec(ctx, `INSERT INTO operations_autonomy_tasks_v1(id,endpoint,domain,source,source_key,title,mode,state,model_state,business_state,ai_account_id,configuration,prompt_version,plan_version,session_id,due_at,created_at,updated_at) VALUES($1,$2,'overview','workbench',$1::uuid::text,'fixture','human-ai','failed','failed','not-started',$3,$4,1,1,$5,now(),now(),now())`, operationID, endpoint, *current.Row.AIAccountID, cfg, current.Row.SessionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = owner.Exec(ctx, `INSERT INTO operations_autonomy_workbench_runs_v1(endpoint,task_id,turn_operation_id,native_run_id,model_state,state,created_at,updated_at) VALUES($1,$2::uuid,$2::uuid,'original-native-run','failed','failed',now(),now())`, endpoint, operationID); err != nil {
+		t.Fatal(err)
+	}
 	retryTurn := Object{"operationId": retryID, "retryOfOperationId": operationID, "message": "查询当前处理状态"}
 	denied := func(context.Context) (operationspermissions.Actor, error) {
 		return operationspermissions.Actor{}, fail("operations_permission_denied", 403)

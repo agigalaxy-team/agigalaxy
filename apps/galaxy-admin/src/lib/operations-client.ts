@@ -2,7 +2,7 @@
 import {operationsReadSignal} from './operations-read-lifecycle';
 
 export class OperationsRequestError extends Error{
-  constructor(readonly status:number,readonly code:string){super(code);this.name='OperationsRequestError';}
+  constructor(readonly status:number,readonly code:string,readonly conversationBusy?:{operationId:string;blockingOperationId:string;conversationId:string;admitted:false}){super(code);this.name='OperationsRequestError';}
 }
 // GET recovery only. These classes identify transport/temporary availability,
 // not a business rejection. 429 requires a separate Retry-After contract.
@@ -17,7 +17,9 @@ export async function operationsRequest<T>(path:string,{signal,csrfToken,body}:{
   const response=await fetch(path,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',redirect:'error',headers:body?{'Content-Type':'application/json','X-Galaxy-Operator-CSRF':csrfToken??''}:undefined,body:body?JSON.stringify(body):undefined,signal:guardedSignal});
   if(!response.ok){
     const value=await response.json().catch(()=>null),code=typeof value?.error==='string'?value.error:typeof value?.error?.code==='string'?value.error.code:'operations_unavailable';
-    throw new OperationsRequestError(response.status,code);
+    const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const busy=response.status===409&&code==='operations_agentos_conversation_busy'&&value?.admitted===false&&typeof value.operationId==='string'&&uuid.test(value.operationId)&&typeof value.blockingOperationId==='string'&&uuid.test(value.blockingOperationId)&&typeof value.conversationId==='string'&&uuid.test(value.conversationId)?{operationId:value.operationId,blockingOperationId:value.blockingOperationId,conversationId:value.conversationId,admitted:false as const}:undefined;
+    throw new OperationsRequestError(response.status,code,busy);
   }
   const value=await response.json(),cursor=response.headers.get('X-Galaxy-Event-Cursor');
   return !body&&cursor&&/^[0-9]{1,20}$/.test(cursor)&&value&&typeof value==='object'&&!Array.isArray(value)?{...value,webEventCursor:cursor} as T:value as T;

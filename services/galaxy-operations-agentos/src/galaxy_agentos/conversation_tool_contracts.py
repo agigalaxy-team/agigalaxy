@@ -4,6 +4,7 @@ from typing import Annotated, Literal, Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from .p13_configuration import P13Configuration
 
 Topic = Literal["technology", "arts", "learning", "life", "galaxy", "unclassified"]
 Reason = Annotated[str, Field(min_length=3, max_length=1600)]
@@ -315,7 +316,7 @@ class StrategyContinue(ClosedArguments):
 
 class StrategyDraft(ClosedArguments):
     kind: Literal["strategy-draft"]
-    configuration: dict
+    configuration: P13Configuration
     reason: Reason
     expectedDraftId: UUID | None = None
 
