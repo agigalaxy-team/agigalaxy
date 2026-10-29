@@ -326,6 +326,8 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const latestFailure=data.contextUsable&&!waitingReply&&!command.pending&&!queueCommand.pending&&latestRun?.status==='ERROR'?latestRun:null;
   const outgoing=queueCommand.pending??command.pending;
   const pendingOutgoing=canUseDomain&&conversation.available&&outgoing?.domain===domain&&outgoing.path===agentOsConversationPath(domain)+'/runs'&&!outgoing.body.retryOfOperationId&&typeof outgoing.body.message==='string'&&!waitingReply&&!currentConversation?.runs.some(run=>run.operationId===outgoing?.body.operationId)?outgoing:null;
+  const extraVisibleTurn=!!pendingOutgoing||!!currentConversation&&!!waitingReply&&!waitingRun&&!waitingReply.retryOfOperationId;
+  const visibleRuns=nativeConversationDisplayRuns(currentConversation?.runs??[]).slice(extraVisibleTurn?-4:-5);
   const qualificationError=!verifiedSession?session.error:(!data.contextUsable||!currentConversation?.capabilities.canSend?conversation.error:'');
   const headerError=queueCommand.error||command.error||dismissCommand.error||stopCommand.error||qualificationError;
   const retryRead=!!qualificationError&&!data.denied&&(!verifiedSession||canUseDomain)&&!workLocked&&!replying&&!signedOut;
@@ -350,7 +352,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
       {domain==='overview'&&<><ReadStatus loading={data.management.loading} error={data.management.error} retry={data.management.read}/>{!data.denied&&data.management.available&&<WorkbenchManagementCapabilities value={data.management.value?.managementCapabilities??null}/>}</>}
       <div className="wb-query-presets" aria-label="预设查询">{queries.map(query=><button type="button" key={query.label} disabled={!canUseDomain} onClick={()=>{updateDraft(query.text);input.current?.focus();}}>{query.label}</button>)}</div>
       {contextNotices[domain]&&<p className="wb-reply-state" role="status">相关内容已有变化，后续对话使用当前资料。</p>}
-      <div>{nativeConversationDisplayRuns(currentConversation?.runs??[]).map(run=>{
+      <div>{visibleRuns.map(run=>{
         const pending=['PENDING','RUNNING'].includes(run.status),live=pending&&run.operationId===activeTurn&&currentConversation?.capabilities.canStream===true;
         const content=['ERROR','CANCELLED'].includes(run.status)?null:live?stream.text:run.content;
         const showProgress=pending&&!content&&!outputStarted.current.has(run.operationId??run.runId)&&!(stopInProgress&&run.operationId===activeTurn);
