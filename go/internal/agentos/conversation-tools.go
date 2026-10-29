@@ -2,11 +2,9 @@ package agentos
 
 import (
 	"context"
-	"errors"
 	"regexp"
 	"time"
 
-	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsqueries"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
@@ -241,15 +239,8 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 	state := "completed"
 	if err != nil {
 		state = "unavailable"
-		code := fault.Code(err)
-		if code != "invalid_operations_agentos_query" && !toolSafeError.MatchString(code) {
-			code = "operations_agentos_tool_unavailable"
-		}
-		metadata["code"] = code
-		if errors.Is(err, context.Canceled) {
-			metadata["code"] = "operations_agentos_tool_request_cancelled"
-		} else if errors.Is(err, context.DeadlineExceeded) {
-			metadata["code"] = "operations_agentos_tool_request_timeout"
+		for key, value := range conversationToolFailure(err) {
+			metadata[key] = value
 		}
 	} else {
 		metadata["cardId"] = nil
