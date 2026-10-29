@@ -35,6 +35,18 @@ func parseStrategyRuleRequest(x Object) (Object, error) {
 		normalized["kind"] = kind
 		return normalized, nil
 	}
+	if kind == "ordinary-strategy-create-draft" {
+		command := clone(x)
+		delete(command, "kind")
+		command["operationId"] = "00000000-0000-0000-0000-000000000000"
+		normalized, e := operationsstrategies.ParseCommand("ordinary-create-draft", command)
+		if e != nil {
+			return nil, e
+		}
+		delete(normalized, "operationId")
+		normalized["kind"] = kind
+		return normalized, nil
+	}
 	if kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" {
 		command := pick(x, "strategyId", "parameterEdits", "mode", "enabled", "versionId")
 		command["operationId"], command["expectedRevision"] = "00000000-0000-0000-0000-000000000000", 0
@@ -188,8 +200,11 @@ func (s *Service) prepareStrategy(ctx context.Context, a Actor, x Object, p *pre
 		}
 		return nil
 	}
-	if kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" {
+	if kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-create-draft" || kind == "ordinary-strategy-publish" {
 		mode := "draft"
+		if kind == "ordinary-strategy-create-draft" {
+			mode = "create-draft"
+		}
 		if kind == "ordinary-strategy-publish" {
 			mode = "publish"
 		}
@@ -199,9 +214,17 @@ func (s *Service) prepareStrategy(ctx context.Context, a Actor, x Object, p *pre
 		}
 		p.expiry(prepared["readExpiresAt"])
 		p.command = obj(prepared["command"])
-		p.target = Object{"kind": "strategy", "id": x["strategyId"], "label": label(obj(prepared["strategy"])["name"], "日常策略"), "href": "/admin/operations/strategies?strategy=" + str(x["strategyId"])}
+		selected := x["strategyId"]
+		if kind == "ordinary-strategy-create-draft" {
+			selected = x["sourceStrategyId"]
+		}
+		p.target = Object{"kind": "strategy", "id": selected, "label": label(obj(prepared["strategy"])["name"], "日常策略"), "href": "/admin/operations/strategies?strategy=" + str(selected)}
 		p.title = "调整已批准边界内的日常策略"
 		impact := "保存一份受限草稿，后续仍需通过当前消费者预演。"
+		if mode == "create-draft" {
+			p.title = "基于已批准模板新建日常策略草稿"
+			impact = "沿用模板业务和授权边界，新增策略不会替代来源；仅保存草稿。"
+		}
 		if mode == "publish" {
 			p.title = "发布已保存的日常策略调整"
 			impact = "对新事项使用已预演的受限策略版本。"

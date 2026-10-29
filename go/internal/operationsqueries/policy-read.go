@@ -81,6 +81,9 @@ func (s *Service) strategies(ctx context.Context, a Actor, args arguments) (quer
 		version := object(value["version"])
 		data := object(project(version, Object{"id": "s", "version": "n", "createdAt": "s"}))
 		data["configuration"] = version["configuration"]
+		if source := object(version["ordinaryCreation"]); source != nil {
+			data["ordinaryCreation"] = project(source, shape("operationId sourceStrategyId sourceVersionId newStrategyId", "s"))
+		}
 		return queryResult{source: value, data: data}, nil
 	}
 	if args.kind != "" {

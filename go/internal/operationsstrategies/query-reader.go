@@ -42,10 +42,18 @@ func (s *Service) QueryRead(ctx context.Context, a Actor, authority p.Authority,
 		if version == nil {
 			return nil, fail("p13_version_not_found", 404)
 		}
+		creation, e := one(ctx, reader.Pool, `SELECT to_jsonb(c) FROM(SELECT operation_id,input->>'sourceStrategyId' AS source_strategy_id,input->>'sourceVersionId' AS source_version_id,result->>'newStrategyId' AS new_strategy_id FROM operations_p13_strategy_commands_v1 WHERE endpoint=$1 AND kind='ordinary-create-draft' AND result->>'versionId'=$2)c`, reader.Endpoint, id)
+		if e != nil {
+			return nil, e
+		}
 		if _, e = reader.current(ctx, a, "strategies.read"); e != nil {
 			return nil, e
 		}
-		return reader.metadata(Object{"version": VersionView(version)}), nil
+		view := VersionView(version).(Object)
+		if creation != nil {
+			view["ordinaryCreation"] = Object{"operationId": creation["operation_id"], "sourceStrategyId": creation["source_strategy_id"], "sourceVersionId": creation["source_version_id"], "newStrategyId": creation["new_strategy_id"]}
+		}
+		return reader.metadata(Object{"version": view}), nil
 	}
 	return nil, invalid()
 }

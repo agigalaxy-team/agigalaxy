@@ -138,6 +138,11 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 			return nil, err
 		}
 		out["inspectionReport"], out["finalAnalysis"], out["assessmentSummary"] = report["inspectionReport"], report["finalAnalysis"], report["assessmentSummary"]
+		artifacts, err := s.strategyArtifactsWithin(ctx, tx, row, a)
+		if err != nil {
+			return nil, err
+		}
+		out["strategyArtifacts"] = artifacts
 	}
 	usage := obj(row["model_usage"])
 	out["calls"] = finite(usage["calls"])

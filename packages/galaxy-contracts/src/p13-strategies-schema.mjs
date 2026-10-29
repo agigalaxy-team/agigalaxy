@@ -28,7 +28,7 @@ export const p13StrategySchema=z.strictObject({
  judgment:z.enum(['prepared-command','semantic']),instructions:maybeNote,
  condition:condition.nullable().default(null),
  ordinaryBounds:z.strictObject({parameters:z.array(z.strictObject({path:parameterPath,minimum:z.number().int().nonnegative(),maximum:z.number().int().nonnegative()}).refine(v=>v.maximum>=v.minimum)).max(30),
-  modes:z.array(z.enum(['code-automatic','ai-autonomous','ai-human-participation'])).max(3).refine(v=>new Set(v).size===v.length),canEnable:z.boolean(),canDisable:z.boolean()}).nullable().default(null),
+  modes:z.array(z.enum(['code-automatic','ai-autonomous','ai-human-participation'])).max(3).refine(v=>new Set(v).size===v.length),canEnable:z.boolean(),canDisable:z.boolean(),canCreate:z.boolean().optional()}).nullable().default(null),
  // A human can explicitly approve a previous, validated version as a recovery
  // target. Empty conditions never mean "recover for any failure".
  recovery:z.strictObject({versionId:z.uuid().nullable(),conditions:z.array(z.enum(['native-unavailable','workflow-failed'])).max(2).refine(v=>new Set(v).size===v.length)})

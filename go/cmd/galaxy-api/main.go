@@ -532,6 +532,7 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	forumOperations := &operationscommunity.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, Duty: autonomy, PrincipalWithin: gateway.LockOperationsPrincipalWithin, ReadPrincipalWithin: gateway.ReadOperationsPrincipalWithin, Forum: forum, Files: forumFiles, Links: links}
 	var executionDiscovery *discovery.Runtime
 	executionGateway, strategies := connectExecutions(gateway, permissionService, autonomy, forumOperations, fileGovernance, agentClient, func() *discovery.Runtime { return executionDiscovery })
+	autonomy.OriginalStrategyArtifactWithin = strategies.OriginalCreationArtifactWithin
 	agentConversations.Tools.AuthorizedWork = (&actions.AuthorizedWork{Gateway: executionGateway}).Execute
 	forumPolicy, _ := forum.PolicySnapshot()
 	resourceOperations := &operationsresources.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, Duty: autonomy, PrincipalWithin: gateway.LockOperationsPrincipalWithin, Projects: projectService, Capsules: capsuleSource, MaxHideSeconds: policySeconds(forumPolicy["maxGovernanceHideSeconds"])}

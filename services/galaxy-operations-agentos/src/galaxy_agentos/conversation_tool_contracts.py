@@ -358,6 +358,18 @@ class OrdinaryStrategyPublish(ClosedArguments):
     versionId: UUID
 
 
+class OrdinaryStrategyCreateDraft(ClosedArguments):
+    kind: Literal["ordinary-strategy-create-draft"]
+    sourceStrategyId: UUID
+    sourceVersionId: UUID
+    expectedRevision: Annotated[int, Field(strict=True, ge=0)]
+    name: Annotated[str, Field(min_length=1, max_length=120)]
+    reason: Reason
+    parameterEdits: Annotated[list[OrdinaryParameterEdit], Field(max_length=30)] = Field(default_factory=list)
+    mode: Literal["code-automatic", "ai-autonomous", "ai-human-participation"] | None = None
+    enabled: bool | None = None
+
+
 SearchReason = Annotated[str, Field(min_length=1, max_length=500)]
 
 
@@ -515,7 +527,7 @@ _BusinessOperation = Union[CleanupPlanCreate, CleanupPlanCancel, ContentTagCreat
     FileScanRetry, FileCleanupApprove, AccountRestriction, FileAccess, CaseResolve, MessagingState, StrategyControl, StrategyContinue,
     OrdinaryStrategyDraft, OrdinaryStrategyPublish, StrategyDraft, StrategyRehearsal, StrategyPublish,
     SearchDraftSave, SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection, RecommendationPolicySave, RecommendationThemeUpdate]
-DutyPreparedOperation = Annotated[_BusinessOperation, Field(discriminator="kind")]
+DutyPreparedOperation = Annotated[Union[_BusinessOperation, OrdinaryStrategyCreateDraft], Field(discriminator="kind")]
 PreparedOperation = Annotated[Union[_BusinessOperation, AiWorkPromptSave, AiRoleCommand], Field(discriminator="kind")]
 
 
@@ -539,6 +551,7 @@ def _prepared_arguments(operation):
         "feedback-update": ("module", "state", "note"),
         "case-resolve": ("restrictionAction", "hideUntil"),
         "ordinary-strategy-draft": ("mode", "enabled"),
+        "ordinary-strategy-create-draft": ("mode", "enabled"),
         "strategy-draft": ("expectedDraftId",),
         "search-draft-save": ("expectedDraftId",),
         "content-tag-update": ("name", "enabled"),

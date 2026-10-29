@@ -52,6 +52,9 @@ func (s *Service) PrepareWithReference(ctx context.Context, a Actor, domain stri
 		return nil, e
 	}
 	kind := str(x["kind"])
+	if kind == "ordinary-strategy-create-draft" && !s.isDuty(a) {
+		return nil, fail("operations_agentos_scope_denied", 403)
+	}
 	if reference != nil && !slices.Contains([]string{"content-visibility", "content-curation"}, kind) {
 		return nil, fail("invalid_operations_agentos_request", 400)
 	}
@@ -77,7 +80,7 @@ func (s *Service) PrepareWithReference(ctx context.Context, a Actor, domain stri
 		e = s.prepareNotice(ctx, actor, x, operationID, &p)
 	case "recommendation-policy-save", "recommendation-theme-update":
 		e = s.prepareRecommendationExtended(ctx, actor, x, &p)
-	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue":
+	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-create-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue":
 		e = s.prepareStrategy(ctx, actor, x, &p)
 	case "rule-publish", "rule-restore":
 		e = s.prepareRule(ctx, actor, x, &p)

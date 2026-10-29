@@ -87,3 +87,9 @@ test('fixed conditions and explicitly approved ordinary bounds survive drafts wi
  const event={id:id(9),sequence:'22',versionId:id(2),strategyId:id(1),runId:null,kind:'ordinary-draft',operatorId:'executor:'+id(4),metadata:{version:3,scope:'ordinary-strategy',changes:{parameters:[{path:[0],before:40,after:50}],enabled:{before:false,after:true},mode:{before:'code-automatic',after:'ai-autonomous'},privateKey:'DO_NOT_SHOW'}},createdAt:time};
  const record=strategiesRecords({...lease,items:[event],nextAfter:null});assert.ok(record);assert.equal(record.items[0].operatorId,event.operatorId);assert.deepEqual(record.items[0].metadata.changes.parameters,[{path:[0],before:40,after:50}]);assert.ok(!JSON.stringify(record).includes('DO_NOT_SHOW'));
 });
+test('ordinary creation permission is explicit, preserved and defaults closed for older bounds',()=>{
+ const base=configuration();base.strategies=[{...definition(),ordinaryBounds:{parameters:[],modes:[],canEnable:false,canDisable:false}}];
+ const old=strategyConfiguration(base);assert.ok(old);assert.notEqual(old.strategies[0].ordinaryBounds.canCreate,true);
+ const enabled=structuredClone(base);enabled.strategies[0].ordinaryBounds.canCreate=true;assert.equal(strategyConfiguration(enabled).strategies[0].ordinaryBounds.canCreate,true);
+ enabled.strategies[0].ordinaryBounds.canCreate='true';assert.equal(strategyConfiguration(enabled),null);
+});

@@ -171,7 +171,7 @@ func CardReadPermission(kind string) (string, error) {
 	if kind == "recommendation-policy-save" || kind == "recommendation-theme-update" {
 		return "recommendations.read", nil
 	}
-	if kind == "strategy-rehearsal" {
+	if kind == "strategy-rehearsal" || kind == "ordinary-strategy-create-draft" {
 		return "strategies.read", nil
 	}
 	cardReadOnce.Do(func() {
@@ -268,7 +268,7 @@ func required(x Object) string {
 		return "strategies.read"
 	case "strategy-publish":
 		return "strategies.publish"
-	case "ordinary-strategy-draft":
+	case "ordinary-strategy-draft", "ordinary-strategy-create-draft":
 		return "strategies.ordinary.configure"
 	case "ordinary-strategy-publish":
 		return "strategies.ordinary.publish"

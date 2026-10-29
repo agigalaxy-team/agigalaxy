@@ -123,9 +123,13 @@ provider reference和analysis语义测试分别用 `test_provider_call_reference
 
 普通工具read-selected-strategy、save-selected-strategy-draft、publish-selected-strategy只处理P10 grant/P105 attested execution选中的strategy UUID；权限为strategies.read/ordinary.configure/ordinary.publish。ordinaryBounds:null不给范围。允许人给定范围内textLength/linkCount/attachmentCount原rule-index数值、获准mode/日常启停，不改field/operator/结构、目标边界、重要人工策略、待决人工草稿或模型。发布使用人工选择的样本完成当前program qualification，只影响新事项，保同一不可变样本祖先。
 
+Duty另通过`execute-operation`的ordinary草稿/发布typed命令，在原角色、计划、策略与grant交集中维护已存在策略；不能把上述P13选定事项工具限制误称全部Duty入口。日常新增R01补入最小来源合同：只有人类完整配置中显式`ordinaryBounds.canCreate=true`的原策略可作模板，缺失视为不允许；AI只提交精确来源版本、名称和原bounds内的数值、mode或启停，代码复制原目标、结构、触发、动作与授权边界，产生随机新strategyId，新产物不能递归开启canCreate。原来源与新产物身份分别保留，同task/AI/grant核原创建回执及草稿，程序预演后才发布。此新增typed入口仅Duty消费，普通人审新增仍走完整配置卡。发布不改在办task冻结计划；已批准的非manual触发方案由现调度器为真实新ID建立新事项并重新核资格，manual不能称自动派发。隔离PG已用真实opaque Duty、API及Worker不同数据库角色验证创建、预演发布、同原号恢复、调度新ID/版本和原content.hide业务回执，不能替代生产模型验收。原task详情另以已验域命令和不可变版本投影`strategyArtifacts`，原授权来源target不冒充新产物；任务详情及绑定工作台复用组件显示原模板、新策略及版本。该批源码已完成必要联测，待发行和生产实测。
+
 部署按完整registry包含对应P13结构/API grants，不给Worker新增P13写或Python业务表权。Go与新native image同批，私有p13/context、p13/step先验service key，native核execution JWT、matter、workflow、session与最新context。health必须回读固定workflow ID/version；启用前由人提供目标、策略、样本与成功分类演练，初始空/停用。它不接消息发送、文件purge、整站恢复、任意参数维护或自动全领域事项发现。
 
 AI查询和准备卡使用持久绑定的人员与AI上下文，由共同主体接口核对当前身份并锁定主体行，不冒充浏览器会话。query只读；stored prepare可读目标并准备卡，不能直接执行业务写入；人工确认、Duty及Execution仍使用各自正式入口。服务未接通、读取失败、对象变化与真实失权分别反馈，内部错误码进入诊断记录；普通对话不因无关状态预读失败而改成重试。
+
+分析时间投影区分带offset的窗口瞬时点与原日桶日期标签：窗口可换算上海时间，日桶不重分成上海自然日。真实68208d85仍把2026-10-25误称周六；核查发现已可见来源的series.date使用ISO时间字符串，旧helper只接受纯日期而跳过，不能据date-only单测断言模型已看到正确星期。后续小批已补严格ISO源标签兼容，保原series字符串与数值，只由其原日期部分计算星期，源时区未报告则保持null；真实Go输出经Agno工具到provider格式化的同形隔离检查通过，现场新答复仍待验。搜索另补同窗口结果状态语义：resultKnownSearches包含已知零结果，非零结果只在已知、零结果、实测及scan-limited计数一致时派生，缺失不猜；健康投影明确运行状态与已观察健康分开，未配置原因未报告时不能臆称环境有意如此。上述源字段交给实际查询及inspect消费者，不替换历史AI答复。
 
 ## 总控跨模块覆盖与验收边界
 

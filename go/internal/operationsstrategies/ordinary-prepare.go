@@ -7,11 +7,21 @@ import (
 )
 
 func (s *Service) PrepareOrdinary(ctx context.Context, a Actor, kind string, input Object) (Object, error) {
-	if !has([]string{"draft", "publish"}, kind) || !uuidPattern.MatchString(str(input["strategyId"])) {
+	if kind == "create-draft" && !s.domain().IsDuty(a) {
+		return nil, fail("operations_ai_duty_operation_denied", 403)
+	}
+	if !has([]string{"draft", "publish", "create-draft"}, kind) {
+		return nil, invalid()
+	}
+	selectedID := input["strategyId"]
+	if kind == "create-draft" {
+		selectedID = input["sourceStrategyId"]
+	}
+	if !uuidPattern.MatchString(str(selectedID)) {
 		return nil, invalid()
 	}
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
-		actor, head, version, strategy, e := s.ordinaryInspect(ctx, tx, a, str(input["strategyId"]))
+		actor, head, version, strategy, e := s.ordinaryInspect(ctx, tx, a, str(selectedID))
 		if e != nil {
 			return nil, e
 		}
@@ -19,7 +29,26 @@ func (s *Service) PrepareOrdinary(ctx context.Context, a Actor, kind string, inp
 			return nil, fail("p13_ordinary_boundary_requires_human", 409)
 		}
 		command := Object{"expectedRevision": head["revision"], "strategyId": strategy["id"]}
-		if kind == "draft" {
+		if kind == "create-draft" {
+			if head["draft_id"] != nil {
+				return nil, fail("p13_existing_draft_requires_human", 409)
+			}
+			if input["sourceVersionId"] != version["id"] || num(input["expectedRevision"]) != num(head["revision"]) {
+				return nil, fail("p13_strategy_revision_changed", 409)
+			}
+			candidate := clone(input)
+			delete(candidate, "kind")
+			candidate["operationId"] = "00000000-0000-0000-0000-000000000000"
+			x, e := ParseCommand("ordinary-create-draft", candidate)
+			if e != nil {
+				return nil, e
+			}
+			if _, e = OrdinaryCreation(obj(version["configuration"]), x, "ffffffff-ffff-ffff-ffff-ffffffffffff"); e != nil {
+				return nil, e
+			}
+			command = clone(x)
+			delete(command, "operationId")
+		} else if kind == "draft" {
 			if head["draft_id"] != nil {
 				return nil, fail("p13_existing_draft_requires_human", 409)
 			}

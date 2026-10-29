@@ -57,6 +57,9 @@ func ParseRequest(input Object) (Object, error) {
 	case "ordinary-strategy-draft":
 		required = append(required, "strategyId")
 		optional = append(optional, "parameterEdits", "mode", "enabled")
+	case "ordinary-strategy-create-draft":
+		required = append(required, "sourceStrategyId", "sourceVersionId", "expectedRevision", "name", "reason")
+		optional = append(optional, "parameterEdits", "mode", "enabled")
 	case "ordinary-strategy-publish":
 		required = append(required, "strategyId", "versionId")
 	case "strategy-control":
@@ -123,7 +126,7 @@ func ParseRequest(input Object) (Object, error) {
 	if !exact(x, required, optional) {
 		return nil, invalid()
 	}
-	if kind == "strategy-draft" || kind == "strategy-rehearsal" || kind == "strategy-publish" || kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" || kind == "strategy-control" || kind == "strategy-continue" || kind == "rule-publish" || kind == "rule-restore" {
+	if kind == "strategy-draft" || kind == "strategy-rehearsal" || kind == "strategy-publish" || kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-create-draft" || kind == "ordinary-strategy-publish" || kind == "strategy-control" || kind == "strategy-continue" || kind == "rule-publish" || kind == "rule-restore" {
 		return parseStrategyRuleRequest(x)
 	}
 	if (kind == "job-cancel" || kind == "job-retry") && !slices.Contains(operationsjobs.Queues[:7], str(x["queue"])) {

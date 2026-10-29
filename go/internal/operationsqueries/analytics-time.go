@@ -1,9 +1,13 @@
 package operationsqueries
 
 import (
+	"regexp"
+	"strconv"
 	"time"
 	_ "time/tzdata"
 )
+
+var analyticsBucketInstant = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$`)
 
 func analyticsTimeFacts(basis, data Object) Object {
 	var sourceTimezone any
@@ -47,7 +51,22 @@ func analyticsTimeFacts(basis, data Object) Object {
 	calendar, seen, complete := []any{}, map[string]bool{}, true
 	if series, ok := data["series"].([]any); ok {
 		for _, raw := range series {
-			date := str(object(raw)["date"])
+			sourceDate := str(object(raw)["date"])
+			date, kind := sourceDate, "source-calendar-bucket"
+			if analyticsBucketInstant.MatchString(sourceDate) {
+				validOffset := true
+				if sourceDate[len(sourceDate)-1] != 'Z' {
+					offset := sourceDate[len(sourceDate)-6:]
+					hours, _ := strconv.Atoi(offset[1:3])
+					minutes, _ := strconv.Atoi(offset[4:6])
+					validOffset = hours <= 23 && minutes <= 59
+				}
+				if _, err := time.Parse(time.RFC3339Nano, sourceDate); err != nil || !validOffset {
+					complete = false
+					continue
+				}
+				date, kind = sourceDate[:10], "source-date-label"
+			}
 			parsed, err := time.Parse("2006-01-02", date)
 			if err != nil || parsed.Format("2006-01-02") != date {
 				complete = false
@@ -62,7 +81,7 @@ func analyticsTimeFacts(basis, data Object) Object {
 				weekday = 7
 			}
 			names := []string{"星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"}
-			calendar = append(calendar, Object{"date": date, "weekday": weekday, "weekdayZh": names[weekday-1], "kind": "source-calendar-bucket", "timezone": sourceTimezone})
+			calendar = append(calendar, Object{"sourceDate": sourceDate, "date": date, "weekday": weekday, "weekdayZh": names[weekday-1], "kind": kind, "timezone": sourceTimezone})
 		}
 	}
 	return Object{"schemaVersion": 1, "scope": "response-basis-not-all-metric-windows", "displayTimezone": "Asia/Shanghai", "window": Object{"sourceFrom": from, "sourceTo": to, "sourceTimezone": sourceTimezone, "displayFrom": displayFrom, "displayTo": displayTo, "state": state, "reason": reason}, "calendar": calendar, "calendarComplete": complete}

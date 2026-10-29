@@ -193,13 +193,18 @@ func parseStrategy(v any) (Object, bool) {
 	out["ordinaryBounds"] = nil
 	if o["ordinaryBounds"] != nil {
 		b := obj(o["ordinaryBounds"])
-		if !closed(b, []string{"parameters", "modes", "canEnable", "canDisable"}, nil) || !array(b["parameters"]) || len(list(b["parameters"])) > 30 || !uniqueArray(b["modes"], 0, 3, func(v any) bool {
+		if !closed(b, []string{"parameters", "modes", "canEnable", "canDisable"}, []string{"canCreate"}) || !array(b["parameters"]) || len(list(b["parameters"])) > 30 || !uniqueArray(b["modes"], 0, 3, func(v any) bool {
 			return has([]string{"code-automatic", "ai-autonomous", "ai-human-participation"}, str(v))
 		}) {
 			return nil, false
 		}
 		for _, k := range []string{"canEnable", "canDisable"} {
 			if _, ok := b[k].(bool); !ok {
+				return nil, false
+			}
+		}
+		if value, ok := b["canCreate"]; ok {
+			if _, valid := value.(bool); !valid {
 				return nil, false
 			}
 		}
@@ -314,6 +319,9 @@ func ParseCommand(kind string, input Object) (Object, error) {
 	case "ordinary-draft":
 		req = append(req, "expectedRevision", "strategyId")
 		opt = []string{"parameterEdits", "mode", "enabled"}
+	case "ordinary-create-draft":
+		req = append(req, "expectedRevision", "sourceStrategyId", "sourceVersionId", "name", "reason")
+		opt = []string{"parameterEdits", "mode", "enabled"}
 	case "ordinary-publish":
 		req = append(req, "expectedRevision", "strategyId", "versionId")
 	default:
@@ -323,7 +331,7 @@ func ParseCommand(kind string, input Object) (Object, error) {
 		return nil, invalid()
 	}
 	x := clone(input)
-	for _, k := range []string{"operationId", "versionId", "rehearsalId", "strategyId", "executionId"} {
+	for _, k := range []string{"operationId", "versionId", "rehearsalId", "strategyId", "executionId", "sourceStrategyId", "sourceVersionId"} {
 		if v, ok := x[k]; ok && !uuidPattern.MatchString(str(v)) {
 			return nil, invalid()
 		}
@@ -369,7 +377,14 @@ func ParseCommand(kind string, input Object) (Object, error) {
 			return nil, invalid()
 		}
 	}
-	if kind == "ordinary-draft" {
+	if kind == "ordinary-create-draft" {
+		name, valid := boundedText(x["name"], 120)
+		if !valid {
+			return nil, invalid()
+		}
+		x["name"] = name
+	}
+	if kind == "ordinary-draft" || kind == "ordinary-create-draft" {
 		if _, ok := x["parameterEdits"]; !ok {
 			x["parameterEdits"] = []any{}
 		}
@@ -392,7 +407,7 @@ func ParseCommand(kind string, input Object) (Object, error) {
 				return nil, invalid()
 			}
 		}
-		if len(list(x["parameterEdits"])) == 0 && !mode && !enabled {
+		if kind == "ordinary-draft" && len(list(x["parameterEdits"])) == 0 && !mode && !enabled {
 			return nil, invalid()
 		}
 	}

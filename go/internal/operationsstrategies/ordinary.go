@@ -55,6 +55,35 @@ func OrdinaryChanges(configuration, input Object) (Object, error) {
 	return ParseConfiguration(config)
 }
 
+// OrdinaryCreation derives a new strategy only from a current human-approved
+// template. It cannot change goals, action/target/grant boundaries or recursively
+// authorize further creation.
+func OrdinaryCreation(configuration, input Object, newID string) (Object, error) {
+	if !uuidPattern.MatchString(newID) || findStrategy(configuration, newID) != nil {
+		return nil, invalid()
+	}
+	source := findStrategy(configuration, input["sourceStrategyId"])
+	if source == nil || obj(source["ordinaryBounds"])["canCreate"] != true {
+		return nil, fail("p13_ordinary_boundary_requires_human", 409)
+	}
+	edits := Object{"strategyId": input["sourceStrategyId"], "parameterEdits": input["parameterEdits"]}
+	for _, key := range []string{"mode", "enabled"} {
+		if v, ok := input[key]; ok {
+			edits[key] = v
+		}
+	}
+	adjusted, err := OrdinaryChanges(configuration, edits)
+	if err != nil {
+		return nil, err
+	}
+	created := deepClone(findStrategy(adjusted, input["sourceStrategyId"]))
+	created["id"], created["name"] = newID, input["name"]
+	obj(created["ordinaryBounds"])["canCreate"] = false
+	result := deepClone(configuration)
+	result["strategies"] = append(list(result["strategies"]), created)
+	return ParseConfiguration(result)
+}
+
 type OrdinaryExecutor interface {
 	AcceptsExecutor(Actor) bool
 	RequireSelectedWithin(context.Context, pgx.Tx, Actor, string, string, Object) (Actor, error)
@@ -190,7 +219,10 @@ func (s *Service) OrdinaryOperation(ctx context.Context, a Actor, strategyID, op
 	})
 }
 func (s *Service) CommandOrdinary(ctx context.Context, a Actor, kind string, input Object) (Object, error) {
-	if !has([]string{"draft", "publish"}, kind) {
+	if kind == "create-draft" && !s.domain().IsDuty(a) {
+		return nil, fail("operations_ai_duty_operation_denied", 403)
+	}
+	if !has([]string{"draft", "publish", "create-draft"}, kind) {
 		return nil, invalid()
 	}
 	x, e := ParseCommand("ordinary-"+kind, input)
@@ -198,8 +230,12 @@ func (s *Service) CommandOrdinary(ctx context.Context, a Actor, kind string, inp
 		return nil, e
 	}
 	action := "strategies.ordinary.publish"
-	if kind == "draft" {
+	if kind == "draft" || kind == "create-draft" {
 		action = "strategies.ordinary.configure"
+	}
+	strategyID := str(x["strategyId"])
+	if kind == "create-draft" {
+		strategyID = str(x["sourceStrategyId"])
 	}
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
 		if e := s.lock(ctx, tx, ""); e != nil {
@@ -208,7 +244,7 @@ func (s *Service) CommandOrdinary(ctx context.Context, a Actor, kind string, inp
 		if e := s.lock(ctx, tx, "operation:"+str(x["operationId"])); e != nil {
 			return nil, e
 		}
-		actor, e := s.ordinaryActor(ctx, tx, a, str(x["strategyId"]), action, x)
+		actor, e := s.ordinaryActor(ctx, tx, a, strategyID, action, x)
 		if e != nil {
 			return nil, e
 		}
@@ -242,18 +278,30 @@ func (s *Service) CommandOrdinary(ctx context.Context, a Actor, kind string, inp
 		if e != nil {
 			return nil, e
 		}
-		prior := findStrategy(obj(current["configuration"]), x["strategyId"])
+		prior := findStrategy(obj(current["configuration"]), strategyID)
 		if prior == nil || prior["ordinaryBounds"] == nil || prior["mode"] == "human-led" {
 			return nil, fail("p13_ordinary_boundary_requires_human", 409)
 		}
 		var id string
 		var version int64
 		var changes Object
-		if kind == "draft" {
+		var newStrategyID any
+		var sourceVersionID any
+		if kind == "draft" || kind == "create-draft" {
 			if head["draft_id"] != nil {
 				return nil, fail("p13_existing_draft_requires_human", 409)
 			}
-			configuration, e := OrdinaryChanges(obj(current["configuration"]), x)
+			var configuration Object
+			if kind == "create-draft" {
+				if x["sourceVersionId"] != current["id"] {
+					return nil, fail("p13_strategy_revision_changed", 409)
+				}
+				newStrategyID = uuid.NewString()
+				sourceVersionID = x["sourceVersionId"]
+				configuration, e = OrdinaryCreation(obj(current["configuration"]), x, str(newStrategyID))
+			} else {
+				configuration, e = OrdinaryChanges(obj(current["configuration"]), x)
+			}
 			if e != nil {
 				return nil, e
 			}
@@ -261,7 +309,7 @@ func (s *Service) CommandOrdinary(ctx context.Context, a Actor, kind string, inp
 			if e = tx.QueryRow(ctx, `SELECT coalesce(max(version),0)+1 FROM operations_p13_strategy_versions_v1 WHERE endpoint=$1`, s.Endpoint).Scan(&version); e != nil {
 				return nil, e
 			}
-			if _, e = tx.Exec(ctx, `INSERT INTO operations_p13_strategy_versions_v1(id,endpoint,version,configuration,created_by,created_at,parent_id,ordinary_strategy_id,ordinary_execution_id,ordinary_task_id,ordinary_ai_account_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, id, s.Endpoint, version, configuration, actor.ID, s.now(), current["id"], x["strategyId"], executionID, taskID, accountID); e != nil {
+			if _, e = tx.Exec(ctx, `INSERT INTO operations_p13_strategy_versions_v1(id,endpoint,version,configuration,created_by,created_at,parent_id,ordinary_strategy_id,ordinary_execution_id,ordinary_task_id,ordinary_ai_account_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, id, s.Endpoint, version, configuration, actor.ID, s.now(), current["id"], strategyID, executionID, taskID, accountID); e != nil {
 				return nil, e
 			}
 			parameters := []any{}
@@ -287,14 +335,36 @@ func (s *Service) CommandOrdinary(ctx context.Context, a Actor, kind string, inp
 			if !ordinarySameIdentity(candidate, actor, taskID, accountID, executionID) || head["draft_id"] != candidate["id"] || candidate["ordinary_strategy_id"] != x["strategyId"] || candidate["parent_id"] != current["id"] || has(texts(head["blocked_version_ids"]), str(candidate["id"])) {
 				return nil, fail("p13_ordinary_draft_changed", 409)
 			}
-			command, e := one(ctx, tx, `SELECT to_jsonb(c) FROM(SELECT input FROM operations_p13_strategy_commands_v1 WHERE endpoint=$1 AND operator_id=$2 AND kind='ordinary-draft' AND result->>'versionId'=$3)c`, s.Endpoint, actor.ID, candidate["id"])
+			command, e := one(ctx, tx, `SELECT to_jsonb(c) FROM(SELECT operation_id,kind,input,result FROM operations_p13_strategy_commands_v1 WHERE endpoint=$1 AND operator_id=$2 AND kind IN ('ordinary-draft','ordinary-create-draft') AND result->>'versionId'=$3)c`, s.Endpoint, actor.ID, candidate["id"])
 			if e != nil {
 				return nil, e
 			}
 			if command == nil {
 				return nil, fail("p13_ordinary_boundary_requires_human", 409)
 			}
-			reconstructed, e := OrdinaryChanges(obj(current["configuration"]), obj(command["input"]))
+			var reconstructed Object
+			if command["kind"] == "ordinary-create-draft" {
+				created := obj(command["input"])
+				newStrategyID = obj(command["result"])["newStrategyId"]
+				sourceVersionID = created["sourceVersionId"]
+				if created["sourceStrategyId"] != strategyID || created["sourceVersionId"] != current["id"] || !uuidPattern.MatchString(str(newStrategyID)) {
+					return nil, fail("p13_ordinary_boundary_requires_human", 409)
+				}
+				if taskID != nil {
+					metadata, err := s.domain().DutyAuthority().DutyMetadata(actor)
+					if err != nil {
+						return nil, err
+					}
+					var originalGrant *string
+					err = tx.QueryRow(ctx, `SELECT grant_id::text FROM business_admin_audit_v1 WHERE endpoint=$1 AND operation_id=$2 AND actor_kind='operations-ai-service' AND action='strategies.ordinary.configure'`, s.Endpoint, command["operation_id"]).Scan(&originalGrant)
+					if err != nil || originalGrant == nil || *originalGrant != str(obj(metadata["operation"])["grantId"]) {
+						return nil, fail("p13_ordinary_boundary_requires_human", 409)
+					}
+				}
+				reconstructed, e = OrdinaryCreation(obj(current["configuration"]), created, str(newStrategyID))
+			} else {
+				reconstructed, e = OrdinaryChanges(obj(current["configuration"]), obj(command["input"]))
+			}
 			if e != nil {
 				return nil, e
 			}
@@ -305,7 +375,11 @@ func (s *Service) CommandOrdinary(ctx context.Context, a Actor, kind string, inp
 			if e != nil {
 				return nil, e
 			}
-			selected := findStrategy(configuration, x["strategyId"])
+			selectedID := strategyID
+			if newStrategyID != nil {
+				selectedID = str(newStrategyID)
+			}
+			selected := findStrategy(configuration, selectedID)
 			samples := []any{}
 			var preview Object
 			if selected["enabled"] == true && selected["template"] != "selected-public-content-visibility" {
@@ -384,11 +458,11 @@ func (s *Service) CommandOrdinary(ctx context.Context, a Actor, kind string, inp
 			}
 			changes = Object{"rehearsalId": rehearsalID, "parentVersionId": current["id"]}
 		}
-		if _, e = s.ordinaryActor(ctx, tx, a, str(x["strategyId"]), action, x); e != nil {
+		if _, e = s.ordinaryActor(ctx, tx, a, strategyID, action, x); e != nil {
 			return nil, e
 		}
 		eventKind := "publish"
-		if kind == "draft" {
+		if kind == "draft" || kind == "create-draft" {
 			eventKind = "ordinary-draft"
 		}
 		actorKind := "business-operator"
@@ -397,17 +471,20 @@ func (s *Service) CommandOrdinary(ctx context.Context, a Actor, kind string, inp
 		} else if executionID != nil {
 			actorKind = "operations-executor"
 		}
-		if e = s.event(ctx, tx, eventKind, Object{"versionId": id, "strategyId": x["strategyId"], "operatorId": actor.ID, "operationId": x["operationId"], "metadata": Object{"version": version, "scope": "ordinary-strategy", "actorKind": actorKind, "aiAccountId": accountID, "taskId": taskID, "changes": changes}}); e != nil {
+		if e = s.event(ctx, tx, eventKind, Object{"versionId": id, "strategyId": strategyID, "operatorId": actor.ID, "operationId": x["operationId"], "metadata": Object{"version": version, "scope": "ordinary-strategy", "actorKind": actorKind, "aiAccountId": accountID, "taskId": taskID, "newStrategyId": newStrategyID, "changes": changes}}); e != nil {
 			return nil, e
 		}
-		if e = s.domain().Record(ctx, tx, actor, action, Object{"versionId": id, "strategyId": x["strategyId"], "revision": head["revision"]}, Object{"version": version, "revision": num(head["revision"]) + 1}, x["operationId"]); e != nil {
+		if e = s.domain().Record(ctx, tx, actor, action, Object{"versionId": id, "strategyId": strategyID, "revision": head["revision"]}, Object{"version": version, "revision": num(head["revision"]) + 1}, x["operationId"]); e != nil {
 			return nil, e
 		}
 		state := "active-for-new-matters"
-		if kind == "draft" {
+		if kind == "draft" || kind == "create-draft" {
 			state = "saved"
 		}
-		result := Object{"operationId": x["operationId"], "strategyId": x["strategyId"], "versionId": id, "version": version, "revision": num(head["revision"]) + 1, "state": state, "newMattersOnly": true}
+		result := Object{"operationId": x["operationId"], "strategyId": strategyID, "versionId": id, "version": version, "revision": num(head["revision"]) + 1, "state": state, "newMattersOnly": true}
+		if newStrategyID != nil {
+			result["sourceStrategyId"], result["sourceVersionId"], result["newStrategyId"] = strategyID, sourceVersionID, newStrategyID
+		}
 		if _, e = tx.Exec(ctx, `INSERT INTO operations_p13_strategy_commands_v1(endpoint,operation_id,operator_id,kind,input,result,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)`, s.Endpoint, x["operationId"], actor.ID, "ordinary-"+kind, x, result, s.now()); e != nil {
 			return nil, e
 		}

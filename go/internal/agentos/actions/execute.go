@@ -59,7 +59,7 @@ func (s *Service) proposal(proposal Object, operationID string) (Object, Object,
 		if err != nil {
 			return nil, nil, err
 		}
-	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
+	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-create-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
 		var err error
 		command, err = normalizeStrategyRuleCommand(x, command)
 		if err != nil {
@@ -404,7 +404,7 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 		if e != nil && fault.Status(e) >= 500 {
 			return unknown(operationID), nil
 		}
-	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
+	case "strategy-draft", "strategy-rehearsal", "strategy-publish", "ordinary-strategy-draft", "ordinary-strategy-create-draft", "ordinary-strategy-publish", "strategy-control", "strategy-continue", "rule-publish", "rule-restore":
 		result, e = s.executeStrategyRule(ctx, actor, x, command, authorize)
 	case "search-draft-save", "search-apply", "search-restore", "recommendation-direction":
 		result, e = s.executeDiscovery(ctx, actor, x, command, authorize)

@@ -5,6 +5,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsstrategies"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/jackc/pgx/v5"
 	"slices"
@@ -56,6 +57,9 @@ func (s *Service) QualifyTargetWithin(ctx context.Context, tx pgx.Tx, a Actor, p
 	if kind == "ordinary-strategy-draft" || kind == "ordinary-strategy-publish" {
 		selectedID = x["strategyId"]
 	}
+	if kind == "ordinary-strategy-create-draft" {
+		selectedID = x["sourceStrategyId"]
+	}
 	if kind == "recommendation-direction" {
 		selectedID = x["themeKey"]
 	}
@@ -87,17 +91,25 @@ func (s *Service) QualifyTargetWithin(ctx context.Context, tx pgx.Tx, a Actor, p
 		return fail("operations_agentos_scope_denied", 403)
 	}
 	switch kind {
-	case "ordinary-strategy-draft", "ordinary-strategy-publish":
+	case "ordinary-strategy-draft", "ordinary-strategy-create-draft", "ordinary-strategy-publish":
 		service, err := s.strategies(a)
 		if err != nil {
 			return err
 		}
-		_, head, _, strategy, err := service.InspectOrdinaryWithin(ctx, tx, a, str(x["strategyId"]))
+		_, head, version, strategy, err := service.InspectOrdinaryWithin(ctx, tx, a, str(selectedID))
 		if err != nil {
 			return err
 		}
 		if head["paused"] == true || strategy["ordinaryBounds"] == nil || strategy["mode"] == "human-led" {
 			return fail("operations_agentos_human_review_required", 409)
+		}
+		if kind == "ordinary-strategy-create-draft" {
+			if obj(strategy["ordinaryBounds"])["canCreate"] != true || version["id"] != x["sourceVersionId"] || num(head["revision"]) != num(x["expectedRevision"]) || head["draft_id"] != nil {
+				return fail("operations_agentos_human_review_required", 409)
+			}
+			if _, err := operationsstrategies.OrdinaryCreation(obj(version["configuration"]), x, "ffffffff-ffff-ffff-ffff-ffffffffffff"); err != nil {
+				return err
+			}
 		}
 	case "search-draft-save", "search-apply", "search-restore", "recommendation-direction":
 		if kind == "search-draft-save" {
