@@ -1,3 +1,4 @@
+import {shanghaiMinute} from '../shanghai-time.mjs';
 import type {AiRecordedTime,AiRunDomain,AiRunEvent,AiRunLocation,AiRunMetadata,AiRunSpan,AiRunState,AiSpanRow} from "../../components/ai-runs/ai-runs-types";
 
 export const aiRunDomains={overview:'工作台',governance:'内容治理',messaging:'公告与消息',discovery:'发现与推荐',maintenance:'运行维护'} as const;
@@ -31,7 +32,7 @@ export function aiTimeMilliseconds(value:AiRecordedTime){
  const time=typeof value==='number'?value*1000:Date.parse(value);
  return Number.isFinite(time)?time:null;
 }
-export function aiRunTime(value:AiRecordedTime){const time=aiTimeMilliseconds(value);return time===null?'未记录':new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(time);}
+export function aiRunTime(value:AiRecordedTime){const time=aiTimeMilliseconds(value);return time===null?'未记录':shanghaiMinute(time);}
 export function aiRunStateLabel(state:AiRunState|string|null){return state&&Object.hasOwn(aiRunStates,state)?aiRunStates[state as AiRunState]:'未记录';}
 export function aiRunDomainLabel(domain:AiRunDomain|string|null){return domain&&Object.hasOwn(aiRunDomains,domain)?aiRunDomains[domain as AiRunDomain]:'未记录';}
 export function aiRunTrigger(run:AiRunMetadata){return run.conversation?'工作台沟通':!run.executor?'未记录':run.executor.mode==='automatic'?'系统自动':'人员代办';}

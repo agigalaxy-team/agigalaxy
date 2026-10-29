@@ -1,3 +1,4 @@
+import {shanghaiMinute} from '../shanghai-time.mjs';
 import type {OperationsSummary,RecentOperation} from "../analytics/admin-analytics-types";
 import type {AdminIconName} from "../../components/AdminIcons";
 import type {WorkbenchInventory,WorkbenchMetric} from "../../components/workbench/WorkbenchCharts";
@@ -35,7 +36,7 @@ export function workbenchTime(value:string|number|null|undefined,mode:'time'|'da
   if(value===null||value===undefined)return '未记录';
   const date=new Date(typeof value==='number'?value*1000:value);
   if(!Number.isFinite(date.getTime()))return '未记录';
-  return new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',...(mode==='day'?{month:'2-digit',day:'2-digit'}:{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})}).format(date);
+  return mode==='day'?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit'}).format(date):shanghaiMinute(date);
 }
 
 function operationHref(operation:RecentOperation){
