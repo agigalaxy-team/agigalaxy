@@ -52,6 +52,24 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 				return nil, fault.New("operations_autonomy_source_unavailable", 503)
 			}
 			return agentos.Object{"availability": "available"}, nil
+		case "forum-file", "chat-file":
+			if service.Files == nil {
+				break
+			}
+			fileKind := "forum"
+			if kind == "chat-file" {
+				fileKind = "chat"
+			}
+			// The owner proves account-backed source membership for this endpoint.
+			value, err := service.Files.ScopeFileAccessWithin(ctx, tx, fileKind, id, false)
+			if err != nil {
+				return nil, err
+			}
+			if value["id"] != id {
+				return nil, fault.New("operations_autonomy_source_unavailable", 503)
+			}
+			return agentos.Object{"availability": "available"}, nil
+
 		case "post", "reply":
 			if service.Content == nil || service.Content.Forum == nil {
 				break

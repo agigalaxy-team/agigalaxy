@@ -104,6 +104,11 @@ func connectExecutions(gateway *access.Gateway, permissions *p.Service, autonomy
 				return operationsstrategies.Object{"available": false, "version": nil}, nil
 			}
 			return previewScanFile(ctx, tx, id, files.ScopeActionFileWithin)
+		case "file-access":
+			if files == nil {
+				return operationsstrategies.Object{"available": false, "version": nil}, nil
+			}
+			return previewAccessFile(ctx, tx, id, files.PreviewFileAccessSourceWithin)
 		case "content-visibility", "content-curation", "public-content-batch":
 			for _, typ := range []string{"post", "reply"} {
 				r, err := content.Forum.OperationsContentSourceWithin(ctx, tx, typ, id, false)

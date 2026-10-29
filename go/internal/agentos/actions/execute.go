@@ -506,7 +506,11 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 		case "file-scan-retry":
 			result, e = service.Retry(ctx, actor, str(x["targetKind"]), str(x["targetId"]), command)
 		case "file-access":
-			result, e = service.ChangeAccess(ctx, actor, str(x["targetKind"]), str(x["targetId"]), command)
+			if s.isDuty(actor) {
+				result, e = service.ChangeDutyAccess(ctx, actor, str(x["targetKind"]), str(x["targetId"]), command)
+			} else {
+				result, e = service.ChangePreparedAccess(ctx, actor, str(x["targetKind"]), str(x["targetId"]), command, authorize)
+			}
 			if e != nil && !slices.Contains([]string{"invalid_operations_request", "business_admin_operation_conflict", "operations_file_changed", "operations_file_access_changed", "operations_file_access_until", "operations_file_access_unavailable", "operations_file_access_restore_unavailable"}, fault.Code(e)) {
 				return unknown(operationID), nil
 			}

@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/objectremoval"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/jackc/pgx/v5"
 	"sort"
 	"strconv"
@@ -153,8 +155,34 @@ func (s *Service) view(ctx context.Context, tx pgx.Tx, kind string, r Object, a 
 		lastError = r["last_error"]
 	}
 	access["operatorDisplayName"] = names[str(access, "operatorId")]
-	access["canStop"] = a.AIProof == nil && has(a.Permissions, "files.access.stop") && stoppable && !truth(access, "stopped")
-	access["canRestore"] = a.AIProof == nil && has(a.Permissions, "files.access.restore") && truth(access, "stopped") && restore == nil
+	direct := a.AIProof == nil && !s.isDuty(a) && !s.domain().IsExecution(a)
+	access["canStop"] = direct && has(a.Permissions, "files.access.stop") && stoppable && !truth(access, "stopped")
+	access["canRestore"] = direct && has(a.Permissions, "files.access.restore") && truth(access, "stopped") && restore == nil
+	basis := "not-checked"
+	if operationspermissions.FileAccessPreparationReaderMatches(s.Authority, a) {
+		basis = "human-confirmation-preparation"
+	} else if s.isDuty(a) && s.duty() != nil {
+		metadata, err := s.duty().DutyMetadata(a)
+		if err != nil {
+			return nil, err
+		}
+		if metadata["accessPurpose"] == "prepare" {
+			basis = "duty-operation-preparation"
+		}
+	}
+	eligibility := Object{"stop": nil, "restore": nil, "basis": basis, "executionAuthorized": false, "recheckedWhenPreparing": true}
+	if basis != "not-checked" {
+		if _, e = s.ScopeFileAccessWithin(ctx, tx, kind, str(r, "id"), false); e != nil {
+			if fault.Code(e) != "source_unavailable" {
+				return nil, e
+			}
+			eligibility["basis"] = "not-checked"
+		} else {
+			eligibility["stop"] = has(a.Permissions, "files.access.stop") && stoppable && !truth(access, "stopped")
+			eligibility["restore"] = has(a.Permissions, "files.access.restore") && truth(access, "stopped") && restore == nil
+		}
+	}
+	access["preparationEligibility"] = eligibility
 	access["restoreBlockedReason"] = restore
 	reserved := safeSize(r["byte_size"])
 	if r["purged_at"] != nil {

@@ -73,7 +73,7 @@ func TestPreparationReadCurrentFileAndCasePermissions(t *testing.T) {
 	if object(caseData["handling"])["canModerate"] != true {
 		t.Fatalf("case eligibility %#v", caseData["handling"])
 	}
-	if access := object(file["access"]); access["canStop"] != false || object(access["preparationEligibility"])["stop"] != nil {
+	if access := object(file["access"]); access["canStop"] != nil || object(access["preparationEligibility"])["stop"] != false {
 		t.Fatalf("file-access boundary %#v", access)
 	}
 	_, err := f.Permissions.SaveRole(ctx, f.Root, Object{"id": role["id"], "operationId": uuid.NewString(), "expectedVersion": role["version"], "name": "Selected governance query role", "description": "Synthetic current read source", "subjectScope": "ai-only", "enabled": true, "permissions": []any{"files.read", "cases.read"}})

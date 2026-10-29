@@ -228,7 +228,12 @@ func (s *Service) QualifyTargetWithin(ctx context.Context, tx pgx.Tx, a Actor, p
 		if s.Files == nil {
 			return fail("operations_agentos_action_not_connected", 503)
 		}
-		if _, e = s.Files.ScopeActionFileWithin(ctx, tx, str(x["targetKind"]), str(x["targetId"])); e != nil {
+		if kind == "file-access" {
+			_, e = s.Files.ScopeFileAccessWithin(ctx, tx, str(x["targetKind"]), str(x["targetId"]), false)
+		} else {
+			_, e = s.Files.ScopeActionFileWithin(ctx, tx, str(x["targetKind"]), str(x["targetId"]))
+		}
+		if e != nil {
 			return e
 		}
 	default:

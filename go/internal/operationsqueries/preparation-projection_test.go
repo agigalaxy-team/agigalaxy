@@ -3,17 +3,17 @@ package operationsqueries
 import "testing"
 
 func TestPreparationProjectionPreservesUnknownAndDirectExecutionBoundary(t *testing.T) {
-	file := Object{"id": "file-1", "canRetryScan": true, "access": Object{"canStop": false, "canRestore": false, "stopped": false}}
+	file := Object{"id": "file-1", "canRetryScan": true, "access": Object{"canStop": false, "canRestore": false, "stopped": false, "preparationEligibility": Object{"stop": true, "restore": false, "basis": "human-confirmation-preparation"}}}
 	known := fileItemPreparation(file, true)
 	if known["canRetryScan"] != true || known["capabilityBasis"] != "human-confirmation-preparation" || known["executionAuthorized"] != false {
 		t.Fatalf("known file %#v", known)
 	}
 	access := object(known["access"])
-	if access["canStop"] != false || access["canRestore"] != false || access["capabilityBasis"] != "direct-execution-only" || object(access["preparationEligibility"])["stop"] != nil {
+	if access["canStop"] != nil || access["canRestore"] != nil || access["capabilityBasis"] != "direct-execution-only" || object(access["preparationEligibility"])["stop"] != true || object(access["preparationEligibility"])["restore"] != false {
 		t.Fatalf("file boundary %#v", access)
 	}
 	unknown := fileItemPreparation(file, false)
-	if unknown["canRetryScan"] != nil || unknown["executionAuthorized"] != nil {
+	if unknown["canRetryScan"] != nil || unknown["executionAuthorized"] != nil || object(object(unknown["access"])["preparationEligibility"])["stop"] != nil {
 		t.Fatalf("duty file %#v", unknown)
 	}
 	data := Object{"handling": Object{"canModerate": true, "knownPartyConflict": false}}

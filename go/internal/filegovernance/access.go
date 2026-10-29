@@ -2,6 +2,7 @@ package filegovernance
 
 import (
 	"context"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -36,6 +37,27 @@ func (s *Service) AccessOperation(ctx context.Context, a Actor, operationID stri
 	})
 }
 func (s *Service) ChangeAccess(ctx context.Context, a Actor, kind, id string, input Object) (Object, error) {
+	if a.AIProof != nil || s.isDuty(a) || s.domain().IsExecution(a) {
+		return nil, fail("business_admin_denied", 403)
+	}
+	return s.changeAccess(ctx, a, kind, id, input, nil)
+}
+
+func (s *Service) ChangePreparedAccess(ctx context.Context, a Actor, kind, id string, input Object, authorize func(context.Context, pgx.Tx) (Actor, error)) (Object, error) {
+	if authorize == nil || !operationspermissions.FileAccessPreparationReaderMatches(s.Authority, a) {
+		return nil, fail("business_admin_denied", 403)
+	}
+	return s.changeAccess(ctx, a, kind, id, input, authorize)
+}
+
+func (s *Service) ChangeDutyAccess(ctx context.Context, a Actor, kind, id string, input Object) (Object, error) {
+	if !s.isDuty(a) {
+		return nil, fail("business_admin_denied", 403)
+	}
+	return s.changeAccess(ctx, a, kind, id, input, nil)
+}
+
+func (s *Service) changeAccess(ctx context.Context, a Actor, kind, id string, input Object, authorize func(context.Context, pgx.Tx) (Actor, error)) (Object, error) {
 	x, e := ParseAccessChange(input)
 	if e != nil || !fileUUID.MatchString(id) {
 		return nil, invalid()
@@ -44,11 +66,24 @@ func (s *Service) ChangeAccess(ctx context.Context, a Actor, kind, id string, in
 		return nil, e
 	}
 	action := "files.access." + str(x, "action")
-	if _, e = s.current(ctx, a, action); e != nil {
+	checked := func(ctx context.Context, tx pgx.Tx) (Actor, error) {
+		if authorize == nil {
+			return s.fresh(ctx, tx, a, action)
+		}
+		confirmed, err := authorize(ctx, tx)
+		if err != nil {
+			return Actor{}, err
+		}
+		return operationspermissions.RequireConfirmedFileAccessWithin(ctx, tx, s.Authority, a, confirmed, action)
+	}
+	currentCheck := func() (Actor, error) {
+		return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Actor, error) { return checked(ctx, tx) })
+	}
+	if _, e = currentCheck(); e != nil {
 		return nil, e
 	}
 	result, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
-		current, e := s.fresh(ctx, tx, a, action)
+		current, e := checked(ctx, tx)
 		if e != nil {
 			return nil, e
 		}
@@ -82,7 +117,7 @@ func (s *Service) ChangeAccess(ctx context.Context, a Actor, kind, id string, in
 			}() {
 				return nil, fail("business_admin_operation_conflict", 409)
 			}
-			if _, e = s.fresh(ctx, tx, a, action); e != nil {
+			if _, e = checked(ctx, tx); e != nil {
 				return nil, e
 			}
 			receipt := accessReceipt(old)
@@ -96,11 +131,16 @@ func (s *Service) ChangeAccess(ctx context.Context, a Actor, kind, id string, in
 		if auditExists {
 			return nil, fail("business_admin_operation_conflict", 409)
 		}
-		r, e := s.scopedRow(ctx, tx, kind, id, true)
+		var r Object
+		if authorize != nil || s.isDuty(current) {
+			r, e = s.ScopeFileAccessWithin(ctx, tx, kind, id, true)
+		} else {
+			r, e = s.scopedRow(ctx, tx, kind, id, true)
+		}
 		if e != nil {
 			return nil, e
 		}
-		access, e := AccessWithin(ctx, tx, s.Endpoint, kind, id, s.now(), false)
+		access, e := AccessWithin(ctx, tx, s.Endpoint, kind, id, s.now(), s.isDuty(current))
 		if e != nil {
 			return nil, e
 		}
@@ -109,6 +149,25 @@ func (s *Service) ChangeAccess(ctx context.Context, a Actor, kind, id string, in
 		}
 		if num(access, "revision") != num(x, "expectedRevision") {
 			return nil, fail("operations_file_access_changed", 409)
+		}
+		if s.isDuty(current) && num(access, "revision") > 0 {
+			metadata, err := s.duty().DutyMetadata(current)
+			if err != nil {
+				return nil, err
+			}
+			binding := obj(metadata, "operation")
+			grant := str(binding, "grantId")
+			if grant == "" || str(access, "operationId") == "" {
+				return nil, fail("operations_file_access_changed", 409)
+			}
+			var matched bool
+			err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations_file_access_events_v1 e JOIN business_admin_audit_v1 b ON b.endpoint=e.endpoint AND b.operation_id=e.operation_id WHERE e.endpoint=$1 AND e.kind=$2 AND e.file_id=$3 AND e.revision=$4 AND e.operation_id=$5 AND e.operator_id=$6 AND b.actor_kind='operations-ai-service' AND b.operator_id=$6 AND b.grant_id::text=$7 AND b.actor_context->>'aiAccountId'=$8 AND b.action='file-access-'||e.action AND b.selection->>'kind'=e.kind AND b.selection->>'id'=e.file_id::text AND b.selection->>'revision'=e.revision::text)`, s.Endpoint, kind, id, num(access, "revision"), access["operationId"], current.ID, grant, metadata["aiAccountId"]).Scan(&matched)
+			if err != nil {
+				return nil, err
+			}
+			if !matched {
+				return nil, fail("operations_file_access_changed", 409)
+			}
 		}
 		stop := str(x, "action") == "stop"
 		if stop {
@@ -143,7 +202,7 @@ func (s *Service) ChangeAccess(ctx context.Context, a Actor, kind, id string, in
 			until = time.Unix(num(x, "until"), 0)
 		}
 		at := s.stamp()
-		if _, e = s.fresh(ctx, tx, a, action); e != nil {
+		if _, e = checked(ctx, tx); e != nil {
 			return nil, e
 		}
 		if _, e = tx.Exec(ctx, `INSERT INTO operations_file_access_events_v1(id,endpoint,kind,file_id,revision,operation_id,operator_id,action,stopped_until,reason,expected_version,expected_revision,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, uuid.NewString(), s.Endpoint, kind, id, revision, operation, current.ID, x["action"], until, x["reason"], x["expectedVersion"], num(x, "expectedRevision"), at); e != nil {
@@ -161,7 +220,7 @@ func (s *Service) ChangeAccess(ctx context.Context, a Actor, kind, id string, in
 		if e = s.record(ctx, tx, current, "file-access-"+str(x, "action"), Object{"kind": kind, "id": id, "resourceId": id, "action": x["action"], "revision": revision, "until": x["until"]}, audit, operation); e != nil {
 			return nil, e
 		}
-		if _, e = s.fresh(ctx, tx, a, action); e != nil {
+		if _, e = checked(ctx, tx); e != nil {
 			return nil, e
 		}
 		if stop && num(x, "until") <= s.now() {
@@ -182,10 +241,11 @@ func (s *Service) ChangeAccess(ctx context.Context, a Actor, kind, id string, in
 	if e != nil {
 		return nil, e
 	}
-	if _, e = s.current(ctx, a, action); e != nil {
+	current, e := currentCheck()
+	if e != nil {
 		return nil, e
 	}
-	result["file"], e = s.Get(ctx, a, kind, id)
+	result["file"], e = s.Get(ctx, current, kind, id)
 	if e != nil {
 		return nil, e
 	}

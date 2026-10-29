@@ -415,9 +415,10 @@ func (s *Service) prepareFile(ctx context.Context, a Actor, x Object, p *prepara
 		return fail("operations_agentos_operation_unavailable", 409)
 	}
 	stop := x["action"] == "stop"
-	cap := access["canRestore"]
+	eligibility := obj(access["preparationEligibility"])
+	cap := eligibility["restore"]
 	if stop {
-		cap = access["canStop"]
+		cap = eligibility["stop"]
 	}
 	if e = capability(cap); e != nil {
 		return e

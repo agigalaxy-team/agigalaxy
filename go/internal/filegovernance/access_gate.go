@@ -3,7 +3,40 @@ package filegovernance
 import (
 	"context"
 	"github.com/jackc/pgx/v5"
+	"strings"
 )
+
+// ScopeFileAccessWithin admits only files whose owning account proves endpoint.
+func (s *Service) ScopeFileAccessWithin(ctx context.Context, tx pgx.Tx, kind, id string, write bool) (Object, error) {
+	r, e := s.scopedRow(ctx, tx, kind, id, write)
+	if e != nil {
+		return nil, e
+	}
+	account := str(r, "account_id")
+	if kind == "chat" && strings.HasPrefix(str(r, "subject_id"), "account:") {
+		account = strings.TrimPrefix(str(r, "subject_id"), "account:")
+	}
+	if !fileUUID.MatchString(account) {
+		return nil, fail("source_unavailable", 404)
+	}
+	return r, nil
+}
+
+// PreviewFileAccessSourceWithin reports only the bounded current source facts;
+// actual access changes still perform their own full authority and state checks.
+func (s *Service) PreviewFileAccessSourceWithin(ctx context.Context, tx pgx.Tx, kind, id string) (Object, error) {
+	r, e := s.ScopeFileAccessWithin(ctx, tx, kind, id, false)
+	if e != nil {
+		return nil, e
+	}
+	pending, e := s.authorPending(ctx, tx, kind, r)
+	if e != nil {
+		return nil, e
+	}
+	expires := timestamp(expiry(r))
+	available := r["purged_at"] == nil && r["revoked_at"] == nil && !truth(r, "purge_pending") && !expires.IsZero() && !due(expiry(r), s.now()) && !pending
+	return Object{"kind": kind + "-file", "available": available, "version": ProcessingVersion(r)}, nil
+}
 
 func AccessWithin(ctx context.Context, tx pgx.Tx, endpoint, kind, id string, now int64, detail bool) (Object, error) {
 	if _, e := table(kind); e != nil {
