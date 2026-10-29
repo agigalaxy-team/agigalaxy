@@ -16,7 +16,7 @@
 
 **防护与影响边界。** 只处理当前可见记录，私有数据泄露未成立。小语料、早命中、来源变更、SQL 错误、取消均限制或终止工作。每语句 10 秒超时不等于整个请求 10 秒上限。外部代理、连接池和部署配额未知。潜在影响为共享 API/DB 重复工作和竞争，未实测。
 
-**证据位置。** `go/internal/searchv2/service.go:302–340`，blob `d16ec69473dd8da89f89df3619fabc08ce280149`；`go/internal/historyv2/service.go:99–200,239–248`，blob `203ce7ce5ce6258bb2cdb24c5a79ccb3cbeb5438`。计费链：`searchv2/http.go:93–99` → `cmd/galaxy-api/fact-sources.go:46–52` → `httpboundary/quota.go`。聚合：`information/http.go:30–37,58–109`，blob `4c8b2f25e28fe549ecdabbf9dea758dd6f6660fb`；`information/input.go:177–251`，blob `01685b32922388a462dd1a66b7004fa1e39bc67f`；`information/service.go:87–92,125–149,184–200`，blob `24b443cf1082aeabebe7b666d4876cffdb3b87fa`。独立复核依据为此次 independent-search/REPORT.md，包含语料前提及计费纠正。
+**证据位置。** `go/internal/searchv2/service.go:302–340`，blob `d16ec69473dd8da89f89df3619fabc08ce280149`；`go/internal/historyv2/service.go:99–200,239–248`，blob `203ce7ce5ce6258bb2cdb24c5a79ccb3cbeb5438`。计费链：`searchv2/http.go:93–99` → `cmd/galaxy-api/fact-sources.go:46–52` → `httpboundary/quota.go:217–234,290–294`，blob `20d094bed5ddb5458c0bba6115260966b5c425de`；外层默认配置 `httpboundary/config.go:39–40`，blob `646b273e2bf71d4d63f3de3d84151f610d1d560a`。聚合：`information/http.go:30–37,58–109`，blob `4c8b2f25e28fe549ecdabbf9dea758dd6f6660fb`；`information/input.go:177–251`，blob `01685b32922388a462dd1a66b7004fa1e39bc67f`；`information/service.go:87–92,125–149,184–200`，blob `24b443cf1082aeabebe7b666d4876cffdb3b87fa`。独立复核依据为此次 independent-search/REPORT.md，包含语料前提及计费纠正。
 
 ## A02 Capsule 预览重复遍历共享来源图
 
@@ -24,11 +24,11 @@
 
 **输入与权限。** 普通有效设备主体可在自己的 standalone case 通过 `POST /v2/cases/events` 提交合法来源引用，再通过 `POST /v2/capsules/preview` 读取。需 case-teaser、capsules 范围、当前设备控制与精确签名同意。引用须指向有效可见的已有事实；不需要越权、不需要公开发布 Capsule。
 
-**边界与工作。** 写入授权遍历保留 visited 集合，而预览来源遍历的 visited 仅在当前递归路径有效，返回后删除；不同分支共享的子图会反复加载 case 及当前授权。返回后的 dependenciesUnique 不能消除已经发生的工作。有限 DAG 在紧凑存储下仍可产生指数级路径展开；不提供构造载荷，也不宣称无限工作。结果投影携带来源 intervention 的 recordEventIds，是已核对的间接来源链，不是臆测递归 result.origin。
+**边界与工作。** 写入授权遍历保留 visited 集合，而预览来源遍历的 visited 仅在当前递归路径有效，返回后删除；不同分支共享的子图会反复加载 case 及当前授权。返回后的 dependenciesUnique 不能消除已经发生的工作。有限 DAG（有向无环图）在紧凑存储下仍可产生指数级路径展开；不提供构造载荷，也不宣称无限工作。结果投影携带来源 intervention 的 recordEventIds，是已核对的间接来源链，不是臆测递归 result.origin。
 
 **防护与影响边界。** case 最多 1000 事件、每事件最多 24,000 字节、引用最多 32、HTTP 32 KiB；默认主体存储预算 1 MiB。预览为读操作，这些存储限额不等于遍历工作预算。默认每 60 秒 submission IP/主体/凭据限额 300/60/30；请求取消、SQL 错误、来源权限变化会中止，SQL 单语句超时 10 秒。部署总时限和并发限制未知。不能据此称为匿名存储型攻击、越权或线上停服。
 
-**证据位置。** `go/internal/cases/fact_input.go:17–28,61–68,133–151`，blob `7c2d29b603bec2319f26b629fbe8aa5421aa5360`；`cases/fact_write.go:63–144,206–261`，blob `579d745305ace987cfc7efb38745897627b14e09`；`cases/authority.go:67–74`，blob `677cb4f9d809f06a97be2ad801b55c9d2069877a`；`capsules/read.go:328–335`，blob `53be82e6747a38e2ce1a40cc23f9ce19a4286dd8`；`capsules/permissions.go:193–240`，blob `45925fb6090c48b362f2e7c5e458510b87d2b10e`；`capsules/sources.go:72–81,125–180`，blob `d2184f6fb762e9c74a4b27dac92a299643c139e5`。此次 server/CAPSULE-DAG-CANDIDATE.md 与 independent-resource/REPORT.md 分别记录原链及独立复核。
+**证据位置。** `go/internal/cases/fact_input.go:17–28,61–68,133–151`，blob `7c2d29b603bec2319f26b629fbe8aa5421aa5360`；`cases/fact_write.go:63–144,206–261`，blob `579d745305ace987cfc7efb38745897627b14e09`；`cases/facts.go:156–170`，blob `ddaee10e1bc0718eb51253651e24500985900176`；`cases/authority.go:67–74`，blob `677cb4f9d809f06a97be2ad801b55c9d2069877a`；`capsules/read.go:328–335`，blob `53be82e6747a38e2ce1a40cc23f9ce19a4286dd8`；`capsules/permissions.go:193–240`，blob `45925fb6090c48b362f2e7c5e458510b87d2b10e`；`capsules/sources.go:72–81,125–180`，blob `d2184f6fb762e9c74a4b27dac92a299643c139e5`。此次 server/CAPSULE-DAG-CANDIDATE.md 与 independent-resource/REPORT.md 分别记录原链及独立复核。
 
 ## A01 官方账户归档遗漏累计存储预算
 
@@ -48,3 +48,5 @@
 
 - [go/internal/searchv2/http.go](https://github.com/agigalaxy-team/agigalaxy/blob/aa9dbc6eae25dc06bb0a9fde7bab99b842f3cbd2/go/internal/searchv2/http.go) — blob `cc67e87f401e032b4956f590ac62aa60f728b2fc`。
 - [go/internal/historyv2/service.go](https://github.com/agigalaxy-team/agigalaxy/blob/aa9dbc6eae25dc06bb0a9fde7bab99b842f3cbd2/go/internal/historyv2/service.go) — blob `203ce7ce5ce6258bb2cdb24c5a79ccb3cbeb5438`。
+
+术语：subject是设备授权主体，不等同于官方账户；case是案例对象，不是测试用例；submission/anonymous是提交类/匿名类请求配额；CSRF是跨站请求伪造防护；WAL是数据库预写日志；blob是Git文件内容标识。

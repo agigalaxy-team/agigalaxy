@@ -23,10 +23,12 @@ Web 早期 checkpoint.md 的 1,061 分配、751 筛查是历史快照，不能�
 | 变更基线与提交 | 已保存结果 | 剩余边界 |
 |---|---|---|
 | aa9dbc6 → 81797043ca9e871c353608c4c990a8daeb155f35 | Server 86 全读、6 完整比较、2 partial、6 显式排除、5 pending；Web 9 个变更文件全读；Auth 8 个分配变更文件已审 | 不覆盖全 HEAD；Server 13 个未完成/排除项仍单列；重叠不相加 |
-| 8179704 → 595cd2ad4e3d09eab61739ffa1b034c993f962cc | Web 8 个分配变更文件全读，未确认可利用回归 | Server HEAD595 尚未开始；inspection profile 的服务端权限语义不由 UI 证明 |
+| 8179704 → 595cd2ad4e3d09eab61739ffa1b034c993f962cc | Server 43 全文件静态阅读、34 完整变更段/结构比较、16 部分阅读、31 显式排除，共124路径；Web 8个分配变更文件全读 | 比较不等于全文件重读；16部分与31排除仍未完成；已审服务端请求权限，不代表运行效果或部署验证 |
 
 前端 delegation ceiling 差量已由 auth 交叉核对：去除 UI 前缀屏蔽并未证明可授予敏感写权限。差量“无新增已确认漏洞”不等于基线三项已修复，也不等于当前 main 或线上版本安全。
 
 ## 可追溯账本
 
 本地审计人员可查同级上层目录的 `server/coverage.json`、`server/COVERAGE-RECONCILIATION.json`、`server/FOLLOWUP-81-RESULT.md`、`auth/ledger.md`、`web/ledger.json` 与各 delta ledger。它们是已保存审阅证据，未随本草稿打包；本报告不生成原始证据总归档。Runtime 仅继承已保存 STATUS 的未完成标记，不恢复被中止分析。
+
+术语：full=全文件静态阅读；partial=部分阅读；pending=待审；excluded=明确排除；delta=两个固定提交间的变更。
