@@ -37,7 +37,9 @@ class LocalModel(Model):
             return ModelResponse(role="assistant", tool_calls=[{"id": "summary", "type": "function",
                 "function": {"name": "current_summary", "arguments": "{}"}}])
         messages = args[0] if args else kwargs.get("messages", [])
-        self.observed_summary = any(message.role == "tool" and '"pending": 0' in str(message.content) for message in messages)
+        self.observed_summary = self.observed_summary or any(message.role == "tool" and '"pending": 0' in str(message.content) for message in messages)
+        if self.calls == 2:
+            return ModelResponse(role="assistant", tool_calls=[{"id":"assess", "type":"function", "function":{"name":"assess_turn", "arguments":json.dumps({"disposition":"completed", "reason":"摘要已核对", "remaining":[]})}}])
         return ModelResponse(role="assistant", content="当前摘要没有待处理事项；这是本地合成回复。")
     async def ainvoke(self, *args, **kwargs): return self.invoke(*args, **kwargs)
     def invoke_stream(self, *args, **kwargs): yield self.invoke(*args, **kwargs)
@@ -54,6 +56,13 @@ class CurrentReader:
         if kwargs.get("resource_type") not in {None, "agents"} or kwargs.get("resource_id") not in {None, "galaxy-conversation-overview"}:
             raise AuthorityDenied("synthetic_scope_denied")
         return {"allowed": True, "execution": self.row, "resourceIds": ["galaxy-conversation-overview"], "readExpiresAt": int(time.time()) + 30}
+    def conversation_tool(self, user_id, tool, arguments, **binding):
+        self.authorize(user_id)
+        if tool != "assess-conversation-task" or binding.get("session_id") != self.row["sessionId"] or not binding.get("turn_id"):
+            raise AuthorityDenied("synthetic_scope_denied")
+        if arguments != {"disposition":"completed", "reason":"摘要已核对", "remaining":[]}:
+            raise AuthorityDenied("synthetic_scope_denied")
+        return {"state":"recorded", "taskProgress":{"phase":"completed", "remaining":[]}}
     def conversation_summary(self, user_id, **kwargs):
         self.authorize(user_id); self.summary_calls += 1
         return {"domain": "overview", "counts": {"communityReports": {"pending": 0}}, "availability": {"communityReports": "available"}}

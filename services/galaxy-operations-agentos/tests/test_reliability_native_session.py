@@ -31,7 +31,8 @@ class LocalSequence(Model):
         self.calls+=1
         self.observed.extend(message for message in messages if message.role=='tool')
         plan=[('current_summary',{}),('query_operations',{'module':'not-a-module','view':'overview'}),
-            ('query_operations',{'module':'search','view':'overview','days':'30'})]
+            ('query_operations',{'module':'search','view':'overview','days':'30'}),
+            ('assess_turn',{'disposition':'completed','reason':'只读查询完成','remaining':[]})]
         if self.calls<=len(plan):
             name,args=plan[self.calls-1]
             return ModelResponse(role='assistant',tool_calls=[{'id':'call_native_'+str(self.calls)+'__thought__'+'aB1+/_='*100,
@@ -56,7 +57,10 @@ class NativeReliability(unittest.TestCase):
                 def conversation_summary(self,user,**binding):
                     calls.append(('summary',{},binding));return {'availability':'available','counts':{}}
                 def conversation_tool(self,user,tool,arguments,**binding):
-                    calls.append((tool,arguments,binding));return {'availability':'available','data':{'observed':True}}
+                    calls.append((tool,arguments,binding))
+                    if tool=='assess-conversation-task':
+                        return {'state':'recorded','taskProgress':{'phase':'completed','remaining':[]}}
+                    return {'availability':'available','data':{'observed':True}}
             settings=Settings(database_url='postgresql+psycopg://unused.invalid/check',authority_url='http://127.0.0.1:1/',
                 service_key='explicit-local-service-key-not-production',verification_key='explicit-local-signing-key-not-production')
             model=LocalSequence()
@@ -65,13 +69,14 @@ class NativeReliability(unittest.TestCase):
             authorization=RunAuthorization(provider=GalaxyAuthorization(gateway),context=AuthorizationContext(principal_id='conversation:'+conversation),enforce_tools=False)
             with authorization_scope(lambda:authorization):
                 run=agent.run('核对当前摘要和最近30天搜索概况。',user_id='conversation:'+conversation,session_id=session,metadata={'operationId':str(uuid4())})
-            self.assertEqual([item[0] for item in calls],['summary','query-operations'])
-            self.assertEqual(calls[-1][1],{'module':'search','view':'overview','filters':{'days':30}})
+            self.assertEqual([item[0] for item in calls],['summary','query-operations','assess-conversation-task'])
+            self.assertEqual(calls[1][1],{'module':'search','view':'overview','filters':{'days':30}})
+            self.assertEqual(calls[2][1],{'disposition':'completed','reason':'只读查询完成','remaining':[]})
             self.assertTrue(any('invalid-request' in str(message.content) for message in model.observed))
             self.assertTrue(all('__thought__' in message.tool_call_id for message in model.observed))
             stored=db.get_run(run_id=run.run_id,deserialize=False)['run_data']
-            self.assertNotIn('__thought__',json.dumps(stored));self.assertEqual(len(stored['tools']),3)
-            self.assertEqual({item['tool_call_id'] for item in stored['tools']}, {conversation_call_reference(run.run_id, 'call_native_'+str(i)+'__thought__'+'aB1+/_='*100) for i in range(1,4)})
+            self.assertNotIn('__thought__',json.dumps(stored));self.assertEqual(len(stored['tools']),4)
+            self.assertEqual({item['tool_call_id'] for item in stored['tools']}, {conversation_call_reference(run.run_id, 'call_native_'+str(i)+'__thought__'+'aB1+/_='*100) for i in range(1,5)})
             # Streaming completion uses the same native adapter, history and
             # account binding, without activating any durable queue.
             with authorization_scope(lambda:authorization):
