@@ -43,6 +43,8 @@ def create_app(settings, *, quiet=True):
     configure(settings, models)
     from .metadata import configure_usage
     configure_usage(usage_store)
+    from .provider_finish import install as install_provider_finish
+    install_provider_finish()
     from litellm.proxy.proxy_server import app
     from .surface import PrivateSurface
     original = app.router.lifespan_context
