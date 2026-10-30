@@ -57,7 +57,29 @@ func (t *ConversationTools) Confirm(ctx context.Context, human operationspermiss
 		return nil, fail("operations_agentos_proposal_changed", 409)
 	}
 	at := s.now()
-	claimed, err := readConversationCard(s.Pool.QueryRow(ctx, `UPDATE operations_agentos_conversation_cards_v1 SET state='processing',result=jsonb_build_object('operationId',operation_id,'state','processing','summary','正在处理…','confirmationAttemptedAt',to_jsonb($3::timestamptz)),updated_at=$3 WHERE endpoint=$1 AND id=$2 AND state='prepared' AND NOT (proposal ? 'confirmationAttemptedAt') AND (result IS NULL OR NOT (result ? 'confirmationAttemptedAt')) RETURNING `+conversationCardColumns, s.Endpoint, id, at))
+	claimed, err := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (*conversationCard, error) {
+		if e := lockCardTurn(ctx, tx, s.Endpoint, row.TurnID); e != nil {
+			return nil, e
+		}
+		choice := object(row.Proposal["choice"])
+		if choice["exclusive"] == true {
+			var selected bool
+			if e := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations_agentos_conversation_cards_v1 WHERE endpoint=$1 AND turn_id=$2 AND id<>$3 AND proposal->'choice'->>'groupId'=$4 AND result ? 'confirmationAttemptedAt')`, s.Endpoint, row.TurnID, id, text(choice, "groupId")).Scan(&selected); e != nil {
+				return nil, e
+			}
+			if selected {
+				return nil, fail("operations_agentos_alternative_already_selected", 409)
+			}
+		}
+		claimed, e := readConversationCard(tx.QueryRow(ctx, `UPDATE operations_agentos_conversation_cards_v1 SET state='processing',result=jsonb_build_object('operationId',operation_id,'state','processing','summary','正在处理…','feedbackEnabled',true,'confirmationAttemptedAt',to_jsonb($3::timestamptz)),updated_at=$3 WHERE endpoint=$1 AND id=$2 AND state='prepared' AND NOT (proposal ? 'confirmationAttemptedAt') AND (result IS NULL OR NOT (result ? 'confirmationAttemptedAt')) RETURNING `+conversationCardColumns, s.Endpoint, id, at))
+		if e != nil || claimed == nil {
+			return claimed, e
+		}
+		if choice["exclusive"] == true {
+			_, e = tx.Exec(ctx, `UPDATE operations_agentos_conversation_cards_v1 SET state='not-available',result=jsonb_build_object('operationId',operation_id,'state','not-selected','summary','已选择其他方案。'),updated_at=$5 WHERE endpoint=$1 AND turn_id=$2 AND id<>$3 AND proposal->'choice'->>'groupId'=$4 AND state='prepared'`, s.Endpoint, row.TurnID, id, text(choice, "groupId"), at)
+		}
+		return claimed, e
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +130,7 @@ func (t *ConversationTools) Confirm(ctx context.Context, human operationspermiss
 		}
 	}
 	result = copyObject(result)
+	result["feedbackEnabled"] = true
 	if attempt, ok := row.Result["confirmationAttemptedAt"]; ok {
 		result["confirmationAttemptedAt"] = attempt
 	}

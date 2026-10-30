@@ -109,7 +109,15 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 	if e = t.RecheckContext(ctx, a, domain, bound); e != nil {
 		return nil, e
 	}
-	return Object{"priorReadReceipts": prior, "currentReadOutcomes": currentReads, "turnOutcomes": turns, "boundedTask": task, "priorActionReceipts": actions, "priorOperationReceipts": operations}, nil
+	plan, e := postgres.InTx(ctx, t.Conversations.Pool, func(tx pgx.Tx) (Object, error) { return turnPlanWithin(ctx, tx, t.Conversations.Endpoint, command.ID) })
+	if e != nil {
+		return nil, e
+	}
+	feedback, e := t.Conversations.receiptFeedback(ctx, *row, command)
+	if e != nil {
+		return nil, e
+	}
+	return Object{"priorReadReceipts": prior, "currentReadOutcomes": currentReads, "turnOutcomes": turns, "boundedTask": task, "priorActionReceipts": actions, "priorOperationReceipts": operations, "turnPlan": plan, "receiptFeedback": feedback}, nil
 }
 
 func (t *ConversationTools) priorSummaryReads(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand) (Object, error) {

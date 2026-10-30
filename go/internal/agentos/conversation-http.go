@@ -25,7 +25,7 @@ type ConversationHandler struct {
 
 var conversationHTTPPath = regexp.MustCompile(`(?i)^/v1/operations/agentos/conversations/(overview|governance|messaging|discovery|maintenance)(?:/(runs|qualification|history|cards|context|management-capabilities|operations/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:/(events|cancel))?))?$`)
 var conversationAfter = regexp.MustCompile(`^(?:0|[1-9][0-9]{0,9})$`)
-var conversationCardHTTPPath = regexp.MustCompile(`(?i)^/v1/operations/agentos/conversations/(overview|governance|messaging|discovery|maintenance)/cards/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:/(confirm|dismiss))?$`)
+var conversationCardHTTPPath = regexp.MustCompile(`(?i)^/v1/operations/agentos/conversations/(overview|governance|messaging|discovery|maintenance)/cards/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:/(confirm|dismiss|feedback))?$`)
 
 func conversationBody(r *http.Request, limit int64) (Object, error) {
 	if r.Header.Get("Content-Type") != "application/json" || r.Header.Get("Content-Encoding") != "" {
@@ -102,7 +102,7 @@ func (h ConversationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeError(err)
 			return
 		}
-	} else if r.URL.RawQuery != "" {
+	} else if r.URL.RawQuery != "" && !(reading && (path[2] == "history" || path[2] == "cards")) {
 		code, status := "not_found", 404
 		if cancelling {
 			code, status = "invalid_operations_agentos_request", 400
@@ -147,9 +147,17 @@ func (h ConversationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case path[2] == "qualification":
 		out, err = h.Service.ReadQualification(r.Context(), actor, domain)
 	case path[2] == "history":
-		out, err = h.Service.ReadHistory(r.Context(), actor, domain)
+		var cursor string
+		cursor, err = historyQuery(r.URL)
+		if err == nil {
+			out, err = h.Service.ReadHistoryPage(r.Context(), actor, domain, cursor)
+		}
 	case path[2] == "cards":
-		out, err = h.Service.ReadCards(r.Context(), actor, domain)
+		var turns []string
+		turns, err = cardTurnsQuery(r.URL)
+		if err == nil {
+			out, err = h.Service.ReadCardsForTurns(r.Context(), actor, domain, turns)
+		}
 	case path[2] == "context":
 		out, err = h.Service.ReadContext(r.Context(), actor, domain)
 	case path[2] == "management-capabilities":

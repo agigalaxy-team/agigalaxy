@@ -47,7 +47,7 @@ var toolRoute = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,79}$`)
 // descriptors are still recorded, but they cannot prepare or execute a command.
 func conversationReadTool(tool string) bool {
 	switch tool {
-	case "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "read-task-operation":
+	case "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "read-task-operation":
 		return true
 	}
 	return false
@@ -71,7 +71,7 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
 	switch tool {
-	case "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "run-authorized-work", "prepare-operation", "read-task-operation":
+	case "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "run-authorized-work", "prepare-operation", "read-task-operation":
 	default:
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
@@ -161,6 +161,8 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 	s := t.Conversations
 	var result Object
 	switch bound.tool {
+	case "plan-conversation-turn":
+		result, err = t.planConversationTurn(ctx, bound, text(input, "turnId"))
 	case "read-task-operation":
 		if len(bound.args) != 2 || !validOperationID(text(bound.args, "taskId")) || !validOperationID(text(bound.args, "operationId")) {
 			err = fail("invalid_operations_agentos_request", 400)

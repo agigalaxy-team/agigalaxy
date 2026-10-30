@@ -50,6 +50,44 @@ func (s *Conversations) decorateRuns(ctx context.Context, row Conversation, runs
 			}
 		}
 	}
+	if len(ids) > 0 {
+		rows, e := s.Pool.Query(ctx, `SELECT id::text,result->>'origin',result->>'parentOperationId',COALESCE(result->>'logicalTurnId',result->>'retryOfOperationId',id::text) FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND id=ANY($4::uuid[])`, s.Endpoint, row.ID, row.OperatorID, ids)
+		if e != nil {
+			return nil, e
+		}
+		type lineage struct {
+			origin, parent *string
+			root           string
+		}
+		byID := map[string]lineage{}
+		for rows.Next() {
+			var id string
+			var l lineage
+			if e = rows.Scan(&id, &l.origin, &l.parent, &l.root); e != nil {
+				rows.Close()
+				return nil, e
+			}
+			byID[id] = l
+		}
+		e = rows.Err()
+		rows.Close()
+		if e != nil {
+			return nil, e
+		}
+		for _, run := range runs {
+			if l, ok := byID[text(run, "operationId")]; ok {
+				if run["logicalTurnId"] == nil {
+					run["logicalTurnId"] = l.root
+				}
+				run["origin"] = "user"
+				run["parentOperationId"] = nil
+				if l.origin != nil && *l.origin == "operation-feedback" {
+					run["origin"] = "operation-feedback"
+					run["parentOperationId"] = l.parent
+				}
+			}
+		}
+	}
 	if err := s.projectConversationTimes(ctx, row, runs, ids); err != nil {
 		return nil, err
 	}

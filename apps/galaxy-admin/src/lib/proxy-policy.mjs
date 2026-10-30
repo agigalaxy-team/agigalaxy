@@ -48,8 +48,8 @@ const messagingWritePath=new RegExp('^/v1/operations/messaging/(?:plans(?:/'+uui
 const smtpReadPath=new RegExp('^/v1/operations/smtp(?:/(?:identities|queue|bounces|domains|tests|history|operations/'+uuid+'))?$','i');
 const smtpWritePath=/^\/v1\/operations\/smtp\/(?:settings|tests\/(?:connection|delivery))$/;
 const agentOsConversationRoot='conversations/(?:overview|governance|messaging|discovery|maintenance)';
-const agentOsReadPath=new RegExp('^/v1/operations/agentos/(?:status|options|operations/'+uuid+'|executions(?:/'+uuid+')?|runs(?:/[A-Za-z0-9_-]{1,128})?|'+agentOsConversationRoot+'(?:/(?:qualification|history|context|cards|management-capabilities|operations/'+uuid+'(?:/events)?|cards/'+uuid+'))?)$','i');
-const agentOsWritePath=new RegExp('^/v1/operations/agentos/(?:executions(?:/'+uuid+'/(?:events|runs|review|continue))?|'+agentOsConversationRoot+'/(?:runs|cards/'+uuid+'/(?:confirm|dismiss)|operations/'+uuid+'/cancel))$','i');
+const agentOsReadPath=new RegExp('^/v1/operations/agentos/(?:status|options|operations/'+uuid+'|executions(?:/'+uuid+')?|runs(?:/[A-Za-z0-9_-]{1,128})?|'+agentOsConversationRoot+'(?:/(?:qualification|history|context|cards|management-capabilities|operations/'+uuid+'(?:/events)?|cards/'+uuid+'(?:/feedback)?))?)$','i');
+const agentOsWritePath=new RegExp('^/v1/operations/agentos/(?:executions(?:/'+uuid+'/(?:events|runs|review|continue))?|'+agentOsConversationRoot+'/(?:runs|cards/'+uuid+'/(?:confirm|dismiss|feedback)|operations/'+uuid+'/cancel))$','i');
 const agentOsConversationEventsPath=new RegExp('^/v1/operations/agentos/'+agentOsConversationRoot+'/operations/'+uuid+'/events$','i');
 export const isAgentOsConversationEventsPath=pathname=>agentOsConversationEventsPath.test(pathname);
 const discoveryAnalyticsPath='/v1/operations/discovery/analytics';
@@ -112,6 +112,12 @@ function agentOsQueryAllowed(pathname,search){
   const params=new URLSearchParams(search);
   return search.length<=80&&[...params].every(([key,value])=>key==='after'&&params.getAll(key).length===1&&/^(?:0|[1-9][0-9]{0,9})$/.test(value));
  }
+ if(new RegExp('^/v1/operations/agentos/'+agentOsConversationRoot+'/history$','i').test(pathname)){
+  const params=new URLSearchParams(search);return search.length<=600&&[...params].every(([key,value])=>key==='before'&&params.getAll(key).length===1&&value.length>0&&value.length<=512&&/^[A-Za-z0-9_-]+$/.test(value));
+ }
+ if(new RegExp('^/v1/operations/agentos/'+agentOsConversationRoot+'/cards$','i').test(pathname)){
+  const params=new URLSearchParams(search);return search.length<=2500&&[...params].length<=50&&[...params].every(([key,value])=>key==='turnId'&&new RegExp('^'+uuid+'$','i').test(value));
+ }
  if(pathname!=='/v1/operations/agentos/runs')return !search;
  const params=new URLSearchParams(search);
  return search.length<=2048&&[...params.keys()].every(key=>['page','limit','domain','state'].includes(key)&&params.getAll(key).length===1);
@@ -133,7 +139,7 @@ export function operationsRequestBodyLimit(pathname){
   if(fileAccessWritePath.test(pathname))return 8192;
   if(pathname==='/v1/operations/files/cleanup/plans')return 262144;
   if(fileCleanupWritePath.test(pathname))return 2048;
-  if(new RegExp('^/v1/operations/agentos/'+agentOsConversationRoot+'/cards/'+uuid+'/(?:confirm|dismiss)$','i').test(pathname))return 2048;
+  if(new RegExp('^/v1/operations/agentos/'+agentOsConversationRoot+'/cards/'+uuid+'/(?:confirm|dismiss|feedback)$','i').test(pathname))return 2048;
   if(new RegExp('^/v1/operations/agentos/'+agentOsConversationRoot+'/operations/'+uuid+'/cancel$','i').test(pathname))return 2048;
   if(pathname==='/v1/operations/strategies/draft')return 262144;
   if(ruleSettingsWritePath.test(pathname))return 262144;

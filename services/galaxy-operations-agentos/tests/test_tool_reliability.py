@@ -195,7 +195,7 @@ class ToolReliability(unittest.TestCase):
         second = FunctionCall(function=function, call_id="second", arguments={"operation":{"kind":"rule-publish", "key":"business-controls", "reason":"corrected"}})
         with redirect_stdout(StringIO()):
             second.execute()
-        self.assertEqual(second.result, "请确认操作。")
+        self.assertEqual(json.loads(second.result)["card"]["cardId"], card_id)
         self.assertEqual(function._run_context.metadata["_galaxyPreparedCardIds"], [card_id])
         self.assertEqual(len(calls), 2)
 

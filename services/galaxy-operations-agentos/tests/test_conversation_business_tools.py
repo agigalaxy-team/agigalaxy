@@ -234,7 +234,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             agents = conversation_agents(settings=settings(), db=db, gateway=gateway,
                 domains={"overview": "运营概览"}, active_domains={"overview"}, model_factory=lambda: model)
             names = {tool.name for tool in agents[0].tools}
-            self.assertEqual(names, {"current_summary", "read_ai_delegation", "read_task_operation", *(name for name, _ in plan)})
+            self.assertEqual(names, {"current_summary", "read_ai_delegation", "read_task_operation", "plan_turn", "assess_turn", *(name for name, _ in plan)})
             for tool in agents[0].tools:
                 function = tool if isinstance(tool, Function) else Function.from_callable(tool)
                 self.assertNotIn("run_context", function.parameters["properties"])
@@ -316,9 +316,11 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             class PreparedModel(BusinessToolModel):
                 def invoke(self, messages=None, **kwargs):
                     self.calls += 1
-                    if self.calls != 1:
-                        raise AssertionError("prepared card must not call provider again")
-                    return ModelResponse(role="assistant", content="已经完成变更", tool_calls=[{"id":"prepared-call", "type":"function", "function":{"name":"prepare_operation", "arguments":json.dumps({"operation":{"kind":"feedback-update", "targetId":node.object_id, "state":"processing"}})}}])
+                    if self.calls == 1:
+                        return ModelResponse(role="assistant", tool_calls=[{"id":"prepared-call", "type":"function", "function":{"name":"prepare_operation", "arguments":json.dumps({"operation":{"kind":"feedback-update", "targetId":node.object_id, "state":"processing"}})}}])
+                    if self.calls == 2:
+                        return ModelResponse(role="assistant", tool_calls=[{"id":"assess-call", "type":"function", "function":{"name":"assess_turn", "arguments":json.dumps({"disposition":"awaiting-confirmation", "reason":"等待确认", "remaining":[]})}}])
+                    return ModelResponse(role="assistant", content="已准备确认卡，请人工确认。")
             model = PreparedModel()
             agents = conversation_agents(settings=settings(), db=db, gateway=gateway, domains={"overview":"运营概览"}, active_domains={"overview"}, model_factory=lambda:model)
             native = AgentOS(id="prepared-local", db=db, agents=agents, user_isolation=True, authorization=Authorization(verification_keys=[settings().verification_key], algorithm="HS256", verify_audience=True, audience=settings().audience, issuer=settings().issuer, authorization_provider=GalaxyAuthorization(gateway)), telemetry=False)
@@ -329,14 +331,14 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 headers = {"Authorization":"Bearer "+token}
                 response = client.post("/agents/galaxy-conversation-overview/runs", headers={**headers,"Idempotency-Key":str(uuid4())}, data={"message":"准备处理", "stream":"true", "background":"false", "session_id":row["sessionId"]})
                 self.assertEqual(response.status_code, 200, response.text)
-                self.assertEqual(model.calls, 1)
-                self.assertIn("请确认操作。", response.text)
+                self.assertEqual(model.calls, 3)
+                self.assertIn("已准备确认卡", response.text)
                 packets = [value for path,value in node.calls if path.endswith("/tools/execute")]
                 self.assertEqual(len(packets), 1)
                 stored = db.get_run(run_id=packets[0]["runId"], deserialize=False)["run_data"]
-                self.assertEqual(stored["content"], "请确认操作。")
+                self.assertEqual(stored["content"], "已准备确认卡，请人工确认。")
                 self.assertEqual(stored["metadata"]["_galaxyPreparedCardIds"], [card_id])
-                self.assertEqual(client.get("/galaxy/conversations/"+row["id"], headers=headers).json()["runs"][0]["content"], "请确认操作。")
+                self.assertEqual(client.get("/galaxy/conversations/"+row["id"], headers=headers).json()["runs"][0]["content"], "已准备确认卡，请人工确认。")
 
     def test_preparation_stop_is_per_call_and_invalid_card_does_not_stop(self):
         from agno.tools.function import FunctionCall
@@ -351,12 +353,12 @@ class ConversationBusinessToolsTest(unittest.TestCase):
         self.assertEqual(json.loads(value)["state"], "prepared")
         self.assertFalse(invalid.function.stop_after_tool_call)
         good = FunctionCall(function=function, call_id="good")
-        self.assertEqual(function.entrypoint(context, good, card_id=first_id), "请确认操作。")
-        self.assertTrue(good.function.stop_after_tool_call)
+        self.assertEqual(json.loads(function.entrypoint(context, good, card_id=first_id))["card"]["cardId"], first_id)
+        self.assertFalse(good.function.stop_after_tool_call)
         self.assertFalse(function.stop_after_tool_call)
         other = FunctionCall(function=function, call_id="other")
-        self.assertEqual(function.entrypoint(context, other, card_id=second_id), "请确认操作。")
-        self.assertTrue(other.function.stop_after_tool_call)
+        self.assertEqual(json.loads(function.entrypoint(context, other, card_id=second_id))["card"]["cardId"], second_id)
+        self.assertFalse(other.function.stop_after_tool_call)
         self.assertEqual(context.metadata["_galaxyPreparedCardIds"], [first_id, second_id])
         self.assertFalse(invalid.function.stop_after_tool_call)
 

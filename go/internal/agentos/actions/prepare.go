@@ -10,11 +10,12 @@ import (
 )
 
 type preparation struct {
-	target, command Object
-	title           string
-	impact          []any
-	basis           []any
-	expires         int64
+	target, command   Object
+	presentationNames Object
+	title             string
+	impact            []any
+	basis             []any
+	expires           int64
 }
 
 func (p *preparation) expiry(v any) {
@@ -116,6 +117,9 @@ func (s *Service) PrepareWithReference(ctx context.Context, a Actor, domain stri
 		return nil, fail("operations_source_unavailable", 409)
 	}
 	out := Object{"schemaVersion": 1, "kind": kind, "domain": domain, "request": x, "command": p.command, "target": p.target, "title": p.title, "impact": p.impact, "basis": p.basis, "requiredAction": permission, "checkedAt": s.now(), "readExpiresAt": p.expires, "decisionSource": "human-required"}
+	if len(p.presentationNames) > 0 {
+		out["presentationNames"] = p.presentationNames
+	}
 	if reference != nil {
 		out["publicReference"] = clone(reference)
 	}

@@ -40,9 +40,11 @@ func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, c
 	// An uncertain original result is never recovered by scanning history or
 	// issuing the command again. The optional locator and parent lineage come
 	// only from the original command's durable record.
-	status := s.Client.Status(ctx)
-	if object(status["conversationTransport"])["originalRunLookup"] != true {
-		return nil, nil
+	if known == "" {
+		status := s.Client.Status(ctx)
+		if object(status["conversationTransport"])["originalRunLookup"] != true {
+			return nil, nil
+		}
 	}
 	locator := ConversationOperationLocator{}
 	if command.NativeRunID != nil {

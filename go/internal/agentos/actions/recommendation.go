@@ -105,6 +105,13 @@ func (s *Service) prepareRecommendationExtended(ctx context.Context, a Actor, x 
 		}
 		directions := items(policy["directions"])
 		catalog := items(obj(value["catalog"])["items"])
+		p.presentationNames = Object{}
+		for _, v := range catalog {
+			entry := obj(v)
+			if key, name := str(entry["key"]), str(entry["label"]); key != "" && name != "" {
+				p.presentationNames[key] = name
+			}
+		}
 		var anchor, theme Object
 		for _, d := range directions {
 			for _, t := range catalog {

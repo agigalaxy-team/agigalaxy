@@ -72,7 +72,7 @@ class ConversationNativeTest(unittest.TestCase):
             gateway = CurrentReader(row)
             agents = conversation_agents(settings=settings, db=db, gateway=gateway,
                 domains={"overview": "运营概览"}, active_domains={"overview"}, model_factory=LocalModel)
-            self.assertEqual([tool.name for tool in agents[0].tools], ["current_summary", "query_operations", "read_operation_object", "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "prepare_operation"])
+            self.assertEqual([tool.name for tool in agents[0].tools], ["current_summary", "query_operations", "read_operation_object", "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "plan_turn", "assess_turn", "prepare_operation"])
             native = AgentOS(id="conversation-native-check", db=db, agents=agents, user_isolation=True,
                 authorization=Authorization(verification_keys=[settings.verification_key], algorithm="HS256",
                     verify_audience=True, audience=settings.audience, issuer=settings.issuer,

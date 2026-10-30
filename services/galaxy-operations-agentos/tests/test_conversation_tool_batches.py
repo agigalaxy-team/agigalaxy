@@ -9,6 +9,8 @@ from agno.models.openai import OpenAIChat
 from agno.models.response import ModelResponse
 from agno.tools.function import Function, FunctionCall
 from galaxy_agentos.conversation_tool_batches import with_conversation_tool_batches
+from galaxy_agentos.model_usage import _RUN
+from types import SimpleNamespace
 
 
 class BatchTests(unittest.TestCase):
@@ -47,6 +49,29 @@ class BatchTests(unittest.TestCase):
         for mode in (False, True):
             effects.clear()
             asyncio.run(check(mode))
+
+    def test_three_distinct_candidates_or_reject_batch_before_dispatch(self):
+        effects=[]
+        def prepare_operation(value: int):
+            effects.append(value)
+            return "prepared"
+        def call(value, ident):
+            fn=Function.from_callable(prepare_operation); fn.process_entrypoint()
+            return FunctionCall(function=fn, arguments={"value":value}, call_id=ident)
+        async def check(async_mode, values):
+            model=with_conversation_tool_batches(OpenAIChat(id="test")); results=[]
+            run=SimpleNamespace(metadata={"_galaxyTurnPlan":{"intent":"prepare","proposalCount":3,"alternatives":True}})
+            token=_RUN.set(run)
+            try:
+                calls=[call(v,str(i)) for i,v in enumerate(values)]
+                if async_mode: _=[v async for v in model.arun_function_calls(calls,results)]
+                else: list(model.run_function_calls(calls,results))
+            finally: _RUN.reset(token)
+            return results
+        for mode in (False,True):
+            effects.clear(); result=asyncio.run(check(mode,[1,2,3])); self.assertCountEqual(effects,[1,2,3]); self.assertTrue(all(not r.tool_call_error for r in result))
+            effects.clear(); result=asyncio.run(check(mode,[1,1,2])); self.assertEqual(effects,[]); self.assertEqual(len(result),3); self.assertTrue(all(r.tool_call_error for r in result))
+            effects.clear(); result=asyncio.run(check(mode,[1,2,3,4])); self.assertEqual(effects,[]); self.assertEqual(len(result),4)
 
     def test_native_agent_delivers_both_errors_to_next_model_request(self):
         effects = []

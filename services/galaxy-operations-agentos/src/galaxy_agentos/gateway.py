@@ -181,7 +181,7 @@ class GalaxyGateway:
             # Neither network URLs nor upstream body/error prose reaches Agno.
             raise AuthorityUnavailable("agentos_authority_unavailable") from None
 
-    def authorize(self, user_id, *, operation="read", resource_type=None, resource_id=None):
+    def authorize(self, user_id, *, operation="read", resource_type=None, resource_id=None, turn_id=None):
         if isinstance(user_id, str) and user_id.startswith("autonomy:"):
             if resource_type not in {None, "agents"} or resource_id not in {None, "galaxy-duty"}:
                 raise AuthorityDenied("agentos_autonomy_resource_denied")
@@ -193,7 +193,8 @@ class GalaxyGateway:
                 "resourceIds": ["galaxy-duty"]}
         if isinstance(user_id, str) and user_id.startswith("conversation:"):
             return self.request("authorize", {"conversationId": conversation_id(user_id), "operation": operation,
-                "resourceType": resource_type, "resourceId": resource_id})
+                "resourceType": resource_type, "resourceId": resource_id,
+                **({"turnId": turn_id} if turn_id is not None else {})})
         return self.request("authorize", {"executionId": execution_id(user_id), "operation": operation,
             "resourceType": resource_type, "resourceId": resource_id})
 
@@ -224,7 +225,7 @@ class GalaxyGateway:
     def conversation_tool(self, user_id, tool: str, arguments: dict, *, run_id: str,
             call_id: str, session_id: str, turn_id: str, public_reference: dict | None = None):
         if (tool not in {"workbench-summary", "query-operations", "read-operation-object", "list-authorized-work",
-                "run-authorized-work", "prepare-operation", "read-ai-delegation", "read-task-operation"}
+                "run-authorized-work", "prepare-operation", "read-ai-delegation", "read-task-operation", "plan-conversation-turn"}
                 or not isinstance(arguments, dict)
                 or not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id)):
             raise AuthorityDenied("agentos_tool_arguments_invalid")

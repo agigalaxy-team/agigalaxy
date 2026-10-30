@@ -29,5 +29,6 @@ export function useConversationScroll({viewport,content,scope,enabled,positions}
   return()=>{cancelAnimationFrame(frame.current);stopResize();node.removeEventListener('wheel',intent);node.removeEventListener('touchmove',intent);node.removeEventListener('pointerdown',pointer);window.removeEventListener('pointerup',release);node.removeEventListener('keydown',key);node.removeEventListener('scroll',scroll);};
  },[scope,enabled,viewport,content,positions,bottom,schedule]);
  useLayoutEffect(()=>{if(enabled&&follow.current)bottom();});
- return {following,jumpToLatest};
+ const pauseFollowing=useCallback(()=>{follow.current=false;setFollowing(false);},[]);
+ return {following,jumpToLatest,pauseFollowing};
 }

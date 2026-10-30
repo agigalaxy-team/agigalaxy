@@ -7,23 +7,29 @@ import {applyConversationReceipt} from './conversation-turns';
 import {agentOsConversationOperationPath,agentOsConversationPath,type AgentOsCommand,type AgentOsConversation,type AgentOsDomain,type AgentOsNativeRun} from './agentos-client';
 import type {AiManagementCapabilities} from './ai-management-capabilities';
 
-export type WorkbenchHistory={domain:AgentOsDomain;conversationId:string|null;runs:AgentOsNativeRun[];contextChanged:boolean;checkedAt:number;readExpiresAt:number};
+export type WorkbenchHistory={domain:AgentOsDomain;conversationId:string|null;runs:AgentOsNativeRun[];hasMore?:boolean;nextCursor?:string|null;contextChanged:boolean;checkedAt:number;readExpiresAt:number};
 export type WorkbenchContext=Omit<AgentOsConversation,'runs'|'managementCapabilities'>&{conversationId:string|null;contextChanged:boolean;latestOperation?:{operationId:string;runId:string|null;state:string;knownNativeStatus?:string|null;requiresOriginalLookup:boolean}|null};
 export type WorkbenchCards={domain:AgentOsDomain;items:unknown[];checkedAt:number;readExpiresAt:number};
 export type WorkbenchManagement={domain:AgentOsDomain;managementCapabilities:AiManagementCapabilities|null;checkedAt:number;readExpiresAt:number};
-type Receipt={value:AgentOsCommand;message?:string;retryOfOperationId?:string;conversationId:string|null};
+type Receipt={value:AgentOsCommand;message?:string;retryOfOperationId?:string;conversationId:string|null;feedback?:{parentOperationId:string;logicalTurnId?:string}};
 type OperationFlight={epoch:number;dirty:boolean;message?:string;promise:Promise<AgentOsCommand|undefined>};
 const terminal=new Set(['COMPLETED','ERROR','CANCELLED','PAUSED','REGENERATED']);
 
 // The four resources are independent: no history request is needed to render
 // cards or to obtain send/stream qualification. Receipts overlay only their
 // own operation so an in-flight snapshot cannot replace a newer turn.
-export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolean){
+export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolean,sessionKey:string|null=null){
  const base=enabled?agentOsConversationPath(domain):null;
  const history=useOperationsRead<WorkbenchHistory>({path:base?base+'/history':null,failureMessage:'历史加载失败',clearOnOffline:true,retryUnavailable:true,renewBeforeMs:20000,invalidateMode:'external'});
  const cards=useOperationsRead<WorkbenchCards>({path:base?base+'/cards':null,failureMessage:'操作记录加载失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
  const context=useOperationsRead<WorkbenchContext>({path:base?base+'/context':null,failureMessage:'连接失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
  const management=useOperationsRead<WorkbenchManagement>({path:base&&domain==='overview'?base+'/management-capabilities':null,failureMessage:'管理权限加载失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
+ const [older,setOlder]=useState<{domain:AgentOsDomain;sessionKey:string|null;conversationId:string|null;runs:AgentOsNativeRun[];hasMore:boolean;nextCursor:string|null}|null>(null);
+ const [moreLoading,setMoreLoading]=useState(false),[moreError,setMoreError]=useState('');
+ const [pageCards,setPageCards]=useState<{domain:AgentOsDomain;sessionKey:string|null;conversationId:string|null;items:unknown[]}|null>(null);
+ const [pageCardError,setPageCardError]=useState(''),[cardRefresh,setCardRefresh]=useState(0),[pageCardsLoading,setPageCardsLoading]=useState(false);
+ const pageEpoch=useRef(0),moreFlight=useRef(false);
+ useEffect(()=>{pageEpoch.current++;moreFlight.current=false;setOlder(null);setPageCards(null);setMoreError('');setPageCardError('');setMoreLoading(false);setPageCardsLoading(false);},[domain,enabled,sessionKey]);
  const [receipts,setReceipts]=useState<Partial<Record<AgentOsDomain,Record<string,Receipt>>>>({});
  const deniedStatus=[history.rejectionStatus,context.rejectionStatus,cards.rejectionStatus,management.rejectionStatus].find(status=>status===401||status===403)??null,denied=deniedStatus!==null,contextChanged=context.rejectionStatus===409||context.value?.contextChanged===true;
  const lastConversation=useRef<Partial<Record<AgentOsDomain,{id:string|null}>>>({}),[retired,setRetired]=useState<Partial<Record<AgentOsDomain,{id:string|null}>>>({});
@@ -33,20 +39,43 @@ export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolea
  const rejected=denied||history.rejected||contextChanged,previousScope=currentScope.current;
  currentScope.current={domain,enabled,rejected,epoch:previousScope.epoch+Number(previousScope.domain!==domain||previousScope.enabled!==enabled||previousScope.rejected!==rejected)};
  const historyValue=!denied&&!contextChanged&&history.value?.domain===domain&&(!oldConversation||history.value.conversationId!==oldConversation.id)?history.value:null,contextValue=!denied&&context.value?.domain===domain&&(!oldConversation||context.value.conversationId!==oldConversation.id)?context.value:null;
+ const olderValue=older?.domain===domain&&older.sessionKey===sessionKey&&older.conversationId===historyValue?.conversationId?older:null;
+ const historyRuns=useMemo(()=>{const unique=new Map<string,AgentOsNativeRun>();for(const run of [...(olderValue?.runs??[]),...(historyValue?.runs??[])])unique.set(run.runId,run);return [...unique.values()];},[olderValue,historyValue]);
+ const loadMore=useCallback(async()=>{
+  const cursor=olderValue?.nextCursor??historyValue?.nextCursor,hasMore=olderValue?olderValue.hasMore:historyValue?.hasMore;
+  if(!base||!cursor||!hasMore||moreFlight.current||!historyValue)return false;
+  moreFlight.current=true;setMoreLoading(true);setMoreError('');const epoch=pageEpoch.current,conversationId=historyValue.conversationId;
+  try{const page=await operationsRequest<WorkbenchHistory>(base+'/history?'+new URLSearchParams({before:cursor}));
+   if(epoch!==pageEpoch.current||page.domain!==domain||page.conversationId!==conversationId||page.contextChanged)return false;
+   setOlder(previous=>{const unique=new Map<string,AgentOsNativeRun>();for(const run of [...page.runs,...(previous?.domain===domain&&previous.sessionKey===sessionKey&&previous.conversationId===conversationId?previous.runs:[])])unique.set(run.runId,run);return {domain,sessionKey,conversationId,runs:[...unique.values()],hasMore:page.hasMore===true,nextCursor:page.nextCursor??null};});return true;
+  }catch(error){if(epoch===pageEpoch.current){if(error instanceof OperationsRequestError&&[401,403].includes(error.status)){history.clear(error.status);context.clear(error.status);cards.clear(error.status);}else setMoreError('更早的历史暂时无法读取，请重试。');}return false;
+  }finally{if(epoch===pageEpoch.current){moreFlight.current=false;setMoreLoading(false);}}
+ },[base,domain,sessionKey,historyValue,olderValue,history.clear,context.clear,cards.clear]);
+ const cardTurnIds=[...historyRuns.flatMap(run=>run.operationId?[run.operationId]:[]),...Object.keys(receipts[domain]??{})].join(',');
+ useEffect(()=>{
+  if(!base||!historyValue||!cardTurnIds)return;
+  const epoch=pageEpoch.current,conversationId=historyValue.conversationId,ids=[...new Set(cardTurnIds.split(','))];let alive=true;setPageCardsLoading(true);
+  void (async()=>{try{const pages:WorkbenchCards[]=[];for(let i=0;i<ids.length;i+=50){const params=new URLSearchParams();ids.slice(i,i+50).forEach(id=>params.append('turnId',id));pages.push(await operationsRequest<WorkbenchCards>(base+'/cards?'+params));}
+   if(!alive||epoch!==pageEpoch.current||pages.some(page=>page.domain!==domain))return;
+   setPageCards(previous=>{const unique=new Map<string,unknown>();for(const item of [...(previous?.domain===domain&&previous.sessionKey===sessionKey&&previous.conversationId===conversationId?previous.items:[]),...pages.flatMap(page=>page.items)])if(item&&typeof item==='object'&&'cardId' in item&&typeof item.cardId==='string')unique.set(item.cardId,item);return {domain,sessionKey,conversationId,items:[...unique.values()]};});setPageCardError('');
+  }catch(error){if(!alive||epoch!==pageEpoch.current)return;if(error instanceof OperationsRequestError&&[401,403].includes(error.status)){history.clear(error.status);context.clear(error.status);cards.clear(error.status);}else setPageCardError('部分操作记录暂时无法读取，请重试。');}finally{if(alive&&epoch===pageEpoch.current)setPageCardsLoading(false);}})();
+  return()=>{alive=false;};
+ },[base,domain,sessionKey,historyValue?.conversationId,cardTurnIds,cardRefresh,history.clear,context.clear,cards.clear]);
+ const refreshPageCards=useCallback(()=>{if(cardTurnIds)setPageCardsLoading(true);setCardRefresh(value=>value+1);},[cardTurnIds]);
  const contextUsable=context.verified&&!!contextValue&&!denied&&!contextChanged&&history.rejectionStatus!==409;
  const conversation=useMemo(()=>{
   if(!historyValue&&!contextValue)return null;
   const conversationId=contextValue?.conversationId??historyValue?.conversationId??null;
   const sameHistory=!contextValue||!historyValue||contextValue.conversationId===historyValue.conversationId;
-  let value:AgentOsConversation&{contextChanged?:boolean}={domain,conversationId,runs:sameHistory?historyValue?.runs??[]:[],runtimeState:contextValue?.runtimeState??'unavailable',modelState:contextValue?.modelState??'unknown',capabilities:contextValue?.capabilities??{canSend:false},blockedReason:contextValue?contextValue.blockedReason:'runtime-unavailable',checkedAt:contextValue?.checkedAt??historyValue?.checkedAt??0,readExpiresAt:contextValue?.readExpiresAt??historyValue?.readExpiresAt??0,contextChanged:contextValue?.contextChanged??historyValue?.contextChanged??false};
-  for(const item of Object.values(denied||history.rejected||contextChanged?{}:receipts[domain]??{})){const existing=value.runs.find(run=>run.operationId===item.value.operationId);if((!item.conversationId||item.conversationId===conversationId)&&!terminal.has(existing?.status??''))value=applyConversationReceipt(value,item.value,item.message,item.retryOfOperationId);}
+  let value:AgentOsConversation&{contextChanged?:boolean}={domain,conversationId,runs:sameHistory?historyRuns:[],runtimeState:contextValue?.runtimeState??'unavailable',modelState:contextValue?.modelState??'unknown',capabilities:contextValue?.capabilities??{canSend:false},blockedReason:contextValue?contextValue.blockedReason:'runtime-unavailable',checkedAt:contextValue?.checkedAt??historyValue?.checkedAt??0,readExpiresAt:contextValue?.readExpiresAt??historyValue?.readExpiresAt??0,contextChanged:contextValue?.contextChanged??historyValue?.contextChanged??false};
+  for(const item of Object.values(denied||history.rejected||contextChanged?{}:receipts[domain]??{})){const existing=value.runs.find(run=>run.operationId===item.value.operationId);if((!item.conversationId||item.conversationId===conversationId)&&!terminal.has(existing?.status??'')){value=applyConversationReceipt(value,item.value,item.message,item.retryOfOperationId);if(item.feedback)value={...value,runs:value.runs.map(run=>run.operationId===item.value.operationId?{...run,origin:'operation-feedback',parentOperationId:item.feedback!.parentOperationId,logicalTurnId:item.feedback!.logicalTurnId??run.logicalTurnId}:run)};}}
   return value;
- },[domain,historyValue,contextValue,receipts,history.rejected,denied,contextChanged]);
- const applyReceipt=useCallback((target:AgentOsDomain,receipt:AgentOsCommand,message?:string,retryOfOperationId?:string)=>{
+ },[domain,historyValue,historyRuns,contextValue,receipts,history.rejected,denied,contextChanged]);
+ const applyReceipt=useCallback((target:AgentOsDomain,receipt:AgentOsCommand,message?:string,retryOfOperationId?:string,feedback?:{parentOperationId:string;logicalTurnId?:string})=>{
   if(currentScope.current.rejected||target!==domain||!receipt.operationId||receipt.state==='context-changed'||receipt.state==='not-started')return;
   const conversationId=target===domain?(contextValue?.conversationId??historyValue?.conversationId??null):null;
   setReceipts(previous=>{const lane=previous[target]??{},prior=lane[receipt.operationId!];if(prior?.value.native&&terminal.has(prior.value.native.status)&&(!receipt.native||!terminal.has(receipt.native.status)))return previous;
-   return {...previous,[target]:{...lane,[receipt.operationId!]:{value:receipt,message:message??prior?.message,retryOfOperationId:retryOfOperationId??prior?.retryOfOperationId,conversationId:conversationId??prior?.conversationId??null}}};});
+   return {...previous,[target]:{...lane,[receipt.operationId!]:{value:receipt,message:message??prior?.message,retryOfOperationId:retryOfOperationId??prior?.retryOfOperationId,conversationId:conversationId??prior?.conversationId??null,feedback:feedback??prior?.feedback}}};});
  },[domain,contextValue?.conversationId,historyValue?.conversationId]);
  const invalidateContext=useCallback(()=>{
   if(currentScope.current.domain!==domain||!currentScope.current.enabled)return;
@@ -109,15 +138,15 @@ export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolea
    if(detail.kind==='configuration'){void context.refresh();if(domain==='overview')void management.refresh();return;}
    if(ownId&&detail.parentId&&detail.parentId!==ownId)return;
    if(detail.kind==='conversation-operation'&&detail.objectId)refreshOperation(detail.objectId);
-   else if(detail.kind==='conversation-card'){void cards.refresh();if(detail.turnId)refreshOperation(detail.turnId);}
+   else if(detail.kind==='conversation-card'){void cards.refresh();refreshPageCards();if(detail.turnId)refreshOperation(detail.turnId);}
    else if(detail.kind==='conversation-tool'&&detail.turnId)refreshOperation(detail.turnId);
    else if(detail.kind==='conversation-context'){void context.refresh();}
   };
   const resync=()=>{void history.refresh();void cards.refresh();void context.refresh();if(domain==='overview')void management.refresh();};
   window.addEventListener('galaxy:admin-agentos-change',change);window.addEventListener('galaxy:admin-agentos-resync',resync);
   return()=>{window.removeEventListener('galaxy:admin-agentos-change',change);window.removeEventListener('galaxy:admin-agentos-resync',resync);};
- },[enabled,domain,contextValue?.conversationId,historyValue?.conversationId,history.refresh,cards.refresh,context.refresh,management.refresh,readOperation,clear]);
- return {history,cards,context,management,conversation,applyReceipt,readOperation,clear,readAll,denied,contextUsable,contextInvalidated:contextChanged||history.rejectionStatus===409};
+ },[enabled,domain,contextValue?.conversationId,historyValue?.conversationId,history.refresh,cards.refresh,context.refresh,management.refresh,readOperation,clear,refreshPageCards]);
+ return {history,cards,context,management,conversation,olderHasMore:olderValue?olderValue.hasMore:historyValue?.hasMore===true,olderCursor:olderValue?olderValue.nextCursor:historyValue?.nextCursor,hasLoadedOlder:!!olderValue,loadMore,moreLoading,moreError,pageCards:pageCards?.domain===domain&&pageCards.sessionKey===sessionKey&&pageCards.conversationId===historyValue?.conversationId?pageCards.items:[],pageCardError,pageCardsLoading,pageCardsVerified:!!pageCards&&pageCards.domain===domain&&pageCards.sessionKey===sessionKey&&pageCards.conversationId===historyValue?.conversationId&&!pageCardsLoading&&!pageCardError,refreshPageCards,applyReceipt,readOperation,clear,readAll,denied,contextUsable,contextInvalidated:contextChanged||history.rejectionStatus===409};
 }
 
 // Keep reconciling only the already admitted operation. A lost stream terminal

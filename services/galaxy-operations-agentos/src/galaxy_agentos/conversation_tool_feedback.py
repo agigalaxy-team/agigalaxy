@@ -140,10 +140,13 @@ def _preparation_feedback(result):
         feedback = {"state": state, "cardPrepared": None,
             "nextStep": "query-original-operation", "mayClaimPrepared": False,
             "report": "结果仍未知或处理中；只能核对原operation，不得重发prepare或声称已制卡、已执行。"}
+    elif state == "prepared" and isinstance(card, dict) and valid_card and isinstance(card.get("presentation"), dict) and card["presentation"].get("reviewable") is not True:
+        feedback = {"state":"not-prepared", "cardPrepared":False, "mayClaimPrepared":False,
+            "nextStep":"explain-card-review-limit", "report":"卡的业务内容尚不可完整审阅，不能称已生成可执行方案；根据原卡的说明给出具体限制。"}
     elif state == "prepared" and isinstance(card, dict) and card.get("state") == "prepared" and valid_card:
         feedback = {"state": "prepared", "cardPrepared": True,
             "nextStep": "review-returned-card", "mayClaimPrepared": True,
-            "report": "原Node回执已返回prepared卡及card.cardId；可说明卡已准备，仍须人工确认，不能声称业务已执行。"}
+            "report": "原业务服务已返回prepared卡及card.cardId；可说明卡已准备，仍须人工确认，不能声称业务已执行。"}
     elif state == "prepared":
         feedback = {"state": "unknown", "cardPrepared": None,
             "nextStep": "query-original-operation", "mayClaimPrepared": False,

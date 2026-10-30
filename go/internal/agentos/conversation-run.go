@@ -91,6 +91,10 @@ func retryableOriginalConversationRun(run Object, message string) bool {
 }
 
 func (s *Conversations) Run(ctx context.Context, operator operationspermissions.Actor, domain string, input Object, authorize AuthorizeConversation) (Object, error) {
+	return s.runWithContext(ctx, operator, domain, input, authorize, nil)
+}
+
+func (s *Conversations) runWithContext(ctx context.Context, operator operationspermissions.Actor, domain string, input Object, authorize AuthorizeConversation, continuation Object) (Object, error) {
 	turn, err := parseConversationTurn(input)
 	if err != nil || !validConversationDomain(domain) {
 		return nil, fail("invalid_operations_agentos_request", 400)
@@ -135,6 +139,9 @@ func (s *Conversations) Run(ctx context.Context, operator operationspermissions.
 	}
 	row := *current.Row
 	receipt := Object{"operationId": turn.ID, "runId": nil, "state": "dispatching", "native": nil, "replayed": false}
+	for key, value := range continuation {
+		receipt[key] = value
+	}
 	if turn.TaskID != "" {
 		receipt["taskId"] = turn.TaskID
 	}
@@ -247,7 +254,7 @@ func (s *Conversations) Run(ctx context.Context, operator operationspermissions.
 		}
 	}
 	_, err = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) {
-		if _, err := tx.Exec(ctx, "UPDATE operations_agentos_conversation_commands_v1 SET state=$3,result=$4,native_run_id=COALESCE(native_run_id,$5) WHERE endpoint=$1 AND id=$2", s.Endpoint, turn.ID, result["state"], result, result["runId"]); err != nil {
+		if _, err := tx.Exec(ctx, "UPDATE operations_agentos_conversation_commands_v1 SET state=$3,result=result || $4::jsonb,native_run_id=COALESCE(native_run_id,$5) WHERE endpoint=$1 AND id=$2", s.Endpoint, turn.ID, result["state"], result, result["runId"]); err != nil {
 			return false, err
 		}
 		if s.UpdateWorkbenchWithin != nil {

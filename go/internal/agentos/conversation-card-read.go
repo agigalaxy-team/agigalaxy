@@ -56,7 +56,7 @@ func (b *cardReadBatch) actor(ctx context.Context, row *conversationCard) (opera
 	return entry.actor, entry.err
 }
 
-func (t *ConversationTools) readCardBatch(ctx context.Context, human operationspermissions.Actor, domain string) ([]Object, error) {
+func (t *ConversationTools) readCardBatch(ctx context.Context, human operationspermissions.Actor, domain string, turns ...string) ([]Object, error) {
 	if !validConversationDomain(domain) {
 		return nil, fail("invalid_operations_agentos_request", 400)
 	}
@@ -68,7 +68,17 @@ func (t *ConversationTools) readCardBatch(ctx context.Context, human operationsp
 	}
 	// Load whole cards and their original fixed-AI association in one bounded
 	// query, rather than an ID query followed by per-card row/conversation reads.
-	rows, err := s.Pool.Query(ctx, `SELECT c.id::text,c.conversation_id::text,c.turn_id::text,c.operator_id,c.domain,c.operation_id::text,c.state,c.proposal,c.result,c.created_at,c.updated_at,s.operator_id,s.domain,s.ai_account_id::text FROM operations_agentos_conversation_cards_v1 c JOIN operations_agentos_conversations_v1 s ON s.endpoint=c.endpoint AND s.id=c.conversation_id WHERE c.endpoint=$1 AND c.domain=$2 AND c.operator_id=$3 ORDER BY c.created_at DESC,c.id DESC LIMIT 30`, s.Endpoint, domain, human.ID)
+	query := `SELECT c.id::text,c.conversation_id::text,c.turn_id::text,c.operator_id,c.domain,c.operation_id::text,c.state,c.proposal,c.result,c.created_at,c.updated_at,s.operator_id,s.domain,s.ai_account_id::text FROM operations_agentos_conversation_cards_v1 c JOIN operations_agentos_conversations_v1 s ON s.endpoint=c.endpoint AND s.id=c.conversation_id WHERE c.endpoint=$1 AND c.domain=$2 AND c.operator_id=$3`
+	args := []any{s.Endpoint, domain, human.ID}
+	if len(turns) > 0 {
+		query += ` AND c.turn_id=ANY($4::uuid[])`
+		args = append(args, turns)
+	}
+	query += ` ORDER BY c.created_at DESC,c.id DESC`
+	if len(turns) == 0 {
+		query += ` LIMIT 30`
+	}
+	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

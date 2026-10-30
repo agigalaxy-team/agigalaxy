@@ -238,6 +238,10 @@ func (s *Conversations) AuthorizeNative(ctx context.Context, input Object) (Obje
 	for key, value := range input {
 		switch key {
 		case "conversationId", "operation":
+		case "turnId":
+			if !validOperationID(text(input, "turnId")) {
+				return nil, fail("invalid_operations_agentos_request", 400)
+			}
 		case "resourceType":
 			if value != nil && value != "agents" && value != "workflows" {
 				return nil, fail("invalid_operations_agentos_request", 400)
@@ -288,5 +292,25 @@ func (s *Conversations) AuthorizeNative(ctx context.Context, input Object) (Obje
 	}
 	view := row.View()
 	view["rolePrompt"] = prompt
-	return Object{"allowed": true, "resourceIds": []any{component}, "execution": view, "readExpiresAt": current.ReadExpiresAt}, nil
+	out := Object{"allowed": true, "resourceIds": []any{component}, "execution": view, "readExpiresAt": current.ReadExpiresAt}
+	if turn := text(input, "turnId"); turn != "" {
+		command, e := s.command(ctx, turn)
+		if e != nil {
+			return nil, e
+		}
+		if command == nil || command.ConversationID != row.ID || command.OperatorID != row.OperatorID {
+			return nil, fail("operations_agentos_scope_denied", 403)
+		}
+		plan, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) { return turnPlanWithin(ctx, tx, s.Endpoint, turn) })
+		if e != nil {
+			return nil, e
+		}
+		out["turnPlan"] = plan
+		feedback, e := s.receiptFeedback(ctx, *row, command)
+		if e != nil {
+			return nil, e
+		}
+		out["receiptFeedback"] = feedback
+	}
+	return out, nil
 }

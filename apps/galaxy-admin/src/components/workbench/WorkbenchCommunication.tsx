@@ -23,6 +23,7 @@ import {authorizedCommandMatches} from "../../lib/workbench/authorized-preparati
 import {workbenchActionCards,workbenchCardPath,type WorkbenchActionCard} from "../../lib/workbench/workbench-action-cards";
 import {useWorkbenchCommand,clearWorkbenchIntents} from "../../lib/workbench/use-workbench-command";
 import {useWorkbenchMessageQueue} from '../../lib/workbench/use-workbench-message-queue';
+import {useWorkbenchCardFeedback} from '../../lib/workbench/use-workbench-card-feedback';
 import {queueLaneMatches,messageQueueStorageKey} from '../../lib/workbench/workbench-message-queue';
 import {WorkbenchReplyProgress,WorkbenchAnswer,replyProgressLabel} from './WorkbenchReply';
 import {useConversationScroll} from '../../lib/workbench/use-conversation-scroll';
@@ -66,9 +67,9 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const identityEnded=!!checkedSession&&(checkedSession.state==='signed-out'||checkedSession.operator.id!==operatorId);
   const verifiedSession=!signedOut&&checkedSession?.state==='signed-in'&&checkedSession.operator.id===operatorId?checkedSession:null;
   const permittedDomains=domains.map(item=>item.id as AgentOsDomain).filter(item=>agentOsCanUseDomain(verifiedSession,item)),canUseDomain=permittedDomains.includes(domain);
-  const data=useWorkbenchConversationData(domain,canUseDomain&&(focused||logSource==='actions'));
+  const data=useWorkbenchConversationData(domain,canUseDomain&&(focused||logSource==='actions'),verifiedSession?.csrfToken??null);
   const conversation=data.context,currentConversation=canUseDomain?data.conversation:null;
-  const actionCards=useMemo(()=>workbenchActionCards(!data.denied&&data.cards.value?.domain===domain?data.cards.value.items:null,domain),[data.cards.value,data.denied,domain]);
+  const actionCards=useMemo(()=>[...new Map(workbenchActionCards(!data.denied?[...data.cards.value?.domain===domain?data.cards.value.items:[],...data.pageCards]:[],domain).sort((a,b)=>a.checkedAt-b.checkedAt).map(card=>[card.cardId,card])).values()],[data.cards.value,data.pageCards,data.denied,domain]);
   const [,tickCardClock]=useState(0),cardNow=Math.floor(Date.now()/1000);
   useEffect(()=>{
     if(!data.cards.verified||!actionCards.length)return;
@@ -98,7 +99,8 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const currentToken=async(targetDomain:AgentOsDomain)=>{const current=await session.read();return current?.state==='signed-in'&&current.operator.id===operatorId&&agentOsCanUseDomain(current,targetDomain)?current.csrfToken:null;};
   const queue=useWorkbenchMessageQueue(operatorId);
   const denyConversation=()=>{session.clear();data.clear();void session.read();};
-  const reread=()=>{void data.context.refresh();void data.cards.refresh();};
+  useWorkbenchCardFeedback({enabled:!!verifiedSession&&canUseDomain&&data.contextUsable&&(data.cards.verified||data.pageCardsVerified)&&!data.pageCardsLoading&&!data.pageCardError,operatorId,csrfToken:verifiedSession?.csrfToken??'',domain,cards:actionCards,runs:currentConversation?.runs??[],currentToken,onReceipt:data.applyReceipt,onDenied:denyConversation});
+  const reread=()=>{void data.context.refresh();void data.cards.refresh();data.refreshPageCards();};
   const restoreUnsent=(sentDomain:AgentOsDomain,operationId:string,text:string)=>{
     if(!draftsRef.current[sentDomain]){const next={...draftsRef.current,[sentDomain]:text};draftsRef.current=next;setDrafts(next);if(storageKey)setDraftStorageError(!saveDrafts(storageKey,domainRef.current,next));}
     else setUnsent(previous=>{const next={...previous,[sentDomain]:[...(previous[sentDomain]??[]),{operationId,text}]};memory.current.unsent=next;return next;});
@@ -131,7 +133,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
       if(sentDomain&&value.state!=='context-changed'&&value.state!=='not-started'){
         data.applyReceipt(sentDomain,value,typeof body.message==='string'?body.message:undefined,typeof body.retryOfOperationId==='string'?body.retryOfOperationId:undefined);
         await data.context.renew();
-      }else if(sentDomain)await data.context.refresh();else await data.cards.refresh();
+      }else if(sentDomain)await data.context.refresh();else {await data.cards.refresh();data.refreshPageCards();}
       if(returnToInput&&(document.activeElement===document.body||dismissedCard?.contains(document.activeElement)))input.current?.focus({preventScroll:true});
     }});
   const queueCommand=useWorkbenchCommand({operatorId,csrfToken:verifiedSession?.csrfToken??'',canWrite:canUseDomain,domain,permittedDomains,memoryLane:'message-queue',currentToken,onProgress:conversation.renew,validateResult:authorizedCommandMatches,onConflict:reread,onDenied:denyConversation,
@@ -156,7 +158,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     onCommitted:async(_value,_path,body)=>{
       const card=typeof body.cardId==='string'?document.querySelector('[data-workbench-card="'+body.cardId+'"]'):null;
       const restoreFocus=!!card&&(document.activeElement===document.body||card.contains(document.activeElement));
-      await data.cards.refresh();
+      await data.cards.refresh();data.refreshPageCards();
       // The original confirm lane settles only by observing this same card's
       // durable cancelled result. Do not clear or replace its pending intent.
       if(restoreFocus&&(document.activeElement===document.body||card?.contains(document.activeElement)))input.current?.focus({preventScroll:true});
@@ -279,9 +281,9 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     if(!submission.admitted){queue.unreserve(operationId);pumpLock.current=false;}else void submission.promise.finally(()=>{pumpLock.current=false;});
   },[queue.ready,queue.state,verifiedSession,focused,canUseDomain,data.contextUsable,currentConversation,taskReady,command.pending,command.locked,dismissCommand.pending,dismissCommand.locked,stopCommand.pending,stopCommand.locked,queueCommand.locked,replying,activeRun,waitingReply,domain,taskId,pumpEpoch]);
   const retryReply=(runId:string)=>{if(!data.contextUsable||currentConversation?.contextChanged)return;const message=nativeConversationRetryMessage(currentConversation,runId);if(message!==null){const original=currentConversation?.runs.find(run=>run.runId===runId);if(original?.operationId)void sendMessage(message,original.operationId);}};
-  const confirmCard=(card:WorkbenchActionCard)=>{if(workLocked||queueCommand.locked&&queueCommand.pending?.domain===domain||!canUseDomain||!verifiedSession||!data.cards.verified||!card.capability.canConfirm||card.readExpiresAt<=Math.floor(Date.now()/1000))return;const path=workbenchCardPath(domain,card.cardId);lastSubmission.current=null;void command.submit(path+'/confirm',{cardId:card.cardId},'',()=>path,card.operationId);};
+  const confirmCard=(card:WorkbenchActionCard)=>{if(workLocked||queueCommand.locked&&queueCommand.pending?.domain===domain||!canUseDomain||!verifiedSession||!(data.cards.verified||data.pageCardsVerified)||data.pageCardsLoading||!!data.pageCardError||!card.capability.canConfirm||card.readExpiresAt<=Math.floor(Date.now()/1000))return;const path=workbenchCardPath(domain,card.cardId);lastSubmission.current=null;void command.submit(path+'/confirm',{cardId:card.cardId},'',()=>path,card.operationId);};
   const canDismissPending=(card:WorkbenchActionCard)=>command.pending?.domain===domain&&command.pending.path===workbenchCardPath(domain,card.cardId)+'/confirm'&&command.pending.body.cardId===card.cardId&&command.pending.body.operationId===card.operationId;
-  const dismissCard=(card:WorkbenchActionCard)=>{if(!canUseDomain||!verifiedSession||!data.cards.verified||dismissCommand.locked||queueCommand.locked&&queueCommand.pending?.domain===domain||command.locked&&!canDismissPending(card)||!['prepared','not-available'].includes(card.state)||!card.capability.canDismiss||card.readExpiresAt<=Math.floor(Date.now()/1000))return;const path=workbenchCardPath(domain,card.cardId);void dismissCommand.submit(path+'/dismiss',{cardId:card.cardId},'',()=>path,card.operationId);};
+  const dismissCard=(card:WorkbenchActionCard)=>{if(!canUseDomain||!verifiedSession||!(data.cards.verified||data.pageCardsVerified)||data.pageCardsLoading||!!data.pageCardError||dismissCommand.locked||queueCommand.locked&&queueCommand.pending?.domain===domain||command.locked&&!canDismissPending(card)||!['prepared','not-available'].includes(card.state)||!card.capability.canDismiss||card.readExpiresAt<=Math.floor(Date.now()/1000))return;const path=workbenchCardPath(domain,card.cardId);void dismissCommand.submit(path+'/dismiss',{cardId:card.cardId},'',()=>path,card.operationId);};
   useEffect(()=>{
     if(!storageKey)return;
     if(Object.values(draftsRef.current).some(Boolean)){setDraftStorageError(!saveDrafts(storageKey,domainRef.current,draftsRef.current));return;}
@@ -321,13 +323,21 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const confirmingCard=typeof command.pending?.body.cardId==='string',sendingConversation=!!command.pending?.path.includes('/conversations/')&&!confirmingCard;
   const pendingCardVisible=canUseDomain&&data.cards.available&&actionCards.some(card=>card.cardId===command.pending?.body.cardId&&card.readExpiresAt>cardNow);
   const onComposerKeyDown=(event:KeyboardEvent<HTMLTextAreaElement>)=>{if(event.key!=='Enter'||event.shiftKey||event.ctrlKey||event.altKey||event.metaKey||composing.current||event.nativeEvent.isComposing||event.keyCode===229)return;event.preventDefault();if(!event.repeat&&primaryReady)activatePrimary();};
-  const showCards=(cards:WorkbenchActionCard[],label:string)=><WorkbenchActionCards cards={cards} label={label} now={cardNow} available={canUseDomain&&!data.denied&&data.cards.available} verified={canUseDomain&&!data.denied&&data.cards.verified} busy={workLocked||queueCommand.locked&&queueCommand.pending?.domain===domain} pendingCardId={typeof dismissCommand.pending?.body.cardId==='string'?dismissCommand.pending.body.cardId:typeof command.pending?.body.cardId==='string'?command.pending.body.cardId:null} pendingDismissCardId={cards.find(card=>card.capability.canDismiss&&canDismissPending(card))?.cardId??null} dismissBusy={dismissCommand.locked} onConfirm={confirmCard} onDismiss={dismissCard}/>;
+  const showCards=(cards:WorkbenchActionCard[],label:string,readOnly=false)=>{
+    const groups:WorkbenchActionCard[][]=[],seen=new Set<string>();
+    for(const card of cards){if(seen.has(card.cardId))continue;const choice=card.choice,peers=choice?.count===3&&choice.exclusive?cards.filter(other=>other.choice?.groupId===choice.groupId&&other.choice.count===3&&other.choice.exclusive):[];const grouped=peers.length===3&&new Set(peers.map(item=>item.choice!.index)).size===3?peers.sort((a,b)=>a.choice!.index-b.choice!.index):[card];grouped.forEach(item=>seen.add(item.cardId));groups.push(grouped);}
+    return groups.map(group=><WorkbenchActionCards key={group[0].cardId} readOnly={readOnly} cards={group} label={label} now={cardNow} available={canUseDomain&&!data.denied&&(data.cards.available||data.pageCardsVerified)} verified={canUseDomain&&!data.denied&&(data.cards.verified||data.pageCardsVerified)} busy={workLocked||data.pageCardsLoading||!!data.pageCardError||queueCommand.locked&&queueCommand.pending?.domain===domain} pendingCardId={typeof dismissCommand.pending?.body.cardId==='string'?dismissCommand.pending.body.cardId:typeof command.pending?.body.cardId==='string'?command.pending.body.cardId:null} pendingDismissCardId={group.find(card=>card.capability.canDismiss&&canDismissPending(card))?.cardId??null} dismissBusy={dismissCommand.locked} onConfirm={confirmCard} onDismiss={dismissCard}/>);
+  };
   const latestRun=currentConversation?.runs.at(-1);
   const latestFailure=data.contextUsable&&!waitingReply&&!command.pending&&!queueCommand.pending&&latestRun?.status==='ERROR'?latestRun:null;
   const outgoing=queueCommand.pending??command.pending;
   const pendingOutgoing=canUseDomain&&conversation.available&&outgoing?.domain===domain&&outgoing.path===agentOsConversationPath(domain)+'/runs'&&!outgoing.body.retryOfOperationId&&typeof outgoing.body.message==='string'&&!waitingReply&&!currentConversation?.runs.some(run=>run.operationId===outgoing?.body.operationId)?outgoing:null;
-  const extraVisibleTurn=!!pendingOutgoing||!!currentConversation&&!!waitingReply&&!waitingRun&&!waitingReply.retryOfOperationId;
-  const visibleRuns=nativeConversationDisplayRuns(currentConversation?.runs??[]).slice(extraVisibleTurn?-4:-5);
+  const logicalRuns=nativeConversationDisplayRuns((currentConversation?.runs??[]).filter(run=>run.origin!=='operation-feedback'));
+  const visibleRuns=logicalRuns;
+  const feedbackRuns=(currentConversation?.runs??[]).filter(run=>run.origin==='operation-feedback');
+  const historyAnchor=useRef<{node:Element;offset:number}|null>(null);
+  useLayoutEffect(()=>{const anchor=historyAnchor.current,viewport=conversationElement.current;if(!anchor||!viewport||!anchor.node.isConnected)return;viewport.scrollTop+=anchor.node.getBoundingClientRect().top-viewport.getBoundingClientRect().top-anchor.offset;historyAnchor.current=null;},[data.olderCursor]);
+  const loadHistory=async()=>{const viewport=conversationElement.current;if(!viewport)return;const top=viewport.getBoundingClientRect().top,node=[...viewport.querySelectorAll('.wb-run')].find(item=>item.getBoundingClientRect().bottom>top);scrolling.pauseFollowing();historyAnchor.current=node?{node,offset:node.getBoundingClientRect().top-top}:null;if(!await data.loadMore())historyAnchor.current=null;};
   const qualificationError=!verifiedSession?session.error:(!data.contextUsable||!currentConversation?.capabilities.canSend?conversation.error:'');
   const headerError=queueCommand.error||command.error||dismissCommand.error||stopCommand.error||qualificationError;
   const retryRead=!!qualificationError&&!data.denied&&(!verifiedSession||canUseDomain)&&!workLocked&&!replying&&!signedOut;
@@ -341,13 +351,15 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const blockedMessage=currentConversation?.blockedReason==='model-not-configured'?'未配置模型':currentConversation?.blockedReason==='runtime-unavailable'?'连接失败':'';
   return <section id="operations-ai" className={'wb-communication'+(focused?' wb-communication--focused':'')} aria-labelledby={panelId}>
     <header className="wb-section-heading"><h2 id={panelId}><AdminIcon name="sparkles" size={19}/>运营AI · {current.label}</h2><div className="wb-communication-controls">{data.contextUsable&&!waitingReply&&latestRun?.status==="COMPLETED"&&!!latestRun.modelFallbacks?.length&&<span className="wb-model-notice wb-model-notice--recovered" role="status">备用模型已接续</span>}<button type="button" className="wb-view-toggle" disabled={!interactive} aria-expanded={focused} aria-controls={panelId+'-conversation'} onClick={()=>focused?onFocusChange(false):open()}><AdminIcon name={focused?'workspace':'comment'} size={16}/><span>{focused?'返回仪表':interactive?'打开沟通':'准备沟通…'}</span></button></div></header>
-    {actionsTarget&&createPortal(<WorkbenchActionHistory domain={domain} label={current.label} cards={actionCards} verified={!!verifiedSession&&canUseDomain&&!data.denied&&data.cards.available} loading={session.loading||data.cards.loading} denied={data.denied||!!verifiedSession&&!canUseDomain||signedOut} error={data.cards.error||session.error} now={cardNow} renderCard={card=>showCards([card],'所选AI操作')} feedback={null} retry={data.cards.read}/>,actionsTarget)}
+    {actionsTarget&&createPortal(<WorkbenchActionHistory domain={domain} label={current.label} cards={actionCards} verified={!!verifiedSession&&canUseDomain&&!data.denied&&data.cards.available} loading={session.loading||data.cards.loading} denied={data.denied||!!verifiedSession&&!canUseDomain||signedOut} error={data.cards.error||session.error} now={cardNow} renderCard={card=>showCards([card],'所选AI操作',true)} feedback={null} retry={data.cards.read}/>,actionsTarget)}
     <AdminTabs items={interactive?domains:domains.map(item=>({...item,disabled:true}))} active={domain} onChange={changeDomain} ariaLabel="运营AI领域" className="wb-ai-domains"/>
     <p className="wb-connection" role="status"><i className="wb-status-dot"/>{status}</p>
     {signedOut&&<a className="wb-text-link" href="/admin/login?redirect=%2Fadmin">重新登录</a>}
     <div className="wb-conversation-frame" hidden={!focused}>
     <div ref={conversationElement} id={panelId+'-conversation'} className="wb-conversation" hidden={!focused}>
       <div ref={conversationContent} className="wb-conversation-content">
+      {data.olderHasMore&&<button type="button" className="wb-text-button" disabled={data.moreLoading} onClick={()=>void loadHistory()}>{data.moreLoading?'正在读取…':'更多历史记录'}</button>}
+      {data.moreError&&<p role="alert">{data.moreError}</p>}{data.pageCardError&&<p role="alert">{data.pageCardError} <button type="button" className="wb-text-button" onClick={data.refreshPageCards}>重试</button></p>}
       <ReadStatus loading={data.history.loading} error={data.history.error} retry={data.history.read}/>
       {domain==='overview'&&<><ReadStatus loading={data.management.loading} error={data.management.error} retry={data.management.read}/>{!data.denied&&data.management.available&&<WorkbenchManagementCapabilities value={data.management.value?.managementCapabilities??null}/>}</>}
       <div className="wb-query-presets" aria-label="预设查询">{queries.map(query=><button type="button" key={query.label} disabled={!canUseDomain} onClick={()=>{updateDraft(query.text);input.current?.focus();}}>{query.label}</button>)}</div>
@@ -357,7 +369,10 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
         const content=['ERROR','CANCELLED'].includes(run.status)?null:live?stream.text:run.content;
         const showProgress=pending&&!content&&!outputStarted.current.has(run.operationId??run.runId)&&!(stopInProgress&&run.operationId===activeTurn);
         const previousAttempts=nativeConversationPreviousAttempts(currentConversation?.runs??[],run);
-        return <article className="wb-run" key={run.runId}>{!!previousAttempts.length&&<details className="wb-retry-history"><summary>重试记录</summary>{previousAttempts.map(attempt=><p key={attempt.runId}>{nativeConversationFailureLabel(attempt)}</p>)}</details>}{run.userInput&&<UserMessage text={run.userInput} sentAt={run.sentAt}/>}{run.userInput&&(content||pending)&&<hr className="wb-message-divider"/>}{content&&<><strong>AI</strong><WorkbenchAnswer content={content} binding={run.runId} animate={pending||!!run.operationId&&animatedTurns.current.has(run.operationId)} streaming={live} onDraft={fillReplyDraft} completedTime={!pending&&run.completedAt!=null?<MessageTime value={run.completedAt}/>:null}/></>}<WorkbenchReplyProgress active={showProgress} label={replyProgressLabel(live?stream.phase:'waiting',live&&stream.finished)}/></article>;
+        const turnIds=new Set([run.operationId,run.runId,...previousAttempts.flatMap(attempt=>[attempt.operationId,attempt.runId])].filter(Boolean));
+        const feedback=feedbackRuns.filter(item=>item.logicalTurnId&&item.logicalTurnId===run.logicalTurnId||!!item.parentOperationId&&turnIds.has(item.parentOperationId));
+        const turnCards=actionCards.filter(card=>!!card.turnId&&turnIds.has(card.turnId));
+        return <article className="wb-run" key={run.runId}>{!!previousAttempts.length&&<details className="wb-retry-history"><summary>重试记录</summary>{previousAttempts.map(attempt=><p key={attempt.runId}>{nativeConversationFailureLabel(attempt)}</p>)}</details>}{run.userInput&&<UserMessage text={run.userInput} sentAt={run.sentAt}/>}{run.userInput&&(content||pending)&&<hr className="wb-message-divider"/>}{content&&<><strong>AI</strong><WorkbenchAnswer content={content} binding={run.runId} animate={pending||!!run.operationId&&animatedTurns.current.has(run.operationId)} streaming={live} onDraft={fillReplyDraft} completedTime={!pending&&run.completedAt!=null?<MessageTime value={run.completedAt}/>:null}/></>}<WorkbenchReplyProgress active={showProgress} label={replyProgressLabel(live?stream.phase:'waiting',live&&stream.finished)}/>{showCards(turnCards,'本轮处理方案')}{feedback.map(item=>{const liveFeedback=item.operationId===activeTurn&&['PENDING','RUNNING'].includes(item.status)&&currentConversation?.capabilities.canStream===true,answer=liveFeedback?stream.text:item.content;return <div key={item.runId} className="wb-operation-feedback"><strong>AI</strong>{answer&&<WorkbenchAnswer content={answer} binding={item.runId} animate={liveFeedback} streaming={liveFeedback} onDraft={fillReplyDraft} completedTime={!liveFeedback&&item.completedAt!=null?<MessageTime value={item.completedAt}/>:null}/>}<WorkbenchReplyProgress active={['PENDING','RUNNING'].includes(item.status)&&!answer} label="正在处理"/>{showCards(actionCards.filter(card=>!!item.operationId&&card.turnId===item.operationId),'本次反馈的处理方案')}</div>;})}</article>;
       })}</div>
 
       {!!currentConversation&&waitingReply&&!waitingRun&&<article className="wb-run wb-run--waiting">{!waitingReply.retryOfOperationId&&<UserMessage text={waitingReply.text}/>}{!waitingReply.retryOfOperationId&&<hr className="wb-message-divider"/>}{stream.text&&<WorkbenchAnswer content={stream.text} binding={waitingReply.operationId} animate streaming/>}<WorkbenchReplyProgress active={!stream.text&&!outputStarted.current.has(waitingReply.operationId)&&!stopInProgress} label={replyProgressLabel(stream.phase,stream.finished)}/></article>}

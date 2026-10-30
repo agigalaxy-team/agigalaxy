@@ -180,7 +180,41 @@ func (t *ConversationTools) prepareCard(ctx context.Context, bound boundConversa
 		}
 		proposal = copyObject(proposal)
 		proposal["dismissalAllowed"] = true
-		_, err = s.Pool.Exec(ctx, `INSERT INTO operations_agentos_conversation_cards_v1(id,endpoint,conversation_id,turn_id,tool_call_id,operator_id,domain,operation_id,request_digest,proposal,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'prepared',$11,$11) ON CONFLICT(endpoint,turn_id,request_digest) DO NOTHING`, uuid.NewString(), s.Endpoint, bound.row.ID, input["turnId"], bound.callID, bound.actor.ID, bound.row.Domain, operationID, digest, proposal, s.now())
+		_, err = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) {
+			turn := text(input, "turnId")
+			if e := lockCardTurn(ctx, tx, s.Endpoint, turn); e != nil {
+				return false, e
+			}
+			prior, e := readConversationCard(tx.QueryRow(ctx, query, s.Endpoint, turn, digest))
+			if e != nil {
+				return false, e
+			}
+			if prior != nil {
+				return false, nil
+			}
+			plan, e := turnPlanWithin(ctx, tx, s.Endpoint, turn)
+			if e != nil {
+				return false, e
+			}
+			ids, _ := plan["preparedCardIds"].([]any)
+			limit, _ := index(plan["proposalCount"])
+			if limit < 1 {
+				limit = 1
+			}
+			if int64(len(ids)) >= limit {
+				return false, fail("operations_agentos_proposal_limit", 409)
+			}
+			var attempted bool
+			if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations_agentos_conversation_cards_v1 WHERE endpoint=$1 AND turn_id=$2 AND result ? 'confirmationAttemptedAt')`, s.Endpoint, turn).Scan(&attempted); e != nil {
+				return false, e
+			}
+			if attempted {
+				return false, fail("operations_agentos_alternative_already_selected", 409)
+			}
+			proposal["choice"] = turnChoice(turn, plan, len(ids)+1)
+			_, e = tx.Exec(ctx, `INSERT INTO operations_agentos_conversation_cards_v1(id,endpoint,conversation_id,turn_id,tool_call_id,operator_id,domain,operation_id,request_digest,proposal,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'prepared',$11,$11) ON CONFLICT(endpoint,turn_id,request_digest) DO NOTHING`, uuid.NewString(), s.Endpoint, bound.row.ID, input["turnId"], bound.callID, bound.actor.ID, bound.row.Domain, operationID, digest, proposal, s.now())
+			return e == nil, e
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -223,8 +257,9 @@ func (t *ConversationTools) cardReadView(ctx context.Context, row *conversationC
 	}
 	s := t.Conversations
 	p := row.Proposal
+	displayNames := p["presentationNames"]
 	capability := Object{"canConfirm": false, "canDismiss": false, "reason": nil}
-	out := Object{"cardId": row.ID, "operationId": row.OperationID, "turnId": row.TurnID, "kind": p["kind"], "domain": row.Domain, "target": p["target"], "title": p["title"], "impact": p["impact"], "basis": p["basis"], "requiredAction": p["requiredAction"], "state": row.State, "result": cardPublicResult(row.Result), "checkedAt": nil, "readExpiresAt": nil, "capability": capability}
+	out := Object{"cardId": row.ID, "operationId": row.OperationID, "turnId": row.TurnID, "kind": p["kind"], "domain": row.Domain, "target": p["target"], "title": p["title"], "impact": p["impact"], "basis": p["basis"], "requiredAction": p["requiredAction"], "state": row.State, "result": cardPublicResult(row.Result), "checkedAt": nil, "readExpiresAt": nil, "capability": capability, "choice": p["choice"], "confirmationAttempted": cardAttempted(row), "feedbackEligible": cardAttempted(row) && row.Result["feedbackEnabled"] == true}
 	deadline := s.now().Unix() + 30
 	prompt := p["kind"] == "ai-work-prompt-save"
 	if row.State == "prepared" {
@@ -237,6 +272,9 @@ func (t *ConversationTools) cardReadView(ctx context.Context, row *conversationC
 			current, err = t.Prepare(ctx, actor, Conversation{ID: row.ConversationID, Domain: row.Domain}, object(p["request"]), row.OperationID)
 		}
 		if err == nil {
+			if current["presentationNames"] != nil {
+				displayNames = current["presentationNames"]
+			}
 			if sameConversationJSON(current["command"], p["command"]) && !cardAttempted(row) {
 				capability["canConfirm"] = true
 			} else {
@@ -289,6 +327,21 @@ func (t *ConversationTools) cardReadView(ctx context.Context, row *conversationC
 			delete(out, "review")
 		}
 	}
+	presentationSource := copyObject(p)
+	presentationSource["presentationNames"] = displayNames
+	for _, key := range []string{"title", "target", "impact", "basis"} {
+		presentationSource[key] = out[key]
+	}
+	out["presentation"] = cardPresentation(presentationSource)
+	// Only human-readable business projection crosses the card boundary.
+	translated := object(out["presentation"])
+	out["impact"] = []any{translated["summary"]}
+	out["basis"] = translated["details"]
+
+	if object(out["presentation"])["reviewable"] != true {
+		capability["canConfirm"] = false
+		capability["reason"] = "presentation-review-unavailable"
+	}
 	capability["canDismiss"] = row.State == "prepared" && p["dismissalAllowed"] == true && !cardAttempted(row)
 	if _, err = reader(ctx, row); err != nil {
 		return nil, err
@@ -336,6 +389,9 @@ func (t *ConversationTools) readCard(ctx context.Context, human operationspermis
 		switch state {
 		case "completed", "processing", "unknown", "not-available":
 			recovered = copyObject(recovered)
+			if row.Result["feedbackEnabled"] == true {
+				recovered["feedbackEnabled"] = true
+			}
 			recovered["state"] = state
 			if attempt, ok := row.Result["confirmationAttemptedAt"]; ok {
 				recovered["confirmationAttemptedAt"] = attempt

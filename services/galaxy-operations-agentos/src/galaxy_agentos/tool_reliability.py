@@ -15,10 +15,12 @@ from pydantic import ValidationError
 
 from .gateway import AuthorityDenied, AuthorityUnavailable, failure_diagnostic, is_internal_diagnostic, closed_failure_fact, SAFE_ARGUMENT_ERROR_CODES
 from .conversation_tool_feedback import _preparation_feedback
+from .conversation_turn_plan import ACTIVITY
 from .tool_schema_feedback import operation_schema_feedback, repair_operation_alias
 
 PREPARED_CARD_MESSAGE = "请确认操作。"
 PREPARED_CARD_IDS = "_galaxyPreparedCardIds"
+PREPARED_FINGERPRINTS = "_galaxyPreparedFingerprints"
 
 EFFECT_TOOLS = frozenset({"run_authorized_work", "execute_operation", "manage_ai_role", "manage_ai_prompt"})
 
@@ -213,6 +215,9 @@ def reliable_function(fn, *, on_read_validation_failure=None):
     def invoke(run_context: RunContext, fc: FunctionCall, **arguments):
         if set(fc.arguments or {}).intersection({"run_context", "fc", "agent", "team"}):
             raise AuthorityDenied("agentos_injected_arguments_forbidden")
+        if native.name not in {"assess_turn", "plan_turn"}:
+            if run_context.metadata is None: run_context.metadata = {}
+            run_context.metadata[ACTIVITY] = run_context.metadata.get(ACTIVITY, 0) + 1
         values = _normalize(native.name, arguments, schema)
         _event(native.name, run_context, "started", repaired=values != arguments)
         try:
@@ -228,6 +233,8 @@ def reliable_function(fn, *, on_read_validation_failure=None):
                         record_local_failure(run_context, fc, values)
                     if native.name == "prepare_operation" and isinstance(value, dict):
                         prepared = _preparation_feedback(value)
+                        if prepared["preparationFeedback"]["cardPrepared"] is None:
+                            run_context.metadata["_galaxyPrepareUnknown"] = True
                         if prepared["preparationFeedback"]["cardPrepared"] is True:
                             card_id = value["card"]["cardId"]
                             if run_context.metadata is None:
@@ -235,14 +242,13 @@ def reliable_function(fn, *, on_read_validation_failure=None):
                             ids = run_context.metadata.setdefault(PREPARED_CARD_IDS, [])
                             if card_id not in ids:
                                 ids.append(card_id)
-                            # Only this provider call gets stop/show flags. Other
-                            # calls and other runs keep their original Function.
-                            function = fc.function.model_copy()
-                            function.stop_after_tool_call = True
-                            function.show_result = True
-                            fc.function = function
+                            from .conversation_tool_batches import fingerprint
+                            key = fingerprint(fc.arguments)
+                            if key is not None:
+                                keys = run_context.metadata.setdefault(PREPARED_FINGERPRINTS, [])
+                                if key not in keys: keys.append(key)
                             _event(native.name, run_context, "prepared")
-                            return PREPARED_CARD_MESSAGE
+                            return json.dumps(prepared, ensure_ascii=False)
                     feedback, diagnostic = _model_feedback(value)
                     _event(native.name, run_context, state if isinstance(state, str) and state in {"available", "prepared", "completed", "invalid-request", "changed", "unknown", "unavailable", "processing", "denied"} else "returned", diagnostic=diagnostic)
                     if diagnostic or feedback != value:
@@ -250,6 +256,9 @@ def reliable_function(fn, *, on_read_validation_failure=None):
                     return result
                 except AuthorityUnavailable as error:
                     if native.name not in READ_TOOLS or attempt or getattr(error, "retry_read", True) is False:
+                        if native.name == "prepare_operation":
+                            run_context.metadata["_galaxyPrepareUnknown"] = True
+                            return json.dumps({"state":"unknown", "cardPrepared":None, "effectExecuted":False, "retryable":False, "nextStep":"query-original-operation"})
                         uncertain = native.name in EFFECT_TOOLS
                         _event(native.name, run_context, "unavailable", outcome="unknown" if uncertain else "not-started", diagnostic=failure_diagnostic(error))
                         return json.dumps(_closed_failure(native.name, error), ensure_ascii=False)

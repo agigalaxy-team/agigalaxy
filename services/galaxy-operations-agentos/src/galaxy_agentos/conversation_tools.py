@@ -12,6 +12,8 @@ from .conversation_references import selected_query_reference, tool_public_refer
 from .conversation_task_operations import task_operation_tool
 
 # Retain the established import surface for runtime callers and contract consumers.
+from .conversation_turn_plan import plan_turn_tool, assess_turn_tool
+from .p13_configuration import validate_configuration
 from .conversation_tool_contracts import (
     Topic,
     Reason,
@@ -389,10 +391,15 @@ def conversation_tools(gateway, *, domain=None):
         This is neither a revoke/delete nor a scan bypass or retention change.
         No business change occurs until the manager confirms the exact card.
         """
-        return send(run_context, fc, "prepare-operation",
-            _prepared_arguments(operation))
+        arguments = _prepared_arguments(operation)
+        if arguments.get("kind") == "strategy-draft":
+            failure = validate_configuration(arguments.get("configuration"))
+            if failure is not None:
+                return json.dumps(failure, ensure_ascii=False)
+        return send(run_context, fc, "prepare-operation", arguments)
 
     query_operations.__doc__ += "\nExact module views: " + "; ".join(
         name + " " + "/".join(sorted(views)) for name, views in VIEWS.items()) + "."
     return [query_operations, read_operation_object, list_authorized_work,
-        run_authorized_work, task_operation_tool(send), read_ai_delegation, prepare_operation]
+        run_authorized_work, task_operation_tool(send), read_ai_delegation,
+        plan_turn_tool(send), assess_turn_tool(), prepare_operation]

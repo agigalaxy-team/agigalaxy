@@ -1,12 +1,15 @@
 """Native Agent sessions for a current management reader, not an automation grant."""
 import asyncio
 import json
+import re
 from .conversation_retry import ConversationAgent
 from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
 from .model_gate import with_current_authority
 from .conversation_failures import with_conversation_failures
 from .conversation_tool_batches import with_conversation_tool_batches
+from .conversation_completion import with_conversation_completion
+from .conversation_turn_plan import PLAN
 from .conversation_turn_context import with_conversation_turn_context
 from .conversation_history_projection import with_conversation_history_projection
 from .tool_reliability import reliable_function, PREPARED_CARD_IDS, PREPARED_CARD_MESSAGE
@@ -36,15 +39,27 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
             turn_id=(run_context.metadata or {}).get("operationId"))), ensure_ascii=False)
 
     def authorized_run(run_context: RunContext):
-        current = gateway.authorize(run_context.user_id, operation="run")
+        current = gateway.authorize(run_context.user_id, operation="run",
+            turn_id=(run_context.metadata or {}).get("operationId"))
         if current.get("execution", {}).get("sessionId") != run_context.session_id:
             raise AuthorityDenied("agentos_conversation_context_changed")
+        if run_context.metadata is None: run_context.metadata = {}
+        plan = current.get("turnPlan")
+        if isinstance(plan, dict) and plan.get("intent") in {"answer", "prepare"} and plan.get("proposalCount") in {1, 3} and type(plan.get("alternatives")) is bool:
+            run_context.metadata[PLAN] = plan
+        receipt = current.get("receiptFeedback")
+        if isinstance(receipt, dict):
+            run_context.metadata["_galaxyReceiptFeedback"] = {key: receipt[key] for key in ("cardId", "operationId", "parentTurnId", "state", "effectExecuted", "presentation", "receipt") if key in receipt}
+        else:
+            run_context.metadata.pop("_galaxyReceiptFeedback", None)
 
     def prepared_card_response(run_context: RunContext, run_output: RunOutput):
+        (run_context.metadata or {}).pop("_galaxyReceiptFeedback", None)
         ids = (run_context.metadata or {}).get(PREPARED_CARD_IDS)
         if isinstance(ids, list) and ids:
-            run_output.content = PREPARED_CARD_MESSAGE
             run_output.metadata = {**(run_output.metadata or {}), PREPARED_CARD_IDS: list(ids)}
+        elif isinstance(run_output.content, str) and re.search(r"(?:已(?:经)?(?:为你|帮你)?(?:生成|创建|准备|制(?:作)?|形成).{0,12}卡|(?:下方|下面).{0,12}(?:确认|操作)卡)", run_output.content):
+            run_output.content = "没有生成可执行的方案。"
 
     agents = []
     conversation_db = conversation_database(db)
@@ -54,6 +69,7 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
         model = (with_current_authority(model_factory(), gateway) if model_factory is not None
             else domain_model(settings, domain, gateway))
         model = with_conversation_tool_batches(with_conversation_history_projection(with_conversation_turn_context(with_conversation_failures(model))))
+        model = with_conversation_completion(model)
         model._galaxy_usage_database = conversation_db
         binding = settings.model_bindings[1].get(domain) if model_factory is None else None
         compaction = conversation_compaction(binding, model)
@@ -62,6 +78,7 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
             pre_hooks=[authorized_run], post_hooks=[authorized_run, prepared_card_response],
             instructions=current_role_instructions(gateway, domain=domain,
                 fixed=reference_aware_instructions(["你是银河工作台的" + label + "助手，和当前管理者连续沟通。",
+                "处理业务前调用plan_turn声明本轮目标；默认一张卡，只有用户明确要求三个备选方案才声明3且alternatives=true。选择先前方案时直接按该方案处理，无需再次询问。业务工具完成后调用assess_turn，真实卡等待人工确认，制卡和模型完成均不等于业务完成。仅凭本轮真实cardId才能说卡已准备。原回执接续以原卡回执为准，不重发未知写入。",
                 "普通问候和不涉及当前业务数据的交流直接回应，不需要读取current_summary或先核验业务摘要。工具读取失败只简短说明该项实际限制，不复述内部错误码，不推断用户缺权限，也不默认要求人工改授权。",
                 "历史答复不是当前权限或数据，只以本轮真实工具结果判断，不把读取失败推断为无权。直接给运营结果，用业务名称说明来源，不罗列内部工具名、字段名、错误码、协议或“按规范”等自我解释。取数时间仅引用本轮工具的实际时间，不自行编造或沿用历史回答的时间。",
                 "用户问今天变化、待办原因、处理进展时，先使用当前摘要工具；只按真实结果回答。",
