@@ -276,6 +276,22 @@ func AllowedQuery(method, path, raw, preflightMethod string) bool {
 	if rule(get && path != "/v1/operations/audit" && !match(`^/v1/operations/users/`+id+`/audit$`, path) && path != "/v1/operations/files" && match(`^/v1/operations/(?:login|users(?:/`+id+`(?:/(?:audit|links|type-history))?)?|audit|jobs|search/failures|content/publications|community/(?:sections|reports|posts)|resources/(?:projects|methods)|files|notices|rules/(?:resource-budget|community-quota|forum-quota)/history|retention/runs)$`, path), 8192, "returnTo", "query", "after", "limit", "accountId", "resourceId", "queue", "state", "category", "kind", "processing") {
 		return true
 	}
+	conversationRoot := `(?i)^/v1/operations/agentos/conversations/(?:overview|governance|messaging|discovery|maintenance)`
+	if read && match(conversationRoot+`/history$`, path) && n <= 600 && queryKeys(q, []string{"before"}) && optionalMatch(q, "before", `^[A-Za-z0-9_-]{1,512}$`) {
+		return true
+	}
+	if read && match(conversationRoot+`/cards$`, path) && n <= 2500 && len(q) == 1 {
+		values := q["turnId"]
+		if len(values) == 0 || len(values) > 50 {
+			return false
+		}
+		for _, value := range values {
+			if !match(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, value) {
+				return false
+			}
+		}
+		return true
+	}
 	if rule(get && match(`(?i)^/v1/operations/agentos/conversations/(?:overview|governance|messaging|discovery|maintenance)/operations/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/events$`, path), 80, "after") && optionalMatch(q, "after", `^(?:0|[1-9][0-9]{0,9})$`) {
 		return true
 	}

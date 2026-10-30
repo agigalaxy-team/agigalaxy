@@ -52,6 +52,42 @@ class CompletionTest(unittest.TestCase):
             return ModelResponse(content="ready")
         model=with_conversation_completion(Model(action)); out=model.response([],run_response=SimpleNamespace(metadata={}))
         self.assertIn("尚未完成",out.content)
+    def test_three_real_cards_finish_without_assessment_or_extra_request(self):
+        ids=[str(uuid4()) for _ in range(3)]
+        for async_mode in (False, True):
+            def action(n,messages,run):
+                turn_state(run).update({PLAN:{"intent":"prepare","proposalCount":3,"alternatives":True}, ACTIVITY:3, PREPARED_CARD_IDS:ids})
+                return ModelResponse(content="三张卡等待确认。")
+            model=with_conversation_completion(Model(action)); run=SimpleNamespace(metadata={})
+            if async_mode:
+                async def collect(): return [v async for v in model.aresponse_stream([],run_response=run)]
+                result=asyncio.run(collect())
+            else: result=list(model.response_stream([],run_response=run))
+            self.assertEqual(model.calls,1); self.assertEqual([v.content for v in result if v.content],["三张卡等待确认。"]); self.assertNotIn(ASSESSMENT,turn_state(run))
+    def test_three_target_zero_or_two_real_cards_still_incomplete(self):
+        for count in (0,2):
+            def action(n,messages,run): return ModelResponse(content="未核验完成")
+            run=SimpleNamespace(metadata={}); turn_state(run).update({PLAN:{"intent":"prepare","proposalCount":3,"alternatives":True},PREPARED_CARD_IDS:[str(uuid4()) for _ in range(count)]})
+            model=with_conversation_completion(Model(action)); result=model.response([],run_response=run)
+            self.assertIn("尚未完成",result.content); self.assertEqual(model.calls,2)
+    def test_two_continuations_merge_one_system_preserve_tool_pairing(self):
+        for initial_system in (True, False):
+            assistant=Message(role="assistant",tool_calls=[{"id":"call-original","type":"function","function":{"name":"query_operations","arguments":"{}"}}])
+            tool=Message(role="tool",tool_call_id="call-original",tool_name="query_operations",content=json.dumps({"state":"available","value":0}))
+            user=Message(role="user",content="问题")
+            messages=([Message(role="system",content="原规则")] if initial_system else [])+[user,assistant,tool]
+            original=[m for m in messages if m.role!="system"]; run=SimpleNamespace(metadata={})
+            def action(n,messages,run):
+                turn_state(run)[ACTIVITY]=n
+                if n<3: messages.append(Message(role="tool",tool_call_id="synthetic-"+str(n),tool_name="query_operations",content=json.dumps({"state":"available","value":n})))
+                else: turn_state(run)[ASSESSMENT]={"activity":n,"disposition":"completed"}
+                return ModelResponse(content="最终" if n==3 else "暂未完成")
+            model=with_conversation_completion(Model(action)); self.assertEqual(model.response(messages,run_response=run).content,"最终")
+            self.assertEqual(model.calls,3); systems=[m for m in messages if m.role=="system"]; self.assertEqual(len(systems),1); self.assertEqual(messages[0].role,"system")
+            from galaxy_agentos.conversation_completion import _PROMPT
+            self.assertEqual(systems[0].content.count(_PROMPT),1)
+            self.assertEqual([m for m in messages if m in original],original); self.assertEqual(assistant.tool_calls[0]["id"],tool.tool_call_id)
+
     def test_stream_discards_prior_answers_and_no_progress_is_bounded(self):
         def action(n, messages, run):
             turn_state(run)[ACTIVITY]=1

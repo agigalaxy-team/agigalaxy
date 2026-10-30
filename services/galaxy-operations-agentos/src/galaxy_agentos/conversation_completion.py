@@ -2,6 +2,7 @@
 import hashlib
 import json
 from functools import wraps
+from uuid import UUID
 from agno.models.message import Message
 from agno.models.response import ModelResponse
 from .conversation_turn_state import turn_state, PLAN, ASSESSMENT, ACTIVITY, PREPARED_CARD_IDS
@@ -25,11 +26,19 @@ def with_conversation_completion(model):
         plan = metadata.get(PLAN) or {}
         if not activity and plan.get("intent") != "prepare": return "done"
         ids = metadata.get(PREPARED_CARD_IDS) or []
+        verified_ids = set()
+        if isinstance(ids, list):
+            for ident in ids:
+                try:
+                    if isinstance(ident, str) and str(UUID(ident)) == ident: verified_ids.add(ident)
+                except (ValueError, TypeError, AttributeError):
+                    pass
         target = 3 if plan.get("intent") == "prepare" and plan.get("proposalCount") == 3 and plan.get("alternatives") is True else 1
+        if plan.get("intent") == "prepare" and len(verified_ids) >= target: return "done"
         assessment = metadata.get(ASSESSMENT) or {}
         valid = assessment.get("activity") == activity
         disposition = assessment.get("disposition") if valid else None
-        if disposition == "awaiting-confirmation" and ids and len(ids) >= target: return "done"
+        if disposition == "awaiting-confirmation" and len(verified_ids) >= target: return "done"
         if disposition in {"needs-information", "blocked"}: return "done"
         if disposition == "completed" and plan.get("intent") != "prepare": return "done"
         return "continue"
@@ -58,7 +67,13 @@ def with_conversation_completion(model):
             current = turn_state(run)
             current[ASSESSMENT] = {"disposition":"blocked", "reason":"未取得新进展", "remaining":[], "activity":current.get(ACTIVITY, 0)}
             return False, seen, idle, -1
-        messages.append(Message(role="system", content=_PROMPT))
+        for index, message in enumerate(messages):
+            if getattr(message, "role", None) == "system" and not getattr(message, "from_history", False) and isinstance(getattr(message, "content", None), str):
+                if _PROMPT not in message.content:
+                    messages[index] = message.model_copy(update={"content": message.content + "\n\n" + _PROMPT})
+                break
+        else:
+            messages.insert(0, Message(role="system", content=_PROMPT))
         return True, seen, idle, extra + 1
     def merge(parts, value):
         tools = {}
