@@ -109,8 +109,8 @@ class ProviderRetry(unittest.TestCase):
                 self.seen = list(messages)
                 if assistant_message.content is not None:
                     raise AssertionError('failed assistant was not restored')
-                return ModelResponse(role='assistant', tool_calls=[{'id':'call__thought__opaque', 'type':'function',
-                    'function':{'name':'read_once', 'arguments':'{}'}}],
+                return ModelResponse(role='assistant', tool_calls=[{'id':'call__thought__opaque', 'type':'function', 'index':7,
+                    'provider_specific_fields':{'thought_signature':'opaque'}, 'function':{'name':'read_once', 'arguments':'{}'}}],
                     response_usage=MessageMetrics(input_tokens=17, output_tokens=5, total_tokens=22))
         calls = []
         def read_once() -> str:

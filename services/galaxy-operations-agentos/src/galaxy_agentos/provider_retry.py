@@ -123,9 +123,9 @@ def _as_stream_delta(response):
         raise ModelProviderError('agentos_malformed_recovery_invalid_response')
     calls = []
     for index, item in enumerate(response.tool_calls or []):
-        if not isinstance(item, dict) or 'index' in item:
+        if not isinstance(item, dict):
             raise ModelProviderError('agentos_malformed_recovery_invalid_tool')
-        calls.append(ChoiceDeltaToolCall(index=index, **item))
+        calls.append(ChoiceDeltaToolCall(**{**item, 'index':index}))
     return replace(response, tool_calls=calls)
 
 
