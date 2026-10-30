@@ -1,7 +1,10 @@
 """Bind native regeneration to its new attempt without appending user input."""
 import asyncio
+import inspect
 from copy import deepcopy
+from functools import wraps
 from agno.agent import Agent
+from agno.tools.function import Function
 # Agno is locked to 3.1.7. Keep its regenerate checkpoint/fork semantics in
 # this compatibility boundary, before its background wrapper saves a run or
 # builds a RunContext. The SDK otherwise saves the parent ID before forking.
@@ -18,16 +21,34 @@ _ATTEMPT_FIELDS = frozenset({"modelCalls", "modelSettingsVersion", "modelSetting
 class ConversationAgent(Agent):
     def get_tools(self, run_response, run_context, session, user_id=None):
         from .conversation_compaction import bind_run
+        loader = getattr(self, "_galaxy_authorized_run", None)
+        if loader is not None: loader(run_context)
         bind_run(run_response, run_context)
         bind_turn_state(run_response, run_context)
         return super().get_tools(run_response, run_context, session, user_id=user_id)
 
     async def aget_tools(self, run_response, run_context, session, user_id=None, check_mcp_tools=True):
         from .conversation_compaction import bind_run
+        loader = getattr(self, "_galaxy_authorized_run", None)
+        if loader is not None: await asyncio.to_thread(loader, run_context)
         bind_run(run_response, run_context)
         bind_turn_state(run_response, run_context)
-        return await super().aget_tools(run_response, run_context, session, user_id=user_id,
+        tools = await super().aget_tools(run_response, run_context, session, user_id=user_id,
             check_mcp_tools=check_mcp_tools)
+        def offload(entrypoint):
+            @wraps(entrypoint)
+            async def invoke(*args, **kwargs):
+                return await asyncio.to_thread(entrypoint, *args, **kwargs)
+            return invoke
+        result = []
+        for tool in tools:
+            entrypoint = tool.entrypoint if isinstance(tool, Function) else None
+            if (callable(entrypoint) and not inspect.iscoroutinefunction(entrypoint)
+                    and not inspect.isgeneratorfunction(entrypoint) and not inspect.isasyncgenfunction(entrypoint)):
+                tool = tool.model_copy()
+                tool.entrypoint = offload(entrypoint)
+            result.append(tool)
+        return result
 
     def _retry_source(self, run_response, options):
         metadata = options.get("metadata")

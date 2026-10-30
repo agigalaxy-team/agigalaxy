@@ -14,9 +14,12 @@ from agno.models.message import Message
 from agno.models.response import ModelResponse
 from agno.run.agent import RunInput, RunOutput
 from agno.run.base import RunContext
+from agno.tools.function import FunctionCall
 from galaxy_agentos.conversation_turn_context import with_conversation_turn_context
 from galaxy_agentos.conversation_turn_state import turn_state, RECEIPT_FEEDBACK, TASK_CONTEXT, TASK_PROGRESS
 from galaxy_agentos.conversation_retry import ConversationAgent
+from galaxy_agentos.gateway import AuthorityUnavailable
+from galaxy_agentos.tool_reliability import reliable_function
 from galaxy_agentos.model_usage import _RUN, install_usage_scope
 
 
@@ -28,6 +31,86 @@ class Model:
 
 
 class TurnContextTests(unittest.TestCase):
+    def test_native_async_tool_can_callback_same_loop_without_mutating_tool(self):
+        @dataclass
+        class Provider(NativeModel):
+            id: str = "local-tool-provider"
+            name: str = "local"
+            provider: str = "local"
+            calls: int = 0
+            observed: bool = False
+            seen: list = field(default_factory=list)
+            def invoke(self, messages, **kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    return ModelResponse(role="assistant", tool_calls=[{"id":"call-1", "type":"function", "function":{"name":"read_current", "arguments":"{}"}}])
+                self.seen = list(messages)
+                self.observed = any(m.role == "tool" and "callback-complete" in str(m.content) for m in messages)
+                return ModelResponse(role="assistant", content="done")
+            async def ainvoke(self, messages, **kwargs): return self.invoke(messages, **kwargs)
+            def invoke_stream(self, messages, **kwargs): yield self.invoke(messages, **kwargs)
+            async def ainvoke_stream(self, messages, **kwargs): yield self.invoke(messages, **kwargs)
+            def _parse_provider_response(self, response, **kwargs): return response
+            def _parse_provider_response_delta(self, response): return response
+        async def exercise():
+            loop = asyncio.get_running_loop()
+            async def callback(): return "callback-complete"
+            def read_current(run_context: RunContext, fc: FunctionCall) -> str:
+                """Read current information."""
+                return asyncio.run_coroutine_threadsafe(callback(), loop).result(timeout=2)
+            tool = reliable_function(read_current)
+            entrypoint = tool.entrypoint
+            provider = Provider()
+            agent = ConversationAgent(model=provider, tools=[tool], telemetry=False)
+            with patch("builtins.print"):
+                result = await agent.arun("查询", user_id="owner", session_id="session", metadata={"operationId":"op"})
+            self.assertEqual(result.status.value, "COMPLETED")
+            self.assertEqual(provider.calls, 2)
+            self.assertTrue(provider.observed, repr([(m.role, m.content) for m in provider.seen]))
+            self.assertIs(tool.entrypoint, entrypoint)
+        asyncio.run(exercise())
+
+    def test_mandatory_loader_reenters_async_loop_and_failure_prevents_provider(self):
+        @dataclass
+        class Provider(NativeModel):
+            id: str = "local-loader-provider"
+            name: str = "local"
+            provider: str = "local"
+            calls: int = 0
+            def invoke(self, messages, **kwargs):
+                self.calls += 1
+                return ModelResponse(role="assistant", content="done")
+            async def ainvoke(self, messages, **kwargs): return self.invoke(messages, **kwargs)
+            def invoke_stream(self, messages, **kwargs): yield self.invoke(messages, **kwargs)
+            async def ainvoke_stream(self, messages, **kwargs): yield self.invoke(messages, **kwargs)
+            def _parse_provider_response(self, response, **kwargs): return response
+            def _parse_provider_response_delta(self, response): return response
+        async def exercise():
+            loop = asyncio.get_running_loop()
+            provider = Provider()
+            agent = ConversationAgent(model=provider, telemetry=False, store_events=True)
+            callbacks = []
+            async def callback(): callbacks.append(True)
+            def loader(context):
+                asyncio.run_coroutine_threadsafe(callback(), loop).result(timeout=2)
+                turn_state(context)[TASK_CONTEXT] = {"objective":"原目标", "objectiveAvailable":True}
+            agent._galaxy_authorized_run = loader
+            result = await agent.arun("反馈", user_id="owner", session_id="session", metadata={"operationId":"op"})
+            self.assertEqual(str(result.status.value), "COMPLETED")
+            self.assertEqual((len(callbacks), provider.calls), (1, 1))
+            def unavailable(context): raise AuthorityUnavailable("agentos_authority_timeout")
+            agent._galaxy_authorized_run = unavailable
+            result = await agent.arun("反馈", user_id="owner", session_id="session", metadata={"operationId":"op2"})
+            self.assertEqual(str(result.status.value), "ERROR")
+            self.assertEqual(provider.calls, 1)
+            self.assertEqual(result.content, "agentos_authority_timeout")
+            return agent, provider
+        agent, provider = asyncio.run(exercise())
+        result = agent.run("反馈", user_id="owner", session_id="session", metadata={"operationId":"op3"})
+        self.assertEqual(str(result.status.value), "ERROR")
+        self.assertEqual(provider.calls, 1)
+        self.assertEqual(result.content, "agentos_authority_timeout")
+
     def test_native_async_prehook_binds_context_to_provider_messages(self):
         @dataclass
         class Provider(NativeModel):

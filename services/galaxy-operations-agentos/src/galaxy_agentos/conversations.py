@@ -63,6 +63,9 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
         else:
             state.pop(RECEIPT_FEEDBACK, None)
 
+    async def authorized_post_run(run_context: RunContext):
+        await asyncio.to_thread(authorized_run, run_context)
+
     def prepared_card_response(run_context: RunContext, run_output: RunOutput):
         state = turn_state(run_context)
         state.pop(RECEIPT_FEEDBACK, None)
@@ -94,9 +97,9 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
         model._galaxy_usage_database = conversation_db
         binding = settings.model_bindings[1].get(domain) if model_factory is None else None
         compaction = conversation_compaction(binding, model)
-        agents.append(ConversationAgent(id="galaxy-conversation-" + domain, name=label + "沟通", model=model,
+        agent = ConversationAgent(id="galaxy-conversation-" + domain, name=label + "沟通", model=model,
             db=conversation_db, tools=[reliable_function(fn) for fn in [current_summary, *conversation_tools(gateway, domain=domain)]],
-            pre_hooks=[authorized_run], post_hooks=[authorized_run, prepared_card_response],
+            post_hooks=[authorized_post_run, prepared_card_response],
             instructions=current_role_instructions(gateway, domain=domain,
                 fixed=reference_aware_instructions(["你是银河工作台的" + label + "助手，和当前管理者连续沟通。",
                 "处理业务前调用plan_turn声明本轮目标；默认一张卡，只有用户明确要求三个备选方案才声明3且alternatives=true。选择先前方案时直接按该方案处理，无需再次询问。业务工具完成后调用assess_turn记录任务进度；未完成继续处理，等待回执、人工或必要信息时分别说明，completed必须没有剩余工作。真实卡等待人工确认，制卡和模型完成均不等于业务完成。仅凭本轮真实cardId才能说卡已准备。原回执接续以原卡回执为准，不重发未知写入。",
@@ -130,7 +133,9 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
             compression_manager=ConversationToolCompression(compaction) if compaction else None, store_tool_messages=False,
             store_media=False, store_events=True, enable_agentic_memory=False,
             update_memory_on_run=False, metadata={"promptVersion": "galaxy-conversation-v2", "domain": domain},
-            telemetry=False, debug_mode=False))
+            telemetry=False, debug_mode=False)
+        agent._galaxy_authorized_run = authorized_run
+        agents.append(agent)
     return agents
 
 
