@@ -95,6 +95,9 @@ class TurnContextTests(unittest.TestCase):
                 asyncio.run_coroutine_threadsafe(callback(), loop).result(timeout=2)
                 turn_state(context)[TASK_CONTEXT] = {"objective":"原目标", "objectiveAvailable":True}
             agent._galaxy_authorized_run = loader
+            agent = agent.deep_copy()
+            self.assertIs(agent._galaxy_authorized_run, loader)
+            provider = agent.model
             result = await agent.arun("反馈", user_id="owner", session_id="session", metadata={"operationId":"op"})
             self.assertEqual(str(result.status.value), "COMPLETED")
             self.assertEqual((len(callbacks), provider.calls), (1, 1))

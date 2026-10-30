@@ -19,6 +19,12 @@ _ATTEMPT_FIELDS = frozenset({"modelCalls", "modelSettingsVersion", "modelSetting
     TURN_STATE, PLAN, ASSESSMENT, ACTIVITY, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK, TASK_PROGRESS, TASK_CONTEXT})
 
 class ConversationAgent(Agent):
+    def deep_copy(self, *, update=None):
+        cloned = super().deep_copy(update=update)
+        loader = getattr(self, "_galaxy_authorized_run", None)
+        if loader is not None: cloned._galaxy_authorized_run = loader
+        return cloned
+
     def get_tools(self, run_response, run_context, session, user_id=None):
         from .conversation_compaction import bind_run
         loader = getattr(self, "_galaxy_authorized_run", None)
