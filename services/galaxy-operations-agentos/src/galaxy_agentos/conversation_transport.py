@@ -1,8 +1,6 @@
 """Exact owned lookup for queued and detached native conversation runs."""
 import asyncio
-import base64
-import binascii
-import json
+import math
 import re
 from urllib.parse import parse_qs
 from uuid import UUID
@@ -35,40 +33,48 @@ def operation_read_locator(query):
         raise ValueError("agentos_query_invalid")
     return _validate_locator({key: items[0] for key, items in values.items()})
 
-def operation_batch_locators(query):
-    if len(query) > 12000: raise ValueError("agentos_query_invalid")
-    values = parse_qs(query.decode("ascii"), keep_blank_values=True)
-    if set(values) != {"requests"} or len(values["requests"]) != 1:
-        raise ValueError("agentos_query_invalid")
-    encoded = values["requests"][0]
-    if not re.fullmatch(r"[A-Za-z0-9_-]+={0,2}", encoded): raise ValueError("agentos_query_invalid")
-    try:
-        raw = base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True)
-        def unique_pairs(pairs):
-            result = {}
-            for key, value in pairs:
-                if key in result: raise ValueError("agentos_query_invalid")
-                result[key] = value
-            return result
-        entries = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_pairs)
-    except (ValueError, UnicodeError, binascii.Error):
-        raise ValueError("agentos_query_invalid") from None
-    if not isinstance(entries, list) or not 1 <= len(entries) <= 10:
-        raise ValueError("agentos_query_invalid")
-    result, seen = [], set()
-    for entry in entries:
-        if not isinstance(entry, dict) or "operationId" not in entry: raise ValueError("agentos_query_invalid")
-        operation = entry["operationId"]
-        try:
-            if not isinstance(operation, str) or str(UUID(operation)) != operation or operation in seen: raise ValueError()
-        except (ValueError, TypeError, AttributeError):
-            raise ValueError("agentos_query_invalid") from None
-        seen.add(operation)
-        result.append((operation, _validate_locator({key:value for key,value in entry.items() if key != "operationId"})))
-    return result
 
 
 def install_conversation_transport_read(app, runtime, run_view):
+    @app.get("/galaxy/conversations/{ident}/history")
+    async def conversation_text_history(ident: str, request: Request):
+        row = dict(request.state.galaxy_execution)
+        user_id = request.state.galaxy_user_id
+        ids = parse_qs(request.scope.get("query_string", b"").decode("ascii"), keep_blank_values=True)["runId"]
+        return await asyncio.to_thread(read_history, ident, row, user_id, ids)
+
+    def read_history(ident, row, user_id, ids):
+        table = runtime["db"]._get_table(table_type="runs", create_table_if_not_found=False)
+        if table is None: return {"conversationId":ident, "sessionId":row["sessionId"], "items":[]}
+        data = table.c.run_data
+        statement = select(table.c.run_id, table.c.status, data["input"]["input_content"].label("user_input"),
+            data["content"].label("content"), data["created_at"].label("created"),
+            data["events"].label("events"), data["messages"].label("messages")).where(
+                table.c.run_id.in_(ids), table.c.user_id == user_id, table.c.session_id == row["sessionId"],
+                table.c.agent_id == "galaxy-conversation-" + row["domain"])
+        with runtime["db"].Session() as session:
+            rows = session.execute(statement).fetchall()
+        def timestamp(value):
+            return value if type(value) in {int, float} and math.isfinite(value) and 0 <= value <= 9007199254740991 else None
+        items = []
+        for record in rows:
+            record = record._mapping
+            status = str(record["status"] or "").upper()
+            user_input = record["user_input"] if isinstance(record["user_input"], str) else None
+            content = record["content"] if isinstance(record["content"], str) and status != "ERROR" else None
+            if content is None and status == "COMPLETED" and isinstance(record["messages"], list):
+                for message in reversed(record["messages"]):
+                    if isinstance(message, dict) and message.get("role") == "assistant" and not message.get("tool_calls") and isinstance(message.get("content"), str):
+                        content = message["content"]; break
+            if not user_input and not content: continue
+            completed_at = None
+            for event in record["events"] if isinstance(record["events"], list) else []:
+                if (isinstance(event, dict) and event.get("event") == "RunCompleted" and event.get("run_id") == record["run_id"]):
+                    completed_at = timestamp(event.get("created_at")) or completed_at
+            items.append({"runId":record["run_id"], "userInput":user_input, "content":content,
+                "createdAt":timestamp(record["created"]), "completedAt":completed_at})
+        return {"conversationId":ident, "sessionId":row["sessionId"], "items":items}
+
     @app.get("/galaxy/conversations/{ident}/operations/{operation_id}")
     async def original_conversation_run(ident: str, operation_id: str, request: Request):
         # HTTP authority and SQLAlchemy are synchronous. Keep the whole owned
@@ -76,29 +82,6 @@ def install_conversation_transport_read(app, runtime, run_view):
         return await asyncio.to_thread(read_original, ident, operation_id,
             dict(request.state.galaxy_execution), request.state.galaxy_user_id,
             request.scope.get("query_string", b""))
-
-    @app.get("/galaxy/conversations/{ident}/operations")
-    async def original_conversation_runs(ident: str, request: Request):
-        return await asyncio.to_thread(read_batch, ident, dict(request.state.galaxy_execution),
-            request.state.galaxy_user_id, request.scope.get("query_string", b""))
-
-    def read_batch(ident, row, user_id, query):
-        if row.get("mode") != "conversation" or row["id"] != ident:
-            raise AuthorityDenied()
-        try:
-            locators = operation_batch_locators(query)
-        except (ValueError, UnicodeError):
-            return JSONResponse({"error":"agentos_query_invalid"}, status_code=400)
-        # The middleware has performed the current authority check before
-        # assigning row/user_id. Recheck once after every owned lookup.
-        items = [read_original_core(ident, operation_id, row, user_id, locator)
-            for operation_id, locator in locators]
-        current = runtime["gateway"].authorize(user_id, operation="read")
-        if current.get("execution", {}).get("sessionId") != row["sessionId"]:
-            raise AuthorityDenied()
-        for item in items: item["readExpiresAt"] = current.get("readExpiresAt")
-        return {"conversationId":ident, "sessionId":row["sessionId"], "items":items,
-            "readExpiresAt":current.get("readExpiresAt")}
 
     def read_original(ident, operation_id, row, user_id, query):
         if row.get("mode") != "conversation" or row["id"] != ident:

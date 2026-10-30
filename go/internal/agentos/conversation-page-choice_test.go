@@ -2,7 +2,6 @@ package agentos
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -47,28 +46,18 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 	insert(feedback, f.Now().Add(9*time.Second), Object{"runId": feedback, "origin": "operation-feedback", "parentOperationId": roots[0]})
 	native := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
-		if id == "operations" {
-			raw, e := base64.RawURLEncoding.DecodeString(r.URL.Query().Get("requests"))
-			if e != nil {
-				t.Error(e)
-				http.Error(w, "invalid", 400)
-				return
-			}
-			var requests []ConversationOperationRequest
-			if e = json.Unmarshal(raw, &requests); e != nil {
-				t.Error(e)
-				http.Error(w, "invalid", 400)
+		if id == "history" {
+			claims, valid := verifyFixtureToken(strings.Repeat("s", 32), strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+			if !valid || claims["scope"] != "history-text" || claims["sid"] != conversation.SessionID || claims["domain"] != "overview" || claims["sub"] != "conversation:"+conversation.ID {
+				t.Error("history token lost its scope/session/owner binding")
+				http.Error(w, "denied", 403)
 				return
 			}
 			items := []Object{}
-			for _, request := range requests {
-				run := Object{"runId": request.OperationID, "operationId": request.OperationID, "status": "COMPLETED", "content": "已读", "userInput": "请求", "createdAt": f.Now().Unix(), "events": []any{}}
-				if request.OperationID == retry {
-					run["regeneratedFrom"] = roots[0]
-				}
-				items = append(items, Object{"operationId": request.OperationID, "runId": request.OperationID, "state": "COMPLETED", "native": run})
+			for _, runID := range r.URL.Query()["runId"] {
+				items = append(items, Object{"runId": runID, "userInput": "请求", "content": "已读", "createdAt": f.Now().Unix(), "completedAt": f.Now().Unix()})
 			}
-			_ = json.NewEncoder(w).Encode(Object{"conversationId": conversation.ID, "sessionId": conversation.SessionID, "items": items, "readExpiresAt": f.Now().Unix() + 30})
+			_ = json.NewEncoder(w).Encode(Object{"conversationId": conversation.ID, "sessionId": conversation.SessionID, "items": items})
 			return
 		}
 		if !validOperationID(id) {
@@ -87,6 +76,12 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var sourceChecks, runSyncs int
+	s.ValidateSources = func(context.Context, Conversation, operationspermissions.Actor) (SourceQualification, error) {
+		sourceChecks++
+		return SourceQualification{}, fail("synthetic_source_unavailable", 503)
+	}
+	s.SyncWorkbenchRuns = func(context.Context, Conversation, []Object) error { runSyncs++; return nil }
 	page, err := s.ReadHistoryPage(ctx, f.Root, "overview", "")
 	if err != nil {
 		t.Fatal(err)
@@ -102,10 +97,19 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 		t.Fatal("retries and feedback must stay with older root", page)
 	}
 	for _, r := range page["runs"].([]Object) {
-		if r["operationId"] == feedback && (r["origin"] != "operation-feedback" || r["logicalTurnId"] != roots[0]) {
-			t.Fatal("feedback lineage lost", r)
+		if r["displayOnly"] != true || r["taskProgress"] != nil || r["status"] != nil {
+			t.Fatal("history exposed control data", r)
+		}
+		if r["operationId"] == feedback && r["userInput"] != nil {
+			t.Fatal("server continuation became a user message", r)
 		}
 	}
+
+	if sourceChecks != 0 || runSyncs != 0 {
+		t.Fatal("pure history consulted sources or synchronized execution", sourceChecks, runSyncs)
+	}
+	s.ValidateSources = nil
+	s.SyncWorkbenchRuns = nil
 	tools := &ConversationTools{Conversations: s, CardReadPermission: func(string) (string, error) { return "workbench.read", nil }}
 	s.Tools = tools
 	tools.Prepare = func(_ context.Context, _ operationspermissions.Actor, _ Conversation, args Object, _ string) (Object, error) {

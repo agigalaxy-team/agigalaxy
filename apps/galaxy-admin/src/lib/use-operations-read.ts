@@ -14,7 +14,7 @@ function expiresAt(value:unknown,checkedAt:number|null){
   if(value&&typeof value==='object'&&'readExpiresAt' in value&&typeof value.readExpiresAt==='number'&&Number.isFinite(value.readExpiresAt))return value.readExpiresAt*1000;
   return checkedAt===null?0:checkedAt+30000;
 }
-const conversationReadPath=/^\/v1\/operations\/agentos\/conversations\/(overview|governance|messaging|discovery|maintenance)(?:\/history)?$/;
+const conversationReadPath=/^\/v1\/operations\/agentos\/conversations\/(overview|governance|messaging|discovery|maintenance)$/;
 const readRetryDelays=[1000,3000] as const;
 function waitForReadRetry(delay:number,signal:AbortSignal):Promise<void>{
   return new Promise((resolve,reject)=>{
@@ -24,7 +24,7 @@ function waitForReadRetry(delay:number,signal:AbortSignal):Promise<void>{
     signal.addEventListener('abort',abort,{once:true});
   });
 }
-export function useOperationsRead<T>({path,initial=null,initialError='',failureMessage,clearOnOffline=false,retryUnavailable=false,renewBeforeMs,invalidateMode='automatic'}:{path:string|null;initial?:T|null;initialError?:string;failureMessage:string;clearOnOffline?:boolean;retryUnavailable?:boolean;renewBeforeMs?:number;invalidateMode?:'automatic'|'external'}){
+export function useOperationsRead<T>({path,initial=null,initialError='',failureMessage,clearOnOffline=false,retryUnavailable=false,renewBeforeMs,invalidateMode='automatic',resumeOnReconnect=true}:{path:string|null;initial?:T|null;initialError?:string;failureMessage:string;clearOnOffline?:boolean;retryUnavailable?:boolean;renewBeforeMs?:number;invalidateMode?:'automatic'|'external';resumeOnReconnect?:boolean}){
   // Hydration must render the exact server snapshot, even when downloading JS
   // outlives its lease. Only the mounted client can validate or renew that lease.
   const ready=useClientReady();
@@ -151,15 +151,15 @@ export function useOperationsRead<T>({path,initial=null,initialError='',failureM
   },[logoutPending,clear]);
   useEffect(()=>{
     if(!path||logoutPending)return;
-    const offline=()=>{generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState(previous=>({...previous,path,value:previous.path===path?previous.value:null,loading:false,refreshing:false,error:'网络已断开，恢复后可继续读取。'}));};
+    const offline=()=>{if(!resumeOnReconnect)return;generation.current++;active.current?.abort();active.current=null;inFlight.current=null;setState(previous=>({...previous,path,value:previous.path===path?previous.value:null,loading:false,refreshing:false,error:'网络已断开，恢复后可继续读取。'}));};
     const snapshot=latestState.current;
     const initialFresh=snapshot.path===path&&snapshot.value!==null&&(!clearOnOffline||expiresAt(snapshot.value,snapshot.checkedAt)>Date.now());
     const freshAfterFailure=resumeFresh.current;resumeFresh.current=false;
     if(!navigator.onLine)offline();else if((freshAfterFailure||!initialFresh)&&document.visibilityState==='visible')void performRead(true);
-    const resume=()=>{const current=latestState.current;if(document.visibilityState==='visible'&&navigator.onLine&&(current.error||current.value===null||clearOnOffline&&expiresAt(current.value,current.checkedAt)<=Date.now()))void renew();};
+    const resume=()=>{if(!resumeOnReconnect)return;const current=latestState.current;if(document.visibilityState==='visible'&&navigator.onLine&&(current.error||current.value===null||clearOnOffline&&expiresAt(current.value,current.checkedAt)<=Date.now()))void renew();};
     window.addEventListener('offline',offline);window.addEventListener('online',resume);document.addEventListener('visibilitychange',resume);
     return()=>{window.removeEventListener('offline',offline);window.removeEventListener('online',resume);document.removeEventListener('visibilitychange',resume);};
-  },[path,initial,read,performRead,renew,clearOnOffline,clear,logoutPending]);
+  },[path,initial,read,performRead,renew,clearOnOffline,clear,logoutPending,resumeOnReconnect]);
   useEffect(()=>{
     if(!ready||logoutPending||!clearOnOffline||state.value===null||state.checkedAt===null)return;
     // A read lease expiring makes actions wait for validation; it does not

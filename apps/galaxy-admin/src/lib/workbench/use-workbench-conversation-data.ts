@@ -7,7 +7,7 @@ import {applyConversationReceipt} from './conversation-turns';
 import {agentOsConversationOperationPath,agentOsConversationPath,type AgentOsCommand,type AgentOsConversation,type AgentOsDomain,type AgentOsNativeRun} from './agentos-client';
 import type {AiManagementCapabilities} from './ai-management-capabilities';
 
-export type WorkbenchHistory={domain:AgentOsDomain;conversationId:string|null;runs:AgentOsNativeRun[];hasMore?:boolean;nextCursor?:string|null;contextChanged:boolean;checkedAt:number;readExpiresAt:number};
+export type WorkbenchHistory={domain:AgentOsDomain;conversationId:string|null;runs:AgentOsNativeRun[];hasMore?:boolean;nextCursor?:string|null;contextChanged:boolean;checkedAt:number;readExpiresAt?:number};
 export type WorkbenchContext=Omit<AgentOsConversation,'runs'|'managementCapabilities'>&{conversationId:string|null;contextChanged:boolean;latestOperation?:{operationId:string;runId:string|null;state:string;knownNativeStatus?:string|null;requiresOriginalLookup:boolean}|null};
 export type WorkbenchCards={domain:AgentOsDomain;items:unknown[];checkedAt:number;readExpiresAt:number};
 export type WorkbenchManagement={domain:AgentOsDomain;managementCapabilities:AiManagementCapabilities|null;checkedAt:number;readExpiresAt:number};
@@ -29,7 +29,7 @@ function mergeHistoryRuns(...lists:readonly AgentOsNativeRun[][]){
 // own operation so an in-flight snapshot cannot replace a newer turn.
 export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolean,sessionKey:string|null=null){
  const base=enabled?agentOsConversationPath(domain):null;
- const history=useOperationsRead<WorkbenchHistory>({path:base?base+'/history':null,failureMessage:'历史加载失败',clearOnOffline:true,retryUnavailable:true,renewBeforeMs:20000,invalidateMode:'external'});
+ const history=useOperationsRead<WorkbenchHistory>({path:base?base+'/history':null,failureMessage:'历史加载失败',invalidateMode:'external',resumeOnReconnect:false});
  const cards=useOperationsRead<WorkbenchCards>({path:base?base+'/cards':null,failureMessage:'操作记录加载失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
  const context=useOperationsRead<WorkbenchContext>({path:base?base+'/context':null,failureMessage:'连接失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
  const management=useOperationsRead<WorkbenchManagement>({path:base&&domain==='overview'?base+'/management-capabilities':null,failureMessage:'管理权限加载失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
@@ -66,10 +66,11 @@ export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolea
   try{const page=await operationsRequest<WorkbenchHistory>(base+'/history?'+new URLSearchParams({before:cursor}));
    if(epoch!==pageEpoch.current||page.domain!==domain||page.conversationId!==conversationId||page.contextChanged)return false;
    setOlder(previous=>{const unique=new Map<string,AgentOsNativeRun>();for(const run of [...page.runs,...(previous?.domain===domain&&previous.sessionKey===sessionKey&&previous.conversationId===conversationId?previous.runs:[])])unique.set(run.runId,run);return {domain,sessionKey,conversationId,runs:[...unique.values()],hasMore:page.hasMore===true,nextCursor:page.nextCursor??null};});return true;
-  }catch(error){if(epoch===pageEpoch.current){if(error instanceof OperationsRequestError&&[401,403].includes(error.status)){history.clear(error.status);context.clear(error.status);cards.clear(error.status);}else setMoreError('更早的历史暂时无法读取，请重试。');}return false;
+  }catch(error){if(epoch===pageEpoch.current){if(error instanceof OperationsRequestError&&[401,403].includes(error.status)){history.clear(error.status);context.clear(error.status);cards.clear(error.status);}else setMoreError('历史加载失败');}return false;
   }finally{if(epoch===pageEpoch.current){moreFlight.current=false;setMoreLoading(false);}}
  },[base,domain,sessionKey,historyValue,frontier,history.clear,context.clear,cards.clear]);
- const cardTurnIds=[...historyRuns.flatMap(run=>run.operationId?[run.operationId]:[]),...Object.keys(receipts[domain]??{})].join(',');
+ // Historical text never starts card, receipt or recovery reads.
+ const cardTurnIds=Object.keys(receipts[domain]??{}).join(',');
  useEffect(()=>{
   if(!base||!historyValue||!cardTurnIds)return;
   const epoch=pageEpoch.current,conversationId=historyValue.conversationId,ids=[...new Set(cardTurnIds.split(','))];let alive=true;setPageCardsLoading(true);

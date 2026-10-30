@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"sync"
 	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
@@ -48,23 +47,28 @@ const conversationHistoryTree = `WITH RECURSIVE owned AS (
  WHERE NOT c.id=ANY(t.path)
 ) `
 
+// ReadHistoryPage displays already stored dialogue text. It does not read
+// original operations, adjudicate business sources, or recover receipts.
 func (s *Conversations) ReadHistoryPage(ctx context.Context, human operationspermissions.Actor, domain, rawCursor string) (Object, error) {
 	if !validConversationDomain(domain) {
 		return nil, fail("invalid_operations_agentos_request", 400)
 	}
-	before, err := s.readSession(ctx, human, domain)
+	current, err := s.readSession(ctx, human, domain)
 	if err != nil {
 		return nil, err
 	}
 	runs := []Object{}
 	var next any
 	hasMore := false
-	deadline := before.ReadExpiresAt
-	if before.Row != nil {
+	if current.Row == nil {
+		if rawCursor != "" {
+			return nil, fail("operations_agentos_context_changed", 409)
+		}
+	} else {
 		if s.Client == nil {
 			return nil, fail("operations_agentos_not_configured", 503)
 		}
-		row := *before.Row
+		row := *current.Row
 		cursor, e := parseHistoryCursor(rawCursor, row.ID)
 		if e != nil {
 			return nil, e
@@ -73,7 +77,6 @@ func (s *Conversations) ReadHistoryPage(ctx context.Context, human operationsper
 		if e != nil {
 			return nil, e
 		}
-		ids := []string{}
 		roots := []conversationHistoryCursor{}
 		for rows.Next() {
 			var root conversationHistoryCursor
@@ -93,6 +96,7 @@ func (s *Conversations) ReadHistoryPage(ctx context.Context, human operationsper
 		if hasMore {
 			roots = roots[:5]
 		}
+		ids := []string{}
 		for _, root := range roots {
 			ids = append(ids, root.ID)
 		}
@@ -100,32 +104,35 @@ func (s *Conversations) ReadHistoryPage(ctx context.Context, human operationsper
 			bytes, _ := json.Marshal(roots[len(roots)-1])
 			next = base64.RawURLEncoding.EncodeToString(bytes)
 		}
-		type historyItem struct {
-			id, root       string
-			origin, parent *string
-			command        conversationCommand
-			locator        ConversationOperationLocator
-			known          string
+		type textRow struct {
+			operation, runID string
+			origin           *string
+			sentAt           time.Time
 		}
-		items := []historyItem{}
+		selected := []textRow{}
+		runIDs := []string{}
+		seen := map[string]bool{}
 		if len(ids) > 0 {
-			rows, e = s.Pool.Query(ctx, conversationHistoryTree+`SELECT t.id::text,t.root_id::text,t.result->>'origin',t.result->>'parentOperationId',c.message_digest,c.state,c.native_run_id,c.result,c.created_at FROM tree t JOIN operations_agentos_conversation_commands_v1 c ON c.endpoint=$1 AND c.conversation_id=$2 AND c.operator_id=$3 AND c.id=t.id WHERE t.root_id=ANY($4::uuid[]) ORDER BY t.root_at,t.root_id,t.created_at,t.id`, s.Endpoint, row.ID, human.ID, ids)
+			rows, e = s.Pool.Query(ctx, conversationHistoryTree+`SELECT t.id::text,t.result->>'origin',t.created_at,COALESCE(c.native_run_id,c.result->>'runId') FROM tree t JOIN operations_agentos_conversation_commands_v1 c ON c.endpoint=$1 AND c.conversation_id=$2 AND c.operator_id=$3 AND c.id=t.id WHERE t.root_id=ANY($4::uuid[]) ORDER BY t.root_at,t.root_id,t.created_at,t.id`, s.Endpoint, row.ID, human.ID, ids)
 			if e != nil {
 				return nil, e
 			}
 			for rows.Next() {
-				var item historyItem
-				if e = rows.Scan(&item.id, &item.root, &item.origin, &item.parent, &item.command.Digest, &item.command.State, &item.command.NativeRunID, &item.command.Result, &item.command.CreatedAt); e != nil {
+				var item textRow
+				var native *string
+				if e = rows.Scan(&item.operation, &item.origin, &item.sentAt, &native); e != nil {
 					rows.Close()
 					return nil, e
 				}
-				item.command.ID, item.command.ConversationID, item.command.OperatorID, item.command.Domain = item.id, row.ID, human.ID, row.Domain
-				item.locator, item.known, e = conversationOriginalLocator(row, &item.command)
-				if e != nil {
-					rows.Close()
-					return nil, e
+				if native == nil || !nativeRunID.MatchString(*native) {
+					continue
 				}
-				items = append(items, item)
+				item.runID = *native
+				selected = append(selected, item)
+				if !seen[item.runID] {
+					seen[item.runID] = true
+					runIDs = append(runIDs, item.runID)
+				}
 			}
 			e = rows.Err()
 			rows.Close()
@@ -133,107 +140,59 @@ func (s *Conversations) ReadHistoryPage(ctx context.Context, human operationsper
 				return nil, e
 			}
 		}
-		values := make([]Object, len(items))
-		batchCount := (len(items) + 9) / 10
-		failures, expiries := make([]error, batchCount), make([]int64, batchCount)
-		jobs := make(chan int)
-		var workers sync.WaitGroup
-		for range min(4, batchCount) {
-			workers.Add(1)
-			go func() {
-				defer workers.Done()
-				for batch := range jobs {
-					start, end := batch*10, min((batch+1)*10, len(items))
-					requests := make([]ConversationOperationRequest, 0, end-start)
-					for _, item := range items[start:end] {
-						requests = append(requests, ConversationOperationRequest{OperationID: item.id, RunID: item.locator.RunID, RetryOfOperationID: item.locator.RetryOfOperationID, RetryOfRunID: item.locator.RetryOfRunID})
-					}
-					response, e := s.Client.ReadConversationOperations(ctx, row.Execution(), requests)
-					if e != nil {
-						failures[batch] = e
-						continue
-					}
-					body := object(response)
-					entries, ok := body["items"].([]any)
-					expiry, expiryOK := index(body["readExpiresAt"])
-					if body["conversationId"] != row.ID || body["sessionId"] != row.SessionID || !ok || len(entries) != len(requests) || !expiryOK || expiry <= s.now().Unix() {
-						failures[batch] = streamInvalid()
-						continue
-					}
-					byID := map[string]Object{}
-					for _, entry := range entries {
-						original := object(entry)
-						id := text(original, "operationId")
-						if original == nil || !validOperationID(id) || byID[id] != nil || (original["conversationId"] != nil && original["conversationId"] != row.ID) || (original["sessionId"] != nil && original["sessionId"] != row.SessionID) {
-							failures[batch] = streamInvalid()
-							break
-						}
-						byID[id] = original
-					}
-					if failures[batch] != nil {
-						continue
-					}
-					expiries[batch] = expiry
-					for i := start; i < end; i++ {
-						item := items[i]
-						original := byID[item.id]
-						if original == nil {
-							failures[batch] = streamInvalid()
-							break
-						}
-						original = copyObject(original)
-						original["conversationId"], original["sessionId"] = row.ID, row.SessionID
-						value, e := validateConversationOriginal(row, &item.command, item.locator, item.known, original)
-						if e != nil {
-							failures[batch] = e
-							break
-						}
-						if value == nil {
-							value = Object{"operationId": item.id, "runId": item.id, "status": "unknown", "content": nil, "userInput": nil, "events": []any{}}
-						}
-						value = copyObject(value)
-						value["operationId"], value["logicalTurnId"], value["origin"], value["parentOperationId"] = item.id, item.root, "user", nil
-						if item.origin != nil && *item.origin == "operation-feedback" {
-							value["origin"], value["parentOperationId"] = "operation-feedback", item.parent
-						}
-						values[i] = value
-					}
-				}
-			}()
-		}
-		for i := 0; i < batchCount; i++ {
-			jobs <- i
-		}
-		close(jobs)
-		workers.Wait()
-		for i, e := range failures {
+		texts := map[string]Object{}
+		for start := 0; start < len(runIDs); start += 50 {
+			end := min(start+50, len(runIDs))
+			response, e := s.Client.ReadConversationText(ctx, row.Execution(), runIDs[start:end])
 			if e != nil {
 				return nil, e
 			}
-			if expiries[i] < deadline || deadline == 0 {
-				deadline = expiries[i]
+			body := object(response)
+			items, ok := body["items"].([]any)
+			if body["conversationId"] != row.ID || body["sessionId"] != row.SessionID || !ok {
+				return nil, streamInvalid()
+			}
+			allowed := map[string]bool{}
+			for _, id := range runIDs[start:end] {
+				allowed[id] = true
+			}
+			for _, v := range items {
+				textItem := object(v)
+				id := text(textItem, "runId")
+				if textItem == nil || !allowed[id] || texts[id] != nil {
+					return nil, streamInvalid()
+				}
+				for _, key := range []string{"userInput", "content"} {
+					if value := textItem[key]; value != nil {
+						if _, valid := value.(string); !valid {
+							return nil, streamInvalid()
+						}
+					}
+				}
+				for _, key := range []string{"createdAt", "completedAt"} {
+					if value := textItem[key]; value != nil {
+						if _, valid := index(value); !valid {
+							return nil, streamInvalid()
+						}
+					}
+				}
+				texts[id] = textItem
 			}
 		}
-		runs, err = s.decorateRuns(ctx, row, values)
-		if err != nil {
-			return nil, err
-		}
-		if s.SyncWorkbenchRuns != nil {
-			if err = s.SyncWorkbenchRuns(ctx, row, runs); err != nil {
-				return nil, err
+		for _, item := range selected {
+			value := texts[item.runID]
+			if value == nil {
+				continue
 			}
+			input := value["userInput"]
+			if item.origin != nil && *item.origin == "operation-feedback" {
+				input = nil
+			}
+			runs = append(runs, Object{"runId": item.runID, "operationId": item.operation, "userInput": input, "content": value["content"], "createdAt": value["createdAt"], "sentAt": item.sentAt.Unix(), "completedAt": value["completedAt"], "displayOnly": true})
 		}
-	} else if rawCursor != "" {
-		return nil, fail("operations_agentos_context_changed", 409)
 	}
-	current, err := s.finishConversationRead(ctx, human, domain, before)
-	if err != nil {
-		return nil, err
-	}
-	if deadline == 0 || current.ReadExpiresAt < deadline {
-		deadline = current.ReadExpiresAt
-	}
-	return Object{"domain": domain, "conversationId": readConversationID(current), "runs": runs, "hasMore": hasMore, "nextCursor": next, "contextChanged": current.ContextChanged, "checkedAt": s.now().Unix(), "readExpiresAt": deadline}, nil
+	at := s.now().Unix()
+	return Object{"domain": domain, "conversationId": readConversationID(current), "runs": runs, "hasMore": hasMore, "nextCursor": next, "contextChanged": false, "checkedAt": at}, nil
 }
 
 func nullableCursorTime(c conversationHistoryCursor) any {

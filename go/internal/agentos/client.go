@@ -5,8 +5,6 @@ package agentos
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -92,6 +90,30 @@ func (c *Client) token(execution Execution) (string, error) {
 	}{prefix + execution.ID, "galaxy-operations", "galaxy-agentos", at, at + 60, uuid.NewString()}
 	return c.signToken(claims)
 }
+
+// The history-text token is scoped to one server-selected conversation and
+// cannot authorize a native execution or an original-operation lookup.
+func (c *Client) historyTextToken(execution Execution) (string, error) {
+	if !c.Configured() {
+		return "", fail("operations_agentos_not_configured", 503)
+	}
+	if execution.Mode != "conversation" || !validOperationID(execution.ID) || !validOperationID(execution.SessionID) || !validConversationDomain(execution.Domain) {
+		return "", fail("invalid_operations_agentos_request", 400)
+	}
+	at := c.now().Unix()
+	claims := struct {
+		Sub    string `json:"sub"`
+		Iss    string `json:"iss"`
+		Aud    string `json:"aud"`
+		Iat    int64  `json:"iat"`
+		Exp    int64  `json:"exp"`
+		JTI    string `json:"jti"`
+		Scope  string `json:"scope"`
+		SID    string `json:"sid"`
+		Domain string `json:"domain"`
+	}{"conversation:" + execution.ID, "galaxy-operations", "galaxy-agentos", at, at + 60, uuid.NewString(), "history-text", execution.SessionID, execution.Domain}
+	return c.signToken(claims)
+}
 func decodeResponse(response *http.Response) (any, error) {
 	// Fetch text limits UTF-16 code units, rather than UTF-8 bytes. Three bytes
 	// per code unit bounds the read without rejecting valid Chinese responses.
@@ -115,6 +137,9 @@ func (c *Client) request(ctx context.Context, execution Execution, path string, 
 	if e != nil {
 		return nil, e
 	}
+	return c.requestToken(ctx, token, path, form, key)
+}
+func (c *Client) requestToken(ctx context.Context, token, path string, form url.Values, key string) (any, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	method := http.MethodGet
@@ -262,33 +287,25 @@ func (c *Client) ReadConversationOperation(ctx context.Context, e Execution, id 
 	return c.request(ctx, e, path, nil, "")
 }
 
-// ConversationOperationRequest carries only server-owned original-operation
-// locators. Unknown run IDs are omitted so the native original lookup can
-// resolve the existing ticket or metadata without scanning conversation history.
-type ConversationOperationRequest struct {
-	OperationID        string `json:"operationId"`
-	RunID              string `json:"runId,omitempty"`
-	RetryOfOperationID string `json:"retryOfOperationId,omitempty"`
-	RetryOfRunID       string `json:"retryOfRunId,omitempty"`
-}
-
-func (c *Client) ReadConversationOperations(ctx context.Context, e Execution, requests []ConversationOperationRequest) (any, error) {
-	if len(requests) == 0 || len(requests) > 10 {
+// ReadConversationText obtains only previously selected native text records.
+func (c *Client) ReadConversationText(ctx context.Context, e Execution, runIDs []string) (any, error) {
+	if len(runIDs) == 0 || len(runIDs) > 50 {
 		return nil, fail("invalid_operations_agentos_request", 400)
 	}
+	q := url.Values{}
 	seen := map[string]bool{}
-	for _, r := range requests {
-		if !validOperationID(r.OperationID) || seen[r.OperationID] || r.RunID != "" && !nativeRunID.MatchString(r.RunID) || (r.RetryOfOperationID == "") != (r.RetryOfRunID == "") || r.RetryOfOperationID != "" && (!validOperationID(r.RetryOfOperationID) || r.RetryOfOperationID == r.OperationID || !nativeRunID.MatchString(r.RetryOfRunID)) {
-			return nil, streamInvalid()
+	for _, id := range runIDs {
+		if !nativeRunID.MatchString(id) || seen[id] {
+			return nil, fail("invalid_operations_agentos_request", 400)
 		}
-		seen[r.OperationID] = true
+		seen[id] = true
+		q.Add("runId", id)
 	}
-	raw, err := json.Marshal(requests)
+	token, err := c.historyTextToken(e)
 	if err != nil {
-		return nil, fail("invalid_operations_agentos_request", 400)
+		return nil, err
 	}
-	query := url.Values{"requests": {base64.RawURLEncoding.EncodeToString(raw)}}
-	return c.request(ctx, e, "/galaxy/conversations/"+url.PathEscape(e.ID)+"/operations?"+query.Encode(), nil, "")
+	return c.requestToken(ctx, token, "/galaxy/conversations/"+url.PathEscape(e.ID)+"/history?"+q.Encode(), nil, "")
 }
 func (c *Client) CancelConversation(ctx context.Context, e Execution, id string) (any, error) {
 	return c.request(ctx, e, "/agents/galaxy-conversation-"+url.PathEscape(e.Domain)+"/runs/"+url.PathEscape(id)+"/cancel?"+url.Values{"session_id": {e.SessionID}}.Encode(), url.Values{}, "")

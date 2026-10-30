@@ -3,6 +3,7 @@ import asyncio
 import json
 import re
 import hmac
+from uuid import UUID
 from urllib.parse import parse_qs
 
 import jwt
@@ -12,7 +13,7 @@ from .gateway import AuthorityDenied, AuthorityUnavailable, execution_id, conver
 from .conversation_references import user_public_references
 from .model_settings import model_settings_view, configured_domains
 from .p13_strategies import p13_health
-from .conversation_transport import operation_read_locator, operation_batch_locators
+from .conversation_transport import operation_read_locator
 
 
 class PrivateSurface:
@@ -30,6 +31,36 @@ class PrivateSurface:
                 return await self.app(scope, receive, send)
             return
         path, method = scope["path"], scope["method"]
+        # Dedicated history capability: no gateway calls or business source
+        # checks. A valid scoped token is unusable on every other surface.
+        bearer = [v.decode() for k, v in scope.get("headers", []) if k.lower() == b"authorization"]
+        if len(bearer) == 1 and bearer[0].startswith("Bearer "):
+            try:
+                history_claims = jwt.decode(bearer[0][7:], self.settings.verification_key, algorithms=["HS256"],
+                    audience=self.settings.audience, issuer=self.settings.issuer,
+                    options={"require":["sub", "exp", "iat", "iss", "aud"]})
+            except jwt.PyJWTError:
+                history_claims = {}
+            if history_claims.get("scope") == "history-text":
+                try:
+                    user_id = history_claims["sub"]
+                    ident = conversation_id(user_id)
+                    sid, domain = history_claims.get("sid"), history_claims.get("domain")
+                    if (method != "GET" or path != "/galaxy/conversations/" + ident + "/history"
+                            or not isinstance(sid, str) or str(UUID(sid)) != sid
+                            or domain not in {"overview", "governance", "messaging", "discovery", "maintenance"}):
+                        raise AuthorityDenied()
+                    values = parse_qs(scope.get("query_string", b"").decode("ascii"), keep_blank_values=True)
+                    ids = values.get("runId", [])
+                    if set(values) != {"runId"} or not 1 <= len(ids) <= 50 or not all(re.fullmatch(r"[A-Za-z0-9_-]{1,128}", item) for item in ids):
+                        return await JSONResponse({"error":"agentos_query_invalid"}, status_code=400)(scope, receive, send)
+                    scope.setdefault("state", {})["galaxy_execution"] = {"id":ident, "sessionId":sid, "domain":domain, "mode":"conversation"}
+                    scope["state"]["galaxy_user_id"] = user_id
+                    return await self.app(scope, receive, send)
+                except (AuthorityDenied, ValueError, TypeError, KeyError, UnicodeError):
+                    return await JSONResponse({"error":"agentos_current_authority_denied"}, status_code=403)(scope, receive, send)
+        if re.fullmatch(r"/galaxy/conversations/[0-9a-f-]{36}/history", path):
+            return await JSONResponse({"error":"agentos_current_authority_denied"}, status_code=403)(scope, receive, send)
         if self.runtime.get("dutySurface") and self.runtime["dutySurface"].matches(path):
             return await self.runtime["dutySurface"].handle(scope, receive, send, self.app)
         if self.runtime.get("p13Surface") and self.runtime["p13Surface"].matches(path):
@@ -71,15 +102,13 @@ class PrivateSurface:
             scope["state"]["galaxy_user_id"] = user_id
             read_path = path == ("/galaxy/conversations/" if conversation else "/galaxy/executions/") + ident
             operation_read_path = conversation and re.fullmatch(r"/galaxy/conversations/" + re.escape(ident) + r"/operations/[0-9a-f-]{36}", path)
-            operation_batch_path = conversation and path == "/galaxy/conversations/" + ident + "/operations"
             continue_path = not conversation and path == "/galaxy/executions/" + ident + "/continue"
             native = re.fullmatch(r"/(agents|workflows)/([A-Za-z0-9_-]+)/runs(?:/([A-Za-z0-9_-]+)/(continue|cancel|resume))?", path)
-            if not (read_path and method == "GET" or operation_read_path and method == "GET" or operation_batch_path and method == "GET" or continue_path and method == "POST" or native and method in {"GET", "POST"}):
+            if not (read_path and method == "GET" or operation_read_path and method == "GET" or continue_path and method == "POST" or native and method in {"GET", "POST"}):
                 raise AuthorityDenied()
-            if operation_read_path or operation_batch_path:
+            if operation_read_path:
                 try:
-                    if operation_batch_path: operation_batch_locators(scope.get("query_string", b""))
-                    else: operation_read_locator(scope.get("query_string", b""))
+                    operation_read_locator(scope.get("query_string", b""))
                 except (ValueError, UnicodeError):
                     return await JSONResponse({"error": "agentos_query_invalid"}, status_code=400)(scope, receive, send)
             if native:

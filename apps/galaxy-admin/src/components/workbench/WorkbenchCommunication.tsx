@@ -71,6 +71,11 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const data=useWorkbenchConversationData(domain,canUseDomain&&(focused||logSource==='actions'),verifiedSession?.csrfToken??null);
   const conversation=data.context,currentConversation=canUseDomain?data.conversation:null;
   const actionCards=useMemo(()=>[...new Map(workbenchActionCards(!data.denied?[...data.cards.value?.domain===domain?data.cards.value.items:[],...data.pageCards]:[],domain).sort((a,b)=>a.checkedAt-b.checkedAt).map(card=>[card.cardId,card])).values()],[data.cards.value,data.pageCards,data.denied,domain]);
+  const currentPreparedTurn=data.context.value?.latestOperation?.operationId;
+  useEffect(()=>{
+    if(!currentPreparedTurn||!actionCards.some(card=>card.turnId===currentPreparedTurn&&['prepared','processing','unknown'].includes(card.state))||currentConversation?.runs.some(run=>run.operationId===currentPreparedTurn&&!run.displayOnly))return;
+    void data.readOperation(currentPreparedTurn).catch(()=>{});
+  },[currentPreparedTurn,actionCards,currentConversation?.runs,data.readOperation]);
   const [,tickCardClock]=useState(0),cardNow=Math.floor(Date.now()/1000);
   useEffect(()=>{
     if(!data.cards.verified||!actionCards.length)return;
@@ -100,7 +105,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const currentToken=async(targetDomain:AgentOsDomain)=>{const current=await session.read();return current?.state==='signed-in'&&current.operator.id===operatorId&&agentOsCanUseDomain(current,targetDomain)?current.csrfToken:null;};
   const queue=useWorkbenchMessageQueue(operatorId);
   const denyConversation=()=>{session.clear();data.clear();void session.read();};
-  useWorkbenchCardFeedback({enabled:!!verifiedSession&&canUseDomain&&data.contextUsable&&(data.cards.verified||data.pageCardsVerified)&&!data.pageCardsLoading&&!data.pageCardError,operatorId,csrfToken:verifiedSession?.csrfToken??'',domain,cards:actionCards,runs:currentConversation?.runs??[],currentToken,onReceipt:data.applyReceipt,onDenied:denyConversation});
+  useWorkbenchCardFeedback({enabled:!!verifiedSession&&canUseDomain&&data.contextUsable&&(data.cards.verified||data.pageCardsVerified)&&!data.pageCardsLoading&&!data.pageCardError,operatorId,csrfToken:verifiedSession?.csrfToken??'',domain,cards:actionCards.filter(card=>!!card.turnId&&currentConversation?.runs.some(run=>run.operationId===card.turnId&&!run.displayOnly)),runs:currentConversation?.runs??[],currentToken,onReceipt:data.applyReceipt,onDenied:denyConversation});
   const reread=()=>{void data.context.refresh();void data.cards.refresh();data.refreshPageCards();};
   const restoreUnsent=(sentDomain:AgentOsDomain,operationId:string,text:string)=>{
     if(!draftsRef.current[sentDomain]){const next={...draftsRef.current,[sentDomain]:text};draftsRef.current=next;setDrafts(next);if(storageKey)setDraftStorageError(!saveDrafts(storageKey,domainRef.current,next));}
@@ -366,6 +371,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
       <div className="wb-query-presets" aria-label="预设查询">{queries.map(query=><button type="button" key={query.label} disabled={!canUseDomain} onClick={()=>{updateDraft(query.text);input.current?.focus();}}>{query.label}</button>)}</div>
       {contextNotices[domain]&&<p className="wb-reply-state" role="status">相关内容已有变化，后续对话使用当前资料。</p>}
       <div>{visibleRuns.map(run=>{
+        if(run.displayOnly)return <article className="wb-run" key={run.runId}>{run.userInput&&<UserMessage text={run.userInput} sentAt={run.sentAt??run.createdAt}/>} {run.userInput&&run.content&&<hr className="wb-message-divider"/>}{run.content&&<WorkbenchAnswer content={run.content} binding={run.runId} animate={false} streaming={false} onDraft={fillReplyDraft} completedTime={run.completedAt!=null?<MessageTime value={run.completedAt}/>:null}/>}</article>;
         const pending=['PENDING','RUNNING'].includes(run.status),live=pending&&run.operationId===activeTurn&&currentConversation?.capabilities.canStream===true;
         const content=['ERROR','CANCELLED'].includes(run.status)?null:live?stream.text:run.content;
         const showProgress=pending&&!content&&!outputStarted.current.has(run.operationId??run.runId)&&!(stopInProgress&&run.operationId===activeTurn);
