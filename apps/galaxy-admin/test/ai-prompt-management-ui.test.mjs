@@ -49,7 +49,7 @@ test('only the bound original completed receipt can display saved prompt version
  assert.doesNotMatch(renderCard({...completed,result:{...completed.result,operationId:id(8)}}),/原操作已保存/);
  assert.doesNotMatch(renderCard({...completed,result:{...completed.result,receipt:{...receipt,aiAccountId:id(8)}}}),/原操作已保存/);
  for(const state of ['processing','unknown','not-available'])assert.doesNotMatch(renderCard({...completed,state}),/原操作已保存岗位工作要求|按此方案处理/);
- assert.match(renderCard({...card,state:'unknown'}),/正在确认结果/);
+ assert.match(renderCard({...card,state:'unknown'}),/结果待确认/);
 });
 
 const fact=(permission,patch={})=>({permission,systemSupport:'connected',permissionAllowed:true,delegated:true,available:true,confirmation:'operation-card',reasons:[],...patch});
