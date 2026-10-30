@@ -121,6 +121,11 @@ func (s *Conversations) conversationTaskContext(ctx context.Context, row Convers
 	}
 	root := text(progress, "rootOperationId")
 	out := Object{"rootOperationId": root, "remaining": progress["remaining"], "phase": progress["phase"], "objective": nil, "objectiveAvailable": false}
+	history, err := s.conversationTaskActionHistory(ctx, row, root)
+	if err != nil {
+		return nil, nil, err
+	}
+	out["actionHistory"] = history
 	if turn != root {
 		command, e := s.command(ctx, root)
 		if e != nil {
@@ -143,6 +148,40 @@ func (s *Conversations) conversationTaskContext(ctx context.Context, row Convers
 		}
 	}
 	return progress, out, nil
+}
+
+// conversationTaskActionHistory is saved task context, not authority to act.
+// It never refreshes a card, business source, or operation receipt.
+func (s *Conversations) conversationTaskActionHistory(ctx context.Context, row Conversation, root string) ([]Object, error) {
+	rows, err := s.Pool.Query(ctx, conversationHistoryTree+`SELECT c.id::text,c.operation_id::text,c.turn_id::text,c.state,c.proposal,c.result FROM operations_agentos_conversation_cards_v1 c JOIN tree t ON t.id=c.turn_id WHERE t.root_id=$4 AND c.endpoint=$1 AND c.conversation_id=$2 AND c.operator_id=$3 AND c.domain=$5 ORDER BY c.created_at,c.id`, s.Endpoint, row.ID, row.OperatorID, root, row.Domain)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Object{}
+	for rows.Next() {
+		var cardID, operationID, turnID, state string
+		var proposal, result Object
+		if err = rows.Scan(&cardID, &operationID, &turnID, &state, &proposal, &result); err != nil {
+			return nil, err
+		}
+		var effect any
+		if value, ok := result["effectExecuted"].(bool); ok {
+			effect = value
+		}
+		var receiptState, receiptSummary any
+		if value, ok := result["state"].(string); ok {
+			receiptState = value
+		}
+		if value, ok := result["summary"].(string); ok {
+			receiptSummary = value
+		}
+		out = append(out, Object{"cardId": cardID, "operationId": operationID, "parentTurnId": turnID, "state": state, "effectExecuted": effect, "receipt": Object{"state": receiptState, "summary": receiptSummary}, "presentation": cardPresentation(proposal)})
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // Lock the actual same-root cards before deciding to assess or prepare. This

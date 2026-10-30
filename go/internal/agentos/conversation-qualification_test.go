@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestConversationReadQualificationCurrentSourcesWithoutNativeHistory(t *testing.T) {
+func TestConversationReadQualificationCurrentIdentityWithoutSourceReads(t *testing.T) {
 	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
 	f := operationsfixture.New(t, owner)
@@ -32,13 +32,11 @@ func TestConversationReadQualificationCurrentSourcesWithoutNativeHistory(t *test
 	if _, err = owner.Exec(ctx, `INSERT INTO operations_agentos_conversation_sources_v1(conversation_id,source_key,evidence_ref,created_at) VALUES($1,$2,$3,$4)`, id, strings.Repeat("e", 64), ref, f.Now()); err != nil {
 		t.Fatal(err)
 	}
-	valid, deadline := true, f.Now().Unix()+7
-	s.ValidateSources = s.SourceValidator(func(_ context.Context, actor operationspermissions.Actor, domain string, refs []Object) (Object, error) {
-		if actor.ID != f.Root.ID || domain != "overview" || len(refs) != 1 || refs[0]["id"] != ref["id"] {
-			t.Fatal("original current-reader source context changed", actor.ID, domain, refs)
-		}
-		return Object{"valid": valid, "refs": []any{Object{"kind": ref["kind"], "id": ref["id"], "readExpiresAt": deadline}}}, nil
-	})
+	sourceCalls := 0
+	s.ValidateSources = func(context.Context, Conversation, operationspermissions.Actor) (SourceQualification, error) {
+		sourceCalls++
+		return SourceQualification{}, fail("synthetic_source_unavailable", 503)
+	}
 	s.ToolCards = func(context.Context, operationspermissions.Actor, string) ([]Object, error) {
 		t.Fatal("qualification must not prepare or recover cards")
 		return nil, nil
@@ -60,40 +58,52 @@ func TestConversationReadQualificationCurrentSourcesWithoutNativeHistory(t *test
 		}
 		return w, value
 	}
+	health := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/health" {
+			t.Error("context called a native record")
+			http.Error(w, "unexpected", 500)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(Object{"framework": "agno", "version": "3.1.7", "state": "running", "model": "configured", "conversations": Object{"version": 2, "agentIds": []string{"galaxy-conversation-overview"}}})
+	}))
+	defer health.Close()
+	s.Client, err = New(Configuration{URL: health.URL, SigningKey: strings.Repeat("s", 32)}, Options{Now: f.Now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	contextView, err := s.ReadContext(ctx, f.Root, "overview")
+	if err != nil || contextView["conversationId"] != id || sourceCalls != 0 {
+		t.Fatal("context read consulted old sources", contextView, sourceCalls, err)
+	}
 	path := "/v1/operations/agentos/conversations/overview/qualification"
 	w, value := call(path)
-	if w.Code != 200 || value["kind"] != "conversation-read-qualification" || value["metadataOnly"] != true || value["conversationId"] != id || value["contextChanged"] != false || value["readExpiresAt"] != float64(deadline) {
-		t.Fatal("qualification omitted current original source deadline", w.Code, value)
+	if w.Code != 200 || value["kind"] != "conversation-read-qualification" || value["metadataOnly"] != true || value["conversationId"] != id || value["contextChanged"] != false || value["readExpiresAt"] != float64(f.Now().Unix()+30) {
+		t.Fatal("qualification omitted current reader deadline", w.Code, value)
 	}
 	for _, key := range []string{"runs", "toolCards", "unchanged"} {
 		if _, exists := value[key]; exists {
 			t.Fatal("qualification claimed body freshness or included native data", key)
 		}
 	}
-	for _, unavailable := range []int64{0, f.Now().Unix()} {
-		deadline = unavailable
-		w, _ = call(path)
-		if w.Code != 503 {
-			t.Fatal("unknown/expired source deadline was extended", w.Code, w.Body.String())
-		}
+	if sourceCalls != 0 {
+		t.Fatal("qualification queried retained sources", sourceCalls)
 	}
 	var retired *time.Time
 	if err = owner.QueryRow(ctx, `SELECT retired_at FROM operations_agentos_conversations_v1 WHERE id=$1`, id).Scan(&retired); err != nil || retired != nil {
-		t.Fatal("temporary qualification failure retired the context", retired, err)
+		t.Fatal("reading retired conversation", retired, err)
 	}
-	deadline = f.Now().Unix() + 70
-	w, value = call(path)
-	if w.Code != 200 || value["readExpiresAt"] != float64(f.Now().Unix()+30) {
-		t.Fatal("qualification exceeded fixed current-read bound", w.Code, value)
+	before, err := s.readSession(ctx, f.Root, "overview")
+	if err != nil {
+		t.Fatal(err)
 	}
-	valid = false
-	w, _ = call(path)
-	if w.Code != 409 {
-		t.Fatal("actual source change was hidden", w.Code, w.Body.String())
+	if _, err = owner.Exec(ctx, `UPDATE operations_agentos_conversations_v1 SET retired_at=$2 WHERE id=$1`, id, f.Now()); err != nil {
+		t.Fatal(err)
 	}
-	w, value = call(path)
-	if w.Code != 200 || value["conversationId"] != nil {
-		t.Fatal("retired source context was revived", w.Code, value)
+	if _, err = s.finishConversationRead(ctx, f.Root, "overview", before); err == nil {
+		t.Fatal("changed conversation accepted")
+	}
+	if _, err = owner.Exec(ctx, `UPDATE operations_agentos_conversations_v1 SET retired_at=NULL WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
 	}
 	if _, err = owner.Exec(ctx, `UPDATE operations_ai_work_accounts_v1 SET enabled=false WHERE endpoint=$1 AND domain='overview'`, f.Endpoint); err != nil {
 		t.Fatal(err)

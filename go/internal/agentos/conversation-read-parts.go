@@ -9,17 +9,21 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// finishConversationRead is the fresh reader/source barrier after a lane's I/O.
-// An initial request snapshot never replaces this check.
+// finishConversationRead rechecks the reader and conversation identity after a UI read.
 func (s *Conversations) finishConversationRead(ctx context.Context, human operationspermissions.Actor, domain string, before CurrentConversation) (CurrentConversation, error) {
-	if before.Row != nil {
-		return s.Current(ctx, before.Row.ID, &human)
-	}
-	after, err := s.Session(ctx, human, domain, false)
+	after, err := s.readSession(ctx, human, domain)
 	if err != nil {
 		return after, err
 	}
-	if after.Row != nil {
+	oldWork, err := s.Permissions.AIWorkContext(before.Actor)
+	if err != nil {
+		return after, err
+	}
+	newWork, err := s.Permissions.AIWorkContext(after.Actor)
+	if err != nil {
+		return after, err
+	}
+	if before.Actor.ID != after.Actor.ID || permissionKey(before.Actor) != permissionKey(after.Actor) || oldWork["accountId"] != newWork["accountId"] || (before.Row == nil) != (after.Row == nil) || before.Row != nil && before.Row.ID != after.Row.ID {
 		return after, fail("operations_agentos_context_changed", 409)
 	}
 	after.ReadExpiresAt = s.now().Unix() + 30

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
@@ -328,5 +329,78 @@ func TestConversationTaskFeedbackUsesOriginalObjectiveOnce(t *testing.T) {
 	foreign.OperatorID = "foreign"
 	if _, err = s.receiptFeedback(ctx, foreign, retryCommand); fault.Status(err) != 403 {
 		t.Fatal("foreign owner accepted", err)
+	}
+}
+
+func TestConversationTaskActionHistoryIsScopedAndSaved(t *testing.T) {
+	owner, _ := testsupport.PostgreSQL(t)
+	ctx := context.Background()
+	f := operationsfixture.New(t, owner)
+	f.Automation(t)
+	f.Delegated(t)
+	s := &Conversations{Pool: f.Pool, Endpoint: f.Endpoint, Permissions: f.Permissions, Now: f.Now}
+	current, err := s.Session(ctx, f.Root, "overview", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := *current.Row
+	root, step, other := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	insertTurn := func(id string, result Object) {
+		t.Helper()
+		_, e := owner.Exec(ctx, `INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,result,created_at) VALUES($1,$2,$3,$4,$5,'accepted',$6,$7)`, id, f.Endpoint, row.ID, row.OperatorID, strings.Repeat("a", 64), result, f.Now())
+		if e != nil {
+			t.Fatal(e)
+		}
+	}
+	insertTurn(root, Object{"taskProgress": defaultConversationTask(root, root)})
+	insertTurn(step, Object{"parentOperationId": root, "origin": "operation-feedback"})
+	insertTurn(other, Object{"taskProgress": defaultConversationTask(other, other)})
+	create := func(turn, operator, state string, result Object, offset time.Duration) string {
+		t.Helper()
+		card, call, operation := uuid.NewString(), uuid.NewString(), uuid.NewString()
+		_, e := owner.Exec(ctx, `INSERT INTO operations_agentos_conversation_tool_calls_v1(id,endpoint,conversation_id,turn_id,native_run_id,call_id,tool,arguments_digest,state,created_at,updated_at) VALUES($1,$2,$3,$4,'fixture',$1::uuid::text,'prepare-operation',$5,'completed',$6,$6)`, call, f.Endpoint, row.ID, turn, strings.Repeat("b", 64), f.Now())
+		if e != nil {
+			t.Fatal(e)
+		}
+		proposal := Object{"kind": "fixture", "title": "处理对象", "target": Object{"label": "对象"}, "impact": []any{"更新说明"}, "command": Object{"secret": "must-not-leak"}}
+		_, e = owner.Exec(ctx, `INSERT INTO operations_agentos_conversation_cards_v1(id,endpoint,conversation_id,turn_id,tool_call_id,operator_id,domain,operation_id,request_digest,proposal,result,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,'overview',$7,$8,$9,$10,$11,$12,$12)`, card, f.Endpoint, row.ID, turn, call, operator, operation, strings.Repeat("c", 63)+string(rune('0'+offset/time.Second)), proposal, result, state, f.Now().Add(offset))
+		if e != nil {
+			t.Fatal(e)
+		}
+		return card
+	}
+	first := create(root, row.OperatorID, "completed", Object{"state": "completed", "summary": "第一步完成", "effectExecuted": true}, time.Second)
+	second := create(step, row.OperatorID, "completed", Object{"state": "completed", "summary": "第二步完成", "effectExecuted": true}, 2*time.Second)
+	pending := create(step, row.OperatorID, "prepared", nil, 3*time.Second)
+	create(other, row.OperatorID, "completed", Object{"state": "completed"}, 4*time.Second)
+	create(root, "foreign-operator", "completed", Object{"state": "completed"}, 5*time.Second)
+	sourceCalls, prepareCalls := 0, 0
+	s.ValidateSources = func(context.Context, Conversation, operationspermissions.Actor) (SourceQualification, error) {
+		sourceCalls++
+		return SourceQualification{}, fail("unexpected", 503)
+	}
+	s.Tools = &ConversationTools{Conversations: s, PrepareStored: func(context.Context, operationspermissions.Actor, Conversation, Object, string) (Object, error) {
+		prepareCalls++
+		return nil, fail("unexpected", 503)
+	}}
+	_, task, err := s.conversationTaskContext(ctx, row, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	history, ok := task["actionHistory"].([]Object)
+	if !ok || len(history) != 3 {
+		t.Fatal("wrong task history", task)
+	}
+	for i, id := range []string{first, second, pending} {
+		if history[i]["cardId"] != id {
+			t.Fatal("history order/ownership", history)
+		}
+	}
+	if history[0]["effectExecuted"] != true || history[1]["effectExecuted"] != true || history[2]["effectExecuted"] != nil || history[2]["state"] != "prepared" || object(history[0]["receipt"])["summary"] != "第一步完成" {
+		t.Fatal("saved results changed", history)
+	}
+	raw, _ := json.Marshal(history)
+	if strings.Contains(string(raw), "must-not-leak") || sourceCalls != 0 || prepareCalls != 0 {
+		t.Fatal("history contained raw command or fetched sources", sourceCalls, prepareCalls)
 	}
 }

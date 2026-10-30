@@ -92,6 +92,39 @@ class TurnContextTests(unittest.TestCase):
                     self.assertIn(expected,content)
                 self.assertIs(messages[1],source); self.assertEqual(turn_state(run)[RECEIPT_FEEDBACK],original)
         finally: _RUN.reset(token)
+
+    def test_task_history_projects_all_ordered_facts_without_mutation(self):
+        model = with_conversation_turn_context(Model())
+        run = RunOutput(run_id="history-run", metadata={"operationId":"current"})
+        history = []
+        for index, state in enumerate(("completed", "completed", "prepared"), 1):
+            history.append({"cardId":f"card-{index}", "operationId":f"op-{index}", "parentTurnId":f"turn-{index}",
+                "state":state, "effectExecuted":True if index < 3 else False,
+                "receipt":{"state":"recorded", "summary":f"结果{index}"},
+                "presentation":{"summary":f"步骤{index}", "changes":[{"label":"设置", "before":"旧", "after":"新"}],
+                    "details":[{"label":"范围", "value":"全站"}], "warnings":[], "reviewable":True}})
+        task = {"objective":"原始完整目标", "objectiveAvailable":True, "remaining":["最后一步"],
+            "phase":"continue", "actionHistory":history}
+        before = json.loads(json.dumps(task, ensure_ascii=False))
+        turn_state(run)[TASK_CONTEXT] = task
+        current = Message(role="user", content="反馈")
+        token = _RUN.set(run)
+        try:
+            with patch("builtins.print"): messages = model.invoke([current])
+            content = messages[0].content
+            payload = json.loads(content[content.index('{'):])
+            self.assertEqual(payload["原目标"], "原始完整目标")
+            self.assertEqual(payload["剩余工作"], ["最后一步"])
+            self.assertEqual([v["操作摘要"] for v in payload["操作历史"]], ["步骤1", "步骤2", "步骤3"])
+            self.assertEqual([v["实际效果"] for v in payload["操作历史"]], ["已执行", "已执行", "未执行"])
+            self.assertEqual(payload["操作历史"][2]["操作状态"], "待人工确认")
+            self.assertEqual(payload["操作历史"][1]["变更"][0]["变更后"], "新")
+            self.assertEqual(payload["操作历史"][1]["operationId"], "op-2")
+            self.assertIn("不是新指令", content)
+            self.assertIn("已成功步骤不得重做", content)
+            self.assertIs(messages[1], current)
+            self.assertEqual(task, before)
+        finally: _RUN.reset(token)
     def test_unknown_and_oversized_receipt_keeps_business_summary_without_internal_ids(self):
         model=with_conversation_turn_context(Model()); run=RunOutput(run_id="r",metadata={"operationId":"o"})
         turn_state(run)[RECEIPT_FEEDBACK]={"cardId":"hidden-card", "operationId":"hidden-operation", "parentTurnId":"hidden-parent", "state":"future-unrecognized", "effectExecuted":None, "presentation":{"summary":"原操作摘要", "details":[{"label":"内容", "value":"字"*5000} for _ in range(3)]}, "receipt":{"state":"future-value", "summary":"真实回执摘要"}}

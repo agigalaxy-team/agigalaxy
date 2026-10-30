@@ -98,8 +98,8 @@ func TestConversationReadLanesDoNotWaitForHistoryOrCards(t *testing.T) {
 		if part == "context" && (object(body["latestOperation"])["requiresOriginalLookup"] != false || object(body["latestOperation"])["state"] != "not-started") {
 			t.Fatal("deterministic unsent turn blocked a new send", body)
 		}
-		if part == "cards" && body["readExpiresAt"] != float64(f.Now().Unix()+30) {
-			t.Fatal("one card shortened unrelated list qualification", body)
+		if part == "cards" && body["readExpiresAt"] != nil {
+			t.Fatal("stored card list must not carry a read lease", body)
 		}
 		select {
 		case e := <-done:
