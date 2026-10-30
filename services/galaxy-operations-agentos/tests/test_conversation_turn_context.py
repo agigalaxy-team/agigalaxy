@@ -13,8 +13,10 @@ from agno.models.base import Model as NativeModel
 from agno.models.message import Message
 from agno.models.response import ModelResponse
 from agno.run.agent import RunInput, RunOutput
+from agno.run.base import RunContext
 from galaxy_agentos.conversation_turn_context import with_conversation_turn_context
-from galaxy_agentos.conversation_turn_state import turn_state, RECEIPT_FEEDBACK, TASK_CONTEXT
+from galaxy_agentos.conversation_turn_state import turn_state, RECEIPT_FEEDBACK, TASK_CONTEXT, TASK_PROGRESS
+from galaxy_agentos.conversation_retry import ConversationAgent
 from galaxy_agentos.model_usage import _RUN, install_usage_scope
 
 
@@ -26,6 +28,48 @@ class Model:
 
 
 class TurnContextTests(unittest.TestCase):
+    def test_native_async_prehook_binds_context_to_provider_messages(self):
+        @dataclass
+        class Provider(NativeModel):
+            id: str = "local-provider"
+            name: str = "local"
+            provider: str = "local"
+            seen: list = field(default_factory=list)
+            def invoke(self, messages, **kwargs):
+                self.seen = list(messages)
+                return ModelResponse(role="assistant", content="done")
+            async def ainvoke(self, messages, **kwargs): return self.invoke(messages, **kwargs)
+            def invoke_stream(self, messages, **kwargs): yield self.invoke(messages, **kwargs)
+            async def ainvoke_stream(self, messages, **kwargs): yield self.invoke(messages, **kwargs)
+            def _parse_provider_response(self, response, **kwargs): return response
+            def _parse_provider_response_delta(self, response): return response
+        def prehook(run_context: RunContext):
+            state = turn_state(run_context)
+            state[TASK_CONTEXT] = {"objective":"原任务目标", "objectiveAvailable":True, "remaining":["后续工作"],
+                "actionHistory":[{"state":"completed", "receipt":{"state":"completed", "summary":"完成一"}, "presentation":{"summary":"步骤一"}},
+                    {"state":"completed", "receipt":{"state":"completed", "summary":"完成二"}, "presentation":{"summary":"步骤二"}}]}
+            state[RECEIPT_FEEDBACK] = {"state":"completed", "effectExecuted":True, "receipt":{"state":"completed", "summary":"本次结果"}, "presentation":{"summary":"当前步骤"}}
+            state[TASK_PROGRESS] = {"phase":"continue"}
+        with tempfile.TemporaryDirectory() as folder:
+            db = SqliteDb(db_file=str(Path(folder) / "runs.db"))
+            model = Provider()
+            install_usage_scope(model)
+            with_conversation_turn_context(model)
+            agent = ConversationAgent(model=model, db=db, pre_hooks=[prehook], telemetry=False)
+            try:
+                with patch("builtins.print") as captured:
+                    asyncio.run(agent.arun("反馈", user_id="owner", session_id="session", metadata={"operationId":"op"}))
+                system = [m.content for m in model.seen if m.role == "system" and isinstance(m.content, str)]
+                self.assertTrue(any("原任务目标" in text and "步骤一" in text and "步骤二" in text for text in system))
+                self.assertTrue(any("本次结果" in text and "当前步骤" in text for text in system))
+                event = next(json.loads(c.args[0]) for c in captured.call_args_list if c.args and isinstance(c.args[0], str) and '"conversation-turn-context"' in c.args[0])
+                self.assertEqual((event["taskContextPresent"], event["objectiveAvailable"], event["actionHistoryCount"],
+                    event["actionHistoryCompletedCount"], event["receiptPresent"], event["progressPhase"]), (True, True, 2, 2, True, "continue"))
+                self.assertNotIn("原任务目标", json.dumps(event, ensure_ascii=False))
+                self.assertNotIn("本次结果", json.dumps(event, ensure_ascii=False))
+            finally:
+                db.db_engine.dispose()
+
     def test_all_model_paths_log_current_run_without_content_or_cross_run_state(self):
         model = with_conversation_turn_context(Model())
         history = Message(role="user", content="old search secret", from_history=True)

@@ -63,12 +63,25 @@ def _record(args, kwargs):
     run_id = getattr(run, "run_id", None)
     operation_id = (getattr(run, "metadata", None) or {}).get("operationId")
     projection = projection_status() or {}
+    state = turn_state(run)
+    task = state.get(TASK_CONTEXT)
+    history = task.get("actionHistory") if isinstance(task, dict) else None
+    history = history if isinstance(history, list) else []
+    progress = state.get(TASK_PROGRESS)
+    phase = progress.get("phase") if isinstance(progress, dict) else None
+    if phase not in {"continue", "completed", "waiting-confirmation", "needs-information", "waiting-result", "blocked", "interrupted"}:
+        phase = None
     event = {"event": "conversation-turn-context", "runId": run_id if isinstance(run_id, str) and _ID.fullmatch(run_id) else None,
         "operationId": operation_id if isinstance(operation_id, str) and _ID.fullmatch(operation_id) else None,
         "currentInputSha256": input_hash, "currentUserCount": len(current),
         "currentInputMatchesLastUser": isinstance(input_content, str) and last_user is not None and getattr(last_user, "content", None) == input_content,
         "historyCount": sum(bool(getattr(m, "from_history", False)) for m in messages),
         "historyProjectionApplied": projection.get("applied", False), "historyNotProjectedCount": projection.get("notProjected", 0),
+        "taskContextPresent": isinstance(task, dict), "objectiveAvailable": isinstance(task, dict) and task.get("objectiveAvailable") is True,
+        "actionHistoryCount": len(history), "actionHistoryCompletedCount": sum(
+            isinstance(item, dict) and item.get("state") == "completed" and isinstance(item.get("receipt"), dict)
+            and item["receipt"].get("state") == "completed" for item in history),
+        "receiptPresent": isinstance(state.get(RECEIPT_FEEDBACK), dict), "progressPhase": phase,
         "currentToolCount": sum(getattr(m, "role", None) == "tool" and not getattr(m, "from_history", False) for m in messages),
         "roles": [{"role": getattr(m, "role", None) if getattr(m, "role", None) in _ROLES else "other",
             "fromHistory": bool(getattr(m, "from_history", False))} for m in messages[:128]],
