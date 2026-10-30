@@ -7,6 +7,7 @@ from agno.agent import Agent
 from agno.models.base import Model
 from agno.models.openai import OpenAIChat
 from agno.models.response import ModelResponse
+from agno.models.message import Message
 from agno.tools.function import Function, FunctionCall
 from galaxy_agentos.conversation_tool_batches import with_conversation_tool_batches
 from galaxy_agentos.model_usage import _RUN
@@ -50,6 +51,39 @@ class BatchTests(unittest.TestCase):
         for mode in (False, True):
             effects.clear()
             asyncio.run(check(mode))
+
+    def test_mixed_results_follow_original_call_order_with_prefix_in_sync_and_async(self):
+        for async_mode in (False, True):
+            for kind in ("assessment", "preparation"):
+                effects=[]
+                def read(value: int):
+                    effects.append(("read",value)); return json.dumps({"value":value})
+                def assess_turn():
+                    effects.append(("assess",None)); return "unexpected"
+                def prepare_operation(value: int):
+                    effects.append(("prepare",value)); return "unexpected"
+                def call(fn, ident, arguments):
+                    function=Function.from_callable(fn); function.process_entrypoint()
+                    return FunctionCall(function=function,call_id=ident,arguments=arguments)
+                calls=([call(read,"read-first",{"value":1}),call(assess_turn,"assess",{}),call(read,"read-last",{"value":2})]
+                    if kind=="assessment" else
+                    [call(read,"read-first",{"value":1}),call(prepare_operation,"prepare-first",{"value":1}),
+                     call(read,"read-last",{"value":2}),call(prepare_operation,"prepare-last",{"value":2})])
+                prior=Message(role="tool",tool_call_id="older",content="previous")
+                results=[prior]; model=with_conversation_tool_batches(OpenAIChat(id="test"))
+                if async_mode:
+                    async def collect(): return [item async for item in model.arun_function_calls(calls,results)]
+                    asyncio.run(collect())
+                else: list(model.run_function_calls(calls,results))
+                self.assertIs(results[0],prior); self.assertEqual(results[0].content,"previous")
+                self.assertEqual([item.tool_call_id for item in results[1:]],[call.call_id for call in calls])
+                self.assertEqual(len(set(item.tool_call_id for item in results[1:])),len(calls))
+                self.assertCountEqual(effects,[("read",1),("read",2)])
+                by_id={item.tool_call_id:item for item in results[1:]}
+                self.assertEqual(json.loads(by_id["read-first"].content),{"value":1})
+                self.assertEqual(json.loads(by_id["read-last"].content),{"value":2})
+                rejected=[item for item in results[1:] if item.tool_call_id not in {"read-first","read-last"}]
+                self.assertTrue(all(item.tool_call_error and json.loads(item.content)["state"]=="invalid-request" for item in rejected))
 
     def test_three_distinct_candidates_or_reject_batch_before_dispatch(self):
         effects=[]

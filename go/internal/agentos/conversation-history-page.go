@@ -105,22 +105,22 @@ func (s *Conversations) ReadHistoryPage(ctx context.Context, human operationsper
 			next = base64.RawURLEncoding.EncodeToString(bytes)
 		}
 		type textRow struct {
-			operation, runID string
-			origin           *string
-			sentAt           time.Time
+			operation, runID, root string
+			origin, parent         *string
+			sentAt                 time.Time
 		}
 		selected := []textRow{}
 		runIDs := []string{}
 		seen := map[string]bool{}
 		if len(ids) > 0 {
-			rows, e = s.Pool.Query(ctx, conversationHistoryTree+`SELECT t.id::text,t.result->>'origin',t.created_at,COALESCE(c.native_run_id,c.result->>'runId') FROM tree t JOIN operations_agentos_conversation_commands_v1 c ON c.endpoint=$1 AND c.conversation_id=$2 AND c.operator_id=$3 AND c.id=t.id WHERE t.root_id=ANY($4::uuid[]) ORDER BY t.root_at,t.root_id,t.created_at,t.id`, s.Endpoint, row.ID, human.ID, ids)
+			rows, e = s.Pool.Query(ctx, conversationHistoryTree+`SELECT t.id::text,t.root_id::text,t.result->>'origin',COALESCE(t.result->>'parentOperationId',t.result->>'retryOfOperationId'),t.created_at,COALESCE(c.native_run_id,c.result->>'runId') FROM tree t JOIN operations_agentos_conversation_commands_v1 c ON c.endpoint=$1 AND c.conversation_id=$2 AND c.operator_id=$3 AND c.id=t.id WHERE t.root_id=ANY($4::uuid[]) ORDER BY t.root_at,t.root_id,t.created_at,t.id`, s.Endpoint, row.ID, human.ID, ids)
 			if e != nil {
 				return nil, e
 			}
 			for rows.Next() {
 				var item textRow
 				var native *string
-				if e = rows.Scan(&item.operation, &item.origin, &item.sentAt, &native); e != nil {
+				if e = rows.Scan(&item.operation, &item.root, &item.origin, &item.parent, &item.sentAt, &native); e != nil {
 					rows.Close()
 					return nil, e
 				}
@@ -188,7 +188,14 @@ func (s *Conversations) ReadHistoryPage(ctx context.Context, human operationsper
 			if item.origin != nil && *item.origin == "operation-feedback" {
 				input = nil
 			}
-			runs = append(runs, Object{"runId": item.runID, "operationId": item.operation, "userInput": input, "content": value["content"], "createdAt": value["createdAt"], "sentAt": item.sentAt.Unix(), "completedAt": value["completedAt"], "displayOnly": true})
+			var origin, parent any
+			if item.origin != nil {
+				origin = *item.origin
+			}
+			if item.parent != nil {
+				parent = *item.parent
+			}
+			runs = append(runs, Object{"runId": item.runID, "operationId": item.operation, "origin": origin, "parentOperationId": parent, "logicalTurnId": item.root, "userInput": input, "content": value["content"], "createdAt": value["createdAt"], "sentAt": item.sentAt.Unix(), "completedAt": value["completedAt"], "displayOnly": true})
 		}
 	}
 	at := s.now().Unix()

@@ -58,6 +58,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const draftsRef=useRef<Record<string,string>>({}),domainRef=useRef('overview');
   const memory=useRef(panelMemory(operatorId)),composing=useRef(false),animatedTurns=useRef(new Set<string>()),revealDomain=useRef<AgentOsDomain>('overview'),outputStarted=useRef(new Set<string>()),lastSubmission=useRef<{domain:AgentOsDomain;message:string}|null>(null);
   const [readRecoveryBusy,setReadRecoveryBusy]=useState(false);
+  const [confirmedHere,setConfirmedHere]=useState<Set<string>>(()=>new Set());
   const [waiting,setWaiting]=useState(memory.current.waiting),[stopping,setStopping]=useState(memory.current.stopping??{}),[contextNotices,setContextNotices]=useState<Partial<Record<AgentOsDomain,boolean>>>({});
   const [unsent,setUnsent]=useState(memory.current.unsent??{});
   const input=useRef<HTMLTextAreaElement>(null),panelId=useId(),inputId=useId();
@@ -71,15 +72,10 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const data=useWorkbenchConversationData(domain,canUseDomain&&(focused||logSource==='actions'),verifiedSession?.csrfToken??null);
   const conversation=data.context,currentConversation=canUseDomain?data.conversation:null;
   const actionCards=useMemo(()=>[...new Map(workbenchActionCards(!data.denied?[...data.cards.value?.domain===domain?data.cards.value.items:[],...data.pageCards]:[],domain).sort((a,b)=>a.checkedAt-b.checkedAt).map(card=>[card.cardId,card])).values()],[data.cards.value,data.pageCards,data.denied,domain]);
-  const currentPreparedTurn=data.context.value?.latestOperation?.operationId;
-  useEffect(()=>{
-    if(!currentPreparedTurn||!actionCards.some(card=>card.turnId===currentPreparedTurn&&['prepared','processing','unknown'].includes(card.state))||currentConversation?.runs.some(run=>run.operationId===currentPreparedTurn&&!run.displayOnly))return;
-    void data.readOperation(currentPreparedTurn).catch(()=>{});
-  },[currentPreparedTurn,actionCards,currentConversation?.runs,data.readOperation]);
   const [,tickCardClock]=useState(0),cardNow=Math.floor(Date.now()/1000);
   useEffect(()=>{
     if(!data.cards.verified||!actionCards.length)return;
-    const expiresAt=Math.min(...actionCards.filter(card=>card.readExpiresAt>Math.floor(Date.now()/1000)).map(card=>card.readExpiresAt));if(!Number.isFinite(expiresAt))return;
+    const expiresAt=Math.min(...actionCards.filter(card=>!card.stored&&card.readExpiresAt>Math.floor(Date.now()/1000)).map(card=>card.readExpiresAt));if(!Number.isFinite(expiresAt))return;
     const timer=setTimeout(()=>{tickCardClock(value=>value+1);void data.cards.refresh();data.refreshPageCards();},Math.max(0,expiresAt*1000-Date.now()));return()=>clearTimeout(timer);
   },[actionCards,data.cards.verified,data.cards.refresh,data.refreshPageCards]);
   const interactive=session.ready&&operatorId!==null&&!identityEnded&&!signedOut;
@@ -105,7 +101,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const currentToken=async(targetDomain:AgentOsDomain)=>{const current=await session.read();return current?.state==='signed-in'&&current.operator.id===operatorId&&agentOsCanUseDomain(current,targetDomain)?current.csrfToken:null;};
   const queue=useWorkbenchMessageQueue(operatorId);
   const denyConversation=()=>{session.clear();data.clear();void session.read();};
-  useWorkbenchCardFeedback({enabled:!!verifiedSession&&canUseDomain&&data.contextUsable&&(data.cards.verified||data.pageCardsVerified)&&!data.pageCardsLoading&&!data.pageCardError,operatorId,csrfToken:verifiedSession?.csrfToken??'',domain,cards:actionCards.filter(card=>!!card.turnId&&currentConversation?.runs.some(run=>run.operationId===card.turnId&&!run.displayOnly)),runs:currentConversation?.runs??[],currentToken,onReceipt:data.applyReceipt,onDenied:denyConversation});
+  useWorkbenchCardFeedback({enabled:!!verifiedSession&&canUseDomain&&data.contextUsable&&(data.cards.verified||data.pageCardsVerified)&&!data.pageCardsLoading&&!data.pageCardError,operatorId,csrfToken:verifiedSession?.csrfToken??'',domain,cards:actionCards.filter(card=>confirmedHere.has(card.cardId)),runs:currentConversation?.runs??[],currentToken,onReceipt:data.applyReceipt,onDenied:denyConversation});
   const reread=()=>{void data.context.refresh();void data.cards.refresh();data.refreshPageCards();};
   const restoreUnsent=(sentDomain:AgentOsDomain,operationId:string,text:string)=>{
     if(!draftsRef.current[sentDomain]){const next={...draftsRef.current,[sentDomain]:text};draftsRef.current=next;setDrafts(next);if(storageKey)setDraftStorageError(!saveDrafts(storageKey,domainRef.current,next));}
@@ -287,9 +283,9 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     if(!submission.admitted){queue.unreserve(operationId);pumpLock.current=false;}else void submission.promise.finally(()=>{pumpLock.current=false;});
   },[queue.ready,queue.state,verifiedSession,focused,canUseDomain,data.contextUsable,currentConversation,taskReady,command.pending,command.locked,dismissCommand.pending,dismissCommand.locked,stopCommand.pending,stopCommand.locked,queueCommand.locked,replying,activeRun,waitingReply,domain,taskId,pumpEpoch]);
   const retryReply=(runId:string)=>{if(!data.contextUsable||currentConversation?.contextChanged)return;const message=nativeConversationRetryMessage(currentConversation,runId);if(message!==null){const original=currentConversation?.runs.find(run=>run.runId===runId);if(original?.operationId)void sendMessage(message,original.operationId);}};
-  const confirmCard=(card:WorkbenchActionCard)=>{if(workLocked||queueCommand.locked&&queueCommand.pending?.domain===domain||!canUseDomain||!verifiedSession||!(data.cards.verified||data.pageCardsVerified)||data.pageCardsLoading||!!data.pageCardError||!card.capability.canConfirm||card.readExpiresAt<=Math.floor(Date.now()/1000))return;const path=workbenchCardPath(domain,card.cardId);lastSubmission.current=null;void command.submit(path+'/confirm',{cardId:card.cardId},'',()=>path,card.operationId);};
+  const confirmCard=(card:WorkbenchActionCard)=>{if(workLocked||queueCommand.locked&&queueCommand.pending?.domain===domain||!canUseDomain||!verifiedSession||!(data.cards.verified||data.pageCardsVerified)||data.pageCardsLoading||!!data.pageCardError||!card.capability.canConfirm||!card.stored&&card.readExpiresAt<=Math.floor(Date.now()/1000))return;setConfirmedHere(previous=>new Set([...previous,card.cardId]));const path=workbenchCardPath(domain,card.cardId);lastSubmission.current=null;void command.submit(path+'/confirm',{cardId:card.cardId},'',()=>path,card.operationId);};
   const canDismissPending=(card:WorkbenchActionCard)=>command.pending?.domain===domain&&command.pending.path===workbenchCardPath(domain,card.cardId)+'/confirm'&&command.pending.body.cardId===card.cardId&&command.pending.body.operationId===card.operationId;
-  const dismissCard=(card:WorkbenchActionCard)=>{if(!canUseDomain||!verifiedSession||!(data.cards.verified||data.pageCardsVerified)||data.pageCardsLoading||!!data.pageCardError||dismissCommand.locked||queueCommand.locked&&queueCommand.pending?.domain===domain||command.locked&&!canDismissPending(card)||!['prepared','not-available'].includes(card.state)||!card.capability.canDismiss||card.readExpiresAt<=Math.floor(Date.now()/1000))return;const path=workbenchCardPath(domain,card.cardId);void dismissCommand.submit(path+'/dismiss',{cardId:card.cardId},'',()=>path,card.operationId);};
+  const dismissCard=(card:WorkbenchActionCard)=>{if(!canUseDomain||!verifiedSession||!(data.cards.verified||data.pageCardsVerified)||data.pageCardsLoading||!!data.pageCardError||dismissCommand.locked||queueCommand.locked&&queueCommand.pending?.domain===domain||command.locked&&!canDismissPending(card)||!['prepared','not-available'].includes(card.state)||!card.capability.canDismiss||!card.stored&&card.readExpiresAt<=Math.floor(Date.now()/1000))return;const path=workbenchCardPath(domain,card.cardId);void dismissCommand.submit(path+'/dismiss',{cardId:card.cardId},'',()=>path,card.operationId);};
   useEffect(()=>{
     if(!storageKey)return;
     if(Object.values(draftsRef.current).some(Boolean)){setDraftStorageError(!saveDrafts(storageKey,domainRef.current,draftsRef.current));return;}
@@ -327,7 +323,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const current=domains.find(item=>item.id===domain)??domains[0];
   const sendReady=queue.ready&&taskReady&&canUseDomain&&data.contextUsable&&!!currentConversation&&!!(drafts[domain]??'').trim();
   const confirmingCard=typeof command.pending?.body.cardId==='string',sendingConversation=!!command.pending?.path.includes('/conversations/')&&!confirmingCard;
-  const pendingCardVisible=canUseDomain&&data.cards.available&&actionCards.some(card=>card.cardId===command.pending?.body.cardId&&card.readExpiresAt>cardNow);
+  const pendingCardVisible=canUseDomain&&data.cards.available&&actionCards.some(card=>card.cardId===command.pending?.body.cardId&&(card.stored||card.readExpiresAt>cardNow));
   const onComposerKeyDown=(event:KeyboardEvent<HTMLTextAreaElement>)=>{if(event.key!=='Enter'||event.shiftKey||event.ctrlKey||event.altKey||event.metaKey||composing.current||event.nativeEvent.isComposing||event.keyCode===229)return;event.preventDefault();if(!event.repeat&&primaryReady)activatePrimary();};
   const showCards=(cards:WorkbenchActionCard[],label:string,readOnly=false)=>{
     const groups:WorkbenchActionCard[][]=[],seen=new Set<string>();
@@ -371,7 +367,10 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
       <div className="wb-query-presets" aria-label="预设查询">{queries.map(query=><button type="button" key={query.label} disabled={!canUseDomain} onClick={()=>{updateDraft(query.text);input.current?.focus();}}>{query.label}</button>)}</div>
       {contextNotices[domain]&&<p className="wb-reply-state" role="status">相关内容已有变化，后续对话使用当前资料。</p>}
       <div>{visibleRuns.map(run=>{
-        if(run.displayOnly)return <article className="wb-run" key={run.runId}>{run.userInput&&<UserMessage text={run.userInput} sentAt={run.sentAt??run.createdAt}/>} {run.userInput&&run.content&&<hr className="wb-message-divider"/>}{run.content&&<WorkbenchAnswer content={run.content} binding={run.runId} animate={false} streaming={false} onDraft={fillReplyDraft} completedTime={run.completedAt!=null?<MessageTime value={run.completedAt}/>:null}/>}</article>;
+        if(run.displayOnly){
+          const related=feedbackRuns.filter(item=>item.logicalTurnId&&item.logicalTurnId===run.logicalTurnId||item.parentOperationId===run.operationId);
+          return <article className="wb-run" key={run.runId}>{run.userInput&&<UserMessage text={run.userInput} sentAt={run.sentAt??run.createdAt}/>} {run.userInput&&run.content&&<hr className="wb-message-divider"/>}{run.content&&<WorkbenchAnswer content={run.content} binding={run.runId} animate={false} streaming={false} onDraft={fillReplyDraft} completedTime={run.completedAt!=null?<MessageTime value={run.completedAt}/>:null}/>} {showCards(actionCards.filter(card=>card.turnId===run.operationId),'相关处理')}{related.map(item=><div key={item.runId}>{item.content&&<WorkbenchAnswer content={item.content} binding={item.runId} animate={false} streaming={false} onDraft={fillReplyDraft} completedTime={item.completedAt!=null?<MessageTime value={item.completedAt}/>:null}/>} {showCards(actionCards.filter(card=>card.turnId===item.operationId),'相关处理')}</div>)}</article>;
+        }
         const pending=['PENDING','RUNNING'].includes(run.status),live=pending&&run.operationId===activeTurn&&currentConversation?.capabilities.canStream===true;
         const content=['ERROR','CANCELLED'].includes(run.status)?null:live?stream.text:run.content;
         const showProgress=pending&&!content&&!outputStarted.current.has(run.operationId??run.runId)&&!(stopInProgress&&run.operationId===activeTurn);

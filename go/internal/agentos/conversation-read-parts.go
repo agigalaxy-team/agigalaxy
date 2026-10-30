@@ -42,7 +42,7 @@ func (s *Conversations) ReadCards(ctx context.Context, human operationspermissio
 	if s.ToolCards != nil {
 		items, err = s.ToolCards(ctx, human, domain)
 	} else {
-		_, err = s.Session(ctx, human, domain, false)
+		_, err = s.readSession(ctx, human, domain)
 	}
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (s *Conversations) ReadCards(ctx context.Context, human operationspermissio
 	at := s.now().Unix()
 	// Each card carries its own current source/action deadline. A short card
 	// does not invalidate the list or the separate conversation history.
-	return Object{"domain": domain, "items": items, "checkedAt": at, "readExpiresAt": at + 30}, nil
+	return Object{"domain": domain, "items": items, "checkedAt": at}, nil
 }
 
 func (s *Conversations) ReadContext(ctx context.Context, human operationspermissions.Actor, domain string) (Object, error) {

@@ -14,14 +14,8 @@ func (s *Service) permissionFor(ctx context.Context, tx pgx.Tx, r Object, action
 	if e != nil {
 		return nil, "", e
 	}
-	if p == nil {
-		return nil, "unavailable", nil
-	}
-	if seconds(p["published_until"]) <= s.clock() {
-		return p, "expired", nil
-	}
-	if p["subject_id"] == nil && p["account_id"] == nil || p["erased_at"] != nil || p["revoked_at"] != nil || str(p, "visibility") != visibility || str(p, "action") != action || str(p, "object_id") != id || str(p, "payload_hash") != str(r, "payload_hash") {
-		return p, "unavailable", nil
+	if state := permissionBaseState(p, r, action, id, visibility, s.clock()); state != "continue" {
+		return p, state, nil
 	}
 	if str(p, "authorization_kind") == "official-account" {
 		var valid bool
@@ -38,18 +32,8 @@ func (s *Service) permissionFor(ctx context.Context, tx pgx.Tx, r Object, action
 	if e != nil {
 		return nil, "", e
 	}
-	if evidence == nil {
-		return p, "unavailable", nil
-	}
-	intent := obj(evidence, "intent")
-	if num(intent, "expiresAt") <= s.clock() {
-		return p, "expired", nil
-	}
-	if evidence["revoked_at"] != nil || str(evidence, "signature_hash") != str(p, "signature_hash") || str(intent, "subjectId") != str(p, "subject_id") || str(intent, "bindingId") != str(p, "origin_binding_id") || str(intent, "endpoint") != s.Endpoint || str(intent, "recipient") != s.Endpoint || str(intent, "action") != action || str(intent, "objectId") != id || str(intent, "payloadHash") != str(p, "payload_hash") || !reflect.DeepEqual(intent["fields"], p["fields"]) || !reflect.DeepEqual(intent["viewers"], p["viewers"]) || str(intent, "visibility") != visibility || visibility == "Public" && str(intent, "purpose") != "public-profile" || seconds(p["published_until"]) > num(intent, "expiresAt") {
-		return p, "unavailable", nil
-	}
-	if evidence["binding_revoked"] != nil && (str(evidence, "revocation_kind") != "recovery" || str(evidence, "revocation_event_kind") != "recover" || str(evidence, "revocation_event_subject") != str(p, "subject_id")) {
-		return p, "unavailable", nil
+	if state := permissionConsentState(p, evidence, action, id, visibility, s.Endpoint, s.clock()); state != "continue" {
+		return p, state, nil
 	}
 	var deletion bool
 	e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM deletion_requests WHERE subject_id=$1 AND state IN ('requested','review-needed','approved','partial','primary-erased'))", p["subject_id"]).Scan(&deletion)
@@ -60,6 +44,37 @@ func (s *Service) permissionFor(ctx context.Context, tx pgx.Tx, r Object, action
 		return p, "unavailable", nil
 	}
 	return p, "available", nil
+}
+
+// Shared by one-object and batched reads; database loading does not decide
+// eligibility, so the exact consent and publication rules stay identical.
+func permissionBaseState(p, r Object, action, id, visibility string, clock int64) string {
+	if p == nil {
+		return "unavailable"
+	}
+	if seconds(p["published_until"]) <= clock {
+		return "expired"
+	}
+	if p["subject_id"] == nil && p["account_id"] == nil || p["erased_at"] != nil || p["revoked_at"] != nil || str(p, "visibility") != visibility || str(p, "action") != action || str(p, "object_id") != id || str(p, "payload_hash") != str(r, "payload_hash") {
+		return "unavailable"
+	}
+	return "continue"
+}
+func permissionConsentState(p, evidence Object, action, id, visibility, endpoint string, clock int64) string {
+	if evidence == nil {
+		return "unavailable"
+	}
+	intent := obj(evidence, "intent")
+	if num(intent, "expiresAt") <= clock {
+		return "expired"
+	}
+	if evidence["revoked_at"] != nil || str(evidence, "signature_hash") != str(p, "signature_hash") || str(intent, "subjectId") != str(p, "subject_id") || str(intent, "bindingId") != str(p, "origin_binding_id") || str(intent, "endpoint") != endpoint || str(intent, "recipient") != endpoint || str(intent, "action") != action || str(intent, "objectId") != id || str(intent, "payloadHash") != str(p, "payload_hash") || !reflect.DeepEqual(intent["fields"], p["fields"]) || !reflect.DeepEqual(intent["viewers"], p["viewers"]) || str(intent, "visibility") != visibility || visibility == "Public" && str(intent, "purpose") != "public-profile" || seconds(p["published_until"]) > num(intent, "expiresAt") {
+		return "unavailable"
+	}
+	if evidence["binding_revoked"] != nil && (str(evidence, "revocation_kind") != "recovery" || str(evidence, "revocation_event_kind") != "recover" || str(evidence, "revocation_event_subject") != str(p, "subject_id")) {
+		return "unavailable"
+	}
+	return "continue"
 }
 func (s *Service) publicEvidence(ctx context.Context, tx pgx.Tx, p Object) (Object, error) {
 	if str(p, "authorization_kind") == "official-account" {

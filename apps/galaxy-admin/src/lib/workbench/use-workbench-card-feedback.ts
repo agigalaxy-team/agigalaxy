@@ -12,14 +12,14 @@ const terminal=new Set(['COMPLETED','ERROR','CANCELLED','PAUSED']);
 export function useWorkbenchCardFeedback(props:Props){
  const latest=useRef(props);latest.current=props;
  const lanes=useRef(new Map<string,Lane>());
- const eligible=props.cards.filter(card=>card.confirmationAttempted&&card.feedbackEligible&&card.readExpiresAt>Math.floor(Date.now()/1000)&&['completed','not-available'].includes(card.state)&&!!card.turnId);
+ const eligible=props.cards.filter(card=>card.confirmationAttempted&&card.feedbackEligible&&(card.stored||card.readExpiresAt>Math.floor(Date.now()/1000))&&['completed','not-available'].includes(card.state)&&!!card.turnId);
  const key=eligible.map(card=>card.cardId+':'+card.turnId).sort().join(',');
  useEffect(()=>{
   if(!props.enabled||!props.operatorId||!props.csrfToken||!key)return;
   let alive=true,timer:ReturnType<typeof setTimeout>|undefined;const controller=new AbortController(),operator=props.operatorId,domain=props.domain,token=props.csrfToken;
   const loop=async()=>{
    if(!alive)return;
-   for(const card of latest.current.cards.filter(item=>item.confirmationAttempted&&item.feedbackEligible&&item.readExpiresAt>Math.floor(Date.now()/1000)&&['completed','not-available'].includes(item.state)&&!!item.turnId)){
+   for(const card of latest.current.cards.filter(item=>item.confirmationAttempted&&item.feedbackEligible&&(item.stored||item.readExpiresAt>Math.floor(Date.now()/1000))&&['completed','not-available'].includes(item.state)&&!!item.turnId)){
     if(!alive||!navigator.onLine||document.visibilityState==='hidden')break;
     const storageKey='galaxy:workbench:card-feedback:'+operator+':'+domain+':'+card.cardId,laneKey=storageKey;
     let lane=lanes.current.get(laneKey);

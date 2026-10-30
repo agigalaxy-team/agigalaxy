@@ -30,7 +30,7 @@ function mergeHistoryRuns(...lists:readonly AgentOsNativeRun[][]){
 export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolean,sessionKey:string|null=null){
  const base=enabled?agentOsConversationPath(domain):null;
  const history=useOperationsRead<WorkbenchHistory>({path:base?base+'/history':null,failureMessage:'历史加载失败',invalidateMode:'external',resumeOnReconnect:false});
- const cards=useOperationsRead<WorkbenchCards>({path:base?base+'/cards':null,failureMessage:'操作记录加载失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
+ const cards=useOperationsRead<WorkbenchCards>({path:base?base+'/cards':null,failureMessage:'操作记录加载失败',invalidateMode:'external',resumeOnReconnect:false});
  const context=useOperationsRead<WorkbenchContext>({path:base?base+'/context':null,failureMessage:'连接失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
  const management=useOperationsRead<WorkbenchManagement>({path:base&&domain==='overview'?base+'/management-capabilities':null,failureMessage:'管理权限加载失败',clearOnOffline:true,retryUnavailable:true,invalidateMode:'external'});
  const [loaded,setLoaded]=useState<{domain:AgentOsDomain;sessionKey:string|null;conversationId:string|null;runs:AgentOsNativeRun[];hasMore:boolean;nextCursor:string|null}|null>(null);
@@ -69,8 +69,8 @@ export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolea
   }catch(error){if(epoch===pageEpoch.current){if(error instanceof OperationsRequestError&&[401,403].includes(error.status)){history.clear(error.status);context.clear(error.status);cards.clear(error.status);}else setMoreError('历史加载失败');}return false;
   }finally{if(epoch===pageEpoch.current){moreFlight.current=false;setMoreLoading(false);}}
  },[base,domain,sessionKey,historyValue,frontier,history.clear,context.clear,cards.clear]);
- // Historical text never starts card, receipt or recovery reads.
- const cardTurnIds=Object.keys(receipts[domain]??{}).join(',');
+ // Saved cards are presentation data; loading them never recovers an operation.
+ const cardTurnIds=[...new Set([...historyRuns.map(run=>run.operationId).filter((id):id is string=>!!id),...Object.keys(receipts[domain]??{})])].join(',');
  useEffect(()=>{
   if(!base||!historyValue||!cardTurnIds)return;
   const epoch=pageEpoch.current,conversationId=historyValue.conversationId,ids=[...new Set(cardTurnIds.split(','))];let alive=true;setPageCardsLoading(true);
@@ -150,7 +150,7 @@ export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolea
  useEffect(()=>{
   if(!enabled)return;
   const ownId=contextValue?.conversationId??historyValue?.conversationId??null;
-  const refreshOperation=(id:string)=>{void readOperation(id).catch(error=>{if(error instanceof OperationsRequestError&&[401,403].includes(error.status))clear(error.status);});};
+  const refreshOperation=(id:string)=>{const known=receipts[domain]?.[id]?.value;if(!known&&historyRuns.some(run=>run.operationId===id)&&!(contextValue?.latestOperation?.operationId===id&&contextValue.latestOperation.requiresOriginalLookup)||known?.native&&terminal.has(known.native.status))return;void readOperation(id).catch(error=>{if(error instanceof OperationsRequestError&&[401,403].includes(error.status))clear(error.status);});};
   const change=(event:Event)=>{
    const detail=(event as CustomEvent<{kind:'conversation-operation'|'conversation-card'|'conversation-context'|'conversation-tool'|'configuration';objectId?:string;parentId?:string;turnId?:string}>).detail;
    if(!detail)return;
@@ -164,7 +164,7 @@ export function useWorkbenchConversationData(domain:AgentOsDomain,enabled:boolea
   const resync=()=>{void history.refresh();void cards.refresh();void context.refresh();if(domain==='overview')void management.refresh();};
   window.addEventListener('galaxy:admin-agentos-change',change);window.addEventListener('galaxy:admin-agentos-resync',resync);
   return()=>{window.removeEventListener('galaxy:admin-agentos-change',change);window.removeEventListener('galaxy:admin-agentos-resync',resync);};
- },[enabled,domain,contextValue?.conversationId,historyValue?.conversationId,history.refresh,cards.refresh,context.refresh,management.refresh,readOperation,clear,refreshPageCards]);
+ },[enabled,domain,contextValue?.conversationId,historyValue?.conversationId,history.refresh,cards.refresh,context.refresh,management.refresh,readOperation,clear,refreshPageCards,receipts,contextValue?.latestOperation,historyRuns]);
  return {history,cards,context,management,conversation,olderHasMore:frontier?.hasMore===true,olderCursor:frontier?.nextCursor,hasLoadedOlder:!!olderValue,loadMore,moreLoading,moreError,pageCards:pageCards?.domain===domain&&pageCards.sessionKey===sessionKey&&pageCards.conversationId===historyValue?.conversationId?pageCards.items:[],pageCardError,pageCardsLoading,pageCardsVerified:!!pageCards&&pageCards.domain===domain&&pageCards.sessionKey===sessionKey&&pageCards.conversationId===historyValue?.conversationId&&!pageCardsLoading&&!pageCardError,refreshPageCards,applyReceipt,readOperation,clear,readAll,denied,contextUsable,contextInvalidated:contextChanged||history.rejectionStatus===409};
 }
 

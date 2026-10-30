@@ -31,19 +31,9 @@ func (s *Service) curation(ctx context.Context, tx pgx.Tx, kind, id string, vers
 	if e != nil {
 		return nil, e
 	}
-	out := Object{"revision": 0, "sourceVersion": nil, "appliesToCurrent": false, "topic": nil, "pinned": false, "featured": false, "tagIds": []any{}, "tags": []Object{}, "publicPlacement": "not-connected"}
-	if r == nil {
-		return out, nil
+	if !curationApplies(r, version) {
+		return curationView(r, version, nil), nil
 	}
-	out["revision"] = r["revision"]
-	out["sourceVersion"] = r["source_version"]
-	if version == nil || int64Number(version) != num(r, "source_version") {
-		return out, nil
-	}
-	out["appliesToCurrent"] = true
-	out["topic"] = r["topic"]
-	out["pinned"] = truth(r, "pinned")
-	out["featured"] = truth(r, "featured")
 	a, _ := r["tag_ids"].([]any)
 	ids := []string{}
 	for _, v := range a {
@@ -53,14 +43,29 @@ func (s *Service) curation(ctx context.Context, tx pgx.Tx, kind, id string, vers
 	if e != nil {
 		return nil, e
 	}
-	used := []any{}
-	for _, t := range tags {
-		used = append(used, t["id"])
-	}
-	out["tags"] = tags
-	out["tagIds"] = used
-	return out, nil
+	return curationView(r, version, tags), nil
 }
+func curationApplies(r Object, version any) bool {
+	return r != nil && version != nil && int64Number(version) == num(r, "source_version")
+}
+func curationView(r Object, version any, tags []Object) Object {
+	out := Object{"revision": 0, "sourceVersion": nil, "appliesToCurrent": false, "topic": nil, "pinned": false, "featured": false, "tagIds": []any{}, "tags": []Object{}, "publicPlacement": "not-connected"}
+	if r == nil {
+		return out
+	}
+	out["revision"], out["sourceVersion"] = r["revision"], r["source_version"]
+	if !curationApplies(r, version) {
+		return out
+	}
+	out["appliesToCurrent"], out["topic"], out["pinned"], out["featured"] = true, r["topic"], truth(r, "pinned"), truth(r, "featured")
+	used := []any{}
+	for _, tag := range tags {
+		used = append(used, tag["id"])
+	}
+	out["tags"], out["tagIds"] = tags, used
+	return out
+}
+
 func int64Number(v any) int64 { return num(Object{"n": v}, "n") }
 func (s *Service) metadata(ctx context.Context, tx pgx.Tx, p Object) ([]Object, error) {
 	a, _ := p["attachments"].([]any)

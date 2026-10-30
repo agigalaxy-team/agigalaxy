@@ -9,9 +9,11 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/webevents"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -98,6 +100,42 @@ func TestSignedIdentityWritesAndPrivateGovernanceAgainstOriginal(t *testing.T) {
 		t.Fatal("identity author lost")
 	}
 	send("/v2/community/replies", "reply", "reporter")
+	compareDiscovery := func(label string, mutate string, available bool) {
+		t.Helper()
+		ctx := context.Background()
+		tx, err := pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		if mutate != "" {
+			if _, err = tx.Exec(ctx, mutate, post["versionId"], now); err != nil {
+				t.Fatalf("%s fixture: %v", label, err)
+			}
+		}
+		single, err := s.ReadPublicDiscoveryWithin(ctx, tx, "post", str(post, "postId"), true)
+		if err != nil {
+			t.Fatalf("%s single: %v", label, err)
+		}
+		batch, err := s.ReadPublicDiscoveryBatchWithin(ctx, tx, []DiscoveryReference{{Kind: "post", ID: str(post, "postId")}})
+		if err != nil {
+			t.Fatalf("%s batch: %v", label, err)
+		}
+		singleAvailable := str(single, "availability") == "available"
+		if singleAvailable != available || (batch[0] != nil) != available {
+			t.Fatalf("%s availability single=%s batch=%v", label, str(single, "availability"), batch[0] != nil)
+		}
+		if available {
+			for _, key := range []string{"payload", "topic", "operatorCuration", "authorAccountId", "currentVersionId", "createdAt", "publishedUntil"} {
+				if !reflect.DeepEqual(single[key], batch[0][key]) {
+					t.Fatalf("%s field %s differs", label, key)
+				}
+			}
+		}
+	}
+	compareDiscovery("signed consent", "", true)
+	compareDiscovery("consent revoked", `UPDATE consents SET revoked_at=$2 WHERE id=(SELECT consent_id FROM forum_permissions_v1 WHERE object_id=$1)`, false)
+	compareDiscovery("anonymous selected audience", `UPDATE forum_versions_v1 SET audience=jsonb_build_object('read',jsonb_build_object('kind','selected-accounts','accountIds','[]'::jsonb)) WHERE id=$1 AND $2::timestamptz IS NOT NULL`, false)
 	send("/v2/community/sections", "section", "owner")
 	send("/v2/community/sections/"+str(section, "sectionId")+"/classification", "classify", "moderator")
 	for _, path := range []string{"/v2/community/posts/" + str(post, "postId"), "/v2/community/replies/" + str(reply, "replyId"), "/v2/community/sections/" + str(section, "sectionId"), "/v2/community/posts/" + str(post, "postId") + "/owned", "/v2/community/quotas", "/v2/community/permissions/" + str(result, "permissionId")} {
@@ -168,6 +206,7 @@ func TestSignedIdentityWritesAndPrivateGovernanceAgainstOriginal(t *testing.T) {
 	}
 	send(reportPath+"/events", "supplement", "reporter")
 	send(reportPath+"/events", "resolve", "moderator")
+	compareDiscovery("governance hides post", "", false)
 	compare()
 	_, hidden := requestJSON(t, server.URL, "/v2/community/posts/"+str(post, "postId"), "", nil)
 	if str(hidden, "availability") != "unavailable" {

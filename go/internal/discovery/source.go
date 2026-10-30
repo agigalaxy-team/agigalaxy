@@ -198,19 +198,40 @@ func (s *CommunitySource) QualifiedSnapshot(ctx context.Context) (Snapshot, erro
 		return time.Now().Unix()
 	}
 	result := Snapshot{Documents: []*Document{}, Complete: true, StartedAt: clock()}
-	reader := *s
-	reader.Worker = true
 	after := ""
 	for {
-		rows, e := sourceCandidates(ctx, tx, after, 100)
-		if e != nil {
-			return Snapshot{}, e
+		refs, err := sourceCandidates(ctx, tx, after, 100)
+		if err != nil {
+			return Snapshot{}, err
 		}
-		if len(rows) == 0 {
+		if len(refs) == 0 {
 			break
 		}
-		for _, reference := range rows {
-			document, e := reader.LoadWithin(ctx, tx, reference)
+		inputs := make([]community.DiscoveryReference, 0, len(refs))
+		for _, ref := range refs {
+			inputs = append(inputs, community.DiscoveryReference{Kind: ref.Kind, ID: ref.ID})
+		}
+		views, err := s.Forum.ReadPublicDiscoveryBatchWithin(ctx, tx, inputs)
+		if err != nil {
+			return Snapshot{}, err
+		}
+		if len(views) != len(refs) {
+			return Snapshot{}, fail("discovery_source_invalid")
+		}
+		for i, view := range views {
+			if view == nil {
+				continue
+			}
+			ref := refs[i]
+			key, e := ItemKey(ref)
+			if e != nil {
+				return Snapshot{}, e
+			}
+			var author *string
+			if id := str(view, "authorAccountId"); id != "" {
+				author = &id
+			}
+			document, e := documentFromView(key, ref, view, author)
 			if e != nil {
 				return Snapshot{}, e
 			}
@@ -218,10 +239,10 @@ func (s *CommunitySource) QualifiedSnapshot(ctx context.Context) (Snapshot, erro
 				result.Documents = append(result.Documents, document)
 			}
 		}
-		result.Scanned += len(rows)
-		last := rows[len(rows)-1]
+		result.Scanned += len(refs)
+		last := refs[len(refs)-1]
 		after = last.Kind + ":" + last.ID
-		if len(rows) < 100 {
+		if len(refs) < 100 {
 			break
 		}
 	}

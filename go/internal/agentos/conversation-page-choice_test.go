@@ -100,6 +100,9 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 		if r["displayOnly"] != true || r["taskProgress"] != nil || r["status"] != nil {
 			t.Fatal("history exposed control data", r)
 		}
+		if r["operationId"] == feedback && (r["origin"] != "operation-feedback" || r["parentOperationId"] != roots[0] || r["logicalTurnId"] != roots[0]) {
+			t.Fatal("feedback lost stored logical relationship", r)
+		}
 		if r["operationId"] == feedback && r["userInput"] != nil {
 			t.Fatal("server continuation became a user message", r)
 		}
@@ -146,6 +149,40 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 			t.Fatal(err)
 		}
 		cards = append(cards, object(card["card"]))
+	}
+	// A historical list is a stored projection, without live preparation or receipt recovery.
+	if _, err = owner.Exec(ctx, `UPDATE operations_agentos_conversation_cards_v1 SET state='unknown',result=jsonb_build_object('confirmationAttemptedAt','recorded','feedbackEnabled',true) WHERE id=$1`, cards[0]["cardId"]); err != nil {
+		t.Fatal(err)
+	}
+	liveReads := 0
+	tools.PrepareStored = func(context.Context, operationspermissions.Actor, Conversation, Object, string) (Object, error) {
+		liveReads++
+		return nil, fail("unexpected_live_read", 503)
+	}
+	tools.RecoverPrepared = func(context.Context, operationspermissions.Actor, Object, string) (Object, error) {
+		liveReads++
+		return nil, fail("unexpected_recovery", 503)
+	}
+	stored, err := s.ReadCardsForTurns(ctx, f.Root, "overview", []string{turn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := stored["items"].([]Object)
+	if len(items) != 3 || stored["readExpiresAt"] != nil || liveReads != 0 {
+		t.Fatal("stored card list did live reads or lost cards", stored, liveReads)
+	}
+	for _, value := range items {
+		if value["stored"] != true || value["readExpiresAt"] != nil {
+			t.Fatal("stored projection has active lease/feedback", value)
+		}
+		if value["cardId"] == cards[0]["cardId"] && (value["state"] != "unknown" || object(value["capability"])["canConfirm"] != false) {
+			t.Fatal("unknown result was changed", value)
+		}
+	}
+	tools.PrepareStored = nil
+	tools.RecoverPrepared = nil
+	if _, err = owner.Exec(ctx, `UPDATE operations_agentos_conversation_cards_v1 SET state='prepared',result=NULL WHERE id=$1`, cards[0]["cardId"]); err != nil {
+		t.Fatal(err)
 	}
 	if _, err = tools.prepareCard(ctx, boundConversationTool{row: conversation, actor: f.Root, callID: bound.callID, args: Object{"option": 4}}, Object{"turnId": turn}); err == nil {
 		t.Fatal("fourth candidate admitted")

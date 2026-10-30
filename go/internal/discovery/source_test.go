@@ -7,6 +7,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -136,6 +137,33 @@ func TestOriginalPublicSourceAndActualIndexSearchUnderWorkerRole(t *testing.T) {
 	view := View(document)
 	if document.SourceID != reference.ID || document.Version != str(payload, "versionId") || document.Title != str(payload, "title") || document.Body != str(payload, "body") || document.IndexVersion == "" || view["source"] != "current-public-community" || view["id"] != reference.ID {
 		t.Fatalf("current qualified source: %+v %v", document, view)
+	}
+	snapshotTx, e := workerPool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	if e != nil {
+		t.Fatal(e)
+	}
+	batch, e := forum.ReadPublicDiscoveryBatchWithin(ctx, snapshotTx, []community.DiscoveryReference{{Kind: reference.Kind, ID: reference.ID}})
+	if e != nil {
+		t.Fatal("batch read", e)
+	}
+	single, e := source.LoadWithin(ctx, snapshotTx, reference)
+	if e != nil {
+		t.Fatal("single read", e)
+	}
+	snapshotKey, e := ItemKey(reference)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var snapshotAuthor *string
+	if id := str(batch[0], "authorAccountId"); id != "" {
+		snapshotAuthor = &id
+	}
+	batched, e := documentFromView(snapshotKey, reference, batch[0], snapshotAuthor)
+	if e != nil || !reflect.DeepEqual(single, batched) {
+		t.Fatalf("single/batch same snapshot mismatch: %+v %+v %v", single, batched, e)
+	}
+	if e = snapshotTx.Rollback(ctx); e != nil {
+		t.Fatal(e)
 	}
 	var mu sync.Mutex
 	paths := []string{}
@@ -297,6 +325,21 @@ func TestOriginalPublicSourceAndActualIndexSearchUnderWorkerRole(t *testing.T) {
 	if e != nil || str(result, "state") != "source-changed" {
 		t.Fatalf("source revoked after native write %s %v", jsonString(result), e)
 	}
+	revokedTx, e := workerPool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	if e != nil {
+		t.Fatal(e)
+	}
+	revokedBatch, e := forum.ReadPublicDiscoveryBatchWithin(ctx, revokedTx, []community.DiscoveryReference{{Kind: reference.Kind, ID: reference.ID}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	revokedSingle, e := source.LoadWithin(ctx, revokedTx, reference)
+	if e != nil || revokedSingle != nil || revokedBatch[0] != nil {
+		t.Fatalf("revocation single/batch mismatch: %+v %+v %v", revokedSingle, revokedBatch, e)
+	}
+	if e = revokedTx.Rollback(ctx); e != nil {
+		t.Fatal(e)
+	}
 	result, e = runtime.Search(ctx, Object{"query": "银河"})
 	if e != nil || len(result["items"].([]Object)) != 0 {
 		t.Fatalf("revoked candidate leaked %s %v", jsonString(result), e)
@@ -372,4 +415,97 @@ func TestOriginalPublicSourceAndActualIndexSearchUnderWorkerRole(t *testing.T) {
 	if len(paths) < 6 {
 		t.Fatal("actual professional-protocol HTTP calls missing", paths)
 	}
+}
+
+func TestBatchReplyAndParentEligibilityWithinSnapshot(t *testing.T) {
+	pool, dsn := testsupport.PostgreSQL(t)
+	ctx := context.Background()
+	if _, e := databaseschema.Migrate(ctx, pool, []string{"api", "worker"}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := postgres.InTx(ctx, pool, func(tx pgx.Tx) (bool, error) {
+		if e := objectremoval.MigrateWithin(ctx, tx); e != nil {
+			return false, e
+		}
+		return true, objectremoval.ProvisionRolesWithin(ctx, tx)
+	}); e != nil {
+		t.Fatal(e)
+	}
+	endpoint := "https://go-community.example.invalid"
+	now := func() time.Time { return time.Unix(2000000000, 0) }
+	fixture := publicationfixture.Prepare(t, pool, endpoint, now)
+	account := fixture["accounts"].([]any)[0].(string)
+	post := object(fixture["payload"])
+	forum := &community.Service{Pool: pool, Endpoint: endpoint, Authority: accountAuthority{}, Now: now}
+	if _, e := forum.Publish(ctx, account, jsonString(post)); e != nil {
+		t.Fatal(e)
+	}
+	reply := community.Object{"schemaVersion": 1, "operationId": uuid.NewString(), "accountId": account, "replyId": uuid.NewString(), "postId": post["postId"], "postVersionId": post["versionId"], "expectedRevision": 0, "body": "Synthetic public reply", "publishedUntil": 2000001800, "replyTo": nil}
+	if !community.BindForumIDs("create-reply", account, reply) {
+		t.Fatal("reply bind")
+	}
+	if _, e := forum.CreateReply(ctx, account, jsonString(Object(reply))); e != nil {
+		t.Fatal(e)
+	}
+	config, e := pgxpool.ParseConfig(dsn)
+	if e != nil {
+		t.Fatal(e)
+	}
+	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
+		_, e := c.Exec(ctx, "SET ROLE galaxy_evidence_worker")
+		return e
+	}
+	worker, e := pgxpool.NewWithConfig(ctx, config)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer worker.Close()
+	source := &CommunitySource{Pool: worker, Forum: forum, Endpoint: endpoint, Worker: true}
+	refs := []Reference{{Kind: "post", ID: str(post, "postId")}, {Kind: "reply", ID: str(Object(reply), "replyId")}}
+	compare := func(name string, expected int) {
+		t.Helper()
+		tx, e := worker.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer tx.Rollback(ctx)
+		batch, e := forum.ReadPublicDiscoveryBatchWithin(ctx, tx, []community.DiscoveryReference{{Kind: refs[0].Kind, ID: refs[0].ID}, {Kind: refs[1].Kind, ID: refs[1].ID}})
+		if e != nil {
+			t.Fatalf("%s batch: %v", name, e)
+		}
+		count := 0
+		for i, ref := range refs {
+			single, e := source.LoadWithin(ctx, tx, ref)
+			if e != nil {
+				t.Fatalf("%s single: %v", name, e)
+			}
+			var actual *Document
+			if batch[i] != nil {
+				key, e := ItemKey(ref)
+				if e != nil {
+					t.Fatal(e)
+				}
+				var author *string
+				if id := str(batch[i], "authorAccountId"); id != "" {
+					author = &id
+				}
+				actual, e = documentFromView(key, ref, batch[i], author)
+				if e != nil {
+					t.Fatal(e)
+				}
+				count++
+			}
+			if !reflect.DeepEqual(single, actual) {
+				t.Fatalf("%s %s mismatch single=%+v batch=%+v", name, ref.Kind, single, actual)
+			}
+		}
+		if count != expected {
+			t.Fatalf("%s got %d expected %d", name, count, expected)
+		}
+	}
+	compare("public", 2)
+	if _, e = pool.Exec(ctx, "UPDATE forum_permissions_v1 SET revoked_at=$2 WHERE object_id=$1", str(post, "versionId"), now()); e != nil {
+		t.Fatal(e)
+	}
+	compare("parent revoked", 0)
 }

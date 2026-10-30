@@ -54,5 +54,5 @@ func (s *Conversations) ReadCardsForTurns(ctx context.Context, a operationspermi
 		return nil, err
 	}
 	at := s.now().Unix()
-	return Object{"domain": domain, "items": items, "checkedAt": at, "readExpiresAt": at + 30}, nil
+	return Object{"domain": domain, "items": items, "checkedAt": at}, nil
 }
