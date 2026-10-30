@@ -63,8 +63,10 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
         else:
             state.pop(RECEIPT_FEEDBACK, None)
 
-    async def authorized_post_run(run_context: RunContext):
-        await asyncio.to_thread(authorized_run, run_context)
+    def authorized_post_run(run_context: RunContext):
+        current = gateway.authorize(run_context.user_id, operation="run")
+        if current.get("execution", {}).get("sessionId") != run_context.session_id:
+            raise AuthorityDenied("agentos_conversation_context_changed")
 
     def prepared_card_response(run_context: RunContext, run_output: RunOutput):
         state = turn_state(run_context)

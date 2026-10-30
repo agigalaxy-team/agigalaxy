@@ -94,7 +94,9 @@ class PromptManagementNativeTest(unittest.TestCase):
         agent = self.agents[0]
         shared = copy.deepcopy(agent.metadata)
         session = AgentSession(session_id=self.first.session_id)
-        native_output = RunOutput(run_id=self.first.run_id, metadata=self.first.metadata)
+        native_output = RunOutput(run_id=self.first.run_id, session_id=self.first.session_id,
+            user_id=self.first.user_id, metadata=self.first.metadata)
+        agent.get_tools(native_output, self.first, session, user_id=self.first.user_id)
         message = get_system_message(agent, session, run_context=self.first)
         self.assertIn("本地岗位文本甲", message.content)
         self.assertNotIn("untrusted-client-or-history-text", message.content)
