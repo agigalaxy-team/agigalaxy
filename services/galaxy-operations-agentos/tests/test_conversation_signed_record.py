@@ -18,9 +18,11 @@ class SignedRecordReadTest(unittest.TestCase):
         run=RunOutput(run_id=runid,agent_id='galaxy-conversation-overview',session_id=sid,user_id=user,status=RunStatus.error,content='synthetic-failure',metadata={'operationId':op,'retryOfOperationId':parent,'retryOfRunId':parent_run},regenerated_from=parent_run,forked_from_run_id=parent_run)
         class DB:
             reads=0
+            override=None
             def get_run(self,*,run_id,deserialize=False):
                 self.reads+=1
                 if run_id != runid: return None
+                if self.override is not None: return self.override
                 return {'user_id':user,'session_id':sid,'agent_id':'galaxy-conversation-overview','run_data':run.to_dict()}
             def _get_table(self,**kwargs): raise AssertionError('unexpected history scan')
         class Gateway:
@@ -36,6 +38,19 @@ class SignedRecordReadTest(unittest.TestCase):
             self.assertEqual(response.status_code,200,response.text); self.assertEqual(db.reads,1)
             self.assertEqual(response.json()['state'],'ERROR'); self.assertEqual(response.json()['operationId'],op); self.assertEqual(response.json()['runId'],runid); self.assertEqual(response.json()['readExpiresAt'],claims['exp'])
             self.assertIsNone(response.json()['native']['content'])
+            pending = RunOutput(run_id=runid,agent_id='galaxy-conversation-overview',session_id=sid,user_id=user,status=RunStatus.pending).to_dict()
+            db.override = {'user_id':user,'session_id':sid,'agent_id':'galaxy-conversation-overview','status':'PENDING','run_data':pending}
+            result = client.get(path,headers=headers,params=locator)
+            self.assertEqual(result.status_code,200,result.text)
+            self.assertEqual((result.json()['runId'],result.json()['state'],result.json()['native']),(runid,'unknown',None))
+            db.override['user_id'] = str(uuid4())
+            self.assertEqual(client.get(path,headers=headers,params=locator).status_code,403)
+            db.override['user_id'] = None
+            self.assertEqual(client.get(path,headers=headers,params=locator).json()['state'],'unknown')
+            db.override['status'] = 'ERROR'
+            self.assertEqual(client.get(path,headers=headers,params=locator).status_code,503)
+            db.override = None
+            self.assertEqual(client.get(path,headers=headers,params=locator).json()['state'],'ERROR')
             for target,method,params in [(path.replace(op,str(uuid4())),'get',locator),(path,'get',{**locator,'runId':str(uuid4())}),(path,'get',{'runId':runid}),(path,'post',{}),('/health','get',{})]:
                 denied=getattr(client,method)(target,headers=headers,params=params); self.assertEqual(denied.status_code,403,denied.text)
             for patch in ({'sid':str(uuid4())},{'domain':'other'},{'sub':'conversation:'+str(uuid4())},{'operationId':str(uuid4())},{'locator':{**locator,'extra':'x'}},{'exp':now-1}):

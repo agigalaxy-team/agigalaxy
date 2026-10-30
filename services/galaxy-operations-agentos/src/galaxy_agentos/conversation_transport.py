@@ -78,12 +78,15 @@ def install_conversation_transport_read(app, runtime, run_view):
     @app.get("/galaxy/conversations/{ident}/operations/{operation_id}")
     async def original_conversation_run(ident: str, operation_id: str, request: Request):
         # HTTP authority and SQLAlchemy are synchronous. Keep the whole owned
-        # lookup, including both current checks, off the shared ASGI loop.
-        return await asyncio.to_thread(read_original, ident, operation_id,
-            dict(request.state.galaxy_execution), request.state.galaxy_user_id,
-            request.scope.get("query_string", b""),
-            getattr(request.state, "galaxy_trusted_record", False),
-            getattr(request.state, "galaxy_record_expires_at", None))
+        # lookup off the shared ASGI loop.
+        try:
+            return await asyncio.to_thread(read_original, ident, operation_id,
+                dict(request.state.galaxy_execution), request.state.galaxy_user_id,
+                request.scope.get("query_string", b""),
+                getattr(request.state, "galaxy_trusted_record", False),
+                getattr(request.state, "galaxy_record_expires_at", None))
+        except AuthorityUnavailable:
+            return JSONResponse({"error":"agentos_authority_unavailable"}, status_code=503)
 
     def read_original(ident, operation_id, row, user_id, query, trusted_record=False, record_expires_at=None):
         if row.get("mode") != "conversation" or row["id"] != ident:
@@ -108,7 +111,6 @@ def install_conversation_transport_read(app, runtime, run_view):
     def read_original_core(ident, operation_id, row, user_id, locator):
         db = runtime["db"]
         run_id, state, ticket = locator.get("runId"), "unknown", None
-        strict_binding = bool(locator)
         discovered = False
         if run_id is None:
             table = db._get_table(table_type="jobs", create_table_if_not_found=False)
@@ -153,37 +155,32 @@ def install_conversation_transport_read(app, runtime, run_view):
                     raise AuthorityUnavailable("agentos_operation_lookup_ambiguous")
                 if candidates:
                     run_id = candidates[0]._mapping["run_id"]
-                    strict_binding = True
                     discovered = True
         native = None
         if run_id is not None:
             stored = db.get_run(run_id=run_id, deserialize=False)
             if stored is not None:
-                if (stored.get("user_id") != user_id or stored.get("session_id") != row["sessionId"]
-                        or stored.get("agent_id") != "galaxy-conversation-" + row["domain"]):
+                raw = stored.get("run_data") if isinstance(stored.get("run_data"), dict) else {}
+                metadata = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+                expected = {"user_id":user_id, "session_id":row["sessionId"],
+                    "agent_id":"galaxy-conversation-" + row["domain"]}
+                checks = [(stored.get(key), value) for key, value in expected.items()]
+                checks += [(raw.get(key), value) for key, value in expected.items()]
+                checks += [(raw.get("run_id"), run_id), (metadata.get("operationId"), operation_id)]
+                parent_run, parent_operation = locator.get("retryOfRunId"), locator.get("retryOfOperationId")
+                lineage = [(metadata.get("retryOfRunId"), parent_run), (metadata.get("retryOfOperationId"), parent_operation),
+                    (raw.get("regenerated_from"), parent_run), (raw.get("forked_from_run_id"), parent_run)]
+                if any(value is not None and value != wanted for value, wanted in checks + lineage):
                     raise AuthorityDenied()
+                missing = any(value is None for value, _ in checks) or (parent_run is not None and any(value is None for value, _ in lineage))
+                if missing:
+                    observed = str(stored.get("status") or raw.get("status") or "").upper()
+                    if observed in {"PENDING", "RUNNING"}:
+                        return {"conversationId":ident, "sessionId":row["sessionId"], "operationId":operation_id,
+                            "runId":run_id, "state":"unknown", "native":None}
+                    raise AuthorityUnavailable("agentos_operation_record_incomplete")
                 from agno.run.agent import RunOutput
-                original = RunOutput.from_dict(stored.get("run_data") or {})
-                metadata = original.metadata or {}
-                operation = metadata.get("operationId")
-                if (original.run_id != run_id
-                        or strict_binding and operation != operation_id
-                        or not strict_binding and operation not in {None, operation_id}):
-                    raise AuthorityDenied()
-                if strict_binding:
-                    if (original.user_id != user_id or original.session_id != row["sessionId"]
-                            or original.agent_id != "galaxy-conversation-" + row["domain"]):
-                        raise AuthorityDenied()
-                    parent_run, parent_operation = locator.get("retryOfRunId"), locator.get("retryOfOperationId")
-                    if parent_run is not None:
-                        if (metadata.get("retryOfRunId") != parent_run
-                                or metadata.get("retryOfOperationId") != parent_operation
-                                or original.regenerated_from != parent_run
-                                or original.forked_from_run_id != parent_run):
-                            raise AuthorityDenied()
-                    elif (metadata.get("retryOfRunId") or metadata.get("retryOfOperationId")
-                            or original.regenerated_from or original.forked_from_run_id):
-                        raise AuthorityDenied()
+                original = RunOutput.from_dict(raw)
                 native = run_view(original)
                 native["operationId"] = operation_id
                 observed = str(getattr(original.status, "value", original.status)).upper()
