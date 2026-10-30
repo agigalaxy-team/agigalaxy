@@ -86,11 +86,14 @@ func validateConversationOriginal(row Conversation, command *conversationCommand
 	return Object{"runId": runID, "operationId": command.ID, "status": state, "content": nil, "userInput": nil, "createdAt": nil, "events": []any{}, "awaitingHuman": false}, nil
 }
 func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, command *conversationCommand) (Object, error) {
+	return s.nativeOperationLookup(ctx, row, command, true)
+}
+func (s *Conversations) nativeOperationLookup(ctx context.Context, row Conversation, command *conversationCommand, checkTransport bool) (Object, error) {
 	locator, known, err := conversationOriginalLocator(row, command)
 	if err != nil {
 		return nil, err
 	}
-	if known == "" {
+	if known == "" && checkTransport {
 		status := s.Client.Status(ctx)
 		if object(status["conversationTransport"])["originalRunLookup"] != true {
 			return nil, nil
@@ -128,7 +131,8 @@ func (s *Conversations) Operation(ctx context.Context, actor operationspermissio
 	if !validConversationDomain(domain) || !validOperationID(id) {
 		return nil, fail("invalid_operations_agentos_request", 400)
 	}
-	if _, err := s.Session(ctx, actor, domain, false); err != nil {
+	current, err := s.readSession(ctx, actor, domain)
+	if err != nil {
 		return nil, err
 	}
 	saved, err := s.command(ctx, id)
@@ -138,14 +142,8 @@ func (s *Conversations) Operation(ctx context.Context, actor operationspermissio
 	if saved == nil || saved.OperatorID != actor.ID || saved.Domain != domain {
 		return nil, fail("operations_agentos_operation_not_found", 404)
 	}
-	current, err := s.Current(ctx, saved.ConversationID, &actor)
-	if err != nil {
-		if fault.Code(err) != "operations_agentos_source_changed" {
-			return nil, err
-		}
-		result := copyObject(saved.Result)
-		result["state"], result["native"], result["contextChanged"], result["replayed"] = "context-changed", nil, true, true
-		return result, nil
+	if current.Row == nil || current.Row.ID != saved.ConversationID {
+		return nil, fail("operations_agentos_operation_not_found", 404)
 	}
 	target := saved
 	if parent := text(saved.Result, "cancelledOperationId"); parent != "" {
@@ -157,7 +155,7 @@ func (s *Conversations) Operation(ctx context.Context, actor operationspermissio
 			return nil, fail("operations_agentos_operation_conflict", 409)
 		}
 	}
-	native, err := s.nativeOperation(ctx, *current.Row, target)
+	native, err := s.nativeOperationLookup(ctx, *current.Row, target, false)
 	if err != nil {
 		return nil, err
 	}
@@ -167,9 +165,6 @@ func (s *Conversations) Operation(ctx context.Context, actor operationspermissio
 			return nil, err
 		}
 		native = runs[0]
-	}
-	if _, err = s.Current(ctx, current.Row.ID, &actor); err != nil {
-		return nil, err
 	}
 	if native != nil && s.SyncWorkbenchRuns != nil {
 		if err = s.SyncWorkbenchRuns(ctx, *current.Row, []Object{native}); err != nil {
@@ -191,8 +186,12 @@ func (s *Conversations) Operation(ctx context.Context, actor operationspermissio
 	if progress != nil {
 		result["taskProgress"] = progress
 	}
-	if _, err = s.Current(ctx, current.Row.ID, &actor); err != nil {
+	after, err := s.readSession(ctx, actor, domain)
+	if err != nil {
 		return nil, err
+	}
+	if after.Row == nil || after.Row.ID != current.Row.ID {
+		return nil, fail("operations_agentos_context_changed", 409)
 	}
 	if native != nil {
 		result["sentAt"] = native["sentAt"]

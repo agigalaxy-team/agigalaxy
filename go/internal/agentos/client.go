@@ -284,7 +284,23 @@ func (c *Client) ReadConversationOperation(ctx context.Context, e Execution, id 
 	if len(query) != 0 {
 		path += "?" + query.Encode()
 	}
-	return c.request(ctx, e, path, nil, "")
+	if !c.Configured() {
+		return nil, fail("operations_agentos_not_configured", 503)
+	}
+	if e.Mode != "conversation" || e.ID == "" || e.SessionID == "" || !validConversationDomain(e.Domain) || id == "" {
+		return nil, fail("invalid_operations_agentos_request", 400)
+	}
+	bound := Object{}
+	for key, values := range query {
+		bound[key] = values[0]
+	}
+	at := c.now().Unix()
+	claims := Object{"sub": "conversation:" + e.ID, "iss": "galaxy-operations", "aud": "galaxy-agentos", "iat": at, "exp": at + 60, "jti": uuid.NewString(), "scope": "conversation-record", "sid": e.SessionID, "domain": e.Domain, "operationId": id, "locator": bound}
+	token, err := c.signToken(claims)
+	if err != nil {
+		return nil, err
+	}
+	return c.requestToken(ctx, token, path, nil, "")
 }
 
 // ReadConversationText obtains only previously selected native text records.

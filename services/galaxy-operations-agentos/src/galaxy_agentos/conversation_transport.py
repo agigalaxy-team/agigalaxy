@@ -81,9 +81,11 @@ def install_conversation_transport_read(app, runtime, run_view):
         # lookup, including both current checks, off the shared ASGI loop.
         return await asyncio.to_thread(read_original, ident, operation_id,
             dict(request.state.galaxy_execution), request.state.galaxy_user_id,
-            request.scope.get("query_string", b""))
+            request.scope.get("query_string", b""),
+            getattr(request.state, "galaxy_trusted_record", False),
+            getattr(request.state, "galaxy_record_expires_at", None))
 
-    def read_original(ident, operation_id, row, user_id, query):
+    def read_original(ident, operation_id, row, user_id, query, trusted_record=False, record_expires_at=None):
         if row.get("mode") != "conversation" or row["id"] != ident:
             raise AuthorityDenied()
         try:
@@ -92,6 +94,8 @@ def install_conversation_transport_read(app, runtime, run_view):
             locator = operation_read_locator(query)
         except (ValueError, TypeError):
             return JSONResponse({"error": "agentos_query_invalid"}, status_code=400)
+        if trusted_record:
+            return {**read_original_core(ident, operation_id, row, user_id, locator), "readExpiresAt":record_expires_at}
         before = runtime["gateway"].authorize(user_id, operation="read")
         if before.get("execution", {}).get("sessionId") != row["sessionId"]:
             raise AuthorityDenied()

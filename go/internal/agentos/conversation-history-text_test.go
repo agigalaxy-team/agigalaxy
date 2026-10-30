@@ -57,6 +57,17 @@ func TestConversationHistoryPureTextBatchAndIsolation(t *testing.T) {
 	s.SyncWorkbenchRuns = func(context.Context, Conversation, []Object) error { runSyncs.Add(1); return nil }
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
+		if r.Method == "GET" && r.URL.Path == "/galaxy/conversations/"+row.ID+"/operations/"+root {
+			claims, ok := verifyFixtureToken(strings.Repeat("s", 32), strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+			locator := object(claims["locator"])
+			if !ok || claims["scope"] != "conversation-record" || claims["sid"] != row.SessionID || claims["domain"] != row.Domain || claims["sub"] != "conversation:"+row.ID || claims["operationId"] != root || len(locator) != 1 || locator["runId"] != root || r.URL.Query().Get("runId") != root {
+				t.Error("record token not bound to original locator")
+				http.Error(w, "denied", 403)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(Object{"conversationId": row.ID, "sessionId": row.SessionID, "operationId": root, "runId": root, "state": "COMPLETED", "native": Object{"runId": root, "operationId": root, "status": "COMPLETED", "content": "原回复", "events": []any{}}})
+			return
+		}
 		if r.Method != "GET" || r.URL.Path != "/galaxy/conversations/"+row.ID+"/history" {
 			t.Error("history consulted a non-text endpoint", r.Method, r.URL.Path)
 			http.Error(w, "invalid", 500)
@@ -107,6 +118,15 @@ func TestConversationHistoryPureTextBatchAndIsolation(t *testing.T) {
 		if run["operationId"] != root && run["userInput"] != nil {
 			t.Fatal("system feedback became user message", run)
 		}
+	}
+	operation, err := s.Operation(ctx, f.Root, "overview", root)
+	if err != nil || operation["state"] != "COMPLETED" || calls.Load() != 3 || sourceChecks.Load() != 0 {
+		t.Fatal("original operation consulted sources or failed", operation, calls.Load(), sourceChecks.Load(), err)
+	}
+	foreign := f.Root
+	foreign.ID = "foreign-operator"
+	if _, err = s.Operation(ctx, foreign, "overview", root); err == nil || calls.Load() != 3 {
+		t.Fatal("foreign owner reached original operation", err, calls.Load())
 	}
 	for _, invalid := range []int32{1, 2} {
 		mode.Store(invalid)

@@ -34,6 +34,8 @@ class PrivateSurface:
         # Dedicated history capability: no gateway calls or business source
         # checks. A valid scoped token is unusable on every other surface.
         bearer = [v.decode() for k, v in scope.get("headers", []) if k.lower() == b"authorization"]
+        if len(bearer) > 1:
+            return await JSONResponse({"error":"agentos_current_authority_denied"}, status_code=403)(scope, receive, send)
         if len(bearer) == 1 and bearer[0].startswith("Bearer "):
             try:
                 history_claims = jwt.decode(bearer[0][7:], self.settings.verification_key, algorithms=["HS256"],
@@ -56,6 +58,25 @@ class PrivateSurface:
                         return await JSONResponse({"error":"agentos_query_invalid"}, status_code=400)(scope, receive, send)
                     scope.setdefault("state", {})["galaxy_execution"] = {"id":ident, "sessionId":sid, "domain":domain, "mode":"conversation"}
                     scope["state"]["galaxy_user_id"] = user_id
+                    return await self.app(scope, receive, send)
+                except (AuthorityDenied, ValueError, TypeError, KeyError, UnicodeError):
+                    return await JSONResponse({"error":"agentos_current_authority_denied"}, status_code=403)(scope, receive, send)
+            if history_claims.get("scope") == "conversation-record":
+                try:
+                    user_id = history_claims["sub"]
+                    ident = conversation_id(user_id)
+                    sid, domain = history_claims.get("sid"), history_claims.get("domain")
+                    operation, locator = history_claims.get("operationId"), history_claims.get("locator")
+                    if (method != "GET" or not isinstance(operation, str) or str(UUID(operation)) != operation
+                            or path != "/galaxy/conversations/" + ident + "/operations/" + operation
+                            or not isinstance(sid, str) or str(UUID(sid)) != sid
+                            or domain not in {"overview", "governance", "messaging", "discovery", "maintenance"}
+                            or not isinstance(locator, dict) or locator != operation_read_locator(scope.get("query_string", b""))):
+                        raise AuthorityDenied()
+                    scope.setdefault("state", {})["galaxy_execution"] = {"id":ident, "sessionId":sid, "domain":domain, "mode":"conversation"}
+                    scope["state"]["galaxy_user_id"] = user_id
+                    scope["state"]["galaxy_trusted_record"] = True
+                    scope["state"]["galaxy_record_expires_at"] = history_claims["exp"]
                     return await self.app(scope, receive, send)
                 except (AuthorityDenied, ValueError, TypeError, KeyError, UnicodeError):
                     return await JSONResponse({"error":"agentos_current_authority_denied"}, status_code=403)(scope, receive, send)
