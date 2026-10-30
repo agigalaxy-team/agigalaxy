@@ -5,6 +5,8 @@ package agentos
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -258,6 +260,35 @@ func (c *Client) ReadConversationOperation(ctx context.Context, e Execution, id 
 		path += "?" + query.Encode()
 	}
 	return c.request(ctx, e, path, nil, "")
+}
+
+// ConversationOperationRequest carries only server-owned original-operation
+// locators. Unknown run IDs are omitted so the native original lookup can
+// resolve the existing ticket or metadata without scanning conversation history.
+type ConversationOperationRequest struct {
+	OperationID        string `json:"operationId"`
+	RunID              string `json:"runId,omitempty"`
+	RetryOfOperationID string `json:"retryOfOperationId,omitempty"`
+	RetryOfRunID       string `json:"retryOfRunId,omitempty"`
+}
+
+func (c *Client) ReadConversationOperations(ctx context.Context, e Execution, requests []ConversationOperationRequest) (any, error) {
+	if len(requests) == 0 || len(requests) > 10 {
+		return nil, fail("invalid_operations_agentos_request", 400)
+	}
+	seen := map[string]bool{}
+	for _, r := range requests {
+		if !validOperationID(r.OperationID) || seen[r.OperationID] || r.RunID != "" && !nativeRunID.MatchString(r.RunID) || (r.RetryOfOperationID == "") != (r.RetryOfRunID == "") || r.RetryOfOperationID != "" && (!validOperationID(r.RetryOfOperationID) || r.RetryOfOperationID == r.OperationID || !nativeRunID.MatchString(r.RetryOfRunID)) {
+			return nil, streamInvalid()
+		}
+		seen[r.OperationID] = true
+	}
+	raw, err := json.Marshal(requests)
+	if err != nil {
+		return nil, fail("invalid_operations_agentos_request", 400)
+	}
+	query := url.Values{"requests": {base64.RawURLEncoding.EncodeToString(raw)}}
+	return c.request(ctx, e, "/galaxy/conversations/"+url.PathEscape(e.ID)+"/operations?"+query.Encode(), nil, "")
 }
 func (c *Client) CancelConversation(ctx context.Context, e Execution, id string) (any, error) {
 	return c.request(ctx, e, "/agents/galaxy-conversation-"+url.PathEscape(e.Domain)+"/runs/"+url.PathEscape(id)+"/cancel?"+url.Values{"session_id": {e.SessionID}}.Encode(), url.Values{}, "")

@@ -29,57 +29,41 @@ func (s *Conversations) command(ctx context.Context, id string) (*conversationCo
 	return &row, err
 }
 
-func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, command *conversationCommand) (Object, error) {
+func conversationOriginalLocator(row Conversation, command *conversationCommand) (ConversationOperationLocator, string, error) {
+	locator := ConversationOperationLocator{}
 	if command == nil || !validOperationID(command.ID) || row.OperatorID == "" || command.OperatorID != row.OperatorID || command.ConversationID != row.ID || command.Domain != row.Domain {
-		return nil, fail("operations_agentos_operation_conflict", 409)
+		return locator, "", fail("operations_agentos_operation_conflict", 409)
 	}
 	known := text(command.Result, "runId")
 	if command.NativeRunID != nil {
 		known = *command.NativeRunID
-	}
-	// An uncertain original result is never recovered by scanning history or
-	// issuing the command again. The optional locator and parent lineage come
-	// only from the original command's durable record.
-	if known == "" {
-		status := s.Client.Status(ctx)
-		if object(status["conversationTransport"])["originalRunLookup"] != true {
-			return nil, nil
+		if !nativeRunID.MatchString(known) {
+			return locator, "", streamInvalid()
 		}
-	}
-	locator := ConversationOperationLocator{}
-	if command.NativeRunID != nil {
-		if !nativeRunID.MatchString(*command.NativeRunID) {
-			return nil, streamInvalid()
-		}
-		locator.RunID = *command.NativeRunID
+		locator.RunID = known
 	}
 	parentOperation, hasParentOperation := command.Result["retryOfOperationId"]
 	parentRun, hasParentRun := command.Result["retryOfRunId"]
 	if hasParentOperation != hasParentRun {
-		return nil, streamInvalid()
+		return locator, "", streamInvalid()
 	}
 	if hasParentOperation {
 		var operationOK, runOK bool
 		locator.RetryOfOperationID, operationOK = parentOperation.(string)
 		locator.RetryOfRunID, runOK = parentRun.(string)
 		if !operationOK || !runOK || !validOperationID(locator.RetryOfOperationID) || locator.RetryOfOperationID == command.ID || !nativeRunID.MatchString(locator.RetryOfRunID) {
-			return nil, streamInvalid()
+			return locator, "", streamInvalid()
 		}
 	}
-	value, err := s.Client.ReadConversationOperation(ctx, row.Execution(), command.ID, locator)
-	if err != nil {
-		if forbidden(err) {
-			return nil, err
-		}
-		return nil, nil
-	}
-	original := object(value)
+	return locator, known, nil
+}
+
+// Validate one result using the same invariants for single and batch reads.
+func validateConversationOriginal(row Conversation, command *conversationCommand, locator ConversationOperationLocator, known string, original Object) (Object, error) {
 	runID := text(original, "runId")
 	if original["operationId"] != command.ID || command.NativeRunID != nil && original["runId"] != *command.NativeRunID || original["runId"] != nil && (!nativeRunID.MatchString(runID) || known != "" && known != runID) {
 		return nil, streamInvalid()
 	}
-	// The original operation response must remain bound to this conversation
-	// and native session, including missing and not-yet-recorded results.
 	if original["conversationId"] != row.ID || original["sessionId"] != row.SessionID {
 		return nil, streamInvalid()
 	}
@@ -92,8 +76,6 @@ func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, c
 		}
 		return native, nil
 	}
-	// A run discovered without an ACK must include native lineage proof before
-	// the new run ID can be admitted as this retry's original result.
 	if command.NativeRunID == nil && locator.RetryOfRunID != "" {
 		return nil, streamInvalid()
 	}
@@ -102,6 +84,26 @@ func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, c
 		state = "unknown"
 	}
 	return Object{"runId": runID, "operationId": command.ID, "status": state, "content": nil, "userInput": nil, "createdAt": nil, "events": []any{}, "awaitingHuman": false}, nil
+}
+func (s *Conversations) nativeOperation(ctx context.Context, row Conversation, command *conversationCommand) (Object, error) {
+	locator, known, err := conversationOriginalLocator(row, command)
+	if err != nil {
+		return nil, err
+	}
+	if known == "" {
+		status := s.Client.Status(ctx)
+		if object(status["conversationTransport"])["originalRunLookup"] != true {
+			return nil, nil
+		}
+	}
+	value, err := s.Client.ReadConversationOperation(ctx, row.Execution(), command.ID, locator)
+	if err != nil {
+		if forbidden(err) {
+			return nil, err
+		}
+		return nil, nil
+	}
+	return validateConversationOriginal(row, command, locator, known, object(value))
 }
 
 func text(value Object, key string) string { result, _ := value[key].(string); return result }

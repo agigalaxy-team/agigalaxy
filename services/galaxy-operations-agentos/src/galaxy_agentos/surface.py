@@ -12,7 +12,7 @@ from .gateway import AuthorityDenied, AuthorityUnavailable, execution_id, conver
 from .conversation_references import user_public_references
 from .model_settings import model_settings_view, configured_domains
 from .p13_strategies import p13_health
-from .conversation_transport import operation_read_locator
+from .conversation_transport import operation_read_locator, operation_batch_locators
 
 
 class PrivateSurface:
@@ -71,13 +71,15 @@ class PrivateSurface:
             scope["state"]["galaxy_user_id"] = user_id
             read_path = path == ("/galaxy/conversations/" if conversation else "/galaxy/executions/") + ident
             operation_read_path = conversation and re.fullmatch(r"/galaxy/conversations/" + re.escape(ident) + r"/operations/[0-9a-f-]{36}", path)
+            operation_batch_path = conversation and path == "/galaxy/conversations/" + ident + "/operations"
             continue_path = not conversation and path == "/galaxy/executions/" + ident + "/continue"
             native = re.fullmatch(r"/(agents|workflows)/([A-Za-z0-9_-]+)/runs(?:/([A-Za-z0-9_-]+)/(continue|cancel|resume))?", path)
-            if not (read_path and method == "GET" or operation_read_path and method == "GET" or continue_path and method == "POST" or native and method in {"GET", "POST"}):
+            if not (read_path and method == "GET" or operation_read_path and method == "GET" or operation_batch_path and method == "GET" or continue_path and method == "POST" or native and method in {"GET", "POST"}):
                 raise AuthorityDenied()
-            if operation_read_path:
+            if operation_read_path or operation_batch_path:
                 try:
-                    operation_read_locator(scope.get("query_string", b""))
+                    if operation_batch_path: operation_batch_locators(scope.get("query_string", b""))
+                    else: operation_read_locator(scope.get("query_string", b""))
                 except (ValueError, UnicodeError):
                     return await JSONResponse({"error": "agentos_query_invalid"}, status_code=400)(scope, receive, send)
             if native:

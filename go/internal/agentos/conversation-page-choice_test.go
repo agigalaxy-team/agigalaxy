@@ -2,6 +2,7 @@ package agentos
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -46,6 +47,30 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 	insert(feedback, f.Now().Add(9*time.Second), Object{"runId": feedback, "origin": "operation-feedback", "parentOperationId": roots[0]})
 	native := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
+		if id == "operations" {
+			raw, e := base64.RawURLEncoding.DecodeString(r.URL.Query().Get("requests"))
+			if e != nil {
+				t.Error(e)
+				http.Error(w, "invalid", 400)
+				return
+			}
+			var requests []ConversationOperationRequest
+			if e = json.Unmarshal(raw, &requests); e != nil {
+				t.Error(e)
+				http.Error(w, "invalid", 400)
+				return
+			}
+			items := []Object{}
+			for _, request := range requests {
+				run := Object{"runId": request.OperationID, "operationId": request.OperationID, "status": "COMPLETED", "content": "已读", "userInput": "请求", "createdAt": f.Now().Unix(), "events": []any{}}
+				if request.OperationID == retry {
+					run["regeneratedFrom"] = roots[0]
+				}
+				items = append(items, Object{"operationId": request.OperationID, "runId": request.OperationID, "state": "COMPLETED", "native": run})
+			}
+			_ = json.NewEncoder(w).Encode(Object{"conversationId": conversation.ID, "sessionId": conversation.SessionID, "items": items, "readExpiresAt": f.Now().Unix() + 30})
+			return
+		}
 		if !validOperationID(id) {
 			t.Error("history unexpectedly depended on health or full history", r.URL.Path)
 			http.Error(w, "unexpected", 500)

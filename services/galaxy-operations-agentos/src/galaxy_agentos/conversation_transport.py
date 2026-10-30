@@ -1,5 +1,8 @@
 """Exact owned lookup for queued and detached native conversation runs."""
 import asyncio
+import base64
+import binascii
+import json
 import re
 from urllib.parse import parse_qs
 from uuid import UUID
@@ -11,15 +14,10 @@ from sqlalchemy import select
 from .gateway import AuthorityDenied, AuthorityUnavailable
 
 
-def operation_read_locator(query):
-    """A locator is never authority: the stored run must prove the full binding."""
-    values = parse_qs(query.decode(), keep_blank_values=True)
-    if (set(values) - {"runId", "retryOfOperationId", "retryOfRunId"}
-            or any(len(items) != 1 for items in values.values())):
+def _validate_locator(fields):
+    if (not isinstance(fields, dict) or set(fields) - {"runId", "retryOfOperationId", "retryOfRunId"}
+            or not all(isinstance(value, str) for value in fields.values())):
         raise ValueError("agentos_query_invalid")
-    fields = {key: items[0] for key, items in values.items()}
-    if not fields:
-        return fields
     if "runId" in fields and not re.fullmatch(r"[-A-Za-z0-9_]{1,128}", fields["runId"]):
         raise ValueError("agentos_query_invalid")
     if ("retryOfOperationId" in fields) != ("retryOfRunId" in fields):
@@ -30,6 +28,45 @@ def operation_read_locator(query):
             raise ValueError("agentos_query_invalid")
     return fields
 
+def operation_read_locator(query):
+    """A locator is never authority: the stored run must prove the full binding."""
+    values = parse_qs(query.decode(), keep_blank_values=True)
+    if any(len(items) != 1 for items in values.values()):
+        raise ValueError("agentos_query_invalid")
+    return _validate_locator({key: items[0] for key, items in values.items()})
+
+def operation_batch_locators(query):
+    if len(query) > 12000: raise ValueError("agentos_query_invalid")
+    values = parse_qs(query.decode("ascii"), keep_blank_values=True)
+    if set(values) != {"requests"} or len(values["requests"]) != 1:
+        raise ValueError("agentos_query_invalid")
+    encoded = values["requests"][0]
+    if not re.fullmatch(r"[A-Za-z0-9_-]+={0,2}", encoded): raise ValueError("agentos_query_invalid")
+    try:
+        raw = base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True)
+        def unique_pairs(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result: raise ValueError("agentos_query_invalid")
+                result[key] = value
+            return result
+        entries = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_pairs)
+    except (ValueError, UnicodeError, binascii.Error):
+        raise ValueError("agentos_query_invalid") from None
+    if not isinstance(entries, list) or not 1 <= len(entries) <= 10:
+        raise ValueError("agentos_query_invalid")
+    result, seen = [], set()
+    for entry in entries:
+        if not isinstance(entry, dict) or "operationId" not in entry: raise ValueError("agentos_query_invalid")
+        operation = entry["operationId"]
+        try:
+            if not isinstance(operation, str) or str(UUID(operation)) != operation or operation in seen: raise ValueError()
+        except (ValueError, TypeError, AttributeError):
+            raise ValueError("agentos_query_invalid") from None
+        seen.add(operation)
+        result.append((operation, _validate_locator({key:value for key,value in entry.items() if key != "operationId"})))
+    return result
+
 
 def install_conversation_transport_read(app, runtime, run_view):
     @app.get("/galaxy/conversations/{ident}/operations/{operation_id}")
@@ -39,6 +76,29 @@ def install_conversation_transport_read(app, runtime, run_view):
         return await asyncio.to_thread(read_original, ident, operation_id,
             dict(request.state.galaxy_execution), request.state.galaxy_user_id,
             request.scope.get("query_string", b""))
+
+    @app.get("/galaxy/conversations/{ident}/operations")
+    async def original_conversation_runs(ident: str, request: Request):
+        return await asyncio.to_thread(read_batch, ident, dict(request.state.galaxy_execution),
+            request.state.galaxy_user_id, request.scope.get("query_string", b""))
+
+    def read_batch(ident, row, user_id, query):
+        if row.get("mode") != "conversation" or row["id"] != ident:
+            raise AuthorityDenied()
+        try:
+            locators = operation_batch_locators(query)
+        except (ValueError, UnicodeError):
+            return JSONResponse({"error":"agentos_query_invalid"}, status_code=400)
+        # The middleware has performed the current authority check before
+        # assigning row/user_id. Recheck once after every owned lookup.
+        items = [read_original_core(ident, operation_id, row, user_id, locator)
+            for operation_id, locator in locators]
+        current = runtime["gateway"].authorize(user_id, operation="read")
+        if current.get("execution", {}).get("sessionId") != row["sessionId"]:
+            raise AuthorityDenied()
+        for item in items: item["readExpiresAt"] = current.get("readExpiresAt")
+        return {"conversationId":ident, "sessionId":row["sessionId"], "items":items,
+            "readExpiresAt":current.get("readExpiresAt")}
 
     def read_original(ident, operation_id, row, user_id, query):
         if row.get("mode") != "conversation" or row["id"] != ident:
@@ -52,6 +112,13 @@ def install_conversation_transport_read(app, runtime, run_view):
         before = runtime["gateway"].authorize(user_id, operation="read")
         if before.get("execution", {}).get("sessionId") != row["sessionId"]:
             raise AuthorityDenied()
+        result = read_original_core(ident, operation_id, row, user_id, locator)
+        current = runtime["gateway"].authorize(user_id, operation="read")
+        if current.get("execution", {}).get("sessionId") != row["sessionId"]:
+            raise AuthorityDenied()
+        return {**result, "readExpiresAt":current.get("readExpiresAt")}
+
+    def read_original_core(ident, operation_id, row, user_id, locator):
         db = runtime["db"]
         run_id, state, ticket = locator.get("runId"), "unknown", None
         strict_binding = bool(locator)
@@ -138,9 +205,6 @@ def install_conversation_transport_read(app, runtime, run_view):
                 # A candidate that disappeared before its PK/lineage check is
                 # not a verified new locator. Keep the caller's ACK unresolved.
                 run_id = None
-        current = runtime["gateway"].authorize(user_id, operation="read")
-        if current.get("execution", {}).get("sessionId") != row["sessionId"]:
-            raise AuthorityDenied()
-        return {"conversationId": ident, "sessionId": row["sessionId"], "operationId": operation_id, "runId": run_id, "state": state, "native": native,
-            "readExpiresAt": current.get("readExpiresAt")}
+        return {"conversationId":ident, "sessionId":row["sessionId"], "operationId":operation_id,
+            "runId":run_id, "state":state, "native":native}
 

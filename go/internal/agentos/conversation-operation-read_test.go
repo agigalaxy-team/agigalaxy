@@ -84,7 +84,12 @@ func TestNativeOperationExactLookupPrecedesHistory(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			value, err := (&Conversations{Client: client}).nativeOperation(context.Background(), row, command)
+			local := *command
+			local.Result = copyObject(command.Result)
+			if mode == "legacy" {
+				delete(local.Result, "runId")
+			}
+			value, err := (&Conversations{Client: client}).nativeOperation(context.Background(), row, &local)
 			switch {
 			case mode == "forbidden":
 				if fault.Status(err) != 403 {
