@@ -14,6 +14,7 @@ from agno.models.message import Message
 from agno.models.response import ModelResponse
 from agno.run.agent import RunInput, RunOutput
 from galaxy_agentos.conversation_turn_context import with_conversation_turn_context
+from galaxy_agentos.conversation_turn_state import turn_state, RECEIPT_FEEDBACK
 from galaxy_agentos.model_usage import _RUN, install_usage_scope
 
 
@@ -54,6 +55,39 @@ class TurnContextTests(unittest.TestCase):
                 self.assertEqual(event["currentToolCount"], 0)
             finally:
                 _RUN.reset(token)
+
+    def test_original_receipt_projects_business_only_across_model_paths(self):
+        model=with_conversation_turn_context(Model()); source=Message(role="user",content="原轮")
+        run=RunOutput(run_id="receipt-run",metadata={"operationId":"current-turn"})
+        original={"cardId":"CARD-SECRET-LOCATOR", "operationId":"ORIGINAL-SECRET-LOCATOR", "parentTurnId":"PARENT-SECRET-LOCATOR", "state":"completed", "effectExecuted":True,
+            "presentation":{"summary":"调整推荐设置", "changes":[{"label":"避免重复", "before":"关闭", "after":"开启"}], "details":[{"label":"范围","value":"推荐策略"}], "warnings":["以实际结果为准"], "reviewable":True, "operationId":"UNTRUSTED-EXTRA"},
+            "receipt":{"state":"recorded", "summary":"变更已记录", "cardId":"UNTRUSTED-EXTRA"}}
+        turn_state(run)[RECEIPT_FEEDBACK]=original; token=_RUN.set(run)
+        try:
+            for mode in ("invoke","ainvoke","invoke_stream","ainvoke_stream"):
+                with patch("builtins.print"):
+                    if mode=="invoke": messages=model.invoke([source])
+                    elif mode=="ainvoke": messages=asyncio.run(model.ainvoke([source]))
+                    elif mode=="invoke_stream": messages=list(model.invoke_stream([source]))[0]
+                    else:
+                        async def collect(): return [v async for v in model.ainvoke_stream([source])]
+                        messages=asyncio.run(collect())[0]
+                content=messages[0].content
+                for forbidden in ("CARD-SECRET-LOCATOR","ORIGINAL-SECRET-LOCATOR","PARENT-SECRET-LOCATOR","UNTRUSTED-EXTRA","cardId","operationId","parentTurnId","completed","recorded","effectExecuted"):
+                    self.assertNotIn(forbidden,content)
+                for expected in ("调整推荐设置","避免重复","关闭","开启","处理已结束","已记录","已执行","变更已记录"):
+                    self.assertIn(expected,content)
+                self.assertIs(messages[1],source); self.assertEqual(turn_state(run)[RECEIPT_FEEDBACK],original)
+        finally: _RUN.reset(token)
+    def test_unknown_and_oversized_receipt_keeps_business_summary_without_internal_ids(self):
+        model=with_conversation_turn_context(Model()); run=RunOutput(run_id="r",metadata={"operationId":"o"})
+        turn_state(run)[RECEIPT_FEEDBACK]={"cardId":"hidden-card", "operationId":"hidden-operation", "parentTurnId":"hidden-parent", "state":"future-unrecognized", "effectExecuted":None, "presentation":{"summary":"原操作摘要", "details":[{"label":"内容", "value":"字"*5000} for _ in range(3)]}, "receipt":{"state":"future-value", "summary":"真实回执摘要"}}
+        token=_RUN.set(run)
+        try:
+            with patch("builtins.print"): content=model.invoke([Message(role="user",content="继续")])[0].content
+            self.assertIn("原操作摘要",content); self.assertIn("真实回执摘要",content); self.assertIn("尚未确认",content); self.assertIn("详细内容过长",content)
+            for forbidden in ("hidden-card","hidden-operation","hidden-parent","future-unrecognized","future-value"): self.assertNotIn(forbidden,content)
+        finally: _RUN.reset(token)
 
     def test_two_native_runs_preserve_current_user_without_replaying_old_tool(self):
         calls = []
