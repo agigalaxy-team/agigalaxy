@@ -1,10 +1,16 @@
 import asyncio
 import unittest
+from dataclasses import dataclass, field
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from agno.exceptions import ModelProviderError
 from agno.models.message import Message
+from agno.models.response import ModelResponse
+from agno.agent import Agent
+from agno.metrics import MessageMetrics
+from agno.models.openai.chat import OpenAIChat
+from agno.run.agent import RunOutput
 
 from galaxy_agentos.gateway import AuthorityDenied
 from galaxy_agentos.model_gate import with_current_authority
@@ -85,6 +91,49 @@ class Model:
 
 
 class ProviderRetry(unittest.TestCase):
+    def test_native_async_stream_malformed_recovers_nonstream_tool_once_and_usage(self):
+        @dataclass
+        class Native(OpenAIChat):
+            id: str = 'synthetic-native'
+            stream_calls: int = 0
+            full_calls: int = 0
+            seen: list = field(default_factory=list)
+            async def ainvoke_stream(self, messages, assistant_message, **kwargs):
+                self.stream_calls += 1
+                if self.stream_calls == 1:
+                    assistant_message.content = 'discarded partial'
+                    raise gateway_malformed_response()
+                yield ModelResponse(content='完成')
+            async def ainvoke(self, messages, assistant_message, **kwargs):
+                self.full_calls += 1
+                self.seen = list(messages)
+                if assistant_message.content is not None:
+                    raise AssertionError('failed assistant was not restored')
+                return ModelResponse(role='assistant', tool_calls=[{'id':'call__thought__opaque', 'type':'function',
+                    'function':{'name':'read_once', 'arguments':'{}'}}],
+                    response_usage=MessageMetrics(input_tokens=17, output_tokens=5, total_tokens=22))
+        calls = []
+        def read_once() -> str:
+            """Read once."""
+            calls.append('read')
+            return 'actual result'
+        async def run():
+            model = with_provider_retry(Native())
+            agent = Agent(model=model, tools=[read_once], instructions=['原系统'], telemetry=False)
+            events = [event async for event in agent.arun('原任务', stream=True, yield_run_output=True)]
+            result = next(event for event in events if isinstance(event, RunOutput))
+            self.assertEqual(result.status.value, 'COMPLETED')
+            self.assertEqual(calls, ['read'])
+            self.assertEqual((model.stream_calls, model.full_calls), (2, 1))
+            self.assertTrue(any('正常文本或合法的必要工具调用' in str(m.content) for m in model.seen if m.role == 'system'))
+            self.assertEqual(result.metrics.input_tokens, 17)
+            self.assertEqual(result.metrics.output_tokens, 5)
+            assistant = next(m for m in result.messages if m.role == 'assistant' and m.tool_calls)
+            tool = next(m for m in result.messages if m.role == 'tool')
+            self.assertEqual(assistant.tool_calls[0]['id'], 'call__thought__opaque')
+            self.assertEqual(tool.tool_call_id, assistant.tool_calls[0]['id'])
+        asyncio.run(run())
+
     @patch('galaxy_agentos.provider_retry.time.sleep')
     def test_malformed_retry_guidance_keeps_messages_and_never_replays_partial(self, _sleep):
         class Capture(Model):
@@ -97,23 +146,23 @@ class ProviderRetry(unittest.TestCase):
             messages = [Message(role='system',content='原系统'), Message(role='user',content='原任务'),
                 Message(role='assistant',tool_calls=[{'id':'prior', 'type':'function', 'function':{'name':'read', 'arguments':'{}'}}]),
                 Message(role='tool',tool_call_id='prior',content='原结果')]
-            model = with_provider_retry(Capture([gateway_malformed(), ['ok'] if 'stream' in mode else 'ok']))
+            model = with_provider_retry(Capture([gateway_malformed(), ModelResponse(content='ok') if 'stream' in mode else 'ok']))
             if mode == 'invoke': result = model.invoke(messages=messages)
             elif mode == 'ainvoke': result = asyncio.run(model.ainvoke(messages=messages))
             elif mode == 'invoke_stream': result = list(model.invoke_stream(messages=messages))
             else: result = asyncio.run(astream(model, messages))
-            self.assertEqual(result, ['ok'] if 'stream' in mode else 'ok')
+            self.assertEqual(result[0].content if 'stream' in mode else result, 'ok')
             self.assertEqual(model.calls, 2)
             self.assertIn('工具名及参数', model.seen[1][0].content)
             self.assertEqual(messages[0].content, '原系统')
             self.assertEqual([m.role for m in model.seen[1]], ['system','user','assistant','tool'])
             self.assertEqual(model.seen[1][2].tool_calls[0]['id'], model.seen[1][3].tool_call_id)
-            other = with_provider_retry(Capture([gateway_malformed_response(), ['ok'] if 'stream' in mode else 'ok']))
+            other = with_provider_retry(Capture([gateway_malformed_response(), ModelResponse(content='ok') if 'stream' in mode else 'ok']))
             if mode == 'invoke': result = other.invoke(messages=messages)
             elif mode == 'ainvoke': result = asyncio.run(other.ainvoke(messages=messages))
             elif mode == 'invoke_stream': result = list(other.invoke_stream(messages=messages))
             else: result = asyncio.run(astream(other, messages))
-            self.assertEqual(result, ['ok'] if 'stream' in mode else 'ok')
+            self.assertEqual(result[0].content if 'stream' in mode else result, 'ok')
             self.assertIn('正常文本或合法的必要工具调用', other.seen[1][0].content)
             self.assertEqual(messages[0].content, '原系统')
             self.assertEqual([m.role for m in other.seen[1]], ['system','user','assistant','tool'])

@@ -3,11 +3,13 @@ import asyncio
 import json
 import time
 from copy import deepcopy
+from dataclasses import replace
 from contextvars import ContextVar
 from functools import wraps
 
 from agno.exceptions import ModelProviderError
 from agno.models.message import Message
+from agno.models.response import ModelResponse
 
 from .model_failover import provider_failure
 from .model_usage import _RUN
@@ -113,6 +115,18 @@ def _retry_snapshot(snapshot, failure):
             if system is None: messages.insert(0, Message(role='system', content=guidance))
             else: system.content += '\n' + guidance
     return args, kwargs
+
+
+def _as_stream_delta(response):
+    from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
+    if not isinstance(response, ModelResponse):
+        raise ModelProviderError('agentos_malformed_recovery_invalid_response')
+    calls = []
+    for index, item in enumerate(response.tool_calls or []):
+        if not isinstance(item, dict) or 'index' in item:
+            raise ModelProviderError('agentos_malformed_recovery_invalid_tool')
+        calls.append(ChoiceDeltaToolCall(index=index, **item))
+    return replace(response, tool_calls=calls)
 
 
 def _assistant_snapshot(args, kwargs):
@@ -224,7 +238,10 @@ def with_provider_retry(model):
             _restore_assistant(assistant)
             try:
                 retry_args, retry_kwargs = _retry_snapshot(snapshot, failure)
-                yield from invoke_stream(*retry_args, **retry_kwargs)
+                if failure.get('malformed'):
+                    yield _as_stream_delta(invoke(*retry_args, **retry_kwargs))
+                else:
+                    yield from invoke_stream(*retry_args, **retry_kwargs)
             except ModelProviderError as second:
                 _finished(kwargs, second)
                 raise
@@ -248,8 +265,11 @@ def with_provider_retry(model):
             _restore_assistant(assistant)
             try:
                 retry_args, retry_kwargs = _retry_snapshot(snapshot, failure)
-                async for chunk in ainvoke_stream(*retry_args, **retry_kwargs):
-                    yield chunk
+                if failure.get('malformed'):
+                    yield _as_stream_delta(await ainvoke(*retry_args, **retry_kwargs))
+                else:
+                    async for chunk in ainvoke_stream(*retry_args, **retry_kwargs):
+                        yield chunk
             except ModelProviderError as second:
                 _finished(kwargs, second)
                 raise
