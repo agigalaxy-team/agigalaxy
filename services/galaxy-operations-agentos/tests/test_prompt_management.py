@@ -124,7 +124,9 @@ class PromptManagementNativeTest(unittest.TestCase):
         self.assertNotIn("当前新岗位文本丙", other.content)
         self.assertEqual(self.second.metadata["rolePromptVersion"], 7)
         self.assertEqual(agent.metadata, shared)
-        self.assertTrue(all(call[1] == {"operation": "run"} for call in self.gateway.calls))
+        self.assertIn((self.first.user_id, {"operation": "run", "turn_id": self.first.metadata["operationId"]}), self.gateway.calls)
+        self.assertTrue(all(call[1] in ({"operation": "run"},
+            {"operation": "run", "turn_id": self.first.metadata["operationId"]}) for call in self.gateway.calls))
 
     def test_current_context_and_closed_prompt_fail_before_any_model(self):
         row = self.gateway.rows[self.first.user_id]
@@ -193,8 +195,9 @@ class ManagementToolNativeTest(unittest.TestCase):
                 return {"state": "prepared"} if tool == "prepare-operation" else {"items": []}
         tools = conversation_tools(Gateway())
         self.assertEqual([tool.name if isinstance(tool, Function) else tool.__name__ for tool in tools], ["query_operations", "read_operation_object",
-            "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "prepare_operation"])
-        prepare, read = tools[-1], tools[-2]
+            "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "plan_turn", "assess_turn", "prepare_operation"])
+        prepare = next(tool for tool in tools if tool.__name__ == "prepare_operation")
+        read = next(tool for tool in tools if tool.__name__ == "read_ai_delegation")
         schema = Function.from_callable(prepare)
         schema.process_entrypoint()
         # Agno resolves Pydantic's discriminated union into the provider-facing

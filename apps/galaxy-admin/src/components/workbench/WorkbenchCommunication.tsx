@@ -359,7 +359,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
     <div ref={conversationElement} id={panelId+'-conversation'} className="wb-conversation" hidden={!focused}>
       <div ref={conversationContent} className="wb-conversation-content">
       {data.olderHasMore&&<button type="button" className="wb-text-button" disabled={data.moreLoading} onClick={()=>void loadHistory()}>{data.moreLoading?'正在读取…':'更多历史记录'}</button>}
-      {data.moreError&&<p role="alert">{data.moreError}</p>}{data.pageCardError&&<p role="alert">{data.pageCardError} <button type="button" className="wb-text-button" onClick={data.refreshPageCards}>重试</button></p>}
+      {data.moreError&&<p role="alert">{data.moreError}</p>}{data.pageCardError&&<p role="alert">{data.pageCardError} <button type="button" className="wb-text-button" onClick={data.refreshPageCards}>重新加载操作记录</button></p>}
       <ReadStatus loading={data.history.loading} error={data.history.error} retry={data.history.read}/>
       {domain==='overview'&&<><ReadStatus loading={data.management.loading} error={data.management.error} retry={data.management.read}/>{!data.denied&&data.management.available&&<WorkbenchManagementCapabilities value={data.management.value?.managementCapabilities??null}/>}</>}
       <div className="wb-query-presets" aria-label="预设查询">{queries.map(query=><button type="button" key={query.label} disabled={!canUseDomain} onClick={()=>{updateDraft(query.text);input.current?.focus();}}>{query.label}</button>)}</div>

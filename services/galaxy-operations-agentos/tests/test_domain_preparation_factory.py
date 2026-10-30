@@ -56,7 +56,7 @@ class FixedDomainPreparationContract(unittest.TestCase):
                     functions = agent.tools
                     self.assertEqual([fn.name for fn in functions], ['current_summary', 'query_operations',
                         'read_operation_object', 'list_authorized_work', 'run_authorized_work',
-                        'read_task_operation', 'read_ai_delegation', 'prepare_operation'])
+                        'read_task_operation', 'read_ai_delegation', 'plan_turn', 'assess_turn', 'prepare_operation'])
                     self.assertEqual(functions[0].parameters['properties'], {})
                     schemas.append(functions[-1].parameters)
                     context = RunContext(run_id=str(uuid4()), user_id='conversation:'+str(uuid4()),

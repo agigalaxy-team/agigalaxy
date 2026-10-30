@@ -62,3 +62,10 @@ func TestCardPresentationComparesPartialWithoutDeletingOmittedFields(t *testing.
 		t.Fatalf("unexpected change: %#v", c)
 	}
 }
+
+func TestCardPresentationUnchangedOpaqueFieldsDoNotBlockActualDifference(t *testing.T) {
+	result := cardPresentation(Object{"title": "调整策略", "impact": []any{`变更前完整配置（1/1）：{"common":{"automationEnabled":false},"unchanged":{"internal":"c7c81457-0134-4e50-bb94-dac87ba27cff"}}`, `变更后完整配置（1/1）：{"common":{"automationEnabled":true},"unchanged":{"internal":"c7c81457-0134-4e50-bb94-dac87ba27cff"}}`}, "basis": []any{}})
+	if result["reviewable"] != true || len(result["changes"].([]any)) != 1 {
+		t.Fatal(result)
+	}
+}

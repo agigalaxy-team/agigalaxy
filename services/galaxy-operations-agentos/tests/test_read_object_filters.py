@@ -16,7 +16,7 @@ class ReadObjectFilters(unittest.TestCase):
                 calls.append({'tool': tool, 'arguments': arguments, **binding})
                 return {'availability': 'available', 'data': {'source': 'local explicit transport double'}}
         tools = conversation_tools(Gateway())
-        self.assertEqual([fn.__name__ for fn in tools], ['query_operations', 'read_operation_object', 'list_authorized_work', 'run_authorized_work', 'read_task_operation', 'read_ai_delegation', 'prepare_operation'])
+        self.assertEqual([fn.__name__ for fn in tools], ['query_operations', 'read_operation_object', 'list_authorized_work', 'run_authorized_work', 'read_task_operation', 'read_ai_delegation', 'plan_turn', 'assess_turn', 'prepare_operation'])
         def exported(fn):
             f = Function.from_callable(fn)
             f.process_entrypoint()
