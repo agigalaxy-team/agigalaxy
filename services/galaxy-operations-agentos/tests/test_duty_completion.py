@@ -15,7 +15,8 @@ class Gateway:
     def __init__(self, states):
         self.states = iter(states)
     def duty_authorize(self, _user, *, operation):
-        return {"task": {"completion": {"disposition": next(self.states)}}}
+        value=next(self.states)
+        return {"task": {"completion": value if isinstance(value, dict) else {"disposition":value}}}
 
 
 class Model:
@@ -101,9 +102,27 @@ class CompletionTests(unittest.TestCase):
 
     def test_new_scope_or_changed_fact_resets_progress(self):
         values = [ModelResponse(tool_executions=[ToolExecution(tool_call_id=str(i), tool_name="query_operations", tool_args={"module":"feedback", "view":"list", "filters":{"state": state}}, result=json.dumps({"availability":"available", "data":{"items":[state]}}))]) for i, state in enumerate(["pending", "pending", "closed", "closed"])]
-        model = with_duty_completion(Model(values), Gateway(["continue", "continue", "continue", "completed"]))
+        model = with_duty_completion(Model(values), Gateway([{"disposition":"continue", "modelAssessment":{"remainingWork":[{"kind":"read","description":"范围一"}]}},
+                {"disposition":"continue", "modelAssessment":{"remainingWork":[{"kind":"read","description":"范围二"}]}}, "continue", "completed"]))
         run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={})
         self.assertIsNotNone(model.response(messages=[], run_response=run))
+
+    def test_failure_alternative_and_many_progress_steps_continue(self):
+        values=[]
+        for i in range(6):
+            values.append(ModelResponse(content="完成" if i==5 else "尝试",tool_executions=[ToolExecution(tool_call_id=str(i),tool_name="query_operations",tool_args={"view":"method"+str(i)},result=json.dumps({"state":"unavailable" if i<5 else "completed"}))]))
+        model=with_duty_completion(Model(values),Gateway(["continue"]*5+["completed"]))
+        run=SimpleNamespace(user_id="autonomy:test",requirements=[],metadata={})
+        result=model.response(messages=[Message(role="user",content="原问题")],run_response=run)
+        self.assertEqual(result.content,"完成"); self.assertEqual(len(result.tool_executions),6)
+    def test_prompt_updates_single_system_without_new_user_messages(self):
+        values=[ModelResponse(tool_executions=[ToolExecution(tool_call_id=str(i),tool_name="query_operations",tool_args={"page":i},result=json.dumps({"state":"available","page":i}))]) for i in range(3)]
+        model=with_duty_completion(Model(values),Gateway(["continue","continue","completed"]))
+        run=SimpleNamespace(user_id="autonomy:test",requirements=[],metadata={}); original=Message(role="user",content="原任务")
+        messages=[Message(role="system",content="原规则"),original]; model.response(messages=messages,run_response=run)
+        self.assertEqual([m.role for m in messages],["system","user"]); self.assertIs(messages[1],original)
+        from galaxy_agentos.duty_completion import _CONTROL_MARKER
+        self.assertEqual(messages[0].content.count(_CONTROL_MARKER),1); self.assertIn("原规则",messages[0].content)
 
     def test_no_progress_bounded(self):
         model = with_duty_completion(Model([ModelResponse(content="no") for _ in range(3)]), Gateway(["continue"] * 3))

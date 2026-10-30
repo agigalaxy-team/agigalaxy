@@ -63,6 +63,9 @@ class NodeTransport:
             return httpx.Response(200, json={"allowed": True, "execution": dict(self.row),
                 "resourceIds": ["galaxy-conversation-overview"], "readExpiresAt": int(time.time()) + 30})
         tool = value["tool"]
+        if tool == "assess-conversation-task":
+            args=value["arguments"]; phase="waiting-confirmation" if args["disposition"]=="awaiting-confirmation" else args["disposition"]
+            return httpx.Response(200,json={"state":"recorded", "taskProgress":{"phase":phase,"remaining":args["remaining"]}})
         if tool in {"query-operations", "read-operation-object"}:
             data = {"count": 2, "publicExcerpt": PUBLIC_TOOL_BODY}
             return httpx.Response(200, json={"tool": tool, "module": "content", "view": "list",
@@ -230,7 +233,8 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 ("list_authorized_work", {}),
                 ("run_authorized_work", {"execution_id": node.execution_id}),
                 ("prepare_operation", {"operation": {"kind": "feedback-update", "targetId": node.object_id,
-                    "state": "processing"}})]
+                    "state": "processing"}}),
+                ("assess_turn", {"disposition":"needs-information", "reason":"制卡回执未确认", "remaining":["核对原处理"]})]
             model = BusinessToolModel(plan=plan)
             agents = conversation_agents(settings=settings(), db=db, gateway=gateway,
                 domains={"overview": "运营概览"}, active_domains={"overview"}, model_factory=lambda: model)
@@ -260,7 +264,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertIn("ToolCallCompleted", response.text)
                 packets = [value for path, value in node.calls if path.endswith("/tools/execute")]
-                self.assertEqual([value["tool"] for value in packets], [name.replace("_", "-") for name, _ in plan])
+                self.assertEqual([value["tool"] for value in packets], ["assess-conversation-task" if name == "assess_turn" else name.replace("_", "-") for name, _ in plan])
                 for index, packet in enumerate(packets, 1):
                     self.assertEqual(set(packet), {"conversationId", "sessionId", "turnId", "runId", "callId", "tool", "arguments"})
                     self.assertEqual(packet["conversationId"], row["id"])
@@ -275,7 +279,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 stored = db.get_run(run_id=packets[0]["runId"], deserialize=False)["run_data"]
                 self.assertNotIn(PUBLIC_TOOL_BODY, json.dumps(stored))
                 self.assertNotIn("forged-by-model", json.dumps(stored))
-                self.assertEqual(len(stored["tools"]), 5)
+                self.assertEqual(len(stored["tools"]), 6)
                 self.assertTrue(all(item.get("result") is None and item.get("tool_args") is None for item in stored["tools"]))
                 self.assertTrue(any(item["event"] == "ToolCallCompleted" for item in stored["events"]))
                 history = client.get("/galaxy/conversations/" + row["id"], headers=headers)
@@ -341,7 +345,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 self.assertIn("方案已准备，请在下方确认。当前尚未执行。", response.text)
                 self.assertNotIn("已准备确认卡，请人工确认。", response.text)
                 packets = [value for path,value in node.calls if path.endswith("/tools/execute")]
-                self.assertEqual(len(packets), 2)
+                self.assertEqual(len(packets), 3)
                 stored = db.get_run(run_id=packets[0]["runId"], deserialize=False)["run_data"]
                 self.assertEqual(stored["content"], "方案已准备，请在下方确认。当前尚未执行。")
                 self.assertNotIn("已准备确认卡，请人工确认。", json.dumps(stored, ensure_ascii=False))
@@ -371,7 +375,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 self.assertEqual(response.status_code,200,response.text)
                 self.assertEqual(model.calls,4); self.assertNotIn("已生成确认卡",response.text); self.assertIn("请明确需要处理的对象",response.text)
                 packets=[value for path,value in node.calls if path.endswith("/tools/execute")]
-                self.assertEqual([p["tool"] for p in packets],["query-operations"])
+                self.assertEqual([p["tool"] for p in packets],["query-operations", "assess-conversation-task"])
                 stored=db.get_run(run_id=packets[0]["runId"],deserialize=False)["run_data"]
                 self.assertEqual(stored["metadata"]["modelCalls"],4)
                 self.assertNotIn("_galaxyPreparedCardIds",stored["metadata"])

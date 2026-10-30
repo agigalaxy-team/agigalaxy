@@ -8,6 +8,8 @@ PREPARED_CARD_IDS = "_galaxyPreparedCardIds"
 PREPARED_FINGERPRINTS = "_galaxyPreparedFingerprints"
 PREPARE_UNKNOWN = "_galaxyPrepareUnknown"
 RECEIPT_FEEDBACK = "_galaxyReceiptFeedback"
+TASK_PROGRESS = "_galaxyTaskProgress"
+TASK_CONTEXT = "_galaxyTaskContext"
 
 def turn_state(value):
     if value is None: return {}

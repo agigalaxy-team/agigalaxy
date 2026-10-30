@@ -1,0 +1,2 @@
+ALTER TABLE operations_agentos_conversation_tool_calls_v1 DROP CONSTRAINT operations_conversation_tool_v4;
+ALTER TABLE operations_agentos_conversation_tool_calls_v1 ADD CONSTRAINT operations_conversation_tool_v5 CHECK(tool IN ('workbench-summary','query-operations','read-operation-object','list-authorized-work','run-authorized-work','prepare-operation','read-ai-delegation','read-task-operation','plan-conversation-turn','assess-conversation-task'));

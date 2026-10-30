@@ -306,6 +306,15 @@ func (s *Conversations) AuthorizeNative(ctx context.Context, input Object) (Obje
 			return nil, e
 		}
 		out["turnPlan"] = plan
+		progress, taskContext, e := s.conversationTaskContext(ctx, *row, turn)
+		if e != nil {
+			return nil, e
+		}
+		if current, e = s.Current(ctx, id, nil); e != nil {
+			return nil, e
+		}
+		out["readExpiresAt"] = current.ReadExpiresAt
+		out["taskProgress"], out["taskContext"] = progress, taskContext
 		feedback, e := s.receiptFeedback(ctx, *row, command)
 		if e != nil {
 			return nil, e

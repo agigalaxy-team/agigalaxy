@@ -213,7 +213,7 @@ def reliable_function(fn, *, on_read_validation_failure=None):
     def invoke(run_context: RunContext, fc: FunctionCall, **arguments):
         if set(fc.arguments or {}).intersection({"run_context", "fc", "agent", "team"}):
             raise AuthorityDenied("agentos_injected_arguments_forbidden")
-        if native.name not in {"assess_turn", "plan_turn"}:
+        if native.name != "assess_turn":
             turn = turn_state(run_context)
             turn[ACTIVITY] = turn.get(ACTIVITY, 0) + 1
         values = _normalize(native.name, arguments, schema)

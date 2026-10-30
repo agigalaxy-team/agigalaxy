@@ -182,6 +182,16 @@ func (s *Conversations) Operation(ctx context.Context, actor operationspermissio
 		state = "unknown"
 	}
 	result["state"], result["native"], result["replayed"] = state, native, true
+	progress, err := s.recordedConversationTaskProgress(ctx, *current.Row, target.ID)
+	if err != nil {
+		return nil, err
+	}
+	if progress != nil {
+		result["taskProgress"] = progress
+	}
+	if _, err = s.Current(ctx, current.Row.ID, &actor); err != nil {
+		return nil, err
+	}
 	if native != nil {
 		result["sentAt"] = native["sentAt"]
 	}

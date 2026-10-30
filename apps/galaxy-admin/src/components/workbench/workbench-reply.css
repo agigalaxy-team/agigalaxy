@@ -27,3 +27,9 @@
 .galaxy-workbench .wb-compose-status{flex:none;text-align:center;color:var(--wb-muted);font-size:11px;line-height:1.6}
 .galaxy-workbench .wb-compose-status:empty{display:none}
 .galaxy-workbench .wb-compose-status :is(p,output){display:block;margin:0 0 8px}
+
+.galaxy-workbench .wb-task-progress{display:flex;align-items:baseline;gap:12px;margin:12px 0 2px;color:var(--wb-muted);font-size:11px;line-height:1.7}
+.galaxy-workbench .wb-task-progress-label{flex:none}
+.galaxy-workbench .wb-task-progress details{min-width:0}
+.galaxy-workbench .wb-task-progress summary{cursor:pointer}
+.galaxy-workbench .wb-task-progress ul{margin:5px 0 0;padding-left:16px;overflow-wrap:anywhere}

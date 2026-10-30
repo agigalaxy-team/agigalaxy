@@ -402,4 +402,4 @@ def conversation_tools(gateway, *, domain=None):
         name + " " + "/".join(sorted(views)) for name, views in VIEWS.items()) + "."
     return [query_operations, read_operation_object, list_authorized_work,
         run_authorized_work, task_operation_tool(send), read_ai_delegation,
-        plan_turn_tool(send), assess_turn_tool(), prepare_operation]
+        plan_turn_tool(send), assess_turn_tool(send), prepare_operation]

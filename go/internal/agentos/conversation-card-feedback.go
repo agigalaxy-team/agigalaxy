@@ -2,12 +2,13 @@ package agentos
 
 import (
 	"context"
+	"strings"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/google/uuid"
 )
 
-const feedbackMessage = "请根据本次确认操作的原回执说明实际结果，并判断原事项是否已完成。未核实的结果不能当作成功；不要重复执行原操作。"
+const feedbackMessage = "继续原任务：结合本次操作结果判断下一步，完成全部目标后再结束。不要重复执行原操作。"
 
 func feedbackOperation(card *conversationCard) string {
 	parent, err := uuid.Parse(card.OperationID)
@@ -37,7 +38,7 @@ func (t *ConversationTools) CardFeedback(ctx context.Context, human operationspe
 	if !start {
 		return Object{"operationId": operation, "runId": nil, "state": "not-started", "native": nil}, nil
 	}
-	if !cardAttempted(card) || (card.State != "completed" && card.State != "not-available") {
+	if !cardAttempted(card) || card.Result["feedbackEnabled"] != true || (card.State != "completed" && card.State != "not-available") {
 		return nil, fail("operations_agentos_feedback_not_ready", 409)
 	}
 	current, err := s.Session(ctx, human, domain, false)
@@ -47,9 +48,31 @@ func (t *ConversationTools) CardFeedback(ctx context.Context, human operationspe
 	if current.Row == nil || current.Row.ID != card.ConversationID {
 		return nil, fail("operations_agentos_context_changed", 409)
 	}
+	progress, _, err := s.conversationTaskContext(ctx, *current.Row, card.TurnID)
+	if err != nil {
+		return nil, err
+	}
+	// The root turn itself does not fetch its still-running input in authorize.
+	// This feedback is a later run, so explicitly read the original native input.
+	root := text(progress, "rootOperationId")
+	rootCommand, err := s.command(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	if rootCommand == nil || rootCommand.ConversationID != card.ConversationID || rootCommand.OperatorID != human.ID {
+		return nil, fail("operations_agentos_scope_denied", 403)
+	}
+	native, err := s.nativeOperation(ctx, *current.Row, rootCommand)
+	if err != nil {
+		return nil, err
+	}
+	objective := text(native, "userInput")
+	if strings.TrimSpace(objective) == "" {
+		return nil, fail("operations_agentos_task_objective_unavailable", 503)
+	}
 	// This server-authored continuation is associated with the original human
 	// request. It does not reinterpret the receipt as a new user instruction.
-	context := Object{"origin": "operation-feedback", "parentOperationId": card.TurnID, "logicalTurnId": card.TurnID, "feedbackCardId": card.ID}
+	context := Object{"origin": "operation-feedback", "parentOperationId": card.TurnID, "logicalTurnId": root, "feedbackCardId": card.ID}
 	input := Object{"operationId": operation, "message": feedbackMessage}
 	parent, err := s.command(ctx, card.TurnID)
 	if err != nil {

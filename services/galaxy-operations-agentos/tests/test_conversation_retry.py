@@ -136,6 +136,9 @@ class ConversationRetry(unittest.TestCase):
             class Gateway:
                 def authorize(self, principal, **kwargs):
                     return {"allowed":True,"execution":{"id":ident,"sessionId":session,"domain":"overview","mode":"conversation"}}
+                def conversation_tool(self, principal, name, arguments, **binding):
+                    self.assert_assessment = name
+                    return {"state":"recorded", "taskProgress":{"phase":arguments["disposition"],"remaining":arguments["remaining"]}}
                 def conversation_summary(self, principal, **binding):
                     tool_bindings.append({"user_id":principal, **binding})
                     return {"domain":"overview", "counts":{}, "availability":{}}

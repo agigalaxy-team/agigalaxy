@@ -324,6 +324,18 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 	if err = owner.QueryRow(ctx, `SELECT count(*) FROM operations_business_roles_v1 WHERE endpoint=$1 AND name='Actual conversation role'`, endpoint).Scan(&count); err != nil || count != 1 {
 		t.Fatal("confirmation duplicated delegated business write", count, err)
 	}
+	// Distinct user turns own distinct preparation budgets. The original test
+	// observes independent receipts rather than adding multiple cards to one turn.
+	newToolTurn := func() {
+		t.Helper()
+		turn, native := uuid.NewString(), "fixture-"+uuid.NewString()
+		_, e := owner.Exec(ctx, `INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,native_run_id,result,created_at) VALUES($1,$2,$3,$4,$5,'accepted',$6,$7,$8)`, turn, endpoint, id, human.ID, strings.Repeat("f", 64), native, Object{"runId": native, "taskProgress": defaultConversationTask(turn, turn)}, now())
+		if e != nil {
+			t.Fatal(e)
+		}
+		toolInput["turnId"], toolInput["runId"] = turn, native
+	}
+	newToolTurn()
 	// An attempted operation without an observable receipt never becomes prepared again.
 	unknownArgs := copyObject(prepareArgs)
 	unknownCommand := copyObject(object(prepareArgs["command"]))
@@ -350,6 +362,7 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 		t.Fatal("unknown original operation was reissued", count, err)
 	}
 
+	newToolTurn()
 	promptArgs := Object{"kind": "ai-work-prompt-save", "aiAccountId": object(automation["accounts"])["governance"], "prompt": "按当前已获准的职责核查，保持原数据边界。"}
 	toolInput["callId"], toolInput["arguments"] = "provider.prepare.prompt", promptArgs
 	response = invokeTool(toolInput)

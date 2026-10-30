@@ -139,6 +139,9 @@ func (s *Conversations) runWithContext(ctx context.Context, operator operationsp
 	}
 	row := *current.Row
 	receipt := Object{"operationId": turn.ID, "runId": nil, "state": "dispatching", "native": nil, "replayed": false}
+	if turn.RetryID == "" && text(continuation, "parentOperationId") == "" {
+		receipt["taskProgress"] = defaultConversationTask(turn.ID, turn.ID)
+	}
 	for key, value := range continuation {
 		receipt[key] = value
 	}
@@ -222,6 +225,35 @@ func (s *Conversations) runWithContext(ctx context.Context, operator operationsp
 		if _, err = tx.Exec(ctx, `INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,result,created_at) VALUES($1,$2,$3,$4,$5,'dispatching',$6,$7)`, turn.ID, s.Endpoint, row.ID, fresh.ID, turnDigest(turn.Message, turn.TaskID, turn.RetryID), receipt, s.now()); err != nil {
 			return false, err
 		}
+		parentID := turn.RetryID
+		if parentID == "" {
+			parentID = text(continuation, "parentOperationId")
+		}
+		if parentID != "" {
+			root, _, e := conversationTaskRootWithin(ctx, tx, s.Endpoint, row, parentID)
+			if e != nil {
+				return false, e
+			}
+			var rootResult Object
+			if e = tx.QueryRow(ctx, `SELECT result FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND id=$4 FOR UPDATE`, s.Endpoint, row.ID, fresh.ID, root).Scan(&rootResult); e != nil {
+				return false, e
+			}
+			progress := object(rootResult["taskProgress"])
+			if progress == nil {
+				progress = defaultConversationTask(root, root)
+			} else {
+				progress = copyObject(progress)
+			}
+			if text(progress, "rootOperationId") != root {
+				return false, fail("operations_agentos_scope_denied", 403)
+			}
+			progress["activeOperationId"] = turn.ID
+			progress["phase"] = "continue"
+			progress["reason"] = ""
+			if _, e = tx.Exec(ctx, `UPDATE operations_agentos_conversation_commands_v1 SET result=jsonb_set(result,'{taskProgress}',$5::jsonb) WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND id=$4`, s.Endpoint, row.ID, fresh.ID, root, progress); e != nil {
+				return false, e
+			}
+		}
 		if s.LinkWorkbenchWithin != nil {
 			return true, s.LinkWorkbenchWithin(ctx, tx, row, turn.ID, turn.TaskID)
 		}
@@ -237,6 +269,9 @@ func (s *Conversations) runWithContext(ctx context.Context, operator operationsp
 		return s.Operation(ctx, fresh, domain, turn.ID)
 	}
 	result := copyObject(receipt)
+	// The tool may checkpoint before native dispatch returns. Do not merge the
+	// initial progress over a newer root checkpoint when recording the ACK.
+	delete(result, "taskProgress")
 	again, dispatchErr := s.fresh(ctx, fresh, authorize)
 	if dispatchErr == nil {
 		_, dispatchErr = s.Current(ctx, row.ID, &again)
@@ -290,6 +325,11 @@ func (s *Conversations) runWithContext(ctx context.Context, operator operationsp
 	if _, err = s.Current(ctx, row.ID, &final); err != nil {
 		return nil, err
 	}
+	progress, e := s.conversationTaskProgress(ctx, row, turn.ID)
+	if e != nil {
+		return nil, e
+	}
+	result["taskProgress"] = progress
 	if runID := text(result, "runId"); runID != "" {
 		projected, e := s.decorateRuns(ctx, row, []Object{{"operationId": turn.ID, "runId": runID, "status": "RUNNING"}})
 		if e == nil {

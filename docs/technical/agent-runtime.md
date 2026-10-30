@@ -18,9 +18,11 @@ Python Agno AgentOS负责原生会话、run、持久队列与HumanReview；Go负
 
 ## 连续业务处理与聊天确认
 
-会话使用 Agno 原生工具循环，银河补充同一 run 的有界结束判断：`plan_turn` 声明答复或制卡目标，默认一张卡；用户明确要求三个备选时可声明三张互斥方案。`assess_turn` 在实际工具返回之后说明已完成、等待确认、需要信息或受阻；新工具活动使旧判断失效。实际卡片达到冻结目标时直接等待人工，由程序生成一次交接通知，完整变更在卡内审阅；流式、最终正文及本轮持久内容一致，不让模型重复命令字段或编号。普通分析和未完成答复仍由原模型流程交付。不为确认制卡事实再追加模型调用；尚需接续时，控制要求幂等归入首条system，不在对话尾部堆system。单轮控制状态放入绑定原操作的共享嵌套对象，工具上下文与RunOutput共用；用量计数替换外层metadata不能分裂结束判断。重试清除父轮控制状态后从当前服务端计划恢复准备目标，原三备选数量不能被模型降为一项；回执副本从持久投影剔除。未完成且有进展时沿同一消息链继续，连续两次无新事实或最多三次额外响应后停止，不另造用户消息、不自动重发未知写入。普通问候不增加判断调用。策略草稿按现有 P13 schema 先给出可修正参数反馈，最终业务校验仍由原 Go 服务执行。
+会话沿用 Agno 原生工具循环，银河在模型响应边界驱动同一原任务。`plan_turn` 只声明当前准备数量等子约束，不限定整个任务只有答复或制卡。`assess_turn` 根据当前工具事实、原目标和剩余工作判断继续、完成、等待确认、等待结果、缺少信息、受阻或中断；新活动使旧评估失效。Go 在原 commands.result 中持久 taskProgress，原操作、重试和确认反馈归属同一根任务；native COMPLETED 只说明本次模型运行结束，不代表业务目标完成。剩余工作非空、当前仍有待确认卡或未知业务结果时不得标任务完成；历史失败和取消保留，但不永久阻止后续有效评估。
 
-参考的是 [OpenCode 的流事件、工具状态与 stop/continue 分流](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/session/processor.ts)和 [DeepSeek Harness 的 agent 循环](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/core/agent-loop/src/agent.ts)中的分层方式，未移植其运行时。Agno 的 followup 建议不当成业务执行接续；模型答复完成、卡已准备和业务完成继续分别记录。
+没有固定接续轮数。相同事实和相同待处理步骤形成的实际循环可判受阻；既有运行时间上限只产生中断，不冒充完成。程序固定边界和新撤权继续生效，未知写入仅核原操作，不重发。卡实际准备齐后等待人工；确认回执作为中间结果，同owner精确读取的原目标及剩余工作交回模型，允许继续查询、准备下一步或最终完成，不将短反馈消息替换成新的全部目标。原目标取不到时明确停止接续，不猜测，也不增加私有全文的第二份持久存储。
+
+参考的是 [OpenCode 的流事件、工具状态与 stop/continue 分流](https://github.com/anomalyco/opencode/blob/fe8cd6596f997aba13a0fcab6baf1e2b5a0178bc/packages/core/src/session/runner/step.ts)和 [DeepSeek Harness 的 agent 循环](https://github.com/deepseek-ai/deepseek-harness/blob/ce7073d51254c26cd63b22a60835b8f948deb447/packages/core/agent-loop/src/agent.ts)中的分层方式：分别处理步骤结果、是否继续、工具待决及停止原因；未移植其运行时。Agno 的 followup 建议不当成业务执行接续；模型答复完成、卡已准备和业务完成继续分别记录。
 
 确认卡归属原 `turnId`；`presentation` 提供业务摘要、变更、影响与限制，不把原始命令 JSON 当正文。完整配置按冻结前后源比较，只展开相关差异；缺块或重要变化无法翻译时不可确认。岗位要求仍用专用全文审阅。`choice` 仅表示明确的互斥备选，服务端按原轮事务控制数量和选择；选择一项即关闭其他项。操作侧栏仅摘要和只读详情。普通回复使用业务名称，不复述内部命令或编号；执行反馈只向模型提供业务化差异、真实状态与摘要，原卡和原操作关联仍由服务端保留，不把展示省略当作删除审计。
 
@@ -95,7 +97,7 @@ API能够连接AgentOS不证明Worker已加载相同运行配置。原health记�
 
 `store_tool_messages=False`不清除RunOutput.tools或event body。`conversation_storage.py`对普通save、atomic error与attempt-fenced worker写共同投影，移除工具参数/结果、event body/additional_input，保闭合ID/错误/时间/metrics。用户输入/最终回答是会话历史，Go绑定来源失效时轮换/withhold会话；不宣称物理擦除旧行或新增保留期。Duty存元数据与真实usage，目的材料/卡/命令仍归Go账本。trace不含prompt/completion/tool正文或异常原文。
 
-普通沟通成功准备操作卡后，以真实`state=prepared`、`card.state=prepared`和cardId为依据，只克隆本次FunctionCall的Function并启用Agno原生`stop_after_tool_call/show_result`，停止后续模型续答。流中工具前的临时文字沿原ToolCallStarted reset清除，工具显示及post-hook保存的最终沟通内容统一为程序的确认提示；失败制卡仍允许按原schema修参，不以停止异常伪造成功。该轮普通沟通的COMPLETED只表示制卡沟通已经结束，业务仍等待原卡人工确认，以后续真实业务operation回执判断效果；不把它改成无人能续接的原生PAUSED，也不将旧卡标记带入新重试轮次。这是当前源码实现，生产采用及真实卡流结果另按发布证据验收。
+普通沟通的制卡、确认与结果接续采用本页通用任务循环；操作卡准备完进入等待确认，程序交接通知与本轮持久文本一致。工具后仍可继续修正参数或处理剩余事项，不能用强制 stop_after_tool_call 代替整个任务的完成判断。原卡人工确认和业务回执保持独立；模型native结束不表示业务已经生效。
 
 普通会话的多prepare批次在执行前统一返回对应callId的纠正反馈，避免Agno并发批次在首卡成功停步前继续生成其它卡；同批只读仍可正常运行。原会话角色轮04619614实际provider顺序和当前user均正确，模型仍沿旧搜索目标推进，不能归因Gateway或输入丢失。后续provider副本投影仅将`from_history`记录封装为明确的只读引用数据，保其原文、角色、次序及非文本引用，当前system/user和当前工具配对不动；数据库与用户可见历史不改，也不把历史准备表述判成当前未决队列。当前原生retry的问题仍按原请求续接，只有更晚轮次中的旧请求按历史引用读取，不新增一份用户消息。修后同原会话已成功准备并确认AI专用角色及分配，完整回收及各边界验收按实际回执分别记录，不宣称模型从此不会偏离目标。
 

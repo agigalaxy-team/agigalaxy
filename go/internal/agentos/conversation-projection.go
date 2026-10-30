@@ -88,6 +88,64 @@ func (s *Conversations) decorateRuns(ctx context.Context, row Conversation, runs
 			}
 		}
 	}
+	if len(ids) > 0 {
+		rows, err := s.Pool.Query(ctx, conversationHistoryTree+`SELECT t.id::text,t.root_id::text,r.result->'taskProgress' FROM tree t JOIN operations_agentos_conversation_commands_v1 r ON r.endpoint=$1 AND r.id=t.root_id AND r.conversation_id=$2 AND r.operator_id=$3 WHERE t.id=ANY($4::uuid[])`, s.Endpoint, row.ID, row.OperatorID, ids)
+		if err != nil {
+			return nil, err
+		}
+		type taskProjection struct {
+			root     string
+			progress Object
+		}
+		byID := map[string]taskProjection{}
+		for rows.Next() {
+			var id, root string
+			var progress Object
+			if err = rows.Scan(&id, &root, &progress); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			byID[id] = taskProjection{root, progress}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+		resolved := map[string]Object{}
+		for _, value := range byID {
+			if value.progress == nil || resolved[value.root] != nil {
+				continue
+			}
+			progress, e := s.conversationTaskProgress(ctx, row, value.root)
+			if e != nil {
+				return nil, e
+			}
+			resolved[value.root] = progress
+		}
+		for _, run := range runs {
+			turn := text(run, "operationId")
+			value, ok := byID[turn]
+			if !ok || value.progress == nil || text(value.progress, "activeOperationId") != turn || text(value.progress, "phase") != "continue" || (run["status"] != "ERROR" && run["status"] != "CANCELLED") {
+				continue
+			}
+			progress, e := s.markConversationTaskInterrupted(ctx, row, value.root, turn)
+			if e != nil {
+				return nil, e
+			}
+			if progress != nil {
+				resolved[value.root] = progress
+			}
+		}
+		for _, run := range runs {
+			if value, ok := byID[text(run, "operationId")]; ok {
+				run["logicalTurnId"] = value.root
+				if value.progress != nil {
+					run["taskProgress"] = resolved[value.root]
+				}
+			}
+		}
+	}
 	if err := s.projectConversationTimes(ctx, row, runs, ids); err != nil {
 		return nil, err
 	}

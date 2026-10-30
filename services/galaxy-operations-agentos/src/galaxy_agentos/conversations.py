@@ -9,7 +9,7 @@ from .model_gate import with_current_authority
 from .conversation_failures import with_conversation_failures
 from .conversation_tool_batches import with_conversation_tool_batches
 from .conversation_completion import with_conversation_completion, prepared_notification
-from .conversation_turn_state import turn_state, PLAN, PREPARED_CARD_IDS, RECEIPT_FEEDBACK
+from .conversation_turn_state import turn_state, PLAN, PREPARED_CARD_IDS, RECEIPT_FEEDBACK, TASK_PROGRESS, TASK_CONTEXT
 from .conversation_turn_context import with_conversation_turn_context
 from .conversation_history_projection import with_conversation_history_projection
 from .tool_reliability import reliable_function, PREPARED_CARD_MESSAGE
@@ -55,6 +55,8 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
                             ids.append(card_id)
                     except (ValueError, TypeError, AttributeError):
                         pass
+        if isinstance(current.get("taskProgress"), dict): state[TASK_PROGRESS] = current["taskProgress"]
+        if isinstance(current.get("taskContext"), dict): state[TASK_CONTEXT] = current["taskContext"]
         receipt = current.get("receiptFeedback")
         if isinstance(receipt, dict):
             state[RECEIPT_FEEDBACK] = {key: receipt[key] for key in ("cardId", "operationId", "parentTurnId", "state", "effectExecuted", "presentation", "receipt") if key in receipt}
@@ -64,6 +66,7 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
     def prepared_card_response(run_context: RunContext, run_output: RunOutput):
         state = turn_state(run_context)
         state.pop(RECEIPT_FEEDBACK, None)
+        state.pop(TASK_CONTEXT, None)
         ids = state.get(PREPARED_CARD_IDS)
         if isinstance(ids, list) and ids:
             run_output.metadata = {**(run_output.metadata or {}), PREPARED_CARD_IDS: list(ids)}
@@ -87,7 +90,7 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
         model = (with_current_authority(model_factory(), gateway) if model_factory is not None
             else domain_model(settings, domain, gateway))
         model = with_conversation_tool_batches(with_conversation_history_projection(with_conversation_turn_context(with_conversation_failures(model))))
-        model = with_conversation_completion(model)
+        model = with_conversation_completion(model, timeout_seconds=getattr(settings, "work_timeout_seconds", 600), gateway=gateway)
         model._galaxy_usage_database = conversation_db
         binding = settings.model_bindings[1].get(domain) if model_factory is None else None
         compaction = conversation_compaction(binding, model)
@@ -96,7 +99,7 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
             pre_hooks=[authorized_run], post_hooks=[authorized_run, prepared_card_response],
             instructions=current_role_instructions(gateway, domain=domain,
                 fixed=reference_aware_instructions(["你是银河工作台的" + label + "助手，和当前管理者连续沟通。",
-                "处理业务前调用plan_turn声明本轮目标；默认一张卡，只有用户明确要求三个备选方案才声明3且alternatives=true。选择先前方案时直接按该方案处理，无需再次询问。业务工具完成后调用assess_turn，真实卡等待人工确认，制卡和模型完成均不等于业务完成。仅凭本轮真实cardId才能说卡已准备。原回执接续以原卡回执为准，不重发未知写入。",
+                "处理业务前调用plan_turn声明本轮目标；默认一张卡，只有用户明确要求三个备选方案才声明3且alternatives=true。选择先前方案时直接按该方案处理，无需再次询问。业务工具完成后调用assess_turn记录任务进度；未完成继续处理，等待回执、人工或必要信息时分别说明，completed必须没有剩余工作。真实卡等待人工确认，制卡和模型完成均不等于业务完成。仅凭本轮真实cardId才能说卡已准备。原回执接续以原卡回执为准，不重发未知写入。",
                 "普通问候和不涉及当前业务数据的交流直接回应，不需要读取current_summary或先核验业务摘要。工具读取失败只简短说明该项实际限制，不复述内部错误码，不推断用户缺权限，也不默认要求人工改授权。",
                 "历史答复不是当前权限或数据，只以本轮真实工具结果判断，不把读取失败推断为无权。普通运营回复、制卡及回执反馈只用业务名称、变更、限制与实际结果说明；确认卡已承载审阅，不重复命令JSON、字段名、内部动作名、UUID或状态枚举，也不罗列内部工具名、错误码、协议或“按规范”等自我解释。用户明确询问技术原理时可正常解释相关技术细节。取数时间仅引用本轮工具的实际时间，不自行编造或沿用历史回答的时间。",
                 "用户问今天变化、待办原因、处理进展时，先使用当前摘要工具；只按真实结果回答。",

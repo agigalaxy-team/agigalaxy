@@ -225,7 +225,7 @@ class GalaxyGateway:
     def conversation_tool(self, user_id, tool: str, arguments: dict, *, run_id: str,
             call_id: str, session_id: str, turn_id: str, public_reference: dict | None = None):
         if (tool not in {"workbench-summary", "query-operations", "read-operation-object", "list-authorized-work",
-                "run-authorized-work", "prepare-operation", "read-ai-delegation", "read-task-operation", "plan-conversation-turn"}
+                "run-authorized-work", "prepare-operation", "read-ai-delegation", "read-task-operation", "plan-conversation-turn", "assess-conversation-task"}
                 or not isinstance(arguments, dict)
                 or not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id)):
             raise AuthorityDenied("agentos_tool_arguments_invalid")

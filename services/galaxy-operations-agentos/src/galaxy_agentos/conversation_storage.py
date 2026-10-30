@@ -6,7 +6,7 @@ attempt-fenced saves therefore need the same projection at the native DB
 boundary. This adapter retains the existing DB class, engine, transaction
 primitives and attempt fencing; it adds no database, queue or history store.
 """
-from .conversation_turn_state import TURN_STATE, RECEIPT_FEEDBACK
+from .conversation_turn_state import TURN_STATE, RECEIPT_FEEDBACK, TASK_CONTEXT
 from copy import copy, deepcopy
 import re
 
@@ -16,7 +16,7 @@ from .tool_call_ids import (conversation_call_reference, projected_tool_call_id,
 
 
 TOOL_NAMES = frozenset({"plan_turn", "assess_turn", "current_summary", "query_operations", "read_operation_object",
-    "list_authorized_work", "run_authorized_work", "prepare_operation", "execute_operation",
+    "list_authorized_work", "run_authorized_work", "plan_turn", "assess_turn", "prepare_operation", "execute_operation",
     "manage_ai_role", "manage_ai_prompt", "read_ai_delegation", "read_task_operation"})
 EVENT_NAMES = frozenset(event.value for event in RunEvent)
 ERROR_TYPES = frozenset({"AuthorityDenied", "AuthorityUnavailable"})
@@ -125,6 +125,7 @@ def conversation_storage_fields(fields, *, reference_ids=False, run_id=None, sto
     metadata_copy = result.get("metadata")
     if isinstance(metadata_copy, dict) and isinstance(metadata_copy.get(TURN_STATE), dict):
         metadata_copy[TURN_STATE].pop(RECEIPT_FEEDBACK, None)
+        metadata_copy[TURN_STATE].pop(TASK_CONTEXT, None)
     run_id = _context_run_id(fields, run_id) if reference_ids else None
     metadata = fields.get("metadata")
     provenance_missing = (reference_ids and isinstance(metadata, dict)

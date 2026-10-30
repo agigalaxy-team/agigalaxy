@@ -117,7 +117,14 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 	if e != nil {
 		return nil, e
 	}
-	return Object{"priorReadReceipts": prior, "currentReadOutcomes": currentReads, "turnOutcomes": turns, "boundedTask": task, "priorActionReceipts": actions, "priorOperationReceipts": operations, "turnPlan": plan, "receiptFeedback": feedback}, nil
+	progress, taskContext, e := t.Conversations.conversationTaskContext(ctx, *row, command.ID)
+	if e != nil {
+		return nil, e
+	}
+	if e = t.RecheckContext(ctx, a, domain, bound); e != nil {
+		return nil, e
+	}
+	return Object{"taskProgress": progress, "taskContext": taskContext, "priorReadReceipts": prior, "currentReadOutcomes": currentReads, "turnOutcomes": turns, "boundedTask": task, "priorActionReceipts": actions, "priorOperationReceipts": operations, "turnPlan": plan, "receiptFeedback": feedback}, nil
 }
 
 func (t *ConversationTools) priorSummaryReads(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand) (Object, error) {

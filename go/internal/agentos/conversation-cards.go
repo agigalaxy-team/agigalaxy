@@ -164,6 +164,29 @@ func (t *ConversationTools) prepareCard(ctx context.Context, bound boundConversa
 		return nil, err
 	}
 	if row == nil {
+		// Do not even construct a new business operation while an earlier
+		// same-root receipt remains uncertain. The insertion transaction repeats
+		// this check to close the race with a concurrent confirmation.
+		_, err = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) {
+			if _, e := s.CurrentReadWithin(ctx, tx, bound.row.ID, &bound.actor); e != nil {
+				return false, e
+			}
+			root, _, e := conversationTaskRootWithin(ctx, tx, s.Endpoint, bound.row, text(input, "turnId"))
+			if e != nil {
+				return false, e
+			}
+			_, unresolved, e := lockConversationTaskCards(ctx, tx, s.Endpoint, bound.row, root)
+			if e != nil {
+				return false, e
+			}
+			if unresolved {
+				return false, fail("operations_agentos_task_result_pending", 409)
+			}
+			return true, nil
+		})
+		if err != nil {
+			return nil, err
+		}
 		operationID := uuid.NewString()
 		var proposal Object
 		if bound.publicReference != nil {
@@ -191,6 +214,21 @@ func (t *ConversationTools) prepareCard(ctx context.Context, bound boundConversa
 			}
 			if prior != nil {
 				return false, nil
+			}
+			root, _, e := conversationTaskRootWithin(ctx, tx, s.Endpoint, bound.row, turn)
+			if e != nil {
+				return false, e
+			}
+			var rootResult Object
+			if e = tx.QueryRow(ctx, `SELECT result FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND id=$4 FOR UPDATE`, s.Endpoint, bound.row.ID, bound.row.OperatorID, root).Scan(&rootResult); e != nil {
+				return false, e
+			}
+			_, unresolved, e := lockConversationTaskCards(ctx, tx, s.Endpoint, bound.row, root)
+			if e != nil {
+				return false, e
+			}
+			if unresolved {
+				return false, fail("operations_agentos_task_result_pending", 409)
 			}
 			plan, e := turnPlanWithin(ctx, tx, s.Endpoint, turn)
 			if e != nil {
@@ -351,6 +389,16 @@ func (t *ConversationTools) cardReadView(ctx context.Context, row *conversationC
 	capability["canDismiss"] = row.State == "prepared" && p["dismissalAllowed"] == true && !cardAttempted(row)
 	if _, err = reader(ctx, row); err != nil {
 		return nil, err
+	}
+	progress, err := s.recordedConversationTaskProgress(ctx, Conversation{ID: row.ConversationID, OperatorID: row.OperatorID, Domain: row.Domain}, row.TurnID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = reader(ctx, row); err != nil {
+		return nil, err
+	}
+	if progress != nil {
+		out["taskProgress"] = progress
 	}
 	out["checkedAt"], out["readExpiresAt"] = s.now().Unix(), deadline
 	if syncProjection && t.SyncCardWithin != nil {

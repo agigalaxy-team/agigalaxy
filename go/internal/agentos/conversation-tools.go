@@ -47,7 +47,7 @@ var toolRoute = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,79}$`)
 // descriptors are still recorded, but they cannot prepare or execute a command.
 func conversationReadTool(tool string) bool {
 	switch tool {
-	case "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "read-task-operation":
+	case "assess-conversation-task", "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "read-task-operation":
 		return true
 	}
 	return false
@@ -71,7 +71,7 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
 	switch tool {
-	case "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "run-authorized-work", "prepare-operation", "read-task-operation":
+	case "assess-conversation-task", "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "run-authorized-work", "prepare-operation", "read-task-operation":
 	default:
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
@@ -161,6 +161,8 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 	s := t.Conversations
 	var result Object
 	switch bound.tool {
+	case "assess-conversation-task":
+		result, err = t.assessConversationTask(ctx, bound, text(input, "turnId"))
 	case "plan-conversation-turn":
 		result, err = t.planConversationTurn(ctx, bound, text(input, "turnId"))
 	case "read-task-operation":
@@ -214,6 +216,13 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 		_, err = currentRead(ctx, bound.row.ID, nil)
 	}
 	metadata := Object{"tool": bound.tool}
+	if bound.tool == "assess-conversation-task" && err == nil {
+		progress := object(result["taskProgress"])
+		metadata["phase"] = progress["phase"]
+		if values, ok := progress["remaining"].([]any); ok {
+			metadata["remainingCount"] = len(values)
+		}
+	}
 	metadata["module"], metadata["view"] = nil, nil
 	if bound.tool == "read-task-operation" {
 		metadata["module"], metadata["view"] = "autonomy", "original-operation"

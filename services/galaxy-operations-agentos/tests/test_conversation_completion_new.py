@@ -63,7 +63,7 @@ class CompletionTest(unittest.TestCase):
                 async def collect(): return [v async for v in model.aresponse_stream([],run_response=run)]
                 result=asyncio.run(collect())
             else: result=list(model.response_stream([],run_response=run))
-            self.assertEqual(model.calls,1); self.assertEqual([v.content for v in result if v.content],["已准备 3 个备选方案，请在下方选择一项。当前尚未执行。"]); self.assertNotIn(ASSESSMENT,turn_state(run))
+            self.assertEqual(model.calls,1); self.assertEqual([v.content for v in result if v.content],["已准备 3 个备选方案，请在下方选择一项。当前尚未执行。"]); self.assertEqual(turn_state(run)[ASSESSMENT]["disposition"], "waiting-confirmation")
     def test_prepare_notice_replaces_model_text_and_preserves_live_events(self):
         from galaxy_agentos.conversation_completion import _PREPARED_ONE, _PREPARED_THREE
         for count, notice in ((1,_PREPARED_ONE),(3,_PREPARED_THREE)):

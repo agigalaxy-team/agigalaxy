@@ -8,12 +8,12 @@ from agno.agent import Agent
 from agno.agent._run import _find_regenerate_checkpoint, _fork_run
 from .gateway import AuthorityDenied
 from .conversation_turn_state import (bind_turn_state, TURN_STATE, PLAN, ASSESSMENT, ACTIVITY,
-    PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK)
+    PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK, TASK_PROGRESS, TASK_CONTEXT)
 
 _ATTEMPT_FIELDS = frozenset({"modelCalls", "modelSettingsVersion", "modelSettingsVersions",
     "modelFallbacks", "activeModelFallbackAlias", "toolRecovery", "rolePromptVersion",
     "boundaryVersion", "compactionStatus", "toolCompressionStatus", "_galaxyConversationCallReferences",
-    TURN_STATE, PLAN, ASSESSMENT, ACTIVITY, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK})
+    TURN_STATE, PLAN, ASSESSMENT, ACTIVITY, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK, TASK_PROGRESS, TASK_CONTEXT})
 
 class ConversationAgent(Agent):
     def get_tools(self, run_response, run_context, session, user_id=None):

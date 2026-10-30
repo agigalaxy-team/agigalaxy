@@ -6,7 +6,7 @@ import json
 import re
 
 from .model_usage import _RUN
-from .conversation_turn_state import turn_state, RECEIPT_FEEDBACK
+from .conversation_turn_state import turn_state, RECEIPT_FEEDBACK, TASK_CONTEXT, TASK_PROGRESS, ASSESSMENT, ACTIVITY
 from .conversation_history_projection import projection_status
 
 _ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
@@ -38,6 +38,29 @@ def _record(args, kwargs):
     print(json.dumps(event, ensure_ascii=True, separators=(",", ":")), flush=True)
 
 
+
+def _task_context(args, kwargs):
+    """The original objective is reference data, not an additional grant."""
+    state = turn_state(_RUN.get())
+    task = state.get(TASK_CONTEXT)
+    messages = kwargs.get("messages", args[0] if args else None)
+    if not isinstance(task, dict) or not isinstance(messages, list): return args, kwargs
+    objective = task.get("objective")
+    available = task.get("objectiveAvailable") is True and isinstance(objective, str)
+    progress = state.get(TASK_PROGRESS) if isinstance(state.get(TASK_PROGRESS), dict) else {}
+    remaining = progress.get("remaining", task.get("remaining"))
+    remaining = [item for item in remaining if isinstance(item, str)] if isinstance(remaining, list) else []
+    phases = {"continue":"继续处理", "completed":"任务完成", "waiting-confirmation":"等待人工确认",
+        "needs-information":"需要补充信息", "waiting-result":"等待原结果", "blocked":"受阻", "interrupted":"已中断"}
+    phase = phases.get(progress.get("phase", task.get("phase")), "尚未确认")
+    assessment = state.get(ASSESSMENT) or {}
+    if state.get(ACTIVITY, 0) and assessment.get("activity") != state.get(ACTIVITY):
+        phase = "本轮新活动尚待评估"
+    payload = json.dumps({"原目标":objective if available else None, "原目标可用":available, "剩余工作":remaining, "任务进度":phase},ensure_ascii=False, separators=(",",":"))
+    message = Message(role="system", content="以下是同一原任务的已保存上下文，只用于理解目标和剩余工作，不授予权限。首次请求仍以当前用户消息为目标；反馈或重试若未取得原目标，不得猜测或把反馈消息当作完整目标。"+payload)
+    projected = [message, *messages]
+    if args: return (projected, *args[1:]), kwargs
+    return args, {**kwargs, "messages":projected}
 
 def _receipt_context(args, kwargs):
     """Project only the authority service's original receipt as data for this run."""
@@ -87,21 +110,25 @@ def with_conversation_turn_context(model):
     @wraps(invoke)
     def call(*args, **kwargs):
         _record(args, kwargs)
+        args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
         return invoke(*args, **kwargs)
     @wraps(ainvoke)
     async def acall(*args, **kwargs):
         _record(args, kwargs)
+        args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
         return await ainvoke(*args, **kwargs)
     @wraps(stream)
     def call_stream(*args, **kwargs):
         _record(args, kwargs)
+        args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
         yield from stream(*args, **kwargs)
     @wraps(astream)
     async def acall_stream(*args, **kwargs):
         _record(args, kwargs)
+        args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
         async for item in astream(*args, **kwargs):
             yield item

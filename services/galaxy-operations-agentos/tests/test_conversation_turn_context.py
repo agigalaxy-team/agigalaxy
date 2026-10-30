@@ -14,7 +14,7 @@ from agno.models.message import Message
 from agno.models.response import ModelResponse
 from agno.run.agent import RunInput, RunOutput
 from galaxy_agentos.conversation_turn_context import with_conversation_turn_context
-from galaxy_agentos.conversation_turn_state import turn_state, RECEIPT_FEEDBACK
+from galaxy_agentos.conversation_turn_state import turn_state, RECEIPT_FEEDBACK, TASK_CONTEXT
 from galaxy_agentos.model_usage import _RUN, install_usage_scope
 
 
@@ -55,6 +55,19 @@ class TurnContextTests(unittest.TestCase):
                 self.assertEqual(event["currentToolCount"], 0)
             finally:
                 _RUN.reset(token)
+
+    def test_root_objective_is_not_cut_and_first_turn_is_distinct_from_feedback(self):
+        model=with_conversation_turn_context(Model()); run=RunOutput(run_id="task-run",metadata={"operationId":"o"})
+        goal="甲"*12000; work=["任务"+str(n) for n in range(12)]
+        turn_state(run)[TASK_CONTEXT]={"objective":goal,"objectiveAvailable":True,"remaining":work,"phase":"continue","rootOperationId":"private-id"}
+        token=_RUN.set(run)
+        try:
+            with patch("builtins.print"): projected=model.invoke([Message(role="user",content="反馈")])
+            content=projected[0].content; self.assertIn(goal,content); self.assertIn("任务11",content); self.assertNotIn("private-id",content)
+            turn_state(run)[TASK_CONTEXT]={"objective":None,"objectiveAvailable":False,"remaining":[],"phase":"continue"}
+            with patch("builtins.print"): projected=model.invoke([Message(role="user",content="当前目标")])
+            self.assertIn("首次请求仍以当前用户消息为目标",projected[0].content); self.assertEqual(projected[1].content,"当前目标")
+        finally: _RUN.reset(token)
 
     def test_original_receipt_projects_business_only_across_model_paths(self):
         model=with_conversation_turn_context(Model()); source=Message(role="user",content="原轮")

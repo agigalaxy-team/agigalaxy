@@ -13,6 +13,7 @@ export function applyConversationReceipt<T extends AgentOsConversation>(conversa
  const native=receipt.native;
  const turn:AgentOsNativeRun={runId,operationId,status:native?.status??previous?.status??'PENDING',content:native?.content??previous?.content??null,userInput:native?.userInput??previous?.userInput??message??null,createdAt:native?.createdAt??previous?.createdAt??null,events:native?.events??previous?.events??[],awaitingHuman:native?.awaitingHuman??previous?.awaitingHuman??false,...previous,...native};
  turn.userInput=native?.userInput??previous?.userInput??message??null;
+ turn.taskProgress=receipt.taskProgress??native?.taskProgress??previous?.taskProgress;
  for(const key of ['sentAt','completedAt'] as const){
   const value=native&&Object.prototype.hasOwnProperty.call(native,key)?native[key]:key==='sentAt'&&Object.prototype.hasOwnProperty.call(receipt,'sentAt')?receipt.sentAt:previous?.[key];
   turn[key]=value===null?null:typeof value==='number'&&Number.isFinite(value)&&value>=0?value:null;
