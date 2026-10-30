@@ -7,11 +7,31 @@ from contextvars import ContextVar
 from functools import wraps
 
 from agno.exceptions import ModelProviderError
+from agno.models.message import Message
 
 from .model_failover import provider_failure
 from .model_usage import _RUN
 
 _ACTIVE = ContextVar('galaxy_provider_retry_active', default=frozenset())
+_FORMAT_GUIDANCE = "上次工具调用格式有误。工具名及参数须遵循已声明的工具定义，沿已有结果继续，不重放已完成的工具。"
+
+
+def gateway_malformed_tool_call(error):
+    if not isinstance(error, ModelProviderError): return None
+    reported = getattr(error, 'status_code', None)
+    if reported is not None and (type(reported) is not int or reported != 502): return None
+    current = error
+    for _ in range(5):
+        body = getattr(current, 'body', None)
+        info = body.get('error', body) if isinstance(body, dict) else None
+        if (isinstance(info, dict) and set(info) == {'code', 'source', 'status', 'category', 'outputStarted'}
+                and info.get('code') == 'model_gateway_malformed_tool_call' and info.get('source') == 'model-gateway'
+                and type(info.get('status')) is int and info['status'] == 502
+                and info.get('category') == 'malformed-tool-call' and info.get('outputStarted') is False):
+            return {'status':502, 'source':'model-gateway', 'malformed':True}
+        current = getattr(current, '__cause__', None) or getattr(current, '__context__', None)
+        if current is None: break
+    return None
 
 
 def gateway_transient_failure(error):
@@ -66,7 +86,7 @@ def _retryable(error):
     failure = provider_failure(error)
     if failure and (failure['status'] in (408, 429) or 500 <= failure['status'] <= 599):
         return failure
-    return gateway_transient_failure(error) or gateway_empty_completion(error)
+    return gateway_transient_failure(error) or gateway_empty_completion(error) or gateway_malformed_tool_call(error)
 
 
 def _snapshot(args, kwargs):
@@ -75,6 +95,18 @@ def _snapshot(args, kwargs):
         args[0] = deepcopy(args[0])
     if isinstance(kwargs.get('messages'), list):
         kwargs['messages'] = deepcopy(kwargs['messages'])
+    return args, kwargs
+
+
+def _retry_snapshot(snapshot, failure):
+    args, kwargs = _snapshot(*snapshot)
+    if failure.get('malformed'):
+        messages = kwargs.get('messages') if 'messages' in kwargs else (args[0] if args else None)
+        if isinstance(messages, list):
+            system = next((item for item in messages if getattr(item, 'role', None) == 'system'
+                and isinstance(getattr(item, 'content', None), str)), None)
+            if system is None: messages.insert(0, Message(role='system', content=_FORMAT_GUIDANCE))
+            else: system.content += '\n' + _FORMAT_GUIDANCE
     return args, kwargs
 
 
@@ -138,7 +170,8 @@ def with_provider_retry(model):
             time.sleep(0.25)
             _restore_assistant(assistant)
             try:
-                result = invoke(*snapshot[0], **snapshot[1])
+                retry_args, retry_kwargs = _retry_snapshot(snapshot, failure)
+                result = invoke(*retry_args, **retry_kwargs)
             except ModelProviderError as second:
                 _finished(kwargs, second)
                 raise
@@ -160,7 +193,8 @@ def with_provider_retry(model):
             await asyncio.sleep(0.25)
             _restore_assistant(assistant)
             try:
-                result = await ainvoke(*snapshot[0], **snapshot[1])
+                retry_args, retry_kwargs = _retry_snapshot(snapshot, failure)
+                result = await ainvoke(*retry_args, **retry_kwargs)
             except ModelProviderError as second:
                 _finished(kwargs, second)
                 raise
@@ -184,7 +218,8 @@ def with_provider_retry(model):
             time.sleep(0.25)
             _restore_assistant(assistant)
             try:
-                yield from invoke_stream(*snapshot[0], **snapshot[1])
+                retry_args, retry_kwargs = _retry_snapshot(snapshot, failure)
+                yield from invoke_stream(*retry_args, **retry_kwargs)
             except ModelProviderError as second:
                 _finished(kwargs, second)
                 raise
@@ -207,7 +242,8 @@ def with_provider_retry(model):
             await asyncio.sleep(0.25)
             _restore_assistant(assistant)
             try:
-                async for chunk in ainvoke_stream(*snapshot[0], **snapshot[1]):
+                retry_args, retry_kwargs = _retry_snapshot(snapshot, failure)
+                async for chunk in ainvoke_stream(*retry_args, **retry_kwargs):
                     yield chunk
             except ModelProviderError as second:
                 _finished(kwargs, second)

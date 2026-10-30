@@ -1,4 +1,6 @@
 import sys
+import asyncio
+import json
 import types
 import unittest
 from unittest.mock import patch
@@ -37,6 +39,42 @@ class ProviderFinishTest(unittest.TestCase):
             emit.reset_mock()
             Iterator({"litellm_params":{"metadata":{**metadata, "galaxy_call_id":"invalid"}}}).chunk_parser(chunk)
             emit.assert_not_called()
+
+    def test_parser_evidence_is_scoped_to_guard_call_and_never_overrides_partial_output(self):
+        from galaxy_model_gateway.response_guard import ResponseGuard
+        custom = types.ModuleType("litellm.integrations.custom_logger")
+        custom.CustomLogger = type("CustomLogger", (), {})
+        modules = {"litellm":types.ModuleType("litellm"), "litellm.integrations":types.ModuleType("litellm.integrations"),
+            "litellm.integrations.custom_logger":custom}
+        class Iterator:
+            def __init__(self, details): self.logging_obj = types.SimpleNamespace(model_call_details=details)
+            def chunk_parser(self, chunk): return chunk
+        ident = "22222222-2222-2222-2222-222222222222"
+        metadata = {"galaxy_model_alias":"galaxy-overview", "galaxy_scenario":"overview", "galaxy_config_version":"v1", "galaxy_call_id":ident}
+        async def check(call_id, partial=False):
+            sent = []
+            async def send(value): sent.append(value)
+            async def rejected(): pass
+            guard = ResponseGuard(send, stream=True, responses=False, version='v1', rejected=rejected, call_id=call_id)
+            await guard.send({'type':'http.response.start', 'status':200, 'headers':[(b'content-type',b'text/event-stream')]})
+            if partial:
+                frame = {'choices':[{'delta':{'content':'partial'}, 'finish_reason':None}]}
+                await guard.send({'type':'http.response.body','body':b'data: '+json.dumps(frame).encode()+b'\n\n','more_body':True})
+            frame = {'choices':[{'delta':{}, 'finish_reason':'stop'}]}
+            await guard.send({'type':'http.response.body','body':b'data: '+json.dumps(frame).encode()+b'\n\ndata: [DONE]\n\n','more_body':False})
+            await guard.complete()
+            return sent
+        with patch.dict(sys.modules, modules), patch.object(provider_finish, 'emit'), patch('galaxy_model_gateway.output.emit'):
+            provider_finish.install(Iterator)
+            Iterator({'litellm_params':{'metadata':metadata}}).chunk_parser({'candidates':[{'finishReason':'MALFORMED_FUNCTION_CALL'}]})
+            proven = asyncio.run(check(ident))
+            other = asyncio.run(check('33333333-3333-3333-3333-333333333333'))
+            partial = asyncio.run(check(ident, True))
+        self.assertEqual(json.loads(proven[-1]['body'])['error'], {'code':'model_gateway_malformed_tool_call', 'source':'model-gateway',
+            'status':502, 'category':'malformed-tool-call', 'outputStarted':False})
+        self.assertEqual(json.loads(other[-1]['body'])['error']['code'], 'model_gateway_empty_completion')
+        self.assertEqual(partial[0]['status'], 200)
+        self.assertNotIn(b'model_gateway_malformed_tool_call', b''.join(v.get('body',b'') for v in partial))
 
 
 if __name__ == "__main__": unittest.main()

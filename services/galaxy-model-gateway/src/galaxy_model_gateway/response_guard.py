@@ -116,6 +116,9 @@ class ResponseGuard:
     async def reject(self, *, status=502, code=None, reason="invalid-response"):
         if self.ended:
             return
+        if reason == 'gateway-empty-completion' and not self.useful and not self.started:
+            from .provider_finish import malformed_for
+            if malformed_for(self.call_id): reason = 'gateway-malformed-tool-call'
         self.bad = True
         self.diagnostic('model-response-rejected', reason=reason, status=status)
         await self.rejected()
@@ -123,6 +126,9 @@ class ResponseGuard:
         if reason == 'gateway-empty-completion':
             body = {'error': {'code': 'model_gateway_empty_completion', 'source': 'model-gateway',
                 'status': 502, 'category': 'empty-completion', 'outputStarted': False}}
+        if reason == 'gateway-malformed-tool-call':
+            body = {'error': {'code':'model_gateway_malformed_tool_call', 'source':'model-gateway',
+                'status':502, 'category':'malformed-tool-call', 'outputStarted':False}}
         if reason == 'gateway-transient-error':
             body = {'error': {'code': 'model_gateway_transient_failure', 'source': 'model-gateway',
                 'status': status, 'category': gateway_transient_category(status), 'outputStarted': False}}

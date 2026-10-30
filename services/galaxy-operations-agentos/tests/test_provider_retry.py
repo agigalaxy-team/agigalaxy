@@ -42,6 +42,11 @@ def gateway_empty(**changes):
     error.__cause__ = cause
     return error
 
+def gateway_malformed(**changes):
+    error = gateway_empty()
+    error.__cause__.body['error'].update(code='model_gateway_malformed_tool_call', category='malformed-tool-call', **changes)
+    return error
+
 
 class Model:
     def __init__(self, results, name='galaxy-test'):
@@ -75,6 +80,38 @@ class Model:
 
 
 class ProviderRetry(unittest.TestCase):
+    @patch('galaxy_agentos.provider_retry.time.sleep')
+    def test_malformed_retry_guidance_keeps_messages_and_never_replays_partial(self, _sleep):
+        class Capture(Model):
+            def __init__(self, results): super().__init__(results); self.seen=[]
+            def invoke(self, *args, **kwargs):
+                self.seen.append(kwargs['messages'])
+                return super().invoke(*args, **kwargs)
+        async def astream(model, messages): return [item async for item in model.ainvoke_stream(messages=messages)]
+        for mode in ('invoke','ainvoke','invoke_stream','ainvoke_stream'):
+            messages = [Message(role='system',content='原系统'), Message(role='user',content='原任务'),
+                Message(role='assistant',tool_calls=[{'id':'prior', 'type':'function', 'function':{'name':'read', 'arguments':'{}'}}]),
+                Message(role='tool',tool_call_id='prior',content='原结果')]
+            model = with_provider_retry(Capture([gateway_malformed(), ['ok'] if 'stream' in mode else 'ok']))
+            if mode == 'invoke': result = model.invoke(messages=messages)
+            elif mode == 'ainvoke': result = asyncio.run(model.ainvoke(messages=messages))
+            elif mode == 'invoke_stream': result = list(model.invoke_stream(messages=messages))
+            else: result = asyncio.run(astream(model, messages))
+            self.assertEqual(result, ['ok'] if 'stream' in mode else 'ok')
+            self.assertEqual(model.calls, 2)
+            self.assertIn('工具名及参数', model.seen[1][0].content)
+            self.assertEqual(messages[0].content, '原系统')
+            self.assertEqual([m.role for m in model.seen[1]], ['system','user','assistant','tool'])
+            self.assertEqual(model.seen[1][2].tool_calls[0]['id'], model.seen[1][3].tool_call_id)
+        model = with_provider_retry(Model([['partial', gateway_malformed()], ['unexpected']]))
+        stream = model.invoke_stream(messages=[])
+        self.assertEqual(next(stream), 'partial')
+        with self.assertRaises(ModelProviderError): next(stream)
+        self.assertEqual(model.calls, 1)
+        model = with_provider_retry(Model([gateway_malformed(outputStarted=True)]))
+        with self.assertRaises(ModelProviderError): model.invoke(messages=[])
+        self.assertEqual(model.calls, 1)
+
     @patch('galaxy_agentos.provider_retry.time.sleep')
     def test_gateway_transient_is_one_same_model_retry_only(self, _sleep):
         model = with_provider_retry(Model([gateway_rejected(), 'ok']))

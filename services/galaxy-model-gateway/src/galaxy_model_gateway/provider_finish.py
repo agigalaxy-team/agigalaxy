@@ -1,5 +1,7 @@
 """Closed Gemini finish-reason diagnostics before LiteLLM's stream mapping."""
 from functools import wraps
+from collections import OrderedDict
+from threading import Lock
 
 from .output import emit
 
@@ -8,6 +10,20 @@ _FINISH_REASONS = frozenset({"FINISH_REASON_UNSPECIFIED", "STOP", "MAX_TOKENS", 
     "MALFORMED_FUNCTION_CALL", "IMAGE_SAFETY", "IMAGE_PROHIBITED_CONTENT", "TOO_MANY_TOOL_CALLS",
     "MALFORMED_RESPONSE", "NO_IMAGE", "IMAGE_RECITATION", "IMAGE_OTHER", "ESCALATION",
     "UNEXPECTED_TOOL_CALL", "MISSING_THOUGHT_SIGNATURE"})
+_malformed = OrderedDict()
+_lock = Lock()
+
+
+def malformed_for(call_id):
+    with _lock:
+        return call_id in _malformed
+
+
+def _record_malformed(call_id):
+    with _lock:
+        _malformed[call_id] = True
+        _malformed.move_to_end(call_id)
+        while len(_malformed) > 512: _malformed.popitem(last=False)
 
 
 def install(iterator_class=None):
@@ -29,6 +45,7 @@ def install(iterator_class=None):
                     if isinstance(candidate, dict) and "finishReason" in candidate:
                         value = candidate["finishReason"]
                         reason = value if isinstance(value, str) and value in _FINISH_REASONS else "unknown"
+                        if reason == "MALFORMED_FUNCTION_CALL": _record_malformed(row["callId"])
                         emit({"event":"provider-native-finish", "callId":row["callId"], "finishReason":reason})
         except Exception:
             pass  # Diagnostics must not alter provider processing.
