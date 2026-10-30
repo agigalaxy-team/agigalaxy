@@ -9,7 +9,7 @@ FORMATS = frozenset({"openai-chat", "openai-responses", "anthropic", "gemini"})
 EFFORTS = frozenset({"none", "minimal", "low", "medium", "high", "xhigh", "max"})
 PROFILE_FIELDS = frozenset({"apiFormat", "contextWindow", "maxOutputTokens", "reasoningEffort",
     "timeoutSeconds", "toolCalling", "structuredOutput", "scenarios"})
-OPTIONAL_PROFILE_FIELDS=frozenset({'imageUnderstanding','parallelToolCalls','verbosity'})
+OPTIONAL_PROFILE_FIELDS=frozenset({'imageUnderstanding','parallelToolCalls','verbosity','contextCompression'})
 
 
 def load_profiles(path, models):
@@ -44,6 +44,14 @@ def load_profiles(path, models):
         if 'imageUnderstanding' in value and type(value['imageUnderstanding']) is not bool:raise ValueError('model_gateway_profile_invalid')
         if value.get('parallelToolCalls') is not None and (type(value['parallelToolCalls']) is not bool or not value['toolCalling']):raise ValueError('model_gateway_profile_invalid')
         if value.get('verbosity') is not None and (value['verbosity'] not in {'low','medium','high'} or value['apiFormat'] not in {'openai-chat','openai-responses'}):raise ValueError('model_gateway_profile_invalid')
+        compression = value.get("contextCompression")
+        if "contextCompression" in value:
+            if (not isinstance(compression, dict) or set(compression) != {"enabled", "triggerPercent", "recentTokens", "summaryTokens"}
+                    or type(compression["enabled"]) is not bool
+                    or type(compression["triggerPercent"]) is not int or not 50 <= compression["triggerPercent"] <= 95
+                    or type(compression["recentTokens"]) is not int or not 256 <= compression["recentTokens"] <= 100000000
+                    or type(compression["summaryTokens"]) is not int or not 128 <= compression["summaryTokens"] <= 100000000):
+                raise ValueError("model_gateway_profile_invalid")
         domains = value["scenarios"]
         if not isinstance(domains, list) or len(set(domains)) != len(domains) or any(x not in SCENARIOS for x in domains):
             raise ValueError("model_gateway_profile_invalid")

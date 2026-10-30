@@ -58,7 +58,7 @@ func operationView(row Object, replayed bool) Object {
 	return Object{"operationId": row["operation_id"], "kind": row["kind"], "phase": row["phase"], "versionId": row["version_id"], "modelRecordId": obj(row["input"])["modelRecordId"], "credentialRef": row["credential_ref"], "errorCode": row["error_code"], "replayed": replayed, "recordedAt": stamp(row["created_at"]), "updatedAt": stamp(row["updated_at"])}
 }
 
-var modelFields = []string{"displayName", "modelId", "apiFormat", "baseUrl", "credentialRef", "contextWindow", "maxOutputTokens", "reasoning", "timeoutSeconds", "toolCalling", "structuredOutput", "imageUnderstanding", "parallelToolCalls", "verbosity", "fallbacks", "enabled"}
+var modelFields = []string{"displayName", "modelId", "apiFormat", "baseUrl", "credentialRef", "contextWindow", "maxOutputTokens", "reasoning", "timeoutSeconds", "toolCalling", "structuredOutput", "imageUnderstanding", "parallelToolCalls", "verbosity", "fallbacks", "contextCompression", "enabled"}
 
 func ConfigurationChanges(before, after Object) Object {
 	a, b := map[string]Object{}, map[string]Object{}

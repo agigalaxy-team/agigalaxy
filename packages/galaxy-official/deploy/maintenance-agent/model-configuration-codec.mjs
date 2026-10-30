@@ -25,7 +25,7 @@ export function compileModelConfiguration(configuration,versionId,credentials){
   const profile={apiFormat:model.apiFormat,contextWindow:model.contextWindow,maxOutputTokens:model.maxOutputTokens,
    reasoningEffort:model.reasoning.mode==='effort'?model.reasoning.effort:null,timeoutSeconds:model.timeoutSeconds,
    toolCalling:model.toolCalling,structuredOutput:model.structuredOutput};
-  for(const key of ['imageUnderstanding','parallelToolCalls','verbosity'])if(Object.hasOwn(model,key))profile[key]=model[key];
+  for(const key of ['imageUnderstanding','parallelToolCalls','verbosity','contextCompression'])if(Object.hasOwn(model,key))profile[key]=model[key];
   const domains=modelSettingsDomains.filter(domain=>value.scenarios[domain]?.modelId===model.id);
   if(domains.includes('governance')&&!model.toolCalling)throw fail();
   rows.push({model_name:alias,litellm_params:{model:nativePrefix+'/'+model.modelId,api_base:modelProtocolBase(model.baseUrl,model.apiFormat),

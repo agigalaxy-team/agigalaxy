@@ -80,3 +80,30 @@ func TestOriginalModelsSchemaAndNativeUnknownProjection(t *testing.T) {
 		}
 	}
 }
+
+func TestContextCompressionConfiguration(t *testing.T) {
+	c := sampleConfiguration()
+	model := obj(list(c["models"])[0])
+	compression := Object{"enabled": true, "triggerPercent": 80, "recentTokens": 8192, "summaryTokens": 2048}
+	model["contextCompression"] = compression
+	parsed, err := ParseConfiguration(c)
+	if err != nil || !reflect.DeepEqual(normalize(obj(list(parsed["models"])[0])["contextCompression"]), normalize(compression)) {
+		t.Fatalf("compression was not preserved: %v", err)
+	}
+	changes := ConfigurationChanges(sampleConfiguration(), parsed)
+	if !strings.Contains(stringMustJSON(changes), "contextCompression") {
+		t.Fatal("compression change missing from history")
+	}
+	for _, bad := range []Object{
+		{"enabled": true, "triggerPercent": 49, "recentTokens": 8192, "summaryTokens": 2048},
+		{"enabled": true, "triggerPercent": 80, "recentTokens": 255, "summaryTokens": 2048},
+		{"enabled": true, "triggerPercent": 80, "recentTokens": 8192, "summaryTokens": 127},
+		{"enabled": true, "triggerPercent": 80, "recentTokens": 8192, "summaryTokens": 2048, "extra": true},
+	} {
+		model["contextCompression"] = bad
+		if _, err := ParseConfiguration(c); err == nil {
+			t.Fatalf("accepted invalid compression: %v", bad)
+		}
+	}
+}
+func stringMustJSON(value any) string { data, _ := json.Marshal(value); return string(data) }

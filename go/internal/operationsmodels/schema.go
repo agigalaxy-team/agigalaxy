@@ -111,7 +111,7 @@ func baseURL(v any) (any, bool) {
 func parseModel(v any) (Object, bool) {
 	o := obj(v)
 	required := []string{"id", "displayName", "modelId", "apiFormat", "baseUrl", "credentialRef", "contextWindow", "maxOutputTokens", "timeoutSeconds", "reasoning", "toolCalling", "structuredOutput", "enabled"}
-	if !closed(o, required, []string{"imageUnderstanding", "parallelToolCalls", "verbosity", "fallbacks"}) {
+	if !closed(o, required, []string{"imageUnderstanding", "parallelToolCalls", "verbosity", "fallbacks", "contextCompression"}) {
 		return nil, false
 	}
 	out := clone(o)
@@ -142,6 +142,15 @@ func parseModel(v any) (Object, bool) {
 			max = 1800
 		}
 		if o[k] != nil && !integer(o[k], 1, max) {
+			return nil, false
+		}
+	}
+	if v, exists := o["contextCompression"]; exists {
+		c := obj(v)
+		if !closed(c, []string{"enabled", "triggerPercent", "recentTokens", "summaryTokens"}, nil) {
+			return nil, false
+		}
+		if _, ok := c["enabled"].(bool); !ok || !integer(c["triggerPercent"], 50, 95) || !integer(c["recentTokens"], 256, 100000000) || !integer(c["summaryTokens"], 128, 100000000) {
 			return nil, false
 		}
 	}

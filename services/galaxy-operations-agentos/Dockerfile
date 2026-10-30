@@ -1,8 +1,9 @@
 FROM python:3.12-slim-bookworm
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/src
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/src TIKTOKEN_CACHE_DIR=/app/tokenizers
 WORKDIR /app
 COPY services/galaxy-operations-agentos/requirements.lock ./requirements.lock
 RUN pip install --no-cache-dir -r requirements.lock
+RUN mkdir -p "$TIKTOKEN_CACHE_DIR" && python -c "import tiktoken; tiktoken.get_encoding('o200k_base'); tiktoken.get_encoding('cl100k_base')" && chmod -R a+rX "$TIKTOKEN_CACHE_DIR"
 COPY services/galaxy-operations-agentos/src ./src
 COPY services/galaxy-operations-agentos/tests ./tests
 COPY services/galaxy-operations-agentos/model-bindings.empty.json ./model-bindings.empty.json

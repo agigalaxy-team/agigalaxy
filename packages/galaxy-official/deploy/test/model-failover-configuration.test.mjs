@@ -24,3 +24,21 @@ test('unapproved, unavailable, incompatible, duplicate and self fallback targets
  b.imageUnderstanding=true;a.fallbacks.push(a.fallbacks[0]);assert.equal(modelSettingsConfigurationSchema.safeParse(value).success,false);
  a.fallbacks=[{modelId:a.id,dataPolicyApproved:true}];assert.equal(modelSettingsConfigurationSchema.safeParse(value).success,false);
 });
+
+test('context compression follows the selected model through primary and fallback bindings',()=>{
+ const config=fixture(),[a,b]=config.models;
+ a.contextCompression={enabled:true,triggerPercent:80,recentTokens:8192,summaryTokens:2048};
+ b.contextCompression={enabled:false,triggerPercent:65,recentTokens:1024,summaryTokens:512};
+ a.fallbacks=[{modelId:b.id,dataPolicyApproved:true}];
+ const credentials=config.models.map(model=>({reference:model.credentialRef,modelRecordId:model.id,configured:true}));
+ const compiled=compileModelConfiguration(config,randomUUID(),credentials);
+ assert.deepEqual(compiled.gateway.galaxy_profiles[modelAlias(a.id)].contextCompression,a.contextCompression);
+ assert.deepEqual(compiled.agentos.scenarios.overview.runtimeProfile.contextCompression,a.contextCompression);
+ assert.deepEqual(compiled.agentos.scenarios.overview.fallbacks[0].runtimeProfile.contextCompression,b.contextCompression);
+ for(const contextCompression of [{...a.contextCompression,triggerPercent:49},{...a.contextCompression,triggerPercent:96},{...a.contextCompression,recentTokens:255},{...a.contextCompression,summaryTokens:127},{...a.contextCompression,enabled:1},{...a.contextCompression,unknown:true}]){
+  assert.equal(modelSettingsConfigurationSchema.safeParse({...config,models:[{...a,contextCompression},b]}).success,false);
+ }
+ delete a.contextCompression;
+ const legacy=compileModelConfiguration(config,randomUUID(),credentials);
+ assert.equal(Object.hasOwn(legacy.agentos.scenarios.overview.runtimeProfile,'contextCompression'),false);
+});

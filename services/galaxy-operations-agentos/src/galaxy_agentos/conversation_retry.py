@@ -10,9 +10,20 @@ from .gateway import AuthorityDenied
 
 _ATTEMPT_FIELDS = frozenset({"modelCalls", "modelSettingsVersion", "modelSettingsVersions",
     "modelFallbacks", "activeModelFallbackAlias", "toolRecovery", "rolePromptVersion",
-    "boundaryVersion", "_galaxyConversationCallReferences", "_galaxyPreparedCardIds"})
+    "boundaryVersion", "compactionStatus", "toolCompressionStatus", "_galaxyConversationCallReferences", "_galaxyPreparedCardIds"})
 
 class ConversationAgent(Agent):
+    def get_tools(self, run_response, run_context, session, user_id=None):
+        from .conversation_compaction import bind_run
+        bind_run(run_response, run_context)
+        return super().get_tools(run_response, run_context, session, user_id=user_id)
+
+    async def aget_tools(self, run_response, run_context, session, user_id=None, check_mcp_tools=True):
+        from .conversation_compaction import bind_run
+        bind_run(run_response, run_context)
+        return await super().aget_tools(run_response, run_context, session, user_id=user_id,
+            check_mcp_tools=check_mcp_tools)
+
     def _retry_source(self, run_response, options):
         metadata = options.get("metadata")
         if not options.get("regenerate") or not isinstance(metadata, dict) or not metadata.get("retryOfRunId"):

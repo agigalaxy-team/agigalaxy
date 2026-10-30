@@ -9,6 +9,7 @@ export type ModelSettingsModel={
  reasoning:{mode:'default'|'effort';effort:ModelSettingsEffort|null;supportedEfforts:ModelSettingsEffort[];supportSource:'manual'};
  toolCalling:boolean;structuredOutput:boolean;enabled:boolean;
  imageUnderstanding?:boolean;parallelToolCalls?:boolean|null;verbosity?:'low'|'medium'|'high'|null;
+ contextCompression?:{enabled:boolean;triggerPercent:number;recentTokens:number;summaryTokens:number};
  fallbacks?:{modelId:string;dataPolicyApproved:boolean}[];
 };
 export type ModelSettingsBinding={modelId:string;dataPolicyApproved:boolean}|null;

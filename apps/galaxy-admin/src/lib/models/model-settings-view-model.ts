@@ -28,6 +28,7 @@ export function modelSettingsPath(kind:'overview'|'history'|'usage'|'operation',
 export const modelSettingsEmpty=():ModelSettingsConfiguration=>({models:[],scenarios:{overview:null,governance:null,messaging:null,discovery:null,maintenance:null}});
 export const modelSettingsClone=(configuration:ModelSettingsConfiguration):ModelSettingsConfiguration=>structuredClone(configuration);
 export const modelSettingsSame=(left:unknown,right:unknown):boolean=>JSON.stringify(left)===JSON.stringify(right);
+export const modelSettingsDefaultCompression={enabled:true,triggerPercent:80,recentTokens:8192,summaryTokens:2048} as const;
 export function modelSettingsNewModel(id:string):ModelSettingsModel{
  return{id,displayName:'',modelId:null,apiFormat:'openai-chat',baseUrl:null,credentialRef:null,contextWindow:null,maxOutputTokens:null,timeoutSeconds:null,reasoning:{mode:'default',effort:null,supportedEfforts:[],supportSource:'manual'},toolCalling:false,structuredOutput:false,imageUnderstanding:false,parallelToolCalls:null,verbosity:null,fallbacks:[],enabled:false};
 }
@@ -70,6 +71,7 @@ export function modelSettingsValidation(configuration:ModelSettingsConfiguration
   for(const [field,label,max] of [['contextWindow','上下文窗口',100000000],['maxOutputTokens','最大输出 Token',100000000],['timeoutSeconds','超时时间',1800]] as const){const number=model[field];if(number!==null&&(!Number.isSafeInteger(number)||number<=0||number>max))errors.push(name+'：'+label+'需为 1–'+max+' 的整数。');}
   if(model.contextWindow!==null&&model.maxOutputTokens!==null&&model.maxOutputTokens>=model.contextWindow)errors.push(name+'：最大输出需小于上下文窗口，为输入保留空间。');
   if(model.apiFormat==='openai-responses'&&model.maxOutputTokens!==null&&model.maxOutputTokens<16)errors.push(name+'：Responses 最大输出至少为 16 Token。');
+  if(model.contextCompression){const c=model.contextCompression;if(typeof c.enabled!=='boolean'||!Number.isSafeInteger(c.triggerPercent)||c.triggerPercent<50||c.triggerPercent>95||!Number.isSafeInteger(c.recentTokens)||c.recentTokens<256||c.recentTokens>100000000||!Number.isSafeInteger(c.summaryTokens)||c.summaryTokens<128||c.summaryTokens>100000000)errors.push(name+'：检查会话压缩参数范围。');}
   const reasoning=model.reasoning,efforts=reasoning.supportedEfforts;
   if(efforts.some(effort=>!modelSettingsEfforts.includes(effort))||new Set(efforts).size!==efforts.length)errors.push(name+'：支持的思考档位无效。');
   if(reasoning.mode==='effort'&&(!reasoning.effort||!efforts.includes(reasoning.effort)))errors.push(name+'：选择该接口实际支持的思考档位。');
@@ -95,15 +97,15 @@ export function modelSettingsValidation(configuration:ModelSettingsConfiguration
 }
 function modelSettingsOptional(model:ModelSettingsModel){
  const result:Partial<ModelSettingsModel>={};
- for(const key of ['imageUnderstanding','parallelToolCalls','verbosity','fallbacks'] as const)if(Object.hasOwn(model,key))(result as Record<string,unknown>)[key]=structuredClone(model[key]);
+ for(const key of ['imageUnderstanding','parallelToolCalls','verbosity','fallbacks','contextCompression'] as const)if(Object.hasOwn(model,key))(result as Record<string,unknown>)[key]=structuredClone(model[key]);
  return result;
 }
 export function modelSettingsSafeConfiguration(configuration:ModelSettingsConfiguration):ModelSettingsConfiguration{
  return{models:configuration.models.map(model=>({id:model.id,displayName:model.displayName.trim(),modelId:model.modelId?.trim()||null,apiFormat:model.apiFormat,baseUrl:model.baseUrl?.trim()||null,credentialRef:model.credentialRef,contextWindow:model.contextWindow,maxOutputTokens:model.maxOutputTokens,timeoutSeconds:model.timeoutSeconds,reasoning:{mode:model.reasoning.mode,effort:model.reasoning.mode==='effort'?model.reasoning.effort:null,supportedEfforts:[...model.reasoning.supportedEfforts],supportSource:'manual'},toolCalling:model.toolCalling,structuredOutput:model.structuredOutput,...modelSettingsOptional(model),enabled:model.enabled})),scenarios:Object.fromEntries(modelSettingsDomains.map(domain=>[domain,configuration.scenarios[domain]?{modelId:configuration.scenarios[domain]!.modelId,dataPolicyApproved:configuration.scenarios[domain]!.dataPolicyApproved}:null])) as ModelSettingsConfiguration['scenarios']};
 }
 export type ModelSettingsConflict={path:string;label:string;mine:unknown;current:unknown};
-const fields=['displayName','modelId','apiFormat','baseUrl','credentialRef','contextWindow','maxOutputTokens','timeoutSeconds','reasoning','toolCalling','structuredOutput','imageUnderstanding','parallelToolCalls','verbosity','fallbacks','enabled'] as const;
-const fieldNames:Record<string,string>={displayName:'显示名称',modelId:'API 模型名称',apiFormat:'接口格式',baseUrl:'接口地址',credentialRef:'凭据',contextWindow:'上下文窗口',maxOutputTokens:'最大输出',timeoutSeconds:'超时',reasoning:'思考设置',toolCalling:'工具调用',structuredOutput:'结构化输出',imageUnderstanding:'图片识别',parallelToolCalls:'并行工具调用',verbosity:'回答详略',fallbacks:'备用模型',enabled:'启用状态'};
+const fields=['displayName','modelId','apiFormat','baseUrl','credentialRef','contextWindow','maxOutputTokens','timeoutSeconds','reasoning','toolCalling','structuredOutput','imageUnderstanding','parallelToolCalls','verbosity','fallbacks','contextCompression','enabled'] as const;
+const fieldNames:Record<string,string>={displayName:'显示名称',modelId:'API 模型名称',apiFormat:'接口格式',baseUrl:'接口地址',credentialRef:'凭据',contextWindow:'上下文窗口',maxOutputTokens:'最大输出',timeoutSeconds:'超时',reasoning:'思考设置',toolCalling:'工具调用',structuredOutput:'结构化输出',imageUnderstanding:'图片识别',parallelToolCalls:'并行工具调用',verbosity:'回答详略',fallbacks:'备用模型',contextCompression:'会话压缩',enabled:'启用状态'};
 export function modelSettingsMerge(base:ModelSettingsConfiguration,mine:ModelSettingsConfiguration,current:ModelSettingsConfiguration,choices:Record<string,'mine'|'current'>={},pendingCredentialIds:readonly string[]=[]){
  const conflicts:ModelSettingsConflict[]=[],pendingCredentials=new Set(pendingCredentialIds),retainedCredentials=new Set<string>();let unresolved=0;
  const knownReferences=[...base.models,...mine.models,...current.models].every(model=>model.credentialRef===null||typeof model.credentialRef==='string'&&/^model-key:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(model.credentialRef));

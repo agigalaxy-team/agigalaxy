@@ -22,6 +22,7 @@ class RuntimeProfile:
     image_understanding: bool | None = None
     parallel_tool_calls: bool | None = None
     verbosity: str | None = None
+    context_compression: dict | None = None
 
     def view(self):
         value = {"apiFormat": self.api_format, "contextWindow": self.context_window,
@@ -31,12 +32,13 @@ class RuntimeProfile:
         if self.image_understanding is not None:value["imageUnderstanding"]=self.image_understanding
         if self.parallel_tool_calls is not None:value["parallelToolCalls"]=self.parallel_tool_calls
         if self.verbosity is not None:value["verbosity"]=self.verbosity
+        if self.context_compression is not None: value["contextCompression"] = dict(self.context_compression)
         return value
 
 
 def load_runtime_profile(value):
     required={"apiFormat", "contextWindow", "maxOutputTokens", "reasoningEffort", "timeoutSeconds", "toolCalling", "structuredOutput"}
-    optional={"imageUnderstanding","parallelToolCalls","verbosity"}
+    optional={"imageUnderstanding","parallelToolCalls","verbosity","contextCompression"}
     if not isinstance(value, dict) or not required.issubset(value) or set(value)-required-optional:
         raise ValueError("agentos_model_profile_invalid")
     if value["apiFormat"] not in FORMATS:
@@ -60,8 +62,16 @@ def load_runtime_profile(value):
     if "imageUnderstanding" in value and type(value["imageUnderstanding"]) is not bool:raise ValueError("agentos_model_profile_invalid")
     if value.get("parallelToolCalls") is not None and (type(value["parallelToolCalls"]) is not bool or not value["toolCalling"]):raise ValueError("agentos_model_profile_invalid")
     if value.get("verbosity") is not None and (value["verbosity"] not in {"low","medium","high"} or value["apiFormat"] not in {"openai-chat","openai-responses"}):raise ValueError("agentos_model_profile_invalid")
+    compression = value.get("contextCompression")
+    if "contextCompression" in value:
+        if (not isinstance(compression, dict) or set(compression) != {"enabled", "triggerPercent", "recentTokens", "summaryTokens"}
+                or type(compression["enabled"]) is not bool
+                or type(compression["triggerPercent"]) is not int or not 50 <= compression["triggerPercent"] <= 95
+                or type(compression["recentTokens"]) is not int or not 256 <= compression["recentTokens"] <= 100000000
+                or type(compression["summaryTokens"]) is not int or not 128 <= compression["summaryTokens"] <= 100000000):
+            raise ValueError("agentos_model_profile_invalid")
     return RuntimeProfile(value["apiFormat"], window, output, effort,
-        value["timeoutSeconds"], value["toolCalling"], value["structuredOutput"],value.get("imageUnderstanding"),value.get("parallelToolCalls"),value.get("verbosity"))
+        value["timeoutSeconds"], value["toolCalling"], value["structuredOutput"],value.get("imageUnderstanding"),value.get("parallelToolCalls"),value.get("verbosity"), compression)
 
 
 def native_model(profile, *, alias, base_url, api_key, headers):

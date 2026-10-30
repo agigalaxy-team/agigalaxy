@@ -12,6 +12,17 @@ from galaxy_agentos.model_settings import DOMAINS, load_bindings
 
 
 class ModelProfilesTest(unittest.TestCase):
+    def test_context_compression_profile_is_optional_and_validated(self):
+        raw = {"apiFormat": "openai-chat", "contextWindow": 8192, "maxOutputTokens": 256,
+            "reasoningEffort": None, "timeoutSeconds": 45, "toolCalling": True, "structuredOutput": True}
+        self.assertEqual(load_runtime_profile(raw).view(), raw)
+        compression = {"enabled": True, "triggerPercent": 80, "recentTokens": 8192, "summaryTokens": 2048}
+        self.assertEqual(load_runtime_profile({**raw, "contextCompression": compression}).view()["contextCompression"], compression)
+        for invalid in (None, {**compression, "triggerPercent": 49}, {**compression, "recentTokens": True},
+                {**compression, "summaryTokens": 127}, {**compression, "extra": 1}):
+            with self.assertRaises(ValueError):
+                load_runtime_profile({**raw, "contextCompression": invalid})
+
     def test_native_adapters_serialize_human_limits_and_reasoning_without_sampling_or_fallback(self):
         for api_format in ("openai-chat", "openai-responses", "anthropic", "gemini"):
             raw = {"apiFormat": api_format, "contextWindow": 8192, "maxOutputTokens": 256,

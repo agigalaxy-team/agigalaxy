@@ -68,7 +68,7 @@ def install_usage_scope(model):
 
     @wraps(response)
     def call(*args, **kwargs):
-        token = _RUN.set(kwargs.get("run_response"))
+        token = _RUN.set(kwargs.get("run_response") or _RUN.get())
         try:
             return response(*args, **kwargs)
         finally:
@@ -76,7 +76,7 @@ def install_usage_scope(model):
 
     @wraps(aresponse)
     async def acall(*args, **kwargs):
-        token = _RUN.set(kwargs.get("run_response"))
+        token = _RUN.set(kwargs.get("run_response") or _RUN.get())
         try:
             return await aresponse(*args, **kwargs)
         finally:
@@ -84,7 +84,7 @@ def install_usage_scope(model):
 
     @wraps(response_stream)
     def stream(*args, **kwargs):
-        token = _RUN.set(kwargs.get("run_response"))
+        token = _RUN.set(kwargs.get("run_response") or _RUN.get())
         try:
             yield from response_stream(*args, **kwargs)
         finally:
@@ -92,7 +92,7 @@ def install_usage_scope(model):
 
     @wraps(aresponse_stream)
     async def astream(*args, **kwargs):
-        token = _RUN.set(kwargs.get("run_response"))
+        token = _RUN.set(kwargs.get("run_response") or _RUN.get())
         try:
             async for event in aresponse_stream(*args, **kwargs):
                 yield event

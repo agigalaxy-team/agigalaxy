@@ -2,6 +2,18 @@
 
 Python Agno AgentOS负责原生会话、run、持久队列与HumanReview；Go负责业务计划、当前权威、命令和回执。通用授权及未知操作处理见[接口](interfaces.md#管理身份与原操作)，部署发行见[部署](../operations/deployment.md)。本页只保存原生协议、存储和配置合同。
 
+## 工作台上下文与会话压缩
+
+工作台显示最近五个逻辑轮；同题重试合并，待发送队列与未发送恢复入口在编辑区。这是显示规则，不删除原始历史、业务记录或审计，也不把五轮当作模型上下文。程序固定要求和本轮岗位要求由 `current_role_instructions` 进入 system，当前提问沿原生 user 输入；历史及生成摘要仅作引用，不提供当前权限、任务或授权。
+
+模型的可选 `contextCompression` 配置贯通银河表单、Go 版本与变更记录、维护程序编译、AgentOS 及网关。字段为 `enabled`、`triggerPercent`、`recentTokens`、`summaryTokens`；缺省有效值为 true、80、8192、2048，不回写或迁移旧版本。近期原文和摘要设置是上限，按主模型及直接备用模型的最小可输入容量缩小；已有最大输出仍预留，摘要不会另选供应商或凭据。缺少有效 runtimeProfile 的旧接入不猜测模型容量。
+
+实现按能力择优：复用 Agno 3.1.7 的消息配对边界、压缩记录/重建和工具循环接口；参考 [DeepSeek Harness 的预算与提交机制](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/compaction/compaction-basic/src)及 [OpenCode 的上下文接续](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/session/compaction.ts)，不引入它们的 TypeScript 运行时，也不采用静默遗漏旧记录或新增后台预计算。银河适配负责完整输入估算、当前运行计量、历史资料角色、摘要完成检查及保存成功后采用。估算包含系统要求、工具定义和本轮文本，并保留余量；tiktoken 在镜像构建时预缓存常用编码，运行时不为取编码下载数据。该估算不是供应商实际用量，网关仍执行最终容量准入。
+
+历史归并保留近期原文并将较早消息按角色和标识作为 JSON 资料分批摘要；批次按完整摘要请求预算合并，不每条消息都调用一次。摘要与本轮工具结果压缩分别使用 Agno 的 Compaction 和 CompressionManager 接点，调用沿当前模型、身份与原运行计数，工具压缩只设置 `compressed_content`，不改变原工具正文或配对。空摘要、上游截断、超出目标或明确保存失败均不切换历史视图；长度不符至多再尝试一次，不靠截断摘要制造成功。原生规划器的 500-run 窗口前增加短轮归并保护，无法保存时停止继续滑出历史，不静默忽略早期轮次。
+
+不会将压缩归档变为绕过当前权限的搜索工具。历史和摘要保留原会话归属；后台任务、私聊及业务回执的存储边界不因本功能改变。超大单次输入、多模态计数差异及不可缩小的当前请求仍可能被网关拒绝，不保证任意输入都能放入窗口。实际 PostgreSQL 提交结果不明的恢复语义及真实供应商效果须在发布验收中单列，SQLite 与本地模型替身检查不能替代这两项。
+
 ## 构建与配置入口
 
 AgentOS依赖以 [`requirements.lock`](../../services/galaxy-operations-agentos/requirements.lock) / `pyproject.toml` 固定Agno3.1.7，入口 `python -m galaxy_agentos.app`，从仓库根构建：

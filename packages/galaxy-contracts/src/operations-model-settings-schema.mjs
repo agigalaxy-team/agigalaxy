@@ -27,6 +27,10 @@ export const modelSettingsReasoningSchema=z.strictObject({
  if(value.mode==='default'&&value.effort!==null||value.mode==='effort'&&(value.effort===null||!value.supportedEfforts.includes(value.effort)))
   ctx.addIssue({code:'custom',message:'Select a declared effort only when effort mode is selected'});
 });
+export const modelContextCompressionSchema=z.strictObject({
+ enabled:z.boolean(),triggerPercent:z.number().int().min(50).max(95),
+ recentTokens:z.number().int().min(256).max(100000000),summaryTokens:z.number().int().min(128).max(100000000),
+});
 export const modelSettingsModelSchema=z.strictObject({
  id:uuid,displayName:z.string().trim().min(1).max(100),modelId,apiFormat:z.enum(modelSettingsFormats),
  baseUrl,credentialRef:credentialRef.nullable(),contextWindow:z.number().int().positive().max(100000000).nullable(),
@@ -34,6 +38,7 @@ export const modelSettingsModelSchema=z.strictObject({
  reasoning:modelSettingsReasoningSchema,toolCalling:z.boolean(),structuredOutput:z.boolean(),enabled:z.boolean(),
  imageUnderstanding:z.boolean().optional(),parallelToolCalls:z.boolean().nullable().optional(),
  verbosity:z.enum(['low','medium','high']).nullable().optional(),
+ contextCompression:modelContextCompressionSchema.optional(),
  fallbacks:z.array(z.strictObject({modelId:uuid,dataPolicyApproved:z.boolean()})).max(3).refine(items=>new Set(items.map(item=>item.modelId)).size===items.length).optional(),
 }).superRefine((value,ctx)=>{
  if(value.contextWindow!==null&&value.maxOutputTokens!==null&&value.maxOutputTokens>=value.contextWindow)
