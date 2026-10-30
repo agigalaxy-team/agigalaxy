@@ -9,7 +9,7 @@ from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from galaxy_agentos.conversation_completion import with_conversation_completion
 from galaxy_agentos.conversation_turn_plan import ACTIVITY, ASSESSMENT, PLAN, plan_turn_tool, assess_turn_tool
-from galaxy_agentos.conversation_turn_state import turn_state, bind_turn_state, TURN_STATE
+from galaxy_agentos.conversation_turn_state import turn_state, bind_turn_state, TURN_STATE, TASK_CONTEXT, TASK_PROGRESS
 from galaxy_agentos.p13_configuration import validate_configuration
 from galaxy_agentos.tool_reliability import PREPARED_CARD_IDS
 
@@ -22,6 +22,16 @@ class Model:
     async def aresponse_stream(self, messages, **kw): yield self.response(messages, **kw)
 
 class CompletionTest(unittest.TestCase):
+    def test_interrupted_resumed_task_plain_answer_does_not_complete(self):
+        model = with_conversation_completion(Model(lambda n,m,r: ModelResponse(content="已完成")))
+        run = SimpleNamespace(metadata={"operationId":"retry"})
+        turn_state(run)[TASK_CONTEXT] = {"rootOperationId":"root", "phase":"interrupted", "remaining":[]}
+        turn_state(run)[TASK_PROGRESS] = {"phase":"interrupted", "remaining":[]}
+        result = model.response([], run_response=run)
+        self.assertIn("尚未完成", result.content)
+        self.assertEqual(model.calls, 2)
+        self.assertNotEqual(turn_state(run)[TASK_PROGRESS]["phase"], "completed")
+
     def test_unassessed_business_continues_once_then_accepts_assessment(self):
         def action(n, messages, run):
             if n == 1:

@@ -71,8 +71,12 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
         if disposition == "continue": return "continue"
         if disposition == "completed" and not assessment.get("remaining"): return "completed"
         if disposition == "waiting-confirmation": return "waiting-confirmation"
+        task = metadata.get(TASK_CONTEXT)
+        root = task.get("rootOperationId") if isinstance(task, dict) else None
+        operation = (getattr(run, "metadata", None) or {}).get("operationId")
+        resumed = isinstance(root, str) and bool(root) and isinstance(operation, str) and bool(operation) and root != operation
         if (not activity and plan.get("intent") != "prepare" and not metadata.get(RECEIPT_FEEDBACK)
-                and not (progress.get("phase") == "continue" and progress.get("remaining"))): return "completed"
+                and not resumed and not (progress.get("phase") == "continue" and progress.get("remaining"))): return "completed"
         return "continue"
     def facts(messages):
         seen = set()
