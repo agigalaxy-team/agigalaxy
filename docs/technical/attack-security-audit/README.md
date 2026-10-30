@@ -23,6 +23,7 @@
 5. [验证限制](VERIFICATION-LIMITS.md)
 6. [修复验收条件](REMEDIATION.md)
 7. [接手说明](HANDOFF.md)
+8. [未完成路径逐项交接](COVERAGE-GAPS.md)：710条版本/路径记录，非去重文件数，不是漏洞清单。
 
 ## 优先次序
 
