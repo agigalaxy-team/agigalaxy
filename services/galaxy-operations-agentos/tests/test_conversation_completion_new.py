@@ -63,7 +63,36 @@ class CompletionTest(unittest.TestCase):
                 async def collect(): return [v async for v in model.aresponse_stream([],run_response=run)]
                 result=asyncio.run(collect())
             else: result=list(model.response_stream([],run_response=run))
-            self.assertEqual(model.calls,1); self.assertEqual([v.content for v in result if v.content],["三张卡等待确认。"]); self.assertNotIn(ASSESSMENT,turn_state(run))
+            self.assertEqual(model.calls,1); self.assertEqual([v.content for v in result if v.content],["已准备 3 个备选方案，请在下方选择一项。当前尚未执行。"]); self.assertNotIn(ASSESSMENT,turn_state(run))
+    def test_prepare_notice_replaces_model_text_and_preserves_live_events(self):
+        from galaxy_agentos.conversation_completion import _PREPARED_ONE, _PREPARED_THREE
+        for count, notice in ((1,_PREPARED_ONE),(3,_PREPARED_THREE)):
+            for async_mode in (False,True):
+                run=SimpleNamespace(metadata={}); turn_state(run)[PLAN]={"intent":"prepare","proposalCount":count,"alternatives":count==3}
+                class Live(Model):
+                    def response_stream(self,messages,**kw):
+                        yield ModelResponse(event="ModelRequestStarted")
+                        yield ModelResponse(content="内部字段 UUID 和命令")
+                        turn_state(run)[PREPARED_CARD_IDS]=[str(uuid4()) for _ in range(count)]
+                        yield ModelResponse(event="ToolCallCompleted")
+                        yield ModelResponse(content="内部字段又出现")
+                    async def aresponse_stream(self,messages,**kw):
+                        for item in self.response_stream(messages,**kw): yield item
+                model=with_conversation_completion(Live(None))
+                if async_mode:
+                    async def collect(): return [v async for v in model.aresponse_stream([],run_response=run)]
+                    events=asyncio.run(collect())
+                else: events=list(model.response_stream([],run_response=run))
+                self.assertEqual([e.content for e in events if e.content],[notice])
+                self.assertEqual([e.event for e in events if not e.content],["ModelRequestStarted","ToolCallCompleted"])
+                def action(n,m,r): return ModelResponse(content="内部字段 UUID")
+                model=with_conversation_completion(Model(action)); self.assertEqual(model.response([],run_response=run).content,notice)
+                self.assertEqual(asyncio.run(model.aresponse([],run_response=run)).content,notice)
+    def test_prepare_needing_information_keeps_honest_content(self):
+        run=SimpleNamespace(metadata={}); turn_state(run).update({PLAN:{"intent":"prepare","proposalCount":3,"alternatives":True}, ACTIVITY:1, ASSESSMENT:{"activity":1,"disposition":"needs-information"}})
+        model=with_conversation_completion(Model(lambda n,m,r:ModelResponse(content="请补充目标。")))
+        self.assertEqual([e.content for e in model.response_stream([],run_response=run) if e.content],["请补充目标。"])
+
     def test_three_target_zero_or_two_real_cards_still_incomplete(self):
         for count in (0,2):
             def action(n,messages,run): return ModelResponse(content="未核验完成")

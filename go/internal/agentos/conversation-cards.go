@@ -327,6 +327,12 @@ func (t *ConversationTools) cardReadView(ctx context.Context, row *conversationC
 			delete(out, "review")
 		}
 	}
+	if p["kind"] == "recommendation-policy-save" {
+		// The theme is a source/authorization anchor; this command changes global policy.
+		target := copyObject(object(out["target"]))
+		target["label"] = "全站推荐策略"
+		out["target"] = target
+	}
 	presentationSource := copyObject(p)
 	presentationSource["presentationNames"] = displayNames
 	for _, key := range []string{"title", "target", "impact", "basis"} {

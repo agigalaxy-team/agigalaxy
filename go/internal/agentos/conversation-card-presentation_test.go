@@ -69,3 +69,18 @@ func TestCardPresentationUnchangedOpaqueFieldsDoNotBlockActualDifference(t *test
 		t.Fatal(result)
 	}
 }
+
+func TestGlobalRecommendationPolicyTargetPresentation(t *testing.T) {
+	p := Object{"kind": "recommendation-policy-save", "title": "调整推荐策略", "target": Object{"label": "来源主题"}, "impact": []any{}, "basis": []any{}}
+	view := cardPresentation(p)
+	found := false
+	for _, item := range view["details"].([]any) {
+		row := object(item)
+		if row["label"] == "目标" {
+			found = row["value"] == "全站推荐策略"
+		}
+	}
+	if !found {
+		t.Fatal("policy presentation must describe global scope, not anchor theme")
+	}
+}

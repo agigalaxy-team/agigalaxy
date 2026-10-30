@@ -1,7 +1,6 @@
 """Native Agent sessions for a current management reader, not an automation grant."""
 import asyncio
 import json
-import re
 from uuid import UUID
 from .conversation_retry import ConversationAgent
 from agno.run.base import RunContext
@@ -9,7 +8,7 @@ from agno.tools.function import FunctionCall
 from .model_gate import with_current_authority
 from .conversation_failures import with_conversation_failures
 from .conversation_tool_batches import with_conversation_tool_batches
-from .conversation_completion import with_conversation_completion
+from .conversation_completion import with_conversation_completion, prepared_notification
 from .conversation_turn_state import turn_state, PLAN, PREPARED_CARD_IDS, RECEIPT_FEEDBACK
 from .conversation_turn_context import with_conversation_turn_context
 from .conversation_history_projection import with_conversation_history_projection
@@ -68,8 +67,17 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
         ids = state.get(PREPARED_CARD_IDS)
         if isinstance(ids, list) and ids:
             run_output.metadata = {**(run_output.metadata or {}), PREPARED_CARD_IDS: list(ids)}
-        elif isinstance(run_output.content, str) and re.search(r"(?:已(?:经)?(?:为你|帮你)?(?:生成|创建|准备|制(?:作)?|形成).{0,12}卡|(?:下方|下面).{0,12}(?:确认|操作)卡)", run_output.content):
-            run_output.content = "没有生成可执行的方案。"
+        notification = prepared_notification(run_context)
+        if notification:
+            run_output.content = notification
+            # The native history can retain the model's final assistant message
+            # separately from RunOutput.content. Keep this turn consistent.
+            for index in range(len(run_output.messages or []) - 1, -1, -1):
+                message = run_output.messages[index]
+                if (message.role == "assistant" and not message.from_history
+                        and not message.tool_calls and isinstance(message.content, str)):
+                    run_output.messages[index] = message.model_copy(update={"content": notification})
+                    break
 
     agents = []
     conversation_db = conversation_database(db)

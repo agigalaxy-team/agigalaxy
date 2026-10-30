@@ -308,6 +308,9 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             class PreparedNode(NodeTransport):
                 def __call__(self, request):
                     value = json.loads(request.content)
+                    if value.get("tool") == "plan-conversation-turn":
+                        self.calls.append((request.url.path, value))
+                        return httpx.Response(200, json={"state":"planned", "turnPlan":{**value["arguments"], "preparedCardIds":[]}})
                     if value.get("tool") == "prepare-operation":
                         self.calls.append((request.url.path, value))
                         return httpx.Response(200, json={"state":"prepared", "card":{"cardId":card_id, "state":"prepared"}})
@@ -318,8 +321,10 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 def invoke(self, messages=None, **kwargs):
                     self.calls += 1
                     if self.calls == 1:
-                        return ModelResponse(role="assistant", tool_calls=[{"id":"prepared-call", "type":"function", "function":{"name":"prepare_operation", "arguments":json.dumps({"operation":{"kind":"feedback-update", "targetId":node.object_id, "state":"processing"}})}}])
+                        return ModelResponse(role="assistant", tool_calls=[{"id":"plan-call", "type":"function", "function":{"name":"plan_turn", "arguments":json.dumps({"intent":"prepare", "proposal_count":1, "alternatives":False, "summary":"处理反馈"})}}])
                     if self.calls == 2:
+                        return ModelResponse(role="assistant", tool_calls=[{"id":"prepared-call", "type":"function", "function":{"name":"prepare_operation", "arguments":json.dumps({"operation":{"kind":"feedback-update", "targetId":node.object_id, "state":"processing"}})}}])
+                    if self.calls == 3:
                         return ModelResponse(role="assistant", tool_calls=[{"id":"assess-call", "type":"function", "function":{"name":"assess_turn", "arguments":json.dumps({"disposition":"awaiting-confirmation", "reason":"等待确认", "remaining":[]})}}])
                     return ModelResponse(role="assistant", content="已准备确认卡，请人工确认。")
             model = PreparedModel()
@@ -332,14 +337,16 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 headers = {"Authorization":"Bearer "+token}
                 response = client.post("/agents/galaxy-conversation-overview/runs", headers={**headers,"Idempotency-Key":str(uuid4())}, data={"message":"准备处理", "stream":"true", "background":"false", "session_id":row["sessionId"]})
                 self.assertEqual(response.status_code, 200, response.text)
-                self.assertEqual(model.calls, 3)
-                self.assertIn("已准备确认卡", response.text)
+                self.assertEqual(model.calls, 4)
+                self.assertIn("方案已准备，请在下方确认。当前尚未执行。", response.text)
+                self.assertNotIn("已准备确认卡，请人工确认。", response.text)
                 packets = [value for path,value in node.calls if path.endswith("/tools/execute")]
-                self.assertEqual(len(packets), 1)
+                self.assertEqual(len(packets), 2)
                 stored = db.get_run(run_id=packets[0]["runId"], deserialize=False)["run_data"]
-                self.assertEqual(stored["content"], "已准备确认卡，请人工确认。")
+                self.assertEqual(stored["content"], "方案已准备，请在下方确认。当前尚未执行。")
+                self.assertNotIn("已准备确认卡，请人工确认。", json.dumps(stored, ensure_ascii=False))
                 self.assertEqual(stored["metadata"]["_galaxyPreparedCardIds"], [card_id])
-                self.assertEqual(client.get("/galaxy/conversations/"+row["id"], headers=headers).json()["runs"][0]["content"], "已准备确认卡，请人工确认。")
+                self.assertEqual(client.get("/galaxy/conversations/"+row["id"], headers=headers).json()["runs"][0]["content"], "方案已准备，请在下方确认。当前尚未执行。")
 
     def test_native_stream_continues_after_usage_metadata_copy_and_never_emits_false_card(self):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as cleanup:

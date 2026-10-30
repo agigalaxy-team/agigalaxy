@@ -358,13 +358,15 @@ func cardPresentation(p Object) Object {
 		title = "待确认操作"
 		b.warn("操作标题无法安全展示。")
 	}
+	kind, _ := p["kind"].(string)
 	target, _ := p["target"].(map[string]any)
-	if target != nil {
+	if kind == "recommendation-policy-save" {
+		b.add("目标", "全站推荐策略")
+	} else if target != nil {
 		if name, ok := target["label"].(string); ok && name != "" {
 			b.add("目标", name)
 		}
 	}
-	kind, _ := p["kind"].(string)
 	if kind == "ai-work-prompt-save" {
 		b.add("审阅方式", "请在专用岗位要求审阅区核对完整正文。")
 		return Object{"summary": title, "changes": b.changes, "details": b.details, "warnings": b.warnings, "reviewable": b.valid}
