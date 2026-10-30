@@ -113,6 +113,22 @@ class PrivateSurface:
                         # parameter; their retention policy is configured with
                         # the selected supplier, not invented by a false flag.
                         payload.pop("store", None)
+                    # Gemini VALIDATED keeps automatic text/tool selection while
+                    # constraining function arguments. Never override an explicit
+                    # no-tool, required-tool, or named-function choice.
+                    tools = payload.get("tools")
+                    if (not is_responses and profile["apiFormat"] == "gemini"
+                            and payload.get("tool_choice", "auto") == "auto"
+                            and isinstance(tools, list) and tools
+                            and all(isinstance(tool, dict) and tool.get("type") == "function"
+                                    and isinstance(tool.get("function"), dict) for tool in tools)):
+                        extra_body = dict(payload.get("extra_body") or {})
+                        tool_config = dict(extra_body.get("toolConfig") or {})
+                        calling_config = dict(tool_config.get("functionCallingConfig") or {})
+                        calling_config["mode"] = "VALIDATED"
+                        tool_config["functionCallingConfig"] = calling_config
+                        extra_body["toolConfig"] = tool_config
+                        payload["extra_body"] = extra_body
                 # A caller cannot supply logging metadata, fallback routes,
                 # callback overrides, credentials, provider base URLs or roles.
                 metadata = {"galaxy_model_alias": payload["model"], "galaxy_scenario": scene,

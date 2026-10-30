@@ -47,6 +47,11 @@ def gateway_malformed(**changes):
     error.__cause__.body['error'].update(code='model_gateway_malformed_tool_call', category='malformed-tool-call', **changes)
     return error
 
+def gateway_malformed_response():
+    error = gateway_empty()
+    error.__cause__.body['error'].update(code='model_gateway_malformed_response', category='malformed-response')
+    return error
+
 
 class Model:
     def __init__(self, results, name='galaxy-test'):
@@ -103,6 +108,16 @@ class ProviderRetry(unittest.TestCase):
             self.assertEqual(messages[0].content, '原系统')
             self.assertEqual([m.role for m in model.seen[1]], ['system','user','assistant','tool'])
             self.assertEqual(model.seen[1][2].tool_calls[0]['id'], model.seen[1][3].tool_call_id)
+            other = with_provider_retry(Capture([gateway_malformed_response(), ['ok'] if 'stream' in mode else 'ok']))
+            if mode == 'invoke': result = other.invoke(messages=messages)
+            elif mode == 'ainvoke': result = asyncio.run(other.ainvoke(messages=messages))
+            elif mode == 'invoke_stream': result = list(other.invoke_stream(messages=messages))
+            else: result = asyncio.run(astream(other, messages))
+            self.assertEqual(result, ['ok'] if 'stream' in mode else 'ok')
+            self.assertIn('正常文本或合法的必要工具调用', other.seen[1][0].content)
+            self.assertEqual(messages[0].content, '原系统')
+            self.assertEqual([m.role for m in other.seen[1]], ['system','user','assistant','tool'])
+            self.assertEqual(other.seen[1][2].tool_calls[0]['id'], other.seen[1][3].tool_call_id)
         model = with_provider_retry(Model([['partial', gateway_malformed()], ['unexpected']]))
         stream = model.invoke_stream(messages=[])
         self.assertEqual(next(stream), 'partial')

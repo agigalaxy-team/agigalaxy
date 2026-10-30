@@ -13,7 +13,9 @@ from .model_failover import provider_failure
 from .model_usage import _RUN
 
 _ACTIVE = ContextVar('galaxy_provider_retry_active', default=frozenset())
-_FORMAT_GUIDANCE = "上次工具调用格式有误。工具名及参数须遵循已声明的工具定义，沿已有结果继续，不重放已完成的工具。"
+_FORMAT_GUIDANCE = {
+    'malformed-tool-call': "上次工具调用格式有误。工具名及参数须遵循已声明的工具定义，使用合法JSON；沿已有结果继续，不重放已完成的工具。",
+    'malformed-response': "上次响应格式有误。请输出正常文本或合法的必要工具调用；沿已有结果继续，不重放已完成的工具。"}
 
 
 def gateway_malformed_tool_call(error):
@@ -24,11 +26,13 @@ def gateway_malformed_tool_call(error):
     for _ in range(5):
         body = getattr(current, 'body', None)
         info = body.get('error', body) if isinstance(body, dict) else None
+        category = info.get('category') if isinstance(info, dict) else None
+        codes = {'malformed-tool-call':'model_gateway_malformed_tool_call', 'malformed-response':'model_gateway_malformed_response'}
         if (isinstance(info, dict) and set(info) == {'code', 'source', 'status', 'category', 'outputStarted'}
-                and info.get('code') == 'model_gateway_malformed_tool_call' and info.get('source') == 'model-gateway'
+                and category in codes and info.get('code') == codes[category] and info.get('source') == 'model-gateway'
                 and type(info.get('status')) is int and info['status'] == 502
-                and info.get('category') == 'malformed-tool-call' and info.get('outputStarted') is False):
-            return {'status':502, 'source':'model-gateway', 'malformed':True}
+                and info.get('outputStarted') is False):
+            return {'status':502, 'source':'model-gateway', 'malformed':category}
         current = getattr(current, '__cause__', None) or getattr(current, '__context__', None)
         if current is None: break
     return None
@@ -105,8 +109,9 @@ def _retry_snapshot(snapshot, failure):
         if isinstance(messages, list):
             system = next((item for item in messages if getattr(item, 'role', None) == 'system'
                 and isinstance(getattr(item, 'content', None), str)), None)
-            if system is None: messages.insert(0, Message(role='system', content=_FORMAT_GUIDANCE))
-            else: system.content += '\n' + _FORMAT_GUIDANCE
+            guidance = _FORMAT_GUIDANCE[failure['malformed']]
+            if system is None: messages.insert(0, Message(role='system', content=guidance))
+            else: system.content += '\n' + guidance
     return args, kwargs
 
 

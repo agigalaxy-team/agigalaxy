@@ -155,7 +155,9 @@ galaxy_profiles约束协议、context/output、reasoning、timeout及tools/struc
 
 原生模型每次调用按当前run上下文复制request params，注入可选`X-Galaxy-Native-Run-Id`；Gateway完成私有认证后校验并剥离，关联信息只进入本地accepted/completed/rejected诊断，不转发供应商，也不充当授权。guard保留原流终态判定，诊断仅增帧/choice/tool-delta计数、useful/DONE/finish及闭合错误形状。旧策略流缺终态的记录不能凭token或后来的成功重建原因；新增关联须以真实run/call对应证据分析，不能只凭时间窗口当作精确绑定。
 
-Gemini 原生工具格式失败在协议转换前按同一调用记录闭合原因；仅有 `MALFORMED_FUNCTION_CALL` 证据且未输出有效内容时，网关返回专用错误。参考 Agno 直接 Gemini 的 guidance 机制，现有单次供应商重试在临时消息副本的 system 中补格式说明；不增加 user 消息、不修改持久内容、不重放工具循环，也不增加重试次数。普通空结果、未知原因和已有部分输出不据此推断为工具格式错误。
+Gemini 原生格式失败在协议转换前按同一调用记录闭合原因；仅有 `MALFORMED_FUNCTION_CALL` 或 `MALFORMED_RESPONSE` 证据且未输出有效内容时，网关分别返回专用错误。参考 Agno 直接 Gemini 的 guidance 机制，现有单次供应商重试在临时消息副本的 system 中补对应格式说明；不增加 user 消息、不修改持久内容、不重放工具循环，也不增加重试次数。普通空结果、未知原因、签名错误、安全拦截和已有部分输出不套用该修正。
+
+Gemini Chat 的自动函数调用在网关内部使用供应商 `VALIDATED` 模式，仍由模型决定普通回复或工具调用，以 schema 约束减少格式错误。只适用于全部为函数工具且未指定或选择 auto 的请求；显式 none、required、指定函数和其他协议保持原意，客户端不能透传任意 extra_body。见[供应商模式说明](https://ai.google.dev/gemini-api/docs/function-calling#function-calling-modes)。
 
 ## 定向检查与诊断
 

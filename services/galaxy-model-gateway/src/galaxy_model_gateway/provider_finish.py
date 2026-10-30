@@ -16,12 +16,12 @@ _lock = Lock()
 
 def malformed_for(call_id):
     with _lock:
-        return call_id in _malformed
+        return _malformed.get(call_id)
 
 
-def _record_malformed(call_id):
+def _record_malformed(call_id, reason):
     with _lock:
-        _malformed[call_id] = True
+        _malformed[call_id] = reason
         _malformed.move_to_end(call_id)
         while len(_malformed) > 512: _malformed.popitem(last=False)
 
@@ -45,7 +45,7 @@ def install(iterator_class=None):
                     if isinstance(candidate, dict) and "finishReason" in candidate:
                         value = candidate["finishReason"]
                         reason = value if isinstance(value, str) and value in _FINISH_REASONS else "unknown"
-                        if reason == "MALFORMED_FUNCTION_CALL": _record_malformed(row["callId"])
+                        if reason in {"MALFORMED_FUNCTION_CALL", "MALFORMED_RESPONSE"}: _record_malformed(row["callId"], reason)
                         emit({"event":"provider-native-finish", "callId":row["callId"], "finishReason":reason})
         except Exception:
             pass  # Diagnostics must not alter provider processing.

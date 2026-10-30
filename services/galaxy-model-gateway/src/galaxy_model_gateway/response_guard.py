@@ -118,7 +118,7 @@ class ResponseGuard:
             return
         if reason == 'gateway-empty-completion' and not self.useful and not self.started:
             from .provider_finish import malformed_for
-            if malformed_for(self.call_id): reason = 'gateway-malformed-tool-call'
+            reason = {"MALFORMED_FUNCTION_CALL":"gateway-malformed-tool-call", "MALFORMED_RESPONSE":"gateway-malformed-response"}.get(malformed_for(self.call_id), reason)
         self.bad = True
         self.diagnostic('model-response-rejected', reason=reason, status=status)
         await self.rejected()
@@ -129,6 +129,9 @@ class ResponseGuard:
         if reason == 'gateway-malformed-tool-call':
             body = {'error': {'code':'model_gateway_malformed_tool_call', 'source':'model-gateway',
                 'status':502, 'category':'malformed-tool-call', 'outputStarted':False}}
+        if reason == 'gateway-malformed-response':
+            body = {'error': {'code':'model_gateway_malformed_response', 'source':'model-gateway',
+                'status':502, 'category':'malformed-response', 'outputStarted':False}}
         if reason == 'gateway-transient-error':
             body = {'error': {'code': 'model_gateway_transient_failure', 'source': 'model-gateway',
                 'status': status, 'category': gateway_transient_category(status), 'outputStarted': False}}
