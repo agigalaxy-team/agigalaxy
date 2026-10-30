@@ -99,8 +99,35 @@ func (s *Conversations) receiptFeedback(ctx context.Context, row Conversation, c
 	if err != nil {
 		return nil, err
 	}
-	if card == nil || card.TurnID != text(command.Result, "parentOperationId") || feedbackOperation(card) != command.ID || !cardAttempted(card) {
+	if card == nil || card.Domain != row.Domain || card.TurnID != text(command.Result, "parentOperationId") || !cardAttempted(card) {
 		return nil, fail("operations_agentos_scope_denied", 403)
+	}
+	// Each retry is server-authored only after the original failed without a
+	// business effect. Verify the complete same-owner chain and fixed card.
+	seen := map[string]bool{}
+	logicalRoot := text(command.Result, "logicalTurnId")
+	if command.ID != feedbackOperation(card) && !validOperationID(logicalRoot) {
+		return nil, fail("operations_agentos_scope_denied", 403)
+	}
+	for depth := 0; ; depth++ {
+		if command == nil || depth >= 128 || seen[command.ID] || command.ConversationID != row.ID || command.OperatorID != row.OperatorID || command.Domain != row.Domain || command.Result["origin"] != "operation-feedback" || text(command.Result, "feedbackCardId") != card.ID || text(command.Result, "parentOperationId") != card.TurnID || text(command.Result, "logicalTurnId") != logicalRoot {
+			return nil, fail("operations_agentos_scope_denied", 403)
+		}
+		seen[command.ID] = true
+		if command.ID == feedbackOperation(card) {
+			if text(command.Result, "retryOfOperationId") != "" {
+				return nil, fail("operations_agentos_scope_denied", 403)
+			}
+			break
+		}
+		parent := text(command.Result, "retryOfOperationId")
+		if !validOperationID(parent) {
+			return nil, fail("operations_agentos_scope_denied", 403)
+		}
+		command, err = s.command(ctx, parent)
+		if err != nil {
+			return nil, err
+		}
 	}
 	current, err := s.CurrentRead(ctx, row.ID, nil)
 	if err != nil {

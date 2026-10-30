@@ -297,4 +297,36 @@ func TestConversationTaskFeedbackUsesOriginalObjectiveOnce(t *testing.T) {
 	if err != nil || again["operationId"] != feedbackID || posts != 1 {
 		t.Fatal("feedback original was reissued", again, posts, err)
 	}
+	retryID := uuid.NewString()
+	retryResult := Object{"runId": retryID, "origin": "operation-feedback", "parentOperationId": root, "logicalTurnId": root, "feedbackCardId": card, "retryOfOperationId": feedbackID, "retryOfRunId": feedbackID}
+	_, err = owner.Exec(ctx, `INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,native_run_id,result,created_at) VALUES($1,$2,$3,$4,$5,'accepted',$1::uuid::text,$6,$7)`, retryID, f.Endpoint, row.ID, row.OperatorID, strings.Repeat("d", 64), retryResult, f.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	retryCommand, err := s.command(ctx, retryID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	feedback, err := s.receiptFeedback(ctx, row, retryCommand)
+	if err != nil || feedback["operationId"] != op || feedback["state"] != "completed" || posts != 1 {
+		t.Fatal("same-owner retry lost original receipt", feedback, posts, err)
+	}
+	gotRoot, err := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (string, error) {
+		rootID, _, e := conversationTaskRootWithin(ctx, tx, s.Endpoint, row, retryID)
+		return rootID, e
+	})
+	if err != nil || gotRoot != root {
+		t.Fatal("feedback retry lost task root", gotRoot, err)
+	}
+	wrong := *retryCommand
+	wrong.Result = copyObject(retryCommand.Result)
+	wrong.Result["feedbackCardId"] = uuid.NewString()
+	if _, err = s.receiptFeedback(ctx, row, &wrong); fault.Status(err) != 403 {
+		t.Fatal("wrong card accepted", err)
+	}
+	foreign := row
+	foreign.OperatorID = "foreign"
+	if _, err = s.receiptFeedback(ctx, foreign, retryCommand); fault.Status(err) != 403 {
+		t.Fatal("foreign owner accepted", err)
+	}
 }

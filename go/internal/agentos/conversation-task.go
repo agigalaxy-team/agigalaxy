@@ -12,6 +12,7 @@ import (
 // Lineage is read exclusively from the same owner's server-side command ledger.
 func conversationTaskRootWithin(ctx context.Context, tx pgx.Tx, endpoint string, row Conversation, turn string) (string, Object, error) {
 	seen := map[string]bool{}
+	var feedback Object
 	for depth := 0; depth < 128; depth++ {
 		if !validOperationID(turn) || seen[turn] {
 			return "", nil, fail("operations_agentos_scope_denied", 403)
@@ -25,17 +26,28 @@ func conversationTaskRootWithin(ctx context.Context, tx pgx.Tx, endpoint string,
 		if err != nil {
 			return "", nil, err
 		}
+		if feedback != nil {
+			for _, key := range []string{"origin", "parentOperationId", "logicalTurnId", "feedbackCardId"} {
+				if text(feedback, key) == "" || text(feedback, key) != text(result, key) {
+					return "", nil, fail("operations_agentos_scope_denied", 403)
+				}
+			}
+		}
 		parent, retry := text(result, "parentOperationId"), text(result, "retryOfOperationId")
-		if result["parentOperationId"] != nil && parent == "" || result["retryOfOperationId"] != nil && retry == "" || parent != "" && retry != "" {
+		if result["parentOperationId"] != nil && parent == "" || result["retryOfOperationId"] != nil && retry == "" || parent != "" && retry != "" && text(result, "origin") != "operation-feedback" {
 			return "", nil, fail("operations_agentos_scope_denied", 403)
 		}
 		if parent == "" && retry == "" {
 			return turn, result, nil
 		}
-		if parent != "" {
-			turn = parent
-		} else {
+		if retry != "" {
+			if parent != "" {
+				feedback = result
+			}
 			turn = retry
+		} else {
+			feedback = nil
+			turn = parent
 		}
 	}
 	return "", nil, fail("operations_agentos_scope_denied", 403)

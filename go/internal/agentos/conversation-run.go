@@ -183,6 +183,15 @@ func (s *Conversations) runWithContext(ctx context.Context, operator operationsp
 		}
 		retryRun = text(checked, "runId")
 		receipt["retryOfOperationId"], receipt["retryOfRunId"], receipt["priorFailure"] = parent.ID, retryRun, Object{"status": "ERROR", "errorCode": checked["errorCode"], "failure": checked["failure"]}
+		if parent.Result["origin"] == "operation-feedback" {
+			for _, key := range []string{"origin", "parentOperationId", "logicalTurnId", "feedbackCardId"} {
+				value := text(parent.Result, key)
+				if value == "" || key != "origin" && !validOperationID(value) {
+					return nil, fail("operations_agentos_retry_unavailable", 409)
+				}
+				receipt[key] = value
+			}
+		}
 	}
 	inserted, err := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (bool, error) {
 		if _, err := s.Permissions.HumanAIWithin(ctx, tx, fresh, domain, "conversation", "workbench.read"); err != nil {
