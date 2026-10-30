@@ -15,6 +15,8 @@ import {AdminIcon} from "../AdminIcons";
 import {AdminTabs} from "../AdminTabs";
 import {ReadStatus} from "../OperationControls";
 import {ModelConnectionEditor} from './ModelConnectionEditor';
+import {ModelRemovalDialog} from './ModelRemovalDialog';
+import {modelSettingsRemoveModel} from '../../lib/models/model-settings-view-model';
 
 import {useModelSettingsCommand} from "../../lib/models/use-model-settings-command";
 import './model-settings.css';
@@ -41,6 +43,7 @@ function NativeStatus({value}:{value:ModelSettingsOverview|null}){
 export function ModelSettings(props:Parameters<typeof ModelSettingsSettings>[0]){return <SettingsDraftBoundary scope="/admin/operations/models" resetKey={props.csrfToken}><ModelSettingsSettings {...props}/></SettingsDraftBoundary>;}
 function ModelSettingsSettings({location,csrfToken,canConfigure,canApply}:{location:ModelSettingsLocation;csrfToken:string;canConfigure:boolean;canApply:boolean}){
  const router=useRouter();
+ const [removing,setRemoving]=useState<string|null>(null);
  const [online,setOnline]=useState(true);
  useEffect(()=>{const update=()=>setOnline(navigator.onLine);update();window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);
  const overview=useOperationsRead<ModelSettingsOverview>({path:modelSettingsPath('overview',location),failureMessage:'模型设置暂时无法取得。',clearOnOffline:true});
@@ -95,13 +98,20 @@ function ModelSettingsSettings({location,csrfToken,canConfigure,canApply}:{locat
  function cancelNewModel(){
   if(!editable||!selectedModel||source?.configuration.models.some(model=>model.id===selectedModel.id))return;
   const id=selectedModel.id,remaining=configuration.models.filter(model=>model.id!==id),next=remaining[0]?.id??'';
-  setConfiguration(previous=>({...previous,models:previous.models.filter(model=>model.id!==id),scenarios:Object.fromEntries(modelSettingsDomains.map(domain=>[domain,previous.scenarios[domain]?.modelId===id?null:previous.scenarios[domain]])) as ModelSettingsConfiguration['scenarios']}));
+  setConfiguration(previous=>modelSettingsRemoveModel(previous,id));
   setKeys(previous=>Object.fromEntries(Object.entries(previous).filter(([key])=>key!==id)));setSelected(next);setErrors([]);navigate({id:next});
  }
  function revertLocal(){
   if(!editable||!current)return;const saved=modelSettingsClone(source?.configuration??modelSettingsEmpty());
   setConfiguration(saved);setBaseConfiguration(modelSettingsClone(saved));setBaseRevision(current.revision);setKeys({});setMergeDecision(null);setErrors([]);
   const next=saved.models.some(model=>model.id===selected)?selected:saved.models[0]?.id??'';setSelected(next);navigate({id:next});
+ }
+ function removeModel(){
+  if(!editable||!removing)return;
+  const id=removing,next=configuration.models.find(model=>model.id!==id)?.id??'';
+  setConfiguration(previous=>modelSettingsRemoveModel(previous,id));
+  setKeys(previous=>Object.fromEntries(Object.entries(previous).filter(([key])=>key!==id)));
+  setMergeDecision(null);setSelected(next);setErrors([]);setRemoving(null);navigate({id:next});
  }
  function save(event:FormEvent,mode:'draft'|'apply'){
   event.preventDefault();if(!editable||baseRevision===null||changed)return;
@@ -116,6 +126,7 @@ function ModelSettingsSettings({location,csrfToken,canConfigure,canApply}:{locat
  const activity=command.locked?command.step:current?.pending?.kind??null;
  useSettingsDraftState(dirty,command.locked);
  return <section className="galaxy-model-settings" aria-label="人工模型设置">
+  {removing&&<ModelRemovalDialog id={removing} configuration={configuration} disabled={!editable} onCancel={()=>setRemoving(null)} onConfirm={removeModel}/>}
   <header className="model-settings-header"><div><h1>模型设置与用量</h1><span>人工配置</span></div><button type="button" disabled={command.locked||overview.loading||usage.loading||history.loading} onClick={()=>void refresh()}><AdminIcon name="refresh" size={15}/>刷新</button></header>
   <AdminTabs items={modelSettingsTabs.map(tab=>({...tab,disabled:command.locked}))} active={location.tab} onChange={tab=>navigate({tab:tab as ModelSettingsLocation['tab']})} ariaLabel="模型设置页面"/>
   <div className="model-settings-status"><SettingsReceiptNotice recovery={recovery}/><ReadStatus loading={overview.loading} error={command.error?'':!online?'网络已断开，恢复后会更新配置、用量和记录。':overview.error} retry={online?overview.read:refresh}/>{command.error?<div className="model-settings-feedback" data-tone="error" role="alert"><AdminIcon name="warning" size={17}/><span>{command.error}</span>{command.recoveryRequired&&<button type="button" disabled={command.busy||!current} onClick={()=>void command.retry()}>重新连接</button>}</div>:activity&&current?<div className="model-settings-feedback" role="status" aria-live="polite"><span className="model-settings-spinner" aria-hidden="true"/><span>{modelSettingsProgressLabel(activity)}</span></div>:command.message?<output className="model-settings-feedback" data-tone="success" role="status"><AdminIcon name="check" size={17}/><span>{command.message}</span></output>:null}</div>
@@ -126,7 +137,7 @@ function ModelSettingsSettings({location,csrfToken,canConfigure,canApply}:{locat
       {changed&&merge&&<section className="model-settings-conflict" aria-label="配置版本变化"><strong>当前配置已有更新，你的修改已保留。</strong>{merge.configuration?<><p>选择有冲突的设置，其余更改自动保留。</p>{merge.conflicts.map(conflict=><fieldset key={conflict.path} disabled={command.locked}><legend>{conflict.label}</legend>{(['current','mine'] as const).map(choice=><label key={choice}><input type="radio" name={conflict.path} checked={mergeChoices[conflict.path]===choice} onChange={()=>setMergeDecision(previous=>({revision:current.revision,choices:{...(previous?.revision===current.revision?previous.choices:{}),[conflict.path]:choice}}))}/>{choice==='current'?'当前配置':'我的修改'}：{modelSettingsConflictValue(conflict[choice],conflict.path)}</label>)}</fieldset>)}</>:<p>连接资料暂未完整取得，恢复读取后可继续编辑。</p>}</section>}
       {location.tab==='usage'?<><div className="model-settings-usage-toolbar"><span>统计范围</span><AdminTabs items={[{id:'7',label:'近 7 天',disabled:command.locked},{id:'30',label:'近 30 天',disabled:command.locked}]} active={String(location.days)} onChange={days=>navigate({days:days==='30'?30:7})} ariaLabel="基础用量时间"/></div><ReadStatus loading={usage.loading} error={online?usage.error:''} retry={usage.read}/><ModelUsagePanel value={usageValue} modelNames={modelNames}/></>:<form onSubmit={event=>save(event,'apply')}>
        {location.tab==='models'?<>
-        <div className="model-settings-picker"><label>模型连接<select aria-label="当前模型连接" disabled={command.locked} value={selectedModel?.id??''} onChange={event=>{setSelected(event.target.value);navigate({id:event.target.value});}}>{configuration.models.length===0&&<option value="">尚未添加模型</option>}{configuration.models.map((model,index)=><option key={model.id} value={model.id}>{model.displayName||'新模型 '+(index+1)}{model.enabled?'':' · 已停用'}</option>)}</select></label>{canConfigure&&<button type="button" disabled={!editable||configuration.models.length>=50} onClick={createModel}><AdminIcon name="plus" size={15}/>新增模型</button>}{canConfigure&&selectedModel&&!source?.configuration.models.some(model=>model.id===selectedModel.id)&&<button type="button" disabled={!editable} onClick={cancelNewModel}>取消本次新增</button>}</div>
+        <div className="model-settings-picker"><label>模型连接<select aria-label="当前模型连接" disabled={command.locked} value={selectedModel?.id??''} onChange={event=>{setSelected(event.target.value);navigate({id:event.target.value});}}>{configuration.models.length===0&&<option value="">尚未添加模型</option>}{configuration.models.map((model,index)=><option key={model.id} value={model.id}>{model.displayName||'新模型 '+(index+1)}{model.enabled?'':' · 已停用'}</option>)}</select></label>{canConfigure&&<button type="button" disabled={!editable||configuration.models.length>=50} onClick={createModel}><AdminIcon name="plus" size={15}/>新增模型</button>}{canConfigure&&selectedModel&&source?.configuration.models.some(model=>model.id===selectedModel.id)&&<button type="button" className="model-settings-danger" disabled={!editable} onClick={()=>setRemoving(selectedModel.id)}><AdminIcon name="trash" size={15}/>删除模型</button>}{canConfigure&&selectedModel&&!source?.configuration.models.some(model=>model.id===selectedModel.id)&&<button type="button" disabled={!editable} onClick={cancelNewModel}>取消本次新增</button>}</div>
         {!selectedModel?<div className="model-settings-empty"><AdminIcon name="settings" size={30}/><h2>尚未添加模型连接</h2><p>{canConfigure?'新增连接后，可为不同领域选择模型。':'当前没有已保存的模型连接。'}</p></div>:<fieldset disabled={!editable} className="model-settings-form-fields"><ModelConnectionEditor model={selectedModel} models={configuration.models} formats={current.formats} native={current.native} apiKey={keys[selectedModel.id]??''} onChange={updateModel} onKey={value=>{forgetMergeChoice('models.'+selectedModel.id+'.connection');setKeys(previous=>({...previous,[selectedModel.id]:value}));}}/></fieldset>}
        </>:<section className="model-settings-scenarios"><h2>场景分配</h2><p className="model-settings-note">选择各领域使用的模型及允许处理的资料。</p>{modelSettingsDomains.map(domain=>{const binding=configuration.scenarios[domain];return <fieldset key={domain} disabled={!editable} className="model-settings-scenario"><legend>{modelSettingsDomainNames[domain]}</legend><label>使用模型<select value={binding?.modelId??''} onChange={event=>updateScenario(domain,event.target.value?{modelId:event.target.value,dataPolicyApproved:false}:null)}><option value="">不配置模型</option>{configuration.models.map(model=><option key={model.id} value={model.id}>{model.displayName||'未命名模型'}{model.enabled?'':' · 已停用'}</option>)}</select></label>{binding&&<label className="model-settings-checkbox"><input type="checkbox" checked={binding.dataPolicyApproved} onChange={event=>updateScenario(domain,{...binding,dataPolicyApproved:event.target.checked})}/>允许该服务处理本领域已获准资料</label>}</fieldset>;})}</section>}
        {!!errors.length&&<div className="model-settings-validation" role="alert">{errors.map(error=><p key={error}>{error}</p>)}</div>}

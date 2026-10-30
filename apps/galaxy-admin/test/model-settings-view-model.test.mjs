@@ -41,3 +41,14 @@ test('model settings reads matching native versions and credential versions with
  assert.equal(modelSettingsOperationLabel({kind:'draft',phase:'applied'}),'草稿已保存');assert.equal(modelSettingsOperationLabel({kind:'apply',phase:'applied'}),'配置已生效');assert.equal(modelSettingsOperationLabel({kind:'credential-provision',phase:'applied'}),'凭据已配置');
  const lines=modelSettingsHistoryLines({changes:{models:[{id,kind:'changed',fields:[{field:'apiKey',after:'private'},{field:'enabled',after:true}]}],scenarios:[]}});assert.deepEqual(lines,['修改模型：启用状态']);assert.equal(lines.join(' ').includes('private'),false);
 });
+
+
+test('removing a model clears only its scenario and fallback references without altering the original',async()=>{
+ const {modelSettingsRemoveModel}=await import('../src/lib/models/model-settings-view-model.ts');
+ const original=configured(),other='a4a43fd1-4eb3-486f-966d-642b06c008cc';
+ original.models.push({...modelSettingsNewModel(other),fallbacks:[{modelId:id,dataPolicyApproved:true}]});
+ original.scenarios.overview={modelId:id,dataPolicyApproved:true};original.scenarios.discovery={modelId:other,dataPolicyApproved:true};
+ const removed=modelSettingsRemoveModel(original,id);
+ assert.equal(removed.models.length,1);assert.deepEqual(removed.models[0].fallbacks,[]);assert.equal(removed.scenarios.overview,null);assert.deepEqual(removed.scenarios.discovery,original.scenarios.discovery);
+ assert.equal(original.models.length,2);assert.equal(original.models[1].fallbacks.length,1);assert.equal(original.scenarios.overview.modelId,id);
+});

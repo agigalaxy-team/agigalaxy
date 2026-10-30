@@ -27,6 +27,10 @@ export function modelSettingsPath(kind:'overview'|'history'|'usage'|'operation',
 }
 export const modelSettingsEmpty=():ModelSettingsConfiguration=>({models:[],scenarios:{overview:null,governance:null,messaging:null,discovery:null,maintenance:null}});
 export const modelSettingsClone=(configuration:ModelSettingsConfiguration):ModelSettingsConfiguration=>structuredClone(configuration);
+export function modelSettingsRemoveModel(configuration:ModelSettingsConfiguration,id:string):ModelSettingsConfiguration{
+ return{models:configuration.models.filter(model=>model.id!==id).map(model=>model.fallbacks?.some(item=>item.modelId===id)?{...model,fallbacks:model.fallbacks.filter(item=>item.modelId!==id)}:model),
+  scenarios:Object.fromEntries(modelSettingsDomains.map(domain=>[domain,configuration.scenarios[domain]?.modelId===id?null:configuration.scenarios[domain]])) as ModelSettingsConfiguration['scenarios']};
+}
 export const modelSettingsSame=(left:unknown,right:unknown):boolean=>JSON.stringify(left)===JSON.stringify(right);
 export const modelSettingsDefaultCompression={enabled:true,triggerPercent:80,recentTokens:8192,summaryTokens:2048} as const;
 export function modelSettingsNewModel(id:string):ModelSettingsModel{
