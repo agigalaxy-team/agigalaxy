@@ -6,6 +6,7 @@ import json
 import re
 
 from .model_usage import _RUN
+from .conversation_turn_state import turn_state, RECEIPT_FEEDBACK
 from .conversation_history_projection import projection_status
 
 _ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
@@ -41,7 +42,7 @@ def _record(args, kwargs):
 def _receipt_context(args, kwargs):
     """Project only the authority service's original receipt as data for this run."""
     run = _RUN.get()
-    receipt = (getattr(run, "metadata", None) or {}).get("_galaxyReceiptFeedback")
+    receipt = turn_state(run).get(RECEIPT_FEEDBACK)
     messages = kwargs.get("messages", args[0] if args else None)
     if not isinstance(receipt, dict) or not isinstance(messages, list):
         return args, kwargs

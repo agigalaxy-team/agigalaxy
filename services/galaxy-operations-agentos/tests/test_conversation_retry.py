@@ -28,6 +28,7 @@ from galaxy_agentos.config import Settings
 from galaxy_agentos.conversations import conversation_agents
 from galaxy_agentos.conversation_failures import failure_view
 from galaxy_agentos.conversation_retry import ConversationAgent
+from galaxy_agentos.conversation_turn_state import TURN_STATE, PLAN, ACTIVITY, ASSESSMENT, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK
 from galaxy_agentos.conversation_transport import install_conversation_transport_read
 from galaxy_agentos.gateway import AuthorityDenied, AuthorityUnavailable
 from galaxy_agentos.model_gate import with_current_authority
@@ -50,6 +51,9 @@ class RecoveryModel(Model):
         if self.calls == self.tool_at:
             return ModelResponse(role="assistant", tool_calls=[{"id":"synthetic-retry-summary", "type":"function",
                 "function":{"name":"current_summary", "arguments":"{}"}}])
+        if self.tool_at is not None and self.calls == self.tool_at + 1:
+            return ModelResponse(role="assistant", tool_calls=[{"id":"synthetic-retry-assess", "type":"function",
+                "function":{"name":"assess_turn", "arguments":json.dumps({"disposition":"completed", "reason":"读取完成", "remaining":[]})}}])
         return ModelResponse(role="assistant", content="已恢复这条原提问。")
     async def ainvoke(self, *a, **k): return self.invoke(*a, **k)
     def invoke_stream(self, *a, **k): yield self.invoke(*a, **k)
@@ -73,7 +77,9 @@ class ConversationRetry(unittest.TestCase):
                     status=RunStatus.error, content='galaxy_conversation_model_failure:service-unavailable:502',
                     messages=[Message(role='user', content='合成原提问。')],
                     metadata={'operationId':old_op, 'domain':'overview',
-                        'userPublicReferences':{'items':[], 'complete':True}},
+                        'userPublicReferences':{'items':[], 'complete':True}, TURN_STATE:{'operationId':old_op, ACTIVITY:99},
+                        PLAN:{'proposalCount':3}, ASSESSMENT:{'disposition':'completed'}, ACTIVITY:99,
+                        PREPARED_CARD_IDS:['old-card'], PREPARED_FINGERPRINTS:['old'], PREPARE_UNKNOWN:True, RECEIPT_FEEDBACK:{'state':'old'}},
                     events=[RunErrorEvent(run_id=old_run, session_id=session, agent_id=agent.id, error_type=kind)])
                 before = original.to_dict()
                 self.assertEqual(run_view(original)['errorCode'], code)
@@ -86,6 +92,8 @@ class ConversationRetry(unittest.TestCase):
                 self.assertEqual(original.to_dict(), before)
                 self.assertEqual(selected.metadata['userPublicReferences'], original.metadata['userPublicReferences'])
                 self.assertNotEqual(selected.run_id, old_run)
+                for key in (TURN_STATE, PLAN, ASSESSMENT, ACTIVITY, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK):
+                    self.assertNotIn(key, selected.metadata)
 
         class Gateway:
             checks = 0
@@ -170,8 +178,8 @@ class ConversationRetry(unittest.TestCase):
                 self.assertEqual(tool_bindings[0]['turn_id'], new_op)
                 self.assertEqual(tool_bindings[0]['session_id'], session)
                 self.assertEqual(tool_bindings[0]['user_id'], user)
-                self.assertEqual(model.calls, 3)
-                for context in model.contexts[1:3]:
+                self.assertEqual(model.calls, 4)
+                for context in model.contexts[1:4]:
                     self.assertEqual(sum(message.role == 'user' and message.content == '这条问题只应出现一次。'
                         for message in context), 1, 'Retry must not append the original question again')
                 self.assertEqual(db.get_run(run_id=failed_id).to_dict(), failed_snapshot,
@@ -202,7 +210,7 @@ class ConversationRetry(unittest.TestCase):
                 self.assertEqual(pending.json()['state'],'unknown')
                 self.assertEqual(pending.json()['runId'],pending_id)
                 self.assertIsNone(pending.json()['native'])
-                self.assertEqual(model.calls,3,'Exact lookup must not dispatch or repeat the model')
+                self.assertEqual(model.calls,4,'Exact lookup must not dispatch or repeat the model')
 
                 # Lose the SSE acknowledgement: no command NativeRunID and no
                 # job ticket, but the native detached attempt already exists.
@@ -267,7 +275,7 @@ class ConversationRetry(unittest.TestCase):
                 self.assertEqual(disappeared.json()['state'], 'unknown')
                 self.assertIsNone(disappeared.json()['runId'], 'Do not publish an unverified candidate that disappeared')
                 self.assertIsNone(disappeared.json()['native'])
-                self.assertEqual(model.calls, 3, 'No ACK recovery path may submit or repeat a model call')
+                self.assertEqual(model.calls, 4, 'No ACK recovery path may submit or repeat a model call')
 
                 # A detached regeneration can itself fail before any tool call.
                 # Its exact owned run remains a readable terminal, without a
@@ -292,11 +300,11 @@ class ConversationRetry(unittest.TestCase):
                 self.assertEqual(failure.json()['state'],'ERROR')
                 self.assertEqual(failure.json()['native']['failure']['category'],'service-unavailable')
                 self.assertEqual(failure.json()['native']['failure']['reportedStatus'],502)
-                self.assertEqual(model.calls,5)
+                self.assertEqual(model.calls,6)
                 self.assertEqual(db.get_run(run_id=parent_id).to_dict(), parent_snapshot,
                     'A failed retry must not overwrite its original failed run either')
                 runtime['db']=db
-            self.assertEqual(model.calls,5)
+            self.assertEqual(model.calls,6)
             self.assert_historical_question_once(model.contexts[-1], "这条问题只应出现一次。")
             self.assertEqual(sum(message.role == "user" and not message.from_history and message.content == "合成的第二次失败重试。" for message in model.contexts[-1]), 1)
             new=db.get_run(run_id=result["run_id"])
@@ -313,7 +321,7 @@ class ConversationRetry(unittest.TestCase):
 
             with authorization_scope(lambda:auth):
                 agent.run("接着说明下一步。",user_id=user,session_id=session,metadata={"operationId":str(uuid4())})
-            self.assertEqual(model.calls,6)
+            self.assertEqual(model.calls,7)
             self.assertEqual(db.get_run(run_id=failed_id).to_dict(),failed_snapshot,
                 'A later ordinary turn must not mutate an earlier failed attempt')
             self.assert_historical_question_once(model.contexts[-1], "这条问题只应出现一次。")

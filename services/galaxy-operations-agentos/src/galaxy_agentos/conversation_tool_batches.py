@@ -5,8 +5,7 @@ import hashlib
 
 from agno.models.message import Message
 from .model_usage import _RUN
-from .conversation_turn_plan import PLAN
-from .tool_reliability import PREPARED_CARD_IDS, PREPARED_FINGERPRINTS
+from .conversation_turn_state import turn_state, PLAN, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN
 
 def fingerprint(arguments):
     try:
@@ -38,13 +37,13 @@ def with_conversation_tool_batches(model):
         if not prepared:
             return args, kwargs
         run = _RUN.get()
-        metadata = getattr(run, "metadata", None) or {}
+        metadata = turn_state(run)
         plan = metadata.get(PLAN) or {}
         quota = 3 if plan.get("intent") == "prepare" and plan.get("proposalCount") == 3 and plan.get("alternatives") is True else 1
         ids = metadata.get(PREPARED_CARD_IDS) or []
         prior = metadata.get(PREPARED_FINGERPRINTS) or []
         keys = [fingerprint(call.arguments) for call in prepared]
-        if not any(call.function.name == "plan_turn" for call in calls) and not metadata.get("_galaxyPrepareUnknown") and len(ids) + len(prepared) <= quota and None not in keys and len(set(keys)) == len(keys) and not set(keys).intersection(prior):
+        if not any(call.function.name == "plan_turn" for call in calls) and not metadata.get(PREPARE_UNKNOWN) and len(ids) + len(prepared) <= quota and None not in keys and len(set(keys)) == len(keys) and not set(keys).intersection(prior):
             return args, kwargs
         content = json.dumps({"state": "invalid-request", "reason": "候选重复或超出本轮计划数量；请依据已准备的真实卡继续。", "cardPrepared": False, "effectExecuted": False}, ensure_ascii=False)
         for call in prepared:

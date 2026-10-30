@@ -4,8 +4,7 @@ import json
 from functools import wraps
 from agno.models.message import Message
 from agno.models.response import ModelResponse
-from .conversation_turn_plan import PLAN, ASSESSMENT, ACTIVITY
-from .tool_reliability import PREPARED_CARD_IDS
+from .conversation_turn_state import turn_state, PLAN, ASSESSMENT, ACTIVITY, PREPARED_CARD_IDS
 
 _BLOCKED = "这项工作尚未完成，暂时无法继续处理。"
 _PROMPT = ("继续当前原请求，按本轮实际工具回执处理。未知写入只读取原操作，不能重发。"
@@ -21,10 +20,10 @@ def with_conversation_completion(model):
         run = kwargs.get("run_response", args[index] if len(args) > index else None)
         return messages, run
     def state(run):
-        metadata = getattr(run, "metadata", None) or {}
+        metadata = turn_state(run)
         activity = metadata.get(ACTIVITY, 0)
-        if not activity: return "done"
         plan = metadata.get(PLAN) or {}
+        if not activity and plan.get("intent") != "prepare": return "done"
         ids = metadata.get(PREPARED_CARD_IDS) or []
         target = 3 if plan.get("intent") == "prepare" and plan.get("proposalCount") == 3 and plan.get("alternatives") is True else 1
         assessment = metadata.get(ASSESSMENT) or {}
@@ -56,7 +55,8 @@ def with_conversation_completion(model):
         idle = 0 if current - seen else idle + 1
         seen |= current
         if idle >= 2 or extra >= 3:
-            run.metadata = {**(run.metadata or {}), ASSESSMENT:{"disposition":"blocked", "reason":"未取得新进展", "remaining":[], "activity":(run.metadata or {}).get(ACTIVITY, 0)}}
+            current = turn_state(run)
+            current[ASSESSMENT] = {"disposition":"blocked", "reason":"未取得新进展", "remaining":[], "activity":current.get(ACTIVITY, 0)}
             return False, seen, idle, -1
         messages.append(Message(role="system", content=_PROMPT))
         return True, seen, idle, extra + 1

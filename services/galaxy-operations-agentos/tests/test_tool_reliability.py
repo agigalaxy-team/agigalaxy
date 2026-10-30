@@ -1,4 +1,5 @@
 import json
+from galaxy_agentos.conversation_turn_state import turn_state
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
@@ -196,7 +197,7 @@ class ToolReliability(unittest.TestCase):
         with redirect_stdout(StringIO()):
             second.execute()
         self.assertEqual(json.loads(second.result)["card"]["cardId"], card_id)
-        self.assertEqual(function._run_context.metadata["_galaxyPreparedCardIds"], [card_id])
+        self.assertEqual(turn_state(function._run_context)["_galaxyPreparedCardIds"], [card_id])
         self.assertEqual(len(calls), 2)
 
     def test_slow_read_timeouts_do_not_repeat_the_same_entire_call(self):

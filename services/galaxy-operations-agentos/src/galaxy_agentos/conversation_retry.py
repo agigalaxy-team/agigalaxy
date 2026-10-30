@@ -7,20 +7,25 @@ from agno.agent import Agent
 # builds a RunContext. The SDK otherwise saves the parent ID before forking.
 from agno.agent._run import _find_regenerate_checkpoint, _fork_run
 from .gateway import AuthorityDenied
+from .conversation_turn_state import (bind_turn_state, TURN_STATE, PLAN, ASSESSMENT, ACTIVITY,
+    PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK)
 
 _ATTEMPT_FIELDS = frozenset({"modelCalls", "modelSettingsVersion", "modelSettingsVersions",
     "modelFallbacks", "activeModelFallbackAlias", "toolRecovery", "rolePromptVersion",
-    "boundaryVersion", "compactionStatus", "toolCompressionStatus", "_galaxyConversationCallReferences", "_galaxyPreparedCardIds"})
+    "boundaryVersion", "compactionStatus", "toolCompressionStatus", "_galaxyConversationCallReferences",
+    TURN_STATE, PLAN, ASSESSMENT, ACTIVITY, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK})
 
 class ConversationAgent(Agent):
     def get_tools(self, run_response, run_context, session, user_id=None):
         from .conversation_compaction import bind_run
         bind_run(run_response, run_context)
+        bind_turn_state(run_response, run_context)
         return super().get_tools(run_response, run_context, session, user_id=user_id)
 
     async def aget_tools(self, run_response, run_context, session, user_id=None, check_mcp_tools=True):
         from .conversation_compaction import bind_run
         bind_run(run_response, run_context)
+        bind_turn_state(run_response, run_context)
         return await super().aget_tools(run_response, run_context, session, user_id=user_id,
             check_mcp_tools=check_mcp_tools)
 

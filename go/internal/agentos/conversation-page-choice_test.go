@@ -91,6 +91,18 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 	if _, err = tools.planConversationTurn(ctx, bound, turn); err != nil {
 		t.Fatal(err)
 	}
+	bound.args = Object{"intent": "prepare", "proposalCount": 1, "alternatives": false, "summary": "只做一个"}
+	if _, err = tools.planConversationTurn(ctx, bound, turn); err == nil {
+		t.Fatal("three-choice goal was silently reduced")
+	}
+	parentCommand, err := s.command(ctx, turn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inherited, err := s.inheritedTurnPlan(ctx, parentCommand)
+	if err != nil || inherited["proposalCount"] != int64(3) {
+		t.Fatal("retry lost original three-choice goal", inherited, err)
+	}
 	cards := []Object{}
 	for i := 0; i < 3; i++ {
 		call := uuid.NewString()

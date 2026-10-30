@@ -74,8 +74,8 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   useEffect(()=>{
     if(!data.cards.verified||!actionCards.length)return;
     const expiresAt=Math.min(...actionCards.filter(card=>card.readExpiresAt>Math.floor(Date.now()/1000)).map(card=>card.readExpiresAt));if(!Number.isFinite(expiresAt))return;
-    const timer=setTimeout(()=>{tickCardClock(value=>value+1);void data.cards.refresh();},Math.max(0,expiresAt*1000-Date.now()));return()=>clearTimeout(timer);
-  },[actionCards,data.cards.verified,data.cards.refresh]);
+    const timer=setTimeout(()=>{tickCardClock(value=>value+1);void data.cards.refresh();data.refreshPageCards();},Math.max(0,expiresAt*1000-Date.now()));return()=>clearTimeout(timer);
+  },[actionCards,data.cards.verified,data.cards.refresh,data.refreshPageCards]);
   const interactive=session.ready&&operatorId!==null&&!identityEnded&&!signedOut;
   const waitingReply=canUseDomain&&verifiedSession&&!currentConversation?.contextChanged&&waiting[domain]?.csrfToken===verifiedSession.csrfToken?waiting[domain]:undefined;
   const waitingRun=waitingReply?currentConversation?.runs.find(run=>run.operationId===waitingReply.operationId||run.runId===(waitingReply.runId??waitingReply.operationId)):undefined;

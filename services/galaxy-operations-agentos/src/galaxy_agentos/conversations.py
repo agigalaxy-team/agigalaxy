@@ -2,6 +2,7 @@
 import asyncio
 import json
 import re
+from uuid import UUID
 from .conversation_retry import ConversationAgent
 from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
@@ -9,10 +10,10 @@ from .model_gate import with_current_authority
 from .conversation_failures import with_conversation_failures
 from .conversation_tool_batches import with_conversation_tool_batches
 from .conversation_completion import with_conversation_completion
-from .conversation_turn_plan import PLAN
+from .conversation_turn_state import turn_state, PLAN, PREPARED_CARD_IDS, RECEIPT_FEEDBACK
 from .conversation_turn_context import with_conversation_turn_context
 from .conversation_history_projection import with_conversation_history_projection
-from .tool_reliability import reliable_function, PREPARED_CARD_IDS, PREPARED_CARD_MESSAGE
+from .tool_reliability import reliable_function, PREPARED_CARD_MESSAGE
 from agno.run.agent import RunOutput
 from .model_settings import domain_model
 from .conversation_storage import conversation_database
@@ -43,19 +44,28 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
             turn_id=(run_context.metadata or {}).get("operationId"))
         if current.get("execution", {}).get("sessionId") != run_context.session_id:
             raise AuthorityDenied("agentos_conversation_context_changed")
-        if run_context.metadata is None: run_context.metadata = {}
+        state = turn_state(run_context)
         plan = current.get("turnPlan")
         if isinstance(plan, dict) and plan.get("intent") in {"answer", "prepare"} and plan.get("proposalCount") in {1, 3} and type(plan.get("alternatives")) is bool:
-            run_context.metadata[PLAN] = plan
+            state[PLAN] = plan
+            if isinstance(plan.get("preparedCardIds"), list):
+                ids = state.setdefault(PREPARED_CARD_IDS, [])
+                for card_id in plan["preparedCardIds"]:
+                    try:
+                        if isinstance(card_id, str) and str(UUID(card_id)) == card_id and card_id not in ids:
+                            ids.append(card_id)
+                    except (ValueError, TypeError, AttributeError):
+                        pass
         receipt = current.get("receiptFeedback")
         if isinstance(receipt, dict):
-            run_context.metadata["_galaxyReceiptFeedback"] = {key: receipt[key] for key in ("cardId", "operationId", "parentTurnId", "state", "effectExecuted", "presentation", "receipt") if key in receipt}
+            state[RECEIPT_FEEDBACK] = {key: receipt[key] for key in ("cardId", "operationId", "parentTurnId", "state", "effectExecuted", "presentation", "receipt") if key in receipt}
         else:
-            run_context.metadata.pop("_galaxyReceiptFeedback", None)
+            state.pop(RECEIPT_FEEDBACK, None)
 
     def prepared_card_response(run_context: RunContext, run_output: RunOutput):
-        (run_context.metadata or {}).pop("_galaxyReceiptFeedback", None)
-        ids = (run_context.metadata or {}).get(PREPARED_CARD_IDS)
+        state = turn_state(run_context)
+        state.pop(RECEIPT_FEEDBACK, None)
+        ids = state.get(PREPARED_CARD_IDS)
         if isinstance(ids, list) and ids:
             run_output.metadata = {**(run_output.metadata or {}), PREPARED_CARD_IDS: list(ids)}
         elif isinstance(run_output.content, str) and re.search(r"(?:已(?:经)?(?:为你|帮你)?(?:生成|创建|准备|制(?:作)?|形成).{0,12}卡|(?:下方|下面).{0,12}(?:确认|操作)卡)", run_output.content):

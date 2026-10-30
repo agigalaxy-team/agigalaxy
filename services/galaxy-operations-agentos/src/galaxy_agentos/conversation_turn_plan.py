@@ -5,9 +5,7 @@ from pydantic import Field
 from agno.run.base import RunContext
 from agno.tools.function import FunctionCall
 
-PLAN = "_galaxyTurnPlan"
-ASSESSMENT = "_galaxyTurnAssessment"
-ACTIVITY = "_galaxyTurnActivity"
+from .conversation_turn_state import turn_state, PLAN, ASSESSMENT, ACTIVITY
 
 def plan_turn_tool(send):
     def plan_turn(run_context: RunContext, fc: FunctionCall,
@@ -26,8 +24,7 @@ def plan_turn_tool(send):
             value = json.loads(result)
             plan = value.get("turnPlan")
             if isinstance(plan, dict) and plan.get("intent") == intent and plan.get("proposalCount") == proposal_count and plan.get("alternatives") is alternatives:
-                if run_context.metadata is None: run_context.metadata = {}
-                run_context.metadata[PLAN] = plan
+                turn_state(run_context)[PLAN] = plan
         except (TypeError, ValueError, AttributeError):
             pass
         return result
@@ -39,8 +36,8 @@ def assess_turn_tool():
             reason: Annotated[str, Field(max_length=240)],
             remaining: Annotated[list[Annotated[str, Field(max_length=240)]], Field(max_length=8)]) -> str:
         """Assess this turn after tools; a prepared card waits for a human, not business completion."""
-        if run_context.metadata is None: run_context.metadata = {}
-        run_context.metadata[ASSESSMENT] = {"disposition": disposition, "reason":reason,
-            "remaining": remaining, "activity": run_context.metadata.get(ACTIVITY, 0)}
+        state = turn_state(run_context)
+        state[ASSESSMENT] = {"disposition": disposition, "reason":reason,
+            "remaining": remaining, "activity": state.get(ACTIVITY, 0)}
         return json.dumps({"state":"recorded", "disposition":disposition}, ensure_ascii=False)
     return assess_turn

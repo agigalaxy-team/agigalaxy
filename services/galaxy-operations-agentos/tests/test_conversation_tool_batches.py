@@ -10,6 +10,7 @@ from agno.models.response import ModelResponse
 from agno.tools.function import Function, FunctionCall
 from galaxy_agentos.conversation_tool_batches import with_conversation_tool_batches
 from galaxy_agentos.model_usage import _RUN
+from galaxy_agentos.conversation_turn_state import turn_state, PLAN
 from types import SimpleNamespace
 
 
@@ -60,7 +61,8 @@ class BatchTests(unittest.TestCase):
             return FunctionCall(function=fn, arguments={"value":value}, call_id=ident)
         async def check(async_mode, values):
             model=with_conversation_tool_batches(OpenAIChat(id="test")); results=[]
-            run=SimpleNamespace(metadata={"_galaxyTurnPlan":{"intent":"prepare","proposalCount":3,"alternatives":True}})
+            run=SimpleNamespace(metadata={})
+            turn_state(run)[PLAN]={"intent":"prepare","proposalCount":3,"alternatives":True}
             token=_RUN.set(run)
             try:
                 calls=[call(v,str(i)) for i,v in enumerate(values)]

@@ -7,6 +7,7 @@ an explicit recording atomic primitive; it does not claim PG fencing tests.
 from dataclasses import dataclass, field
 from contextlib import ExitStack
 import json
+from galaxy_agentos.conversation_turn_state import turn_state
 from pathlib import Path
 import tempfile
 import time
@@ -340,6 +341,35 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 self.assertEqual(stored["metadata"]["_galaxyPreparedCardIds"], [card_id])
                 self.assertEqual(client.get("/galaxy/conversations/"+row["id"], headers=headers).json()["runs"][0]["content"], "已准备确认卡，请人工确认。")
 
+    def test_native_stream_continues_after_usage_metadata_copy_and_never_emits_false_card(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as cleanup:
+            db=SqliteDb(db_file=str(Path(directory)/"holder.db"),id="holder-local"); cleanup.callback(db.db_engine.dispose)
+            row={"id":str(uuid4()),"sessionId":str(uuid4()),"domain":"overview","mode":"conversation","actions":[],"resourceIds":[]}
+            node=NodeTransport(row); gateway=GalaxyGateway(settings(),transport=httpx.MockTransport(node)); cleanup.callback(gateway.close)
+            class Sequence(BusinessToolModel):
+                def invoke(self, messages=None, **kwargs):
+                    self.calls+=1
+                    if self.calls==1:
+                        return ModelResponse(role="assistant", tool_calls=[{"id":"read-1","type":"function","function":{"name":"query_operations","arguments":json.dumps({"module":"content","view":"list","filters":{"days":7}})}}])
+                    if self.calls==2: return ModelResponse(role="assistant",content="已生成确认卡，请在下方执行。")
+                    if self.calls==3:
+                        return ModelResponse(role="assistant",tool_calls=[{"id":"assess-1","type":"function","function":{"name":"assess_turn","arguments":json.dumps({"disposition":"needs-information","reason":"需要明确处理对象","remaining":["明确对象"]})}}])
+                    return ModelResponse(role="assistant",content="请明确需要处理的对象。")
+            model=Sequence(); agents=conversation_agents(settings=settings(),db=db,gateway=gateway,domains={"overview":"运营概览"},active_domains={"overview"},model_factory=lambda:model)
+            native=AgentOS(id="holder-local",db=db,agents=agents,user_isolation=True,authorization=Authorization(verification_keys=[settings().verification_key],algorithm="HS256",verify_audience=True,audience=settings().audience,issuer=settings().issuer,authorization_provider=GalaxyAuthorization(gateway)),telemetry=False)
+            app=native.get_app(); app.add_middleware(PrivateSurface,settings=settings(),runtime={"os":native,"db":db,"gateway":gateway,"configuredDomains":{"overview"}})
+            now=int(time.time()); token=jwt.encode({"sub":"conversation:"+row["id"],"iat":now,"exp":now+120,"aud":settings().audience,"iss":settings().issuer},settings().verification_key,algorithm="HS256")
+            with TestClient(app) as client:
+                response=client.post("/agents/galaxy-conversation-overview/runs",headers={"Authorization":"Bearer "+token,"Idempotency-Key":str(uuid4())},data={"message":"查询并准备处理", "stream":"true","background":"false","session_id":row["sessionId"]})
+                self.assertEqual(response.status_code,200,response.text)
+                self.assertEqual(model.calls,4); self.assertNotIn("已生成确认卡",response.text); self.assertIn("请明确需要处理的对象",response.text)
+                packets=[value for path,value in node.calls if path.endswith("/tools/execute")]
+                self.assertEqual([p["tool"] for p in packets],["query-operations"])
+                stored=db.get_run(run_id=packets[0]["runId"],deserialize=False)["run_data"]
+                self.assertEqual(stored["metadata"]["modelCalls"],4)
+                self.assertNotIn("_galaxyPreparedCardIds",stored["metadata"])
+                self.assertEqual(stored["content"],"请明确需要处理的对象。")
+
     def test_preparation_stop_is_per_call_and_invalid_card_does_not_stop(self):
         from agno.tools.function import FunctionCall
         from galaxy_agentos.tool_reliability import reliable_function
@@ -359,7 +389,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
         other = FunctionCall(function=function, call_id="other")
         self.assertEqual(json.loads(function.entrypoint(context, other, card_id=second_id))["card"]["cardId"], second_id)
         self.assertFalse(other.function.stop_after_tool_call)
-        self.assertEqual(context.metadata["_galaxyPreparedCardIds"], [first_id, second_id])
+        self.assertEqual(turn_state(context)["_galaxyPreparedCardIds"], [first_id, second_id])
         self.assertFalse(invalid.function.stop_after_tool_call)
 
     def test_native_error_persistence_scrubs_tool_payload_without_mutating_live_result(self):

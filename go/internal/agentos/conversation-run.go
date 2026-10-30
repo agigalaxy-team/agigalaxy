@@ -171,6 +171,13 @@ func (s *Conversations) runWithContext(ctx context.Context, operator operationsp
 		if !retryableOriginalConversationRun(checked, turn.Message) {
 			return nil, fail("operations_agentos_retry_unavailable", 409)
 		}
+		inherited, e := s.inheritedTurnPlan(ctx, parent)
+		if e != nil {
+			return nil, e
+		}
+		if inherited != nil {
+			receipt["turnPlan"] = inherited
+		}
 		retryRun = text(checked, "runId")
 		receipt["retryOfOperationId"], receipt["retryOfRunId"], receipt["priorFailure"] = parent.ID, retryRun, Object{"status": "ERROR", "errorCode": checked["errorCode"], "failure": checked["failure"]}
 	}
