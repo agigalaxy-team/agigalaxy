@@ -341,6 +341,18 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 				}
 			}
 			var outcome any
+			isQuery := tool == "query-operations" || tool == "read-operation-object"
+			if isQuery {
+				proof := querySourceProof(result)
+				var bytes int
+				if e = tx.QueryRow(ctx, `SELECT octet_length($1::jsonb::text)`, jsonText(proof)).Scan(&bytes); e != nil {
+					return false, e
+				}
+				if bytes > 8192 {
+					proof["complete"], proof["refs"] = false, []any{}
+				}
+				outcome = jsonText(proof)
+			}
 			if tool == "inspect-operations" {
 				if projected := inspectionOutcome(result); projected != nil {
 					var bytes int
@@ -353,7 +365,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 					outcome = jsonText(projected)
 				}
 			}
-			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state=$5,code=$6,updated_at=$4,read_outcome=CASE WHEN $7 THEN $8::jsonb ELSE read_outcome END WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, x["taskId"], x["callId"], s.now(), state, code, tool == "inspect-operations", outcome); e != nil {
+			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state=$5,code=$6,updated_at=$4,read_outcome=CASE WHEN $7 THEN $8::jsonb ELSE read_outcome END WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, x["taskId"], x["callId"], s.now(), state, code, tool == "inspect-operations" || isQuery, outcome); e != nil {
 				return false, e
 			}
 			if result["availability"] == "available" && (has([]string{"query-operations", "read-operation-object"}, tool) || has([]string{"current-summary", "inspect-operations"}, tool) && result["inspectionChecked"] == true) {

@@ -8,6 +8,9 @@ import (
 	"github.com/google/uuid"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestFinalAnalysisTerminalRaceAndIdempotency(t *testing.T) {
@@ -145,6 +148,24 @@ func TestAnalysisSourceUsesActualFactsAndOriginalReadScope(t *testing.T) {
 	if check([]Object{call}) {
 		t.Fatal("unverified material list was released")
 	}
+	proof := Object{"sourceProofVersion": 1, "complete": true, "material": "present", "refs": []any{Object{"kind": "feedback", "id": "item"}}}
+	call["read_outcome"] = proof
+	if check([]Object{call}) {
+		t.Fatal("new evidence was released before external revalidation")
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verified := context.WithValue(ctx, sourceProofContextKey{}, id)
+	if !s.analysisSourcesAllowedWithin(verified, tx, row, actor, []Object{call}) {
+		t.Fatal("valid fresh proof should allow an ordinary query scope")
+	}
+	proof["complete"] = false
+	if s.analysisSourcesAllowedWithin(verified, tx, row, actor, []Object{call}) {
+		t.Fatal("incomplete proof released")
+	}
+	_ = tx.Rollback(ctx)
 	op := uuid.NewString()
 	writer := Object{"tool": "execute-operation", "state": "completed", "operation_id": op}
 	if check([]Object{writer}) {
@@ -169,5 +190,114 @@ func TestAnalysisSourceUsesActualFactsAndOriginalReadScope(t *testing.T) {
 	analysis := obj(obj(value["task"])["finalAnalysis"])
 	if analysis["state"] != "available" || analysis["text"] != "原回执未知" {
 		t.Fatalf("original writer GET was withheld %#v", value)
+	}
+}
+
+func TestTaskReportFinalizerRevalidatesOutsideTransaction(t *testing.T) {
+	owner, _ := testsupport.PostgreSQL(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if _, err := databaseschema.Migrate(ctx, owner, nil); err != nil {
+		t.Fatal(err)
+	}
+	config := owner.Config().Copy()
+	config.MaxConns = 1
+	config.MinConns = 0
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	endpoint, id, ai, callID := "https://report-finalizer-"+uuid.NewString()+".invalid", uuid.NewString(), uuid.NewString(), uuid.NewString()
+	if _, err = pool.Exec(ctx, `INSERT INTO operations_ai_work_accounts_v1(id,endpoint,domain,name,description,enabled,version,authorization_version,created_at,updated_at) VALUES($1,$2,'overview','fixture','',true,1,1,now(),now())`, ai, endpoint); err != nil {
+		t.Fatal(err)
+	}
+	analysis := Object{"schemaVersion": 1, "analysis": Object{"state": "available", "basis": "native-run-final-content", "nativeRunId": "original", "text": "当前分析", "recordedAt": "2026-10-29T00:00:00Z"}}
+	if _, err = pool.Exec(ctx, `INSERT INTO operations_autonomy_tasks_v1(id,endpoint,domain,source,source_key,title,mode,state,model_state,business_state,ai_account_id,configuration,prompt_version,plan_version,session_id,due_at,created_at,updated_at,result) VALUES($1,$2,'overview','routine',$1::uuid::text,'fixture','ai','completed','completed','not-started',$3,'{}',1,1,$4,now(),now(),now(),$5)`, id, endpoint, ai, uuid.NewString(), analysis); err != nil {
+		t.Fatal(err)
+	}
+	args := Object{"module": "feedback", "view": "list", "filters": Object{}}
+	ref := Object{"kind": "feedback", "id": "item", "version": 1, "controlledSource": true, "purpose": "feedback-processing", "read": Object{"tool": "read-operation-object", "arguments": Object{"kind": "feedback", "id": "item", "filters": Object{}}}}
+	proof := Object{"sourceProofVersion": 1, "complete": true, "material": "present", "refs": []any{ref}}
+	if _, err = pool.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,created_at,updated_at,read_outcome) VALUES($1,$2,$3,'query-operations',$4,$5,'completed',now(),now(),$6)`, endpoint, id, callID, args, uuid.NewString(), proof); err != nil {
+		t.Fatal(err)
+	}
+	authority := &originalReadAuthority{}
+	service := &Service{Pool: pool, Endpoint: endpoint, Authority: authority, QueryReadPermission: func(string, Object) (string, error) { return "feedback.read", nil }}
+	actor := Actor{ID: "human", Endpoint: endpoint}
+	mode, calls, selected := "valid", 0, 0
+	service.RevalidateReadSources = func(ctx context.Context, got Actor, domain string, refs []Object) (Object, error) {
+		calls++
+		var one int
+		if err := pool.QueryRow(ctx, `SELECT 1`).Scan(&one); err != nil {
+			return nil, err
+		}
+		selected += one
+		if got.ID != actor.ID || domain != "overview" || len(refs) != 1 || refs[0]["id"] != "item" {
+			t.Fatalf("unexpected callback input: %#v %q %#v", got, domain, refs)
+		}
+		switch mode {
+		case "source-changed":
+			return Object{"valid": false, "refs": []any{}}, nil
+		case "permission-revoked":
+			authority.denied = "feedback.read"
+		case "call-changed":
+			if _, err := pool.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state='failed',updated_at=now() WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, endpoint, id, callID); err != nil {
+				return nil, err
+			}
+		}
+		return Object{"valid": true, "refs": []any{ref}}, nil
+	}
+	check := func(list bool, want string) {
+		t.Helper()
+		before := calls
+		var value Object
+		var err error
+		if list {
+			value, err = service.Tasks(ctx, actor, Object{})
+			if err == nil {
+				items, ok := value["items"].([]Object)
+				if !ok || len(items) != 1 {
+					t.Fatalf("unexpected items: %#v", value)
+				}
+				value = items[0]
+			}
+		} else {
+			value, err = service.GetTask(ctx, actor, id)
+			if err == nil {
+				value = obj(value["task"])
+			}
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := obj(value["finalAnalysis"])["state"]; got != want {
+			t.Fatalf("%s: expected %s, got %#v", mode, want, value)
+		}
+		if calls != before+1 || selected != calls {
+			t.Fatalf("callback or single-connection SELECT failed: calls=%d before=%d selects=%d", calls, before, selected)
+		}
+	}
+	check(false, "available")
+	check(true, "available")
+	mode = "source-changed"
+	check(false, "withheld")
+	mode = "permission-revoked"
+	check(false, "withheld")
+	authority.denied = ""
+	mode = "call-changed"
+	check(true, "withheld")
+	if _, err = pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET result=NULL WHERE endpoint=$1 AND id=$2`, endpoint, id); err != nil {
+		t.Fatal(err)
+	}
+	before := calls
+	if _, err = service.GetTask(ctx, actor, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.Tasks(ctx, actor, Object{}); err != nil {
+		t.Fatal(err)
+	}
+	if calls != before {
+		t.Fatalf("callback called without analysis: %d -> %d", before, calls)
 	}
 }

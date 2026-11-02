@@ -29,7 +29,12 @@ func strategyTaskConfig(cfg, strategy, version Object) (Object, error) {
 	configuration["strategyExecution"] = clone(execution)
 	return out, nil
 }
-func (s *Service) CreateStrategyTask(ctx context.Context, a Actor, input Object, authorize Authorize) (Object, error) {
+func (s *Service) CreateStrategyTask(ctx context.Context, a Actor, input Object, authorize Authorize) (out Object, err error) {
+	defer func() {
+		if err == nil && out != nil {
+			s.finalizeTaskReports(ctx, a, out)
+		}
+	}()
 	if !closed(input, []string{"operationId", "strategyId", "expectedStrategyVersion"}, nil) || !schemaUUID.MatchString(str(input["operationId"])) || !schemaUUID.MatchString(str(input["strategyId"])) || !integer(input["expectedStrategyVersion"], 1, 9007199254740991) {
 		return nil, invalid()
 	}

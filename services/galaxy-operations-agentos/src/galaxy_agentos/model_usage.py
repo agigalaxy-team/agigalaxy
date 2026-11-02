@@ -17,6 +17,17 @@ _ACTIVE = ContextVar("galaxy_model_usage_active", default=frozenset())
 _SETTINGS_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
 
 
+def reset_context_token(variable, token):
+    """Release a token, allowing abandoned async generators to close elsewhere."""
+    try:
+        variable.reset(token)
+    except ValueError:
+        # A token cannot be reset in a different task's Context. That original
+        # generator context has already been abandoned; no model/tool error is
+        # suppressed by this cleanup-only exception handler.
+        pass
+
+
 def _valid_settings_version(value):
     return isinstance(value, str) and _SETTINGS_VERSION.fullmatch(value) is not None
 
@@ -56,7 +67,7 @@ def provider_call(model, enabled):
     try:
         yield True
     finally:
-        _ACTIVE.reset(token)
+        reset_context_token(_ACTIVE, token)
 
 
 def install_usage_scope(model):
@@ -72,7 +83,7 @@ def install_usage_scope(model):
         try:
             return response(*args, **kwargs)
         finally:
-            _RUN.reset(token)
+            reset_context_token(_RUN, token)
 
     @wraps(aresponse)
     async def acall(*args, **kwargs):
@@ -80,7 +91,7 @@ def install_usage_scope(model):
         try:
             return await aresponse(*args, **kwargs)
         finally:
-            _RUN.reset(token)
+            reset_context_token(_RUN, token)
 
     @wraps(response_stream)
     def stream(*args, **kwargs):
@@ -88,7 +99,7 @@ def install_usage_scope(model):
         try:
             yield from response_stream(*args, **kwargs)
         finally:
-            _RUN.reset(token)
+            reset_context_token(_RUN, token)
 
     @wraps(aresponse_stream)
     async def astream(*args, **kwargs):
@@ -97,7 +108,7 @@ def install_usage_scope(model):
             async for event in aresponse_stream(*args, **kwargs):
                 yield event
         finally:
-            _RUN.reset(token)
+            reset_context_token(_RUN, token)
 
     model.response, model.aresponse = call, acall
     model.response_stream, model.aresponse_stream = stream, astream

@@ -8,6 +8,7 @@ import re
 from copy import deepcopy
 from functools import wraps
 from agno.exceptions import ModelProviderError
+from .task_loop import observe_provider, _start_provider_request
 
 STATUSES=frozenset({401,402,403,408,429,*range(500,600)})
 
@@ -51,6 +52,8 @@ def _event(primary,backup,failure,state,run=None):
 def with_model_failover(primary,backups):
     if not backups:return primary
     if len(backups)>3 or len({model.id for model in [primary,*backups]})!=len(backups)+1:raise ValueError('agentos_model_fallback_invalid')
+    for backup in backups:
+        observe_provider(backup)
     invoke,ainvoke=primary.invoke,primary.ainvoke
     invoke_stream,ainvoke_stream=primary.invoke_stream,primary.ainvoke_stream
 
@@ -69,12 +72,14 @@ def with_model_failover(primary,backups):
     @wraps(invoke)
     def checked(*args,**kwargs):
         first,remaining=order(kwargs);snapshot=seed(args,kwargs)
+        _start_provider_request()
         try:return (invoke if first is primary else first.invoke)(*args,**kwargs)
         except ModelProviderError as original:
             failure=provider_failure(original)
             if not failure:raise
             for backup in remaining:
                 _event(first,backup,failure,'attempting',kwargs.get('run_response'))
+                _start_provider_request()
                 try:
                     fresh_args,fresh_kwargs=seed(*snapshot)
                     result=backup.invoke(*fresh_args,**fresh_kwargs);_event(first,backup,failure,'completed',kwargs.get('run_response'));return result
@@ -86,12 +91,14 @@ def with_model_failover(primary,backups):
     @wraps(ainvoke)
     async def achecked(*args,**kwargs):
         first,remaining=order(kwargs);snapshot=seed(args,kwargs)
+        _start_provider_request()
         try:return await (ainvoke if first is primary else first.ainvoke)(*args,**kwargs)
         except ModelProviderError as original:
             failure=provider_failure(original)
             if not failure:raise
             for backup in remaining:
                 _event(first,backup,failure,'attempting',kwargs.get('run_response'))
+                _start_provider_request()
                 try:
                     fresh_args,fresh_kwargs=seed(*snapshot)
                     result=await backup.ainvoke(*fresh_args,**fresh_kwargs);_event(first,backup,failure,'completed',kwargs.get('run_response'));return result
@@ -126,12 +133,14 @@ def with_model_failover(primary,backups):
         # before a fallback decision. Buffer only this provider invocation,
         # never the task or previously executed business operations.
         first,remaining=order(kwargs);snapshot=seed(args,kwargs)
+        _start_provider_request()
         try:chunks=collect(invoke_stream if first is primary else first.invoke_stream,args,kwargs)
         except ModelProviderError as original:
             failure=provider_failure(original)
             if not failure:raise
             for backup in remaining:
                 _event(first,backup,failure,'attempting',kwargs.get('run_response'))
+                _start_provider_request()
                 try:
                     chunks=collect(backup.invoke_stream,*seed(*snapshot));_event(first,backup,failure,'completed',kwargs.get('run_response'));break
                 except ModelProviderError as error:
@@ -143,12 +152,14 @@ def with_model_failover(primary,backups):
     @wraps(ainvoke_stream)
     async def astream(*args,**kwargs):
         first,remaining=order(kwargs);snapshot=seed(args,kwargs)
+        _start_provider_request()
         try:chunks=await acollect(ainvoke_stream if first is primary else first.ainvoke_stream,args,kwargs)
         except ModelProviderError as original:
             failure=provider_failure(original)
             if not failure:raise
             for backup in remaining:
                 _event(first,backup,failure,'attempting',kwargs.get('run_response'))
+                _start_provider_request()
                 try:
                     chunks=await acollect(backup.ainvoke_stream,*seed(*snapshot));_event(first,backup,failure,'completed',kwargs.get('run_response'));break
                 except ModelProviderError as error:

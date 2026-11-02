@@ -528,6 +528,7 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	agentConversations.Tools.Query = queries.Query
 	autonomy.QueryReadPermission = operationsqueries.QueryReadPermission
 	autonomy.QueryTool = queries.Query
+	autonomy.RevalidateReadSources = queries.Revalidate
 	permissionService.Duty = autonomy
 	forumOperations := &operationscommunity.Service{Pool: pool, Endpoint: endpoint, Authority: gateway, Duty: autonomy, PrincipalWithin: gateway.LockOperationsPrincipalWithin, ReadPrincipalWithin: gateway.ReadOperationsPrincipalWithin, Forum: forum, Files: forumFiles, Links: links}
 	var executionDiscovery *discovery.Runtime

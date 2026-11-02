@@ -10,7 +10,12 @@ import (
 	"time"
 )
 
-func (s *Service) Operation(ctx context.Context, a Actor, id string) (Object, error) {
+func (s *Service) Operation(ctx context.Context, a Actor, id string) (out Object, err error) {
+	defer func() {
+		if err == nil && out != nil {
+			s.finalizeTaskReports(ctx, a, out)
+		}
+	}()
 	if !schemaUUID.MatchString(id) {
 		return nil, invalid()
 	}
@@ -41,7 +46,12 @@ func (s *Service) Operation(ctx context.Context, a Actor, id string) (Object, er
 		return s.stamp(Object{"state": "recorded", "operationId": id, "kind": row["kind"], "result": row["result"]}), nil
 	})
 }
-func (s *Service) Run(ctx context.Context, a Actor, domain string, input Object, authorize Authorize) (Object, error) {
+func (s *Service) Run(ctx context.Context, a Actor, domain string, input Object, authorize Authorize) (out Object, err error) {
+	defer func() {
+		if err == nil && out != nil {
+			s.finalizeTaskReports(ctx, a, out)
+		}
+	}()
 	if !closed(input, []string{"operationId"}, nil) || !schemaUUID.MatchString(str(input["operationId"])) {
 		return nil, invalid()
 	}
@@ -107,7 +117,12 @@ func parseControl(input Object) (Object, error) {
 	}
 	return obj(clone(input)), nil
 }
-func (s *Service) Control(ctx context.Context, a Actor, id string, input Object, authorize Authorize) (Object, error) {
+func (s *Service) Control(ctx context.Context, a Actor, id string, input Object, authorize Authorize) (out Object, err error) {
+	defer func() {
+		if err == nil && out != nil {
+			s.finalizeTaskReports(ctx, a, out)
+		}
+	}()
 	if !schemaUUID.MatchString(id) {
 		return nil, invalid()
 	}
@@ -490,7 +505,12 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 	}
 	return result, nil
 }
-func (s *Service) Decide(ctx context.Context, a Actor, id string, input Object, authorize Authorize) (Object, error) {
+func (s *Service) Decide(ctx context.Context, a Actor, id string, input Object, authorize Authorize) (out Object, err error) {
+	defer func() {
+		if err == nil && out != nil {
+			s.finalizeTaskReports(ctx, a, out)
+		}
+	}()
 	if !closed(input, []string{"operationId", "expectedRevision", "callId", "decision"}, nil) || !schemaUUID.MatchString(str(input["operationId"])) || !schemaUUID.MatchString(str(input["callId"])) || !integer(input["expectedRevision"], 1, 9007199254740991) || !has([]string{"rejected", "cancelled", "no-action"}, str(input["decision"])) {
 		return nil, invalid()
 	}

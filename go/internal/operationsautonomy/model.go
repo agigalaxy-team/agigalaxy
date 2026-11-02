@@ -39,6 +39,7 @@ type Service struct {
 	Permissions                    *perms.Service
 	QueryTool                      func(context.Context, Actor, string, string, Object) (Object, error)
 	QueryReadPermission            func(string, Object) (string, error)
+	RevalidateReadSources          func(context.Context, Actor, string, []Object) (Object, error)
 	OriginalStrategyArtifactWithin func(context.Context, pgx.Tx, string, string, string) (Object, error)
 	ActionReady                    func(string) bool
 	ExecuteDutyOperation           func(context.Context, Actor, string, Object, bool) (Object, error)

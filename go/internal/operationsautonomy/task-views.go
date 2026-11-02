@@ -161,6 +161,7 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 			return nil, err
 		}
 		out["inspectionReport"], out["finalAnalysis"], out["assessmentSummary"] = report["inspectionReport"], report["finalAnalysis"], report["assessmentSummary"]
+		out["_sourceProofPending"] = report["sourceProofPending"]
 		artifacts, err := s.strategyArtifactsWithin(ctx, tx, row, a)
 		if err != nil {
 			return nil, err
@@ -180,7 +181,12 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 	}
 	return out, nil
 }
-func (s *Service) GetTask(ctx context.Context, a Actor, id string) (Object, error) {
+func (s *Service) GetTask(ctx context.Context, a Actor, id string) (out Object, err error) {
+	defer func() {
+		if err == nil && out != nil {
+			s.finalizeTaskReports(ctx, a, out)
+		}
+	}()
 	if !schemaUUID.MatchString(id) {
 		return nil, invalid()
 	}
@@ -237,7 +243,12 @@ func parseTaskQuery(input Object) (Object, error) {
 	}
 	return x, nil
 }
-func (s *Service) Tasks(ctx context.Context, a Actor, input Object) (Object, error) {
+func (s *Service) Tasks(ctx context.Context, a Actor, input Object) (out Object, err error) {
+	defer func() {
+		if err == nil && out != nil {
+			s.finalizeTaskReports(ctx, a, out)
+		}
+	}()
 	q, e := parseTaskQuery(input)
 	if e != nil {
 		return nil, e

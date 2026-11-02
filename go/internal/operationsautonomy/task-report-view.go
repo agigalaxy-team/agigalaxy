@@ -24,7 +24,11 @@ func (s *Service) taskReportWithin(ctx context.Context, tx pgx.Tx, row Object, a
 		return nil, err
 	}
 	var latest, assessment Object
+	hasSourceProof := false
 	for _, call := range calls {
+		if has([]string{"query-operations", "read-operation-object"}, str(call["tool"])) && obj(call["read_outcome"])["sourceProofVersion"] != nil {
+			hasSourceProof = true
+		}
 		if latest == nil && call["tool"] == "inspect-operations" && obj(obj(call["read_outcome"])["inspectionReport"]) != nil {
 			latest = call
 		}
@@ -72,7 +76,7 @@ func (s *Service) taskReportWithin(ctx context.Context, tx pgx.Tx, row Object, a
 		}
 		summary = nil
 	}
-	return Object{"inspectionReport": inspection, "finalAnalysis": analysis, "assessmentSummary": summary}, nil
+	return Object{"inspectionReport": inspection, "finalAnalysis": analysis, "assessmentSummary": summary, "sourceProofPending": hasSourceProof && (stored != nil || assessment != nil)}, nil
 }
 
 func (s *Service) filterInspectionReportWithin(ctx context.Context, tx pgx.Tx, actor Actor, report Object) {
@@ -109,10 +113,28 @@ func (s *Service) analysisSourcesAllowedWithin(ctx context.Context, tx pgx.Tx, r
 	}
 	observed := false
 	for _, call := range calls {
+		tool, args := str(call["tool"]), obj(call["arguments"])
+		proof := obj(call["read_outcome"])
+		if has([]string{"query-operations", "read-operation-object"}, tool) && proof["sourceProofVersion"] != nil {
+			if !integer(proof["sourceProofVersion"], 1, 1) || proof["complete"] != true {
+				return false
+			}
+			if proof["material"] == "none" {
+				continue
+			}
+			if proof["material"] != "present" || ctx.Value(sourceProofContextKey{}) != str(row["id"]) || s.QueryReadPermission == nil {
+				return false
+			}
+			permission, err := s.QueryReadPermission(tool, args)
+			if err != nil || !s.reportAllowed(ctx, tx, actor, []string{permission}) {
+				return false
+			}
+			observed = true
+			continue
+		}
 		if call["state"] != "completed" {
 			continue
 		}
-		tool, args := str(call["tool"]), obj(call["arguments"])
 		switch tool {
 		case "assess-task", "reconcile-task-operations":
 			continue

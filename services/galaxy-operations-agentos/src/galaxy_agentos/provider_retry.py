@@ -12,7 +12,8 @@ from agno.models.message import Message
 from agno.models.response import ModelResponse
 
 from .model_failover import provider_failure
-from .model_usage import _RUN
+from .model_usage import _RUN, reset_context_token
+from .task_loop import _start_provider_request
 
 _ACTIVE = ContextVar('galaxy_provider_retry_active', default=frozenset())
 _FORMAT_GUIDANCE = {
@@ -189,6 +190,7 @@ def with_provider_retry(model):
             time.sleep(0.25)
             _restore_assistant(assistant)
             try:
+                _start_provider_request()
                 retry_args, retry_kwargs = _retry_snapshot(snapshot, failure)
                 result = invoke(*retry_args, **retry_kwargs)
             except ModelProviderError as second:
@@ -212,6 +214,7 @@ def with_provider_retry(model):
             await asyncio.sleep(0.25)
             _restore_assistant(assistant)
             try:
+                _start_provider_request()
                 retry_args, retry_kwargs = _retry_snapshot(snapshot, failure)
                 result = await ainvoke(*retry_args, **retry_kwargs)
             except ModelProviderError as second:
@@ -237,6 +240,7 @@ def with_provider_retry(model):
             time.sleep(0.25)
             _restore_assistant(assistant)
             try:
+                _start_provider_request()
                 retry_args, retry_kwargs = _retry_snapshot(snapshot, failure)
                 if failure.get('malformed'):
                     yield _as_stream_delta(invoke(*retry_args, **retry_kwargs))
@@ -264,6 +268,7 @@ def with_provider_retry(model):
             await asyncio.sleep(0.25)
             _restore_assistant(assistant)
             try:
+                _start_provider_request()
                 retry_args, retry_kwargs = _retry_snapshot(snapshot, failure)
                 if failure.get('malformed'):
                     yield _as_stream_delta(await ainvoke(*retry_args, **retry_kwargs))
@@ -284,7 +289,7 @@ def with_provider_retry(model):
         try:
             return retry_invoke(*args, **kwargs)
         finally:
-            _ACTIVE.reset(token)
+            reset_context_token(_ACTIVE, token)
 
     @wraps(ainvoke)
     async def achecked(*args, **kwargs):
@@ -295,7 +300,7 @@ def with_provider_retry(model):
         try:
             return await retry_ainvoke(*args, **kwargs)
         finally:
-            _ACTIVE.reset(token)
+            reset_context_token(_ACTIVE, token)
 
     @wraps(invoke_stream)
     def stream(*args, **kwargs):
@@ -307,7 +312,7 @@ def with_provider_retry(model):
         try:
             yield from retry_stream(*args, **kwargs)
         finally:
-            _ACTIVE.reset(token)
+            reset_context_token(_ACTIVE, token)
 
     @wraps(ainvoke_stream)
     async def astream(*args, **kwargs):
@@ -321,7 +326,7 @@ def with_provider_retry(model):
             async for chunk in retry_astream(*args, **kwargs):
                 yield chunk
         finally:
-            _ACTIVE.reset(token)
+            reset_context_token(_ACTIVE, token)
 
     model.invoke, model.ainvoke = checked, achecked
     model.invoke_stream, model.ainvoke_stream = stream, astream
