@@ -82,6 +82,11 @@ def _record(args, kwargs):
             isinstance(item, dict) and item.get("state") == "completed" and isinstance(item.get("receipt"), dict)
             and item["receipt"].get("state") == "completed" for item in history),
         "receiptPresent": isinstance(state.get(RECEIPT_FEEDBACK), dict), "progressPhase": phase,
+        "messageShapes": [{"role":getattr(m,"role",None) if getattr(m,"role",None) in _ROLES else "other",
+            "history":bool(getattr(m,"from_history",False)),
+            "tool":getattr(m,"tool_name",None) if getattr(m,"tool_name",None) in {"current_summary","query_operations","read_operation_object","plan_turn","assess_turn","prepare_operation"} else None,
+            "contentChars":len(m.content) if isinstance(getattr(m,"content",None),str) else None}
+            for m in messages[:128]],
         "currentToolCount": sum(getattr(m, "role", None) == "tool" and not getattr(m, "from_history", False) for m in messages),
         "roles": [{"role": getattr(m, "role", None) if getattr(m, "role", None) in _ROLES else "other",
             "fromHistory": bool(getattr(m, "from_history", False))} for m in messages[:128]],
@@ -178,31 +183,31 @@ def with_conversation_turn_context(model):
     invoke, ainvoke, stream, astream = model.invoke, model.ainvoke, model.invoke_stream, model.ainvoke_stream
     @wraps(invoke)
     def call(*args, **kwargs):
-        _record(args, kwargs)
         args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
         args, kwargs = _stage_tools(args, kwargs)
+        _record(args, kwargs)
         return invoke(*args, **kwargs)
     @wraps(ainvoke)
     async def acall(*args, **kwargs):
-        _record(args, kwargs)
         args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
         args, kwargs = _stage_tools(args, kwargs)
+        _record(args, kwargs)
         return await ainvoke(*args, **kwargs)
     @wraps(stream)
     def call_stream(*args, **kwargs):
-        _record(args, kwargs)
         args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
         args, kwargs = _stage_tools(args, kwargs)
+        _record(args, kwargs)
         yield from stream(*args, **kwargs)
     @wraps(astream)
     async def acall_stream(*args, **kwargs):
-        _record(args, kwargs)
         args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
         args, kwargs = _stage_tools(args, kwargs)
+        _record(args, kwargs)
         async for item in astream(*args, **kwargs):
             yield item
     model.invoke, model.ainvoke, model.invoke_stream, model.ainvoke_stream = call, acall, call_stream, acall_stream
