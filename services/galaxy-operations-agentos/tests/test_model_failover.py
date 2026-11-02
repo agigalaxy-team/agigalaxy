@@ -3,6 +3,7 @@ import unittest
 import httpx
 from types import SimpleNamespace
 from agno.exceptions import ModelProviderError
+from agno.models.response import ModelResponse
 from galaxy_agentos.model_failover import with_model_failover,provider_failure
 from galaxy_agentos.gateway import AuthorityDenied
 
@@ -62,14 +63,77 @@ class ModelFailover(unittest.TestCase):
             with self.assertRaises(type(error)):with_model_failover(primary,[backup]).invoke(messages=[])
             self.assertEqual(backup.calls,0)
 
-    def test_stream_discards_half_calls_and_async_paths_use_the_same_rules(self):
-        primary=Candidate('primary',rejected(503),partial=True);backup=Candidate('backup')
-        self.assertEqual(list(with_model_failover(primary,[backup]).invoke_stream(messages=[])),['complete'])
-        async def check():
-            primary=Candidate('primary',rejected(401));backup=Candidate('backup');model=with_model_failover(primary,[backup])
-            self.assertEqual(await model.ainvoke(messages=[]),'complete')
-            self.assertEqual([chunk async for chunk in model.ainvoke_stream(messages=[])],['complete'])
-        asyncio.run(check())
+    def test_stream_fallback_before_output_and_errors_after_output(self):
+        for asynchronous in (False, True):
+            for useful, has_output in ((None, False), (ModelResponse(), False), (ModelResponse(content='前缀'), True),
+                    (ModelResponse(reasoning_content='推理'), True), (ModelResponse(tool_calls=[{'id':'partial'}]), True),
+                    (ModelResponse(images=[object()]), True)):
+                with self.subTest(asynchronous=asynchronous, useful=useful):
+                    class Source(Candidate):
+                        def invoke_stream(self,*args,**kwargs):
+                            self.calls+=1
+                            if useful is not None: yield useful
+                            raise self.error
+                        async def ainvoke_stream(self,*args,**kwargs):
+                            for item in self.invoke_stream(*args,**kwargs): yield item
+                    primary=Source('primary',rejected(503));backup=Candidate('backup');model=with_model_failover(primary,[backup])
+                    output=[]
+                    async def collect():
+                        async for item in model.ainvoke_stream(messages=[]): output.append(item)
+                    try:
+                        if asynchronous: asyncio.run(collect())
+                        else:
+                            for item in model.invoke_stream(messages=[]): output.append(item)
+                    except ModelProviderError as error:
+                        self.assertTrue(has_output)
+                        self.assertIs(error,primary.error)
+                    else:
+                        self.assertFalse(has_output)
+                    self.assertEqual(backup.calls, 0 if has_output else 1)
+                    if has_output: self.assertEqual(output, [useful])
+                    else: self.assertEqual(output[-1], 'complete')
+
+    def test_first_stream_delta_is_delivered_before_source_finishes(self):
+        for asynchronous in (False, True):
+            class Source(Candidate):
+                finished=False
+                def invoke_stream(self,*args,**kwargs):
+                    yield ModelResponse(content='首段')
+                    self.finished=True
+                async def ainvoke_stream(self,*args,**kwargs):
+                    yield ModelResponse(content='首段')
+                    self.finished=True
+            primary=Source('primary');model=with_model_failover(primary,[Candidate('backup')])
+            if asynchronous:
+                async def check():
+                    stream=model.ainvoke_stream(messages=[])
+                    first=await anext(stream)
+                    self.assertEqual(first.content,'首段');self.assertFalse(primary.finished)
+                    await stream.aclose()
+                asyncio.run(check())
+            else:
+                stream=model.invoke_stream(messages=[])
+                self.assertEqual(next(stream).content,'首段');self.assertFalse(primary.finished);stream.close()
+
+    def test_backup_can_fallback_when_it_fails_before_output(self):
+        for asynchronous in (False, True):
+            primary=Candidate('primary',rejected(503));backup=Candidate('backup',rejected(502));last=Candidate('last')
+            model=with_model_failover(primary,[backup,last])
+            async def collect(): return [item async for item in model.ainvoke_stream(messages=[])]
+            output=asyncio.run(collect()) if asynchronous else list(model.invoke_stream(messages=[]))
+            self.assertEqual(output,['complete']);self.assertEqual([primary.calls,backup.calls,last.calls],[1,1,1])
+
+    def test_backup_cannot_fallback_after_its_own_visible_delta(self):
+        for asynchronous in (False, True):
+            primary=Candidate('primary',rejected(503));backup=Candidate('backup',rejected(502),partial=True);last=Candidate('last')
+            model=with_model_failover(primary,[backup,last]);seen=[]
+            async def collect():
+                async for item in model.ainvoke_stream(messages=[]):seen.append(item)
+            with self.assertRaises(ModelProviderError) as caught:
+                if asynchronous: asyncio.run(collect())
+                else:
+                    for item in model.invoke_stream(messages=[]):seen.append(item)
+            self.assertIs(caught.exception,backup.error);self.assertEqual(seen,['DISCARD_PARTIAL']);self.assertEqual(last.calls,0)
 
     def test_exhaustion_preserves_original_failure(self):
         original=rejected(502);primary=Candidate('primary',original);backup=Candidate('backup',rejected(503))

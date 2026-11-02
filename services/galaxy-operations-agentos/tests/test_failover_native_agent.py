@@ -19,7 +19,7 @@ def chat(message):
 
 
 class NativeAgentFailover(unittest.TestCase):
-    def test_streamed_provider_error_after_a_completed_tool_discards_only_the_failed_prefix(self):
+    def test_streamed_provider_error_after_a_completed_tool_does_not_replay_after_output(self):
         effects=[];primary_calls=[];backup_calls=[]
         def record_test()->str:
             """Record one isolated local effect and return its immutable receipt."""
@@ -39,10 +39,9 @@ class NativeAgentFailover(unittest.TestCase):
         primary=model('galaxy-local-primary','openai-chat',transport);backup=model('galaxy-local-backup','openai-chat',backup_transport)
         self.addCleanup(primary.http_client.close);self.addCleanup(backup.http_client.close)
         events=list(Agent(model=with_model_failover(primary,[backup]),tools=[record_test],telemetry=False,debug_mode=False).run('Record once and inspect.',stream=True,stream_events=True))
-        done=next(event for event in events if event.event=='RunCompleted')
-        self.assertIn('LOCAL-RECEIPT-73',done.content);self.assertNotIn('DISCARD_FAILED_PREFIX',done.content)
-        self.assertEqual(len(effects),1);self.assertEqual(len(primary_calls),2);self.assertEqual(len(backup_calls),1)
-        self.assertIn('LOCAL-RECEIPT-73',json.dumps(backup_calls[0]))
+        self.assertTrue(any(event.event=='RunError' for event in events))
+        self.assertTrue(any('DISCARD_FAILED_PREFIX' in str(event.content) for event in events))
+        self.assertEqual(len(effects),1);self.assertEqual(len(primary_calls),2);self.assertEqual(len(backup_calls),0)
 
     def test_tool_executes_once_and_fallback_continues_the_original_results(self):
         for target in ['openai-chat','openai-responses']:

@@ -83,12 +83,14 @@ class FailingOutputProvider(NativeOutputProvider):
         raise provider_error()
 
     def invoke_stream(self, messages, **kwargs):
-        yield self._parse_provider_response_delta(self.packet(messages))
+        self._parse_provider_response_delta(self.packet(messages))
         raise provider_error()
+        yield
 
     async def ainvoke_stream(self, messages, **kwargs):
-        yield self._parse_provider_response_delta(self.packet(messages))
+        self._parse_provider_response_delta(self.packet(messages))
         raise provider_error()
+        yield
 
 
 @dataclass

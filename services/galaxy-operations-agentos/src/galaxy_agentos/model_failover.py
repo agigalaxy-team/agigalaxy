@@ -8,6 +8,7 @@ import re
 from copy import deepcopy
 from functools import wraps
 from agno.exceptions import ModelProviderError
+from agno.models.response import ModelResponse
 from .task_loop import observe_provider, _start_provider_request
 
 STATUSES=frozenset({401,402,403,408,429,*range(500,600)})
@@ -47,6 +48,17 @@ def _event(primary,backup,failure,state,run=None):
         rows=metadata.get('modelFallbacks',[])
         run.metadata={**metadata,'activeModelFallbackAlias':backup.id,'modelFallbacks':[
             *(rows[-15:] if isinstance(rows,list) else []),{'from':primary.id,'to':backup.id,'status':failure['status'],'source':'provider'}]}
+
+
+
+def _useful_stream_delta(chunk):
+    """Only actual output bars fallback; usage and metadata are not output."""
+    if not isinstance(chunk, ModelResponse):
+        # Unknown output is treated conservatively: it may already be visible.
+        return bool(chunk)
+    return any(getattr(chunk, name, None) for name in (
+        "content", "reasoning_content", "redacted_reasoning_content", "tool_calls",
+        "audio", "images", "videos", "audios", "files", "parsed"))
 
 
 def with_model_failover(primary,backups):
@@ -107,66 +119,63 @@ def with_model_failover(primary,backups):
                     _event(first,backup,provider_failure(error),'failed',kwargs.get('run_response'))
             raise original
 
-    def size(chunk):
-        # Bound in-memory buffering; no model content is written to disk/logs.
-        return len(chunk.model_dump_json()) if callable(getattr(chunk,'model_dump_json',None)) else len(str(chunk))
-
-    def collect(method,args,kwargs):
-        chunks=[];length=0
-        for chunk in method(*args,**kwargs):
-            length+=size(chunk)
-            if length>16*1024*1024 or len(chunks)>65536:raise RuntimeError('agentos_model_stream_limit')
-            chunks.append(chunk)
-        return chunks
-
-    async def acollect(method,args,kwargs):
-        chunks=[];length=0
-        async for chunk in method(*args,**kwargs):
-            length+=size(chunk)
-            if length>16*1024*1024 or len(chunks)>65536:raise RuntimeError('agentos_model_stream_limit')
-            chunks.append(chunk)
-        return chunks
-
     @wraps(invoke_stream)
     def stream(*args,**kwargs):
-        # No half tool-call JSON or duplicated assistant prefix is delivered
-        # before a fallback decision. Buffer only this provider invocation,
-        # never the task or previously executed business operations.
         first,remaining=order(kwargs);snapshot=seed(args,kwargs)
         _start_provider_request()
-        try:chunks=collect(invoke_stream if first is primary else first.invoke_stream,args,kwargs)
+        emitted=False
+        try:
+            for chunk in (invoke_stream if first is primary else first.invoke_stream)(*args,**kwargs):
+                emitted = emitted or _useful_stream_delta(chunk)
+                yield chunk
+            return
         except ModelProviderError as original:
             failure=provider_failure(original)
-            if not failure:raise
+            if emitted or not failure:raise
             for backup in remaining:
                 _event(first,backup,failure,'attempting',kwargs.get('run_response'))
                 _start_provider_request()
+                emitted=False
                 try:
-                    chunks=collect(backup.invoke_stream,*seed(*snapshot));_event(first,backup,failure,'completed',kwargs.get('run_response'));break
+                    fresh_args,fresh_kwargs=seed(*snapshot)
+                    for chunk in backup.invoke_stream(*fresh_args,**fresh_kwargs):
+                        emitted = emitted or _useful_stream_delta(chunk)
+                        yield chunk
+                    _event(first,backup,failure,'completed',kwargs.get('run_response'))
+                    return
                 except ModelProviderError as error:
-                    if not provider_failure(error):raise
+                    if emitted or not provider_failure(error):raise
                     _event(first,backup,provider_failure(error),'failed',kwargs.get('run_response'))
-            else:raise original
-        yield from chunks
+            raise original
 
     @wraps(ainvoke_stream)
     async def astream(*args,**kwargs):
         first,remaining=order(kwargs);snapshot=seed(args,kwargs)
         _start_provider_request()
-        try:chunks=await acollect(ainvoke_stream if first is primary else first.ainvoke_stream,args,kwargs)
+        emitted=False
+        try:
+            async for chunk in (ainvoke_stream if first is primary else first.ainvoke_stream)(*args,**kwargs):
+                emitted = emitted or _useful_stream_delta(chunk)
+                yield chunk
+            return
         except ModelProviderError as original:
             failure=provider_failure(original)
-            if not failure:raise
+            if emitted or not failure:raise
             for backup in remaining:
                 _event(first,backup,failure,'attempting',kwargs.get('run_response'))
                 _start_provider_request()
+                emitted=False
                 try:
-                    chunks=await acollect(backup.ainvoke_stream,*seed(*snapshot));_event(first,backup,failure,'completed',kwargs.get('run_response'));break
+                    fresh_args,fresh_kwargs=seed(*snapshot)
+                    async for chunk in backup.ainvoke_stream(*fresh_args,**fresh_kwargs):
+                        emitted = emitted or _useful_stream_delta(chunk)
+                        yield chunk
+                    _event(first,backup,failure,'completed',kwargs.get('run_response'))
+                    return
                 except ModelProviderError as error:
-                    if not provider_failure(error):raise
+                    if emitted or not provider_failure(error):raise
                     _event(first,backup,provider_failure(error),'failed',kwargs.get('run_response'))
-            else:raise original
-        for chunk in chunks:yield chunk
+            raise original
 
     primary.invoke,primary.ainvoke=checked,achecked
     primary.invoke_stream,primary.ainvoke_stream=stream,astream
