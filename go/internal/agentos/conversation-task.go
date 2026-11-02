@@ -302,13 +302,6 @@ func (t *ConversationTools) assessConversationTask(ctx context.Context, bound bo
 			phase = "waiting-confirmation"
 		}
 		state := "recorded"
-		var coverage Object
-		if disposition == "completed" {
-			coverage, err = conversationReadCoverage(ctx, tx, s.Endpoint, bound.row, turn)
-			if err != nil {
-				return nil, err
-			}
-		}
 		if disposition == "awaiting-confirmation" {
 			if unresolved {
 				phase, state = "waiting-result", "needs-continuation"
@@ -325,9 +318,6 @@ func (t *ConversationTools) assessConversationTask(ctx context.Context, bound bo
 			} else if len(remaining) > 0 {
 				phase = "continue"
 				state = "needs-continuation"
-			} else if missing, _ := index(coverage["missing"]); missing > 0 {
-				phase, state = "continue", "needs-continuation"
-				remaining = []any{coverage["remaining"]}
 			}
 		} else if disposition == "continue" && unresolved {
 			phase = "waiting-result"
@@ -340,6 +330,6 @@ func (t *ConversationTools) assessConversationTask(ctx context.Context, bound bo
 		if err != nil {
 			return nil, err
 		}
-		return Object{"state": state, "taskProgress": publicConversationTask(progress), "readCoverage": coverage}, nil
+		return Object{"state": state, "taskProgress": publicConversationTask(progress)}, nil
 	})
 }

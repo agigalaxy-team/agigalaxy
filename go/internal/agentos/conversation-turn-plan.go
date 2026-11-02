@@ -52,22 +52,7 @@ func (t *ConversationTools) planConversationTurn(ctx context.Context, bound boun
 	n, ok := index(a["proposalCount"])
 	intent, summary := text(a, "intent"), text(a, "summary")
 	alternatives, typed := a["alternatives"].(bool)
-	readCount, readOK := index(a["readCount"])
-	_, readPresent := a["readCount"]
-	keysOK := len(a) == 4 || len(a) == 5
-	for _, key := range []string{"intent", "proposalCount", "alternatives", "summary"} {
-		if _, present := a[key]; !present {
-			keysOK = false
-		}
-	}
-	for key := range a {
-		switch key {
-		case "intent", "proposalCount", "alternatives", "summary", "readCount":
-		default:
-			keysOK = false
-		}
-	}
-	if !keysOK || (readPresent && (!readOK || readCount < 1 || readCount > 100)) || !ok || (n != 1 && n != 3) || !typed || (intent != "answer" && intent != "prepare") || utf8.RuneCountInString(summary) > 240 || (n == 3 && (!alternatives || intent != "prepare")) || (n == 1 && alternatives) {
+	if len(a) != 4 || !ok || (n != 1 && n != 3) || !typed || (intent != "answer" && intent != "prepare") || utf8.RuneCountInString(summary) > 240 || (n == 3 && (!alternatives || intent != "prepare")) || (n == 1 && alternatives) {
 		return nil, fail("invalid_operations_agentos_request", 400)
 	}
 	s := t.Conversations
@@ -81,13 +66,6 @@ func (t *ConversationTools) planConversationTurn(ctx context.Context, bound boun
 		}
 		ids, _ := plan["preparedCardIds"].([]any)
 		oldCount, _ := index(plan["proposalCount"])
-		oldReadCount, _ := index(plan["readCount"])
-		if readOK && readCount < oldReadCount {
-			return nil, fail("operations_agentos_turn_plan_conflict", 409)
-		}
-		if !readOK {
-			readCount = oldReadCount
-		}
 		if oldCount == 3 && n != 3 {
 			return nil, fail("operations_agentos_turn_plan_conflict", 409)
 		}
@@ -100,9 +78,6 @@ func (t *ConversationTools) planConversationTurn(ctx context.Context, bound boun
 			}
 		}
 		plan = Object{"intent": intent, "proposalCount": n, "alternatives": alternatives, "summary": summary, "preparedCardIds": ids}
-		if readCount > 0 {
-			plan["readCount"] = readCount
-		}
 		_, err = tx.Exec(ctx, `UPDATE operations_agentos_conversation_commands_v1 SET result=jsonb_set(result,'{turnPlan}',$3::jsonb) WHERE endpoint=$1 AND id=$2 AND conversation_id=$4`, s.Endpoint, turn, plan, bound.row.ID)
 		return Object{"state": "planned", "turnPlan": plan}, err
 	})
@@ -128,7 +103,7 @@ func (s *Conversations) inheritedTurnPlan(ctx context.Context, parent *conversat
  SELECT id,result,ARRAY[id] AS path,0 AS depth FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND id=$2 AND conversation_id=$3 AND operator_id=$4
  UNION ALL SELECT c.id,c.result,l.path||c.id,l.depth+1 FROM operations_agentos_conversation_commands_v1 c JOIN lineage l ON c.id::text=l.result->>'retryOfOperationId'
  WHERE c.endpoint=$1 AND c.conversation_id=$3 AND c.operator_id=$4 AND NOT c.id=ANY(l.path) AND l.depth<64)
- SELECT result->'turnPlan' FROM lineage WHERE result->'turnPlan'->>'intent'='prepare' OR result->'turnPlan'->>'readCount' IS NOT NULL ORDER BY CASE WHEN result->'turnPlan'->>'proposalCount'='3' THEN 0 ELSE 1 END,depth LIMIT 1`, s.Endpoint, parent.ID, parent.ConversationID, parent.OperatorID).Scan(&plan)
+ SELECT result->'turnPlan' FROM lineage WHERE result->'turnPlan'->>'intent'='prepare' ORDER BY CASE WHEN result->'turnPlan'->>'proposalCount'='3' THEN 0 ELSE 1 END,depth LIMIT 1`, s.Endpoint, parent.ID, parent.ConversationID, parent.OperatorID).Scan(&plan)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -139,9 +114,5 @@ func (s *Conversations) inheritedTurnPlan(ctx context.Context, parent *conversat
 	if !ok || count != 1 && count != 3 || count == 3 && plan["alternatives"] != true {
 		return nil, nil
 	}
-	out := Object{"intent": text(plan, "intent"), "proposalCount": count, "alternatives": count == 3, "summary": text(plan, "summary"), "preparedCardIds": []any{}}
-	if reads, ok := index(plan["readCount"]); ok && reads > 0 && reads <= 100 {
-		out["readCount"] = reads
-	}
-	return out, nil
+	return Object{"intent": "prepare", "proposalCount": count, "alternatives": count == 3, "summary": text(plan, "summary"), "preparedCardIds": []any{}}, nil
 }
