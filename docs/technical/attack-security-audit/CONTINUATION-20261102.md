@@ -111,3 +111,15 @@
 5. 每项发现的实际修复提交、有效调用链、获准验证结果及部署适用性。当前没有完成修复或部署的证据。
 
 本次只推进审计文档，主分支及业务源码不变，草稿 PR 不合并。满三天不是完成标准，报告发布也不等于审计完成。
+
+
+## 六、19:37 UTC 前端独立补查
+
+固定版本为 9ad760b。全文阅读 `apps/galaxy-admin/src/lib/workbench/workbench-view-model.ts`、`components/workbench/WorkbenchActionCards.tsx` 和 `lib/workbench/workbench-action-cards.ts`（后两项同属 apps/galaxy-admin/src）；另阅读 `lib/strategies/strategies-view-model.ts:1–56,90–114` 与 `components/strategies/Strategies.tsx:58–99` 的普通输入、导航、三方合并及草稿状态调用范围，不扩展到真实策略执行。
+
+- 仪表盘目标为固定本地管理路由，变量使用编码；卡片 href 解析限定本地管理路径并拒绝控制字符、空白、反斜线和片段。所读组件使用 JSX 文本渲染，没有从这些展示字段建立 HTML 注入链。
+- 卡片结果要求原 operationId；确认状态要求 prepared、允许确认且 presentation 可审阅。stored 卡片仍跳过客户端期限，不能取代第四节的服务端边界。
+- 条件解析限制深度 6、节点 1000、每组 20；导航校验标识符与顺序号，历史游标链最多 50。它们不证明后端总成本有界。
+- 三方合并按稳定标识符，而非数组位置；条件与日常范围共同合并。调用方只有未解决冲突为零且当前视图有效、未锁定时才前移预期修订。冲突期间保存可能仍携带旧修订，需服务端比较并交换校验；没有据此确认丢失更新或越权。
+
+未运行测试，没有新确认漏洞。导入依赖、后端效果和旧版本剩余范围仍按原限制保留。
