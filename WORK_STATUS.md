@@ -1,5 +1,11 @@
 # 当前工作
 
+## 2026-11-03：六视图任务继续排查
+
+从迁移后的 main/1722107 继续，历史与确认卡展示边界不变。已核实纯读取阶段仍携带约5万字符的制卡参数定义；同一人工模型、相同原生工具与合成小回执的定向对照中，完整声明在第三次调用返回 malformed-tool-call，移除无关制卡声明的对照继续推进。该对照仅定位请求结构，不当作真实业务六视图验收。
+
+现按已接受的 plan_turn 阶段投影模型工具声明：读阶段不携带完整制卡定义，prepare 计划接受后原轮下一次调用即可制卡。保留原注册/授权/确认接口、原任务判断与重试上限，不换模型。本地原生同步/异步流式覆盖同轮声明→加载→制卡，连同任务上下文及完成判断定向检查通过；真实六视图、上传与部署尚待本批完成。
+
 ## 2026-10-30：通用任务循环（部分验收通过，仍有模型场景未通过）
 
 运行代码：Go860c254、Admin e3d55f8、AgentOS b7e03da、Gateway e6e5e6c；官网8e919ac，数据库144。b7e03da Runner41041713043、组件41041713308均成功；e6e5e6c Runner41036191049、组件41036191114均成功。代码已上传并部署，不改人工模型、凭据、授权及周期计划，不恢复全系统压测、模拟活跃或资料填充。
@@ -82,4 +88,4 @@ system/user 提示词分离、模型上下文管理与阈值压缩已按 2026-10
 
 Native 最终 Windows 候选包及外部宿主、联合整站恢复等仍有独立验收边界，不把本轮 Web/AI 实测扩称为这些平台通过。
 
-现行说明见[架构](docs/technical/architecture.md)、[AI 运行](docs/technical/agent-runtime.md)和[部署](docs/operations/deployment.md)。历史状态正文已完整保留于[本次归并前快照](C:/Users/USER1/Documents/ChatGPT/work/galaxy-reconstruction-implementation-20261029/WORK_STATUS-pre-consolidation-20261029.md)；原操作事实与详细证据继续使用工作区唯一 canonical JSONL 和 work/galaxy-reconstruction-implementation-20261029/，不重建或删改旧证据。
+现行说明见[架构](docs/technical/architecture.md)、[AI 运行](docs/technical/agent-runtime.md)和[部署](docs/operations/deployment.md)。历史状态正文已完整保留于[本次归并前快照](D:/ChatGPT/work/galaxy-reconstruction-implementation-20261029/WORK_STATUS-pre-consolidation-20261029.md)；原操作事实与详细证据继续使用工作区唯一 canonical JSONL 和 work/galaxy-reconstruction-implementation-20261029/，不重建或删改旧证据。

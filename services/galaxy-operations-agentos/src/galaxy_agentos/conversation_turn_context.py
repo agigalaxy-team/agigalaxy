@@ -6,7 +6,7 @@ import json
 import re
 
 from .model_usage import _RUN
-from .conversation_turn_state import turn_state, RECEIPT_FEEDBACK, TASK_CONTEXT, TASK_PROGRESS, ASSESSMENT, ACTIVITY
+from .conversation_turn_state import turn_state, RECEIPT_FEEDBACK, TASK_CONTEXT, TASK_PROGRESS, ASSESSMENT, ACTIVITY, PLAN
 from .conversation_history_projection import projection_status
 
 _ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
@@ -150,6 +150,30 @@ def _receipt_context(args, kwargs):
     if args: return (copied, *args[1:]), kwargs
     return args, {**kwargs, "messages":copied}
 
+def _stage_tools(args, kwargs):
+    """Send the preparation schema only after the existing plan accepts prepare.
+
+    This is a provider projection, not an authority or tool-registry change.
+    The native functions and server checks remain intact. A model can move
+    from reading to preparation by calling plan_turn in the same native loop.
+    Explicit caller tool selection is preserved.
+    """
+    run = _RUN.get()
+    if run is None or (turn_state(run).get(PLAN) or {}).get("intent") == "prepare":
+        return args, kwargs
+    choice = kwargs.get("tool_choice", args[4] if len(args) > 4 else None)
+    if choice not in (None, "auto", "none"):
+        return args, kwargs
+    tools = kwargs.get("tools", args[3] if len(args) > 3 else None)
+    if not isinstance(tools, list): return args, kwargs
+    selected = [tool for tool in tools if not (isinstance(tool, dict)
+        and tool.get("type") == "function" and isinstance(tool.get("function"), dict)
+        and tool["function"].get("name") == "prepare_operation")]
+    if len(selected) == len(tools): return args, kwargs
+    if "tools" in kwargs: return args, {**kwargs, "tools":selected}
+    return (*args[:3], selected, *args[4:]), kwargs
+
+
 def with_conversation_turn_context(model):
     invoke, ainvoke, stream, astream = model.invoke, model.ainvoke, model.invoke_stream, model.ainvoke_stream
     @wraps(invoke)
@@ -157,24 +181,28 @@ def with_conversation_turn_context(model):
         _record(args, kwargs)
         args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
+        args, kwargs = _stage_tools(args, kwargs)
         return invoke(*args, **kwargs)
     @wraps(ainvoke)
     async def acall(*args, **kwargs):
         _record(args, kwargs)
         args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
+        args, kwargs = _stage_tools(args, kwargs)
         return await ainvoke(*args, **kwargs)
     @wraps(stream)
     def call_stream(*args, **kwargs):
         _record(args, kwargs)
         args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
+        args, kwargs = _stage_tools(args, kwargs)
         yield from stream(*args, **kwargs)
     @wraps(astream)
     async def acall_stream(*args, **kwargs):
         _record(args, kwargs)
         args, kwargs = _task_context(args, kwargs)
         args, kwargs = _receipt_context(args, kwargs)
+        args, kwargs = _stage_tools(args, kwargs)
         async for item in astream(*args, **kwargs):
             yield item
     model.invoke, model.ainvoke, model.invoke_stream, model.ainvoke_stream = call, acall, call_stream, acall_stream

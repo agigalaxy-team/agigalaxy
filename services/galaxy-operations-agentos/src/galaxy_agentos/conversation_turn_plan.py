@@ -15,6 +15,8 @@ def plan_turn_tool(send):
 
         For a choice such as option 2, continue the selected prior proposal without asking again.
         Three proposals means distinct alternatives, each needing separate human confirmation.
+        The preparation tool schema becomes available after an accepted prepare plan.
+        An answer plan covers reads and analysis; it need not be repeated for each read.
         """
         if proposal_count == 3 and (intent != "prepare" or not alternatives):
             return json.dumps({"state":"invalid-request", "reason":"three_requires_alternatives", "effectExecuted":False})
