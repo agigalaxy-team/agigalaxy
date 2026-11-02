@@ -55,6 +55,19 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
         run = kwargs.get("run_response", args[index] if len(args) > index else None)
         return messages, run
     deadline = ContextVar("galaxy_conversation_deadline", default=None)
+    continuations = ContextVar("galaxy_conversation_continuations", default=None)
+    def provider_input(args, kwargs):
+        messages = kwargs.get("messages", args[0] if args else None)
+        markers = continuations.get()
+        if not markers or not isinstance(messages, list): return args, kwargs
+        existing = {getattr(m,"id",None) for m in messages}
+        projected = []
+        for message in messages:
+            projected.append(message)
+            signal = markers.get(getattr(message,"id",None))
+            if signal is not None and signal.id not in existing: projected.append(signal)
+        if args: return (projected,*args[1:]),kwargs
+        return args,{**kwargs,"messages":projected}
     def expired():
         limit = deadline.get()
         return limit is not None and time.monotonic() >= limit
@@ -161,6 +174,15 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
                 break
         else:
             messages.insert(0, Message(role="system", content=_PROMPT))
+        markers = continuations.get()
+        if (markers is not None and messages and messages[-1].role == "assistant"
+                and not messages[-1].tool_calls and not messages[-1].from_history):
+            # A provider may reject an assistant-prefill request. Keep an
+            # explicit runtime continuation at this boundary in every later
+            # provider copy, including after tools, without inventing a user
+            # turn in native history or changing the original task/input.
+            markers.setdefault(messages[-1].id, Message(role="user", name="galaxy_runtime_continuation",
+                content="运行器接续信号，不是新的用户请求：当前原任务尚未完成。依据已取得结果和剩余工作继续；不要重做已完成步骤。需要人工、信息或原结果时等待，全部目标完成后总结并结束。"))
         return "continue", seen
     def merge(parts, value):
         tools = {}
@@ -176,10 +198,12 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
         if method_name == "invoke":
             def guarded(*args, _fn=original, **kwargs):
                 if expired(): raise _TaskTimedOut()
+                args,kwargs = provider_input(args,kwargs)
                 return _fn(*args, **kwargs)
         elif method_name == "ainvoke":
             async def guarded(*args, _fn=original, **kwargs):
                 if expired(): raise _TaskTimedOut()
+                args,kwargs = provider_input(args,kwargs)
                 limit = deadline.get()
                 if limit is None: return await _fn(*args, **kwargs)
                 timer = asyncio.timeout(max(0, limit - time.monotonic()))
@@ -191,10 +215,12 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
         elif method_name == "invoke_stream":
             def guarded(*args, _fn=original, **kwargs):
                 if expired(): raise _TaskTimedOut()
+                args,kwargs = provider_input(args,kwargs)
                 yield from _fn(*args, **kwargs)
         else:
             async def guarded(*args, _fn=original, **kwargs):
                 if expired(): raise _TaskTimedOut()
+                args,kwargs = provider_input(args,kwargs)
                 limit = deadline.get()
                 if limit is None:
                     async for item in _fn(*args, **kwargs): yield item
@@ -211,7 +237,7 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
     def checked(*args, **kwargs):
         messages, run = context(args, kwargs)
         if messages is None or run is None: return response(*args, **kwargs)
-        token=deadline.set(time.monotonic()+timeout_seconds); parts, seen = [], set()
+        token=deadline.set(time.monotonic()+timeout_seconds); signals=continuations.set({}); parts, seen = [], set()
         try:
             while True:
                 try: value=response(*args, **kwargs); parts.append(value)
@@ -226,12 +252,12 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
                     elif outcome == "blocked-loop": checkpoint(run,"blocked","重复相同事实且没有新进展"); value.content=_BLOCKED
                     elif prepared_notification(run): value.content=prepared_notification(run)
                     return merge(parts, value)
-        finally: deadline.reset(token)
+        finally: continuations.reset(signals); deadline.reset(token)
     @wraps(aresponse)
     async def achecked(*args, **kwargs):
         messages, run = context(args, kwargs)
         if messages is None or run is None: return await aresponse(*args, **kwargs)
-        token=deadline.set(time.monotonic()+timeout_seconds); parts, seen = [], set()
+        token=deadline.set(time.monotonic()+timeout_seconds); signals=continuations.set({}); parts, seen = [], set()
         try:
             while True:
                 try: value=await aresponse(*args, **kwargs); parts.append(value)
@@ -246,7 +272,7 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
                     elif outcome == "blocked-loop": await asyncio.to_thread(checkpoint,run,"blocked","重复相同事实且没有新进展"); value.content=_BLOCKED
                     elif prepared_notification(run): value.content=prepared_notification(run)
                     return merge(parts, value)
-        finally: deadline.reset(token)
+        finally: continuations.reset(signals); deadline.reset(token)
     def visible(event):
         return getattr(event, "event", None) == "AssistantResponse" and bool(getattr(event, "content", None))
     @wraps(stream)
@@ -254,7 +280,7 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
         messages, run = context(args, kwargs, streaming=True)
         if messages is None or run is None:
             yield from stream(*args, **kwargs); return
-        token=deadline.set(time.monotonic()+timeout_seconds); seen=set()
+        token=deadline.set(time.monotonic()+timeout_seconds); signals=continuations.set({}); seen=set()
         try:
             while True:
                 pending=[]
@@ -278,14 +304,14 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
                     elif prepared_notification(run): yield ModelResponse(content=prepared_notification(run))
                     else: yield from pending
                     return
-        finally: deadline.reset(token)
+        finally: continuations.reset(signals); deadline.reset(token)
     @wraps(astream)
     async def achecked_stream(*args, **kwargs):
         messages, run = context(args, kwargs, streaming=True)
         if messages is None or run is None:
             async for event in astream(*args, **kwargs): yield event
             return
-        token=deadline.set(time.monotonic()+timeout_seconds); seen=set()
+        token=deadline.set(time.monotonic()+timeout_seconds); signals=continuations.set({}); seen=set()
         try:
             while True:
                 pending=[]
@@ -312,7 +338,7 @@ def with_conversation_completion(model, *, timeout_seconds=600, gateway=None):
                     else:
                         for item in pending: yield item
                     return
-        finally: deadline.reset(token)
+        finally: continuations.reset(signals); deadline.reset(token)
     model.response, model.aresponse = checked, achecked
     model.response_stream, model.aresponse_stream = checked_stream, achecked_stream
     return model

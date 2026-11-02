@@ -58,8 +58,10 @@ def _record(args, kwargs):
         return
     input_content = getattr(getattr(run, "input", None), "input_content", None)
     input_hash = hashlib.sha256(input_content.encode("utf-8")).hexdigest() if isinstance(input_content, str) else None
-    current = [m for m in messages if getattr(m, "role", None) == "user" and not getattr(m, "from_history", False)]
-    last_user = next((m for m in reversed(messages) if getattr(m, "role", None) == "user"), None)
+    current = [m for m in messages if getattr(m, "role", None) == "user" and not getattr(m, "from_history", False)
+        and getattr(m,"name",None) != "galaxy_runtime_continuation"]
+    last_user = next((m for m in reversed(messages) if getattr(m, "role", None) == "user"
+        and getattr(m,"name",None) != "galaxy_runtime_continuation"), None)
     run_id = getattr(run, "run_id", None)
     operation_id = (getattr(run, "metadata", None) or {}).get("operationId")
     projection = projection_status() or {}
@@ -75,6 +77,7 @@ def _record(args, kwargs):
         "operationId": operation_id if isinstance(operation_id, str) and _ID.fullmatch(operation_id) else None,
         "currentInputSha256": input_hash, "currentUserCount": len(current),
         "currentInputMatchesLastUser": isinstance(input_content, str) and last_user is not None and getattr(last_user, "content", None) == input_content,
+        "runtimeContinuationCount":sum(getattr(m,"name",None)=="galaxy_runtime_continuation" for m in messages),
         "historyCount": sum(bool(getattr(m, "from_history", False)) for m in messages),
         "historyProjectionApplied": projection.get("applied", False), "historyNotProjectedCount": projection.get("notProjected", 0),
         "taskContextPresent": isinstance(task, dict), "objectiveAvailable": isinstance(task, dict) and task.get("objectiveAvailable") is True,

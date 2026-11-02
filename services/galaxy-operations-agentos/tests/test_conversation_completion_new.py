@@ -22,6 +22,64 @@ class Model:
     async def aresponse_stream(self, messages, **kw): yield self.response(messages, **kw)
 
 class CompletionTest(unittest.TestCase):
+    def test_native_continuation_is_provider_input_not_an_extra_user_turn(self):
+        from dataclasses import dataclass,field
+        import tempfile
+        from pathlib import Path
+        from galaxy_agentos.conversation_retry import ConversationAgent as Agent
+        from agno.models.base import Model as NativeModel
+        from agno.db.sqlite import SqliteDb
+        from galaxy_agentos.model_usage import _RUN,install_usage_scope
+        for streaming,asynchronous in ((False,False),(True,False),(False,True),(True,True)):
+            @dataclass
+            class StrictProvider(NativeModel):
+                id: str = "strict-continuation-fixture"
+                name: str = "local"
+                provider: str = "local"
+                calls: int = 0
+                snapshots: list = field(default_factory=list)
+                def invoke(self,messages,**kwargs):
+                    self.calls+=1;self.snapshots.append(list(messages))
+                    state=turn_state(_RUN.get())
+                    if self.calls in (1,3):
+                        if self.calls==3:
+                            if messages[-1].role!="user" or messages[-1].name!="galaxy_runtime_continuation":
+                                raise AssertionError("provider received unsupported assistant-prefill continuation")
+                        return ModelResponse(role="assistant",tool_calls=[{"id":"read-"+str(self.calls),"type":"function","function":{"name":"read_current","arguments":"{}"}}])
+                    state[ASSESSMENT]={"activity":state[ACTIVITY],"disposition":"continue" if self.calls==2 else "completed","remaining":["第二项"] if self.calls==2 else [],"reason":"继续" if self.calls==2 else "完成"}
+                    return ModelResponse(role="assistant",content="第一项已完成，接着处理。" if self.calls==2 else "两项已完成。")
+                async def ainvoke(self,messages,**kwargs):return self.invoke(messages,**kwargs)
+                def invoke_stream(self,messages,**kwargs):yield self.invoke(messages,**kwargs)
+                async def ainvoke_stream(self,messages,**kwargs):yield self.invoke(messages,**kwargs)
+                def _parse_provider_response(self,response,**kwargs):return response
+                def _parse_provider_response_delta(self,response):return response
+            reads=[]
+            def read_current(run_context: RunContext):
+                reads.append(len(reads)+1);state=turn_state(run_context);state[ACTIVITY]=len(reads)
+                return json.dumps({"value":len(reads)})
+            with tempfile.TemporaryDirectory() as directory:
+                db=SqliteDb(db_file=str(Path(directory)/"native.sqlite"))
+                provider=StrictProvider();install_usage_scope(provider);with_conversation_completion(provider)
+                agent=Agent(model=provider,db=db,tools=[read_current],store_tool_messages=False,telemetry=False)
+                try:
+                    if asynchronous:
+                        async def run():
+                            if streaming:return [item async for item in agent.arun("完成两项",session_id="s",user_id="u",stream=True)]
+                            return await agent.arun("完成两项",session_id="s",user_id="u")
+                        asyncio.run(run())
+                    elif streaming:list(agent.run("完成两项",session_id="s",user_id="u",stream=True))
+                    else:agent.run("完成两项",session_id="s",user_id="u")
+                    self.assertEqual(reads,[1,2]);self.assertEqual(provider.calls,4)
+                    signals=[m for m in provider.snapshots[2] if m.name=="galaxy_runtime_continuation"]
+                    self.assertEqual(len(signals),1)
+                    self.assertEqual([m.id for m in provider.snapshots[3] if m.name=="galaxy_runtime_continuation"],[signals[0].id])
+                    stored=db.get_runs(session_id="s",user_id="u")[0]
+                    self.assertEqual(stored.input.input_content,"完成两项")
+                    self.assertFalse(any(m.name=="galaxy_runtime_continuation" for m in stored.messages))
+                    self.assertEqual([m.content for m in stored.messages if m.role=="user"],["完成两项"])
+                    self.assertEqual(stored.content,"两项已完成。")
+                finally:db.db_engine.dispose()
+
     def test_interrupted_resumed_task_plain_answer_does_not_complete(self):
         model = with_conversation_completion(Model(lambda n,m,r: ModelResponse(content="已完成")))
         run = SimpleNamespace(metadata={"operationId":"retry"})
