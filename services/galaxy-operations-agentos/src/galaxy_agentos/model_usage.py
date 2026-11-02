@@ -109,8 +109,9 @@ def _begin(model):
         return None
     before = run.metadata
     previous = (before or {}).get("modelCalls")
-    count = previous if type(previous) is int and previous >= 0 else 0
-    run.metadata = {**(before or {}), "modelCalls": count + 1}
+    count = (None if before is not None and "modelCalls" in before and previous is None
+        else previous if type(previous) is int and previous >= 0 else 0)
+    run.metadata = {**(before or {}), "modelCalls": None if count is None else count + 1}
     _record_settings_version(run.metadata, model)
     db = getattr(model, "_galaxy_usage_database", None)
     if db is None:
@@ -129,10 +130,17 @@ def _begin(model):
 def _finish(value, result):
     if result is True or result == RunPersistOutcome.UPDATED:
         return
+    if result is None:
+        _mark_usage_unknown(value)
+        return
     value[0].metadata = value[1]
     if result in {RunPersistOutcome.STALE_ATTEMPT, RunPersistOutcome.TERMINAL_REFUSED}:
         raise AuthorityDenied("agentos_model_call_attempt_changed")
     raise AuthorityUnavailable("agentos_model_call_metadata_unavailable")
+
+
+def _mark_usage_unknown(value):
+    value[0].metadata = {**(value[0].metadata or {}), "modelCalls": None}
 
 
 def record_model_call(model):
@@ -140,10 +148,14 @@ def record_model_call(model):
     if value is None or value[2] is None:
         return
     try:
-        _finish(value, value[2](**value[3]))
-    except Exception:
+        result = value[2](**value[3])
+    except AuthorityDenied:
         value[0].metadata = value[1]
         raise
+    except Exception:
+        _mark_usage_unknown(value)
+        return
+    _finish(value, result)
 
 
 async def arecord_model_call(model):
@@ -152,7 +164,10 @@ async def arecord_model_call(model):
         return
     try:
         result = await value[2](**value[3]) if inspect.iscoroutinefunction(value[2]) else await asyncio.to_thread(value[2], **value[3])
-        _finish(value, result)
-    except Exception:
+    except AuthorityDenied:
         value[0].metadata = value[1]
         raise
+    except Exception:
+        _mark_usage_unknown(value)
+        return
+    _finish(value, result)

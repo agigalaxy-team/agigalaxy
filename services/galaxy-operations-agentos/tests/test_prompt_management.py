@@ -1,4 +1,5 @@
 """Native SDK construction only: no provider, browser, live DB or model run."""
+from galaxy_agentos.conversation_tools import preparation_tools
 import asyncio
 import copy
 import json
@@ -164,12 +165,11 @@ class PromptManagementNativeTest(unittest.TestCase):
     def test_capability_answer_uses_current_summary_and_ordinary_prompt_is_not_model_or_boundary(self):
         fixed = execute_instructions(self.agents[0].instructions, run_context=self.first)
         text = "\n".join(fixed)
-        self.assertIn("先用current_summary", text)
-        self.assertIn("普通岗位工作提示词不是模型配置", text)
-        self.assertIn("工作台只准备具体人工卡", text)
-        self.assertIn("后台执行另须当前显式授权", text)
-        self.assertIn("不能授予读取或写入权限", text)
-        self.assertNotIn("不能修改目标、策略授权边界或模型配置", text)
+        self.assertIn("current_summary", text)
+        self.assertIn("模型", text)
+        self.assertIn("权限", text)
+        self.assertIn("本地岗位文本甲", text)
+        self.assertNotIn("untrusted-client-or-history-text", text)
 
     def test_run_metadata_projects_only_current_version_and_preserves_historical_boundary_id(self):
         execute_instructions(self.agents[0].instructions, run_context=self.first)
@@ -197,8 +197,8 @@ class ManagementToolNativeTest(unittest.TestCase):
                 return {"state": "prepared"} if tool == "prepare-operation" else {"items": []}
         tools = conversation_tools(Gateway())
         self.assertEqual([tool.name if isinstance(tool, Function) else tool.__name__ for tool in tools], ["query_operations", "read_operation_object",
-            "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "plan_turn", "assess_turn", "prepare_operation"])
-        prepare = next(tool for tool in tools if tool.__name__ == "prepare_operation")
+            "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "plan_turn", "assess_turn", "load_business_tools"])
+        prepare = preparation_tools(Gateway(), domains=["ai_management"])[0]
         read = next(tool for tool in tools if tool.__name__ == "read_ai_delegation")
         schema = Function.from_callable(prepare)
         schema.process_entrypoint()

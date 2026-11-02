@@ -7,7 +7,6 @@ import re
 
 from .model_usage import _RUN
 from .conversation_turn_state import turn_state, RECEIPT_FEEDBACK, TASK_CONTEXT, TASK_PROGRESS, ASSESSMENT, ACTIVITY, PLAN
-from .conversation_history_projection import projection_status
 
 _ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 _ROLES = {"system", "developer", "user", "assistant", "tool"}
@@ -64,7 +63,6 @@ def _record(args, kwargs):
         and getattr(m,"name",None) != "galaxy_runtime_continuation"), None)
     run_id = getattr(run, "run_id", None)
     operation_id = (getattr(run, "metadata", None) or {}).get("operationId")
-    projection = projection_status() or {}
     state = turn_state(run)
     task = state.get(TASK_CONTEXT)
     history = task.get("actionHistory") if isinstance(task, dict) else None
@@ -79,7 +77,6 @@ def _record(args, kwargs):
         "currentInputMatchesLastUser": isinstance(input_content, str) and last_user is not None and getattr(last_user, "content", None) == input_content,
         "runtimeContinuationCount":sum(getattr(m,"name",None)=="galaxy_runtime_continuation" for m in messages),
         "historyCount": sum(bool(getattr(m, "from_history", False)) for m in messages),
-        "historyProjectionApplied": projection.get("applied", False), "historyNotProjectedCount": projection.get("notProjected", 0),
         "taskContextPresent": isinstance(task, dict), "objectiveAvailable": isinstance(task, dict) and task.get("objectiveAvailable") is True,
         "actionHistoryCount": len(history), "actionHistoryCompletedCount": sum(
             isinstance(item, dict) and item.get("state") == "completed" and isinstance(item.get("receipt"), dict)
@@ -159,26 +156,24 @@ def _receipt_context(args, kwargs):
     return args, {**kwargs, "messages":copied}
 
 def _stage_tools(args, kwargs):
-    """Send the preparation schema only after the existing plan accepts prepare.
-
-    This is a provider projection, not an authority or tool-registry change.
-    The native functions and server checks remain intact. A model can move
-    from reading to preparation by calling plan_turn in the same native loop.
-    Explicit caller tool selection is preserved.
-    """
-    run = _RUN.get()
-    if run is None or (turn_state(run).get(PLAN) or {}).get("intent") == "prepare":
-        return args, kwargs
+    """Expose the requested business definitions inside the same native run."""
+    from .conversation_tools import preparation_tool_catalog, is_preparation_tool
+    loaded = turn_state(_RUN.get()).get("loadedBusinessDomains") or []
+    names = {name for domain, entry in preparation_tool_catalog().items() if domain in loaded
+             for name in entry["tools"]}
     choice = kwargs.get("tool_choice", args[4] if len(args) > 4 else None)
     if choice not in (None, "auto", "none"):
         return args, kwargs
     tools = kwargs.get("tools", args[3] if len(args) > 3 else None)
-    if not isinstance(tools, list): return args, kwargs
+    if not isinstance(tools, list):
+        return args, kwargs
     selected = [tool for tool in tools if not (isinstance(tool, dict)
         and tool.get("type") == "function" and isinstance(tool.get("function"), dict)
-        and tool["function"].get("name") == "prepare_operation")]
-    if len(selected) == len(tools): return args, kwargs
-    if "tools" in kwargs: return args, {**kwargs, "tools":selected}
+        and is_preparation_tool(tool["function"].get("name")) and tool["function"].get("name") not in names)]
+    if len(selected) == len(tools):
+        return args, kwargs
+    if "tools" in kwargs:
+        return args, {**kwargs, "tools": selected}
     return (*args[:3], selected, *args[4:]), kwargs
 
 

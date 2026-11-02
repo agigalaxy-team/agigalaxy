@@ -1,3 +1,4 @@
+from galaxy_agentos.conversation_tools import preparation_tools
 import asyncio
 import json
 import time
@@ -107,15 +108,15 @@ class CanonicalPublicReferences(unittest.TestCase):
         self.assertEqual(calls[-1]['publicReference'], ref)
         operation = TypeAdapter(PreparedOperation).validate_python({'kind': 'content-curation',
             'targetKind': 'post', 'targetId': post, 'topic': 'learning', 'reason': '本轮明确版本分类核对'})
-        prepare = FunctionCall(function=Function.from_callable(tools[-1]), call_id='canonical-prepare')
-        tools[-1](context, prepare, operation=operation)
+        content_prepare = preparation_tools(gateway, domains=['content'])[0]
+        prepare = FunctionCall(function=Function.from_callable(content_prepare), call_id='canonical-prepare')
+        content_prepare(context, prepare, operation=operation)
         self.assertEqual(calls[-1]['publicReference'], ref)
         self.assertNotIn('publicReference', calls[-1]['arguments'])
         self.assertNotIn('versionId', calls[-1]['arguments'], 'model does not supply the CAS or source restriction')
         changed_version = True
         changed = json.loads(tools[1](context, read, kind='post', id=post))
-        self.assertIsNone(changed['analysisConstraints']['requestedDays'])
-        self.assertEqual({key: value for key, value in changed.items() if key != 'analysisConstraints'}, {'state': 'changed', 'reason': 'agentos_public_reference_version_changed',
+        self.assertEqual(changed, {'state': 'changed', 'reason': 'agentos_public_reference_version_changed',
             'nextStep': 'select-current-version', 'effectState': 'not-confirmed'})
         self.assertNotIn('UNSAFE_', json.dumps(changed))
         changed_version = False
@@ -125,7 +126,7 @@ class CanonicalPublicReferences(unittest.TestCase):
         count = len(calls)
         ambiguous = RunContext(run_id=str(uuid4()), user_id=context.user_id, session_id=session,
             metadata={**metadata, 'userPublicReferences': both})
-        feedback = json.loads(tools[-1](ambiguous, prepare, operation=operation))
+        feedback = json.loads(content_prepare(ambiguous, prepare, operation=operation))
         self.assertEqual(feedback['reason'], 'agentos_public_reference_ambiguous')
         self.assertEqual(len(calls), count, 'different versions cannot be silently selected for a card')
         feedback = json.loads(tools[1](ambiguous, read, kind='post', id=post))
@@ -135,11 +136,11 @@ class CanonicalPublicReferences(unittest.TestCase):
         self.assertEqual(feedback['reason'], 'agentos_public_reference_ambiguous')
         self.assertEqual(len(calls), count)
         other = TypeAdapter(PreparedOperation).validate_python({**operation.model_dump(mode='json'), 'targetId': str(uuid4())})
-        self.assertEqual(json.loads(tools[-1](context, prepare, operation=other))['reason'], 'agentos_public_reference_mismatch')
+        self.assertEqual(json.loads(content_prepare(context, prepare, operation=other))['reason'], 'agentos_public_reference_mismatch')
         self.assertEqual(len(calls), count)
         incomplete = RunContext(run_id=str(uuid4()), user_id=context.user_id, session_id=session,
             metadata={**metadata, 'userPublicReferences': {**parsed, 'complete': False}})
-        self.assertEqual(json.loads(tools[-1](incomplete, prepare, operation=operation))['reason'], 'agentos_public_reference_ambiguous')
+        self.assertEqual(json.loads(content_prepare(incomplete, prepare, operation=operation))['reason'], 'agentos_public_reference_ambiguous')
         self.assertEqual(len(calls), count)
 
         reply_context = RunContext(run_id=str(uuid4()), user_id=context.user_id, session_id=session,

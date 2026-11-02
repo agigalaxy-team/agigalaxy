@@ -116,8 +116,28 @@ func (t *ConversationTools) readCardBatch(ctx context.Context, human operationsp
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
+	rows.Close()
+	qualified, err := s.CurrentRead(ctx, current.Row.ID, &human)
+	if err != nil {
+		return nil, err
+	}
+	for _, card := range out {
+		if qualified.SourceQualification.restricts(text(card, "turnId")) {
+			redactSourceCard(card)
+		}
+	}
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
 		out[i], out[j] = out[j], out[i]
 	}
 	return out, nil
+}
+
+func redactSourceCard(card Object) {
+	for _, key := range []string{"target", "title", "impact", "basis", "result", "review", "presentation", "choice", "taskProgress"} {
+		card[key] = nil
+	}
+	capability := object(card["capability"])
+	if capability != nil {
+		capability["canConfirm"], capability["reason"] = false, "source-unavailable"
+	}
 }

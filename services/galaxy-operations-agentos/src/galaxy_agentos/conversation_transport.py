@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
 from .gateway import AuthorityDenied, AuthorityUnavailable
+from .source_qualification import source_qualification
 
 
 def _validate_locator(fields):
@@ -106,6 +107,10 @@ def install_conversation_transport_read(app, runtime, run_view):
         current = runtime["gateway"].authorize(user_id, operation="read")
         if current.get("execution", {}).get("sessionId") != row["sessionId"]:
             raise AuthorityDenied()
+        qualification = source_qualification(current)
+        if operation_id in qualification["affectedTurns"] or qualification["legacyUnknown"] and operation_id not in (qualification.get("legacySafeTurns") or []):
+            native = result.get("native")
+            if isinstance(native, dict): native["content"], native["events"] = None, []
         return {**result, "readExpiresAt":current.get("readExpiresAt")}
 
     def read_original_core(ident, operation_id, row, user_id, locator):

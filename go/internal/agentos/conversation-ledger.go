@@ -172,6 +172,7 @@ func (s *Conversations) Operation(ctx context.Context, actor operationspermissio
 		}
 	}
 	result := copyObject(saved.Result)
+	delete(result, "sourceQualificationVersion")
 	state := saved.State
 	if native != nil && native["status"] != nil {
 		state = text(native, "status")
@@ -192,6 +193,14 @@ func (s *Conversations) Operation(ctx context.Context, actor operationspermissio
 	}
 	if after.Row == nil || after.Row.ID != current.Row.ID {
 		return nil, fail("operations_agentos_context_changed", 409)
+	}
+	qualified, err := s.CurrentRead(ctx, current.Row.ID, &actor)
+	if err != nil {
+		return nil, err
+	}
+	if qualified.SourceQualification.restricts(target.ID) && native != nil {
+		native["content"] = nil
+		native["events"] = []any{}
 	}
 	if native != nil {
 		result["sentAt"] = native["sentAt"]

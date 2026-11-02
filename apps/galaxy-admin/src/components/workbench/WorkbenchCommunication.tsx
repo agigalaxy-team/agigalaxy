@@ -21,7 +21,7 @@ import {WorkbenchTaskProgress} from './WorkbenchTaskProgress';
 import {WorkbenchActionCards} from './WorkbenchActionCards';
 import {WorkbenchMessageQueue} from './WorkbenchMessageQueue';
 import {authorizedCommandMatches} from "../../lib/workbench/authorized-preparation-model";
-import {workbenchActionCards,workbenchCardPath,type WorkbenchActionCard} from "../../lib/workbench/workbench-action-cards";
+import {workbenchActionCards,workbenchCardGroups,workbenchCardPath,type WorkbenchActionCard} from "../../lib/workbench/workbench-action-cards";
 import {useWorkbenchCommand,clearWorkbenchIntents} from "../../lib/workbench/use-workbench-command";
 import {useWorkbenchMessageQueue} from '../../lib/workbench/use-workbench-message-queue';
 import {useWorkbenchCardFeedback} from '../../lib/workbench/use-workbench-card-feedback';
@@ -326,8 +326,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const pendingCardVisible=canUseDomain&&data.cards.available&&actionCards.some(card=>card.cardId===command.pending?.body.cardId&&(card.stored||card.readExpiresAt>cardNow));
   const onComposerKeyDown=(event:KeyboardEvent<HTMLTextAreaElement>)=>{if(event.key!=='Enter'||event.shiftKey||event.ctrlKey||event.altKey||event.metaKey||composing.current||event.nativeEvent.isComposing||event.keyCode===229)return;event.preventDefault();if(!event.repeat&&primaryReady)activatePrimary();};
   const showCards=(cards:WorkbenchActionCard[],label:string,readOnly=false)=>{
-    const groups:WorkbenchActionCard[][]=[],seen=new Set<string>();
-    for(const card of cards){if(seen.has(card.cardId))continue;const choice=card.choice,peers=choice?.count===3&&choice.exclusive?cards.filter(other=>other.choice?.groupId===choice.groupId&&other.choice.count===3&&other.choice.exclusive):[];const grouped=peers.length===3&&new Set(peers.map(item=>item.choice!.index)).size===3?peers.sort((a,b)=>a.choice!.index-b.choice!.index):[card];grouped.forEach(item=>seen.add(item.cardId));groups.push(grouped);}
+    const groups=workbenchCardGroups(cards);
     return groups.map(group=><WorkbenchActionCards key={group[0].cardId} readOnly={readOnly} cards={group} label={label} now={cardNow} available={canUseDomain&&!data.denied&&(data.cards.available||data.pageCardsVerified)} verified={canUseDomain&&!data.denied&&(data.cards.verified||data.pageCardsVerified)} busy={workLocked||data.pageCardsLoading||!!data.pageCardError||queueCommand.locked&&queueCommand.pending?.domain===domain} pendingCardId={typeof dismissCommand.pending?.body.cardId==='string'?dismissCommand.pending.body.cardId:typeof command.pending?.body.cardId==='string'?command.pending.body.cardId:null} pendingDismissCardId={group.find(card=>card.capability.canDismiss&&canDismissPending(card))?.cardId??null} dismissBusy={dismissCommand.locked} onConfirm={confirmCard} onDismiss={dismissCard}/>);
   };
   const latestRun=currentConversation?.runs.at(-1);

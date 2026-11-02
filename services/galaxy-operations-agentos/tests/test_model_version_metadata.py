@@ -215,6 +215,29 @@ class ModelVersionMetadataTests(unittest.TestCase):
         self.assertEqual(self.run.metadata, before)
         self.assertEqual(cas.row(), row)
 
+    def test_usage_storage_exception_allows_provider_but_keeps_count_unknown(self):
+        class Unavailable:
+            def update_run_in_session(self, **kwargs):
+                raise OSError("local statistics storage unavailable")
+        model = self.model(db=Unavailable())
+        self.invoke(model, asynchronous=True)
+        self.assertEqual(model.calls, 1)
+        self.assertIsNone(self.run.metadata["modelCalls"])
+        self.invoke(model)
+        self.assertEqual(model.calls, 2)
+        self.assertIsNone(self.run.metadata["modelCalls"])
+
+    def test_terminal_refusal_still_blocks_provider(self):
+        class Refused:
+            def update_run_in_session(self, **kwargs):
+                return RunPersistOutcome.TERMINAL_REFUSED
+        model = self.model(db=Refused())
+        before = deepcopy(self.run.metadata)
+        with self.assertRaises(AuthorityDenied):
+            self.invoke(model)
+        self.assertEqual(model.calls, 0)
+        self.assertEqual(self.run.metadata, before)
+
     def test_provider_failure_retains_the_attempted_version_already_recorded_by_cas(self):
         cas = self.cas()
         model = self.model("models-local-failed-attempt", cas.db, failure=True)

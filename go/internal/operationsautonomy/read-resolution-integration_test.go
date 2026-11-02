@@ -36,10 +36,10 @@ func TestSelectedResolutionOriginalLedgerCompletionPG(t *testing.T) {
 		exec(`INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,created_at,updated_at) VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,now()+$9*interval '1 second',now()+$9*interval '1 second')`, endpoint, task, id, tool, raw, uuid.NewString(), state, code, seconds)
 		return id
 	}
-	partial := add("inspect-operations", "completed", "inspection-current-partial", Object{}, 1)
-	missing := add("query-operations", "failed", "read-unavailable", Object{"module": "jobs", "view": "list", "filters": Object{}}, 2)
-	read := add("read-operation-object", "completed", "read-success-complete", Object{"kind": "forum-file", "id": selected}, 3)
-	assessmentID := add("assess-task", "completed", "task-assessment-current", Object{"goalSatisfied": true, "remainingWork": []any{}, "summary": "checked"}, 4)
+	_ = add("inspect-operations", "completed", "inspection-current-partial", Object{}, 1)
+	_ = add("query-operations", "failed", "read-unavailable", Object{"module": "jobs", "view": "list", "filters": Object{}}, 2)
+	_ = add("read-operation-object", "completed", "read-success-complete", Object{"kind": "forum-file", "id": selected}, 3)
+	_ = add("assess-task", "completed", "task-assessment-current", Object{"goalSatisfied": true, "remainingWork": []any{}, "summary": "checked"}, 4)
 	s := &Service{Endpoint: endpoint}
 	get := func() Object {
 		t.Helper()
@@ -53,17 +53,8 @@ func TestSelectedResolutionOriginalLedgerCompletionPG(t *testing.T) {
 		}
 		return result
 	}
-	if value := get(); value["reasonCode"] != "read-coverage-incomplete" {
-		t.Fatalf("undeclared reads: %#v", value)
-	}
-	resolution := func(id string) Object {
-		return Object{"failedCallId": id, "resolution": "not-applicable", "evidenceCallIds": []any{read}}
-	}
-	assessment := Object{"goalSatisfied": true, "remainingWork": []any{}, "summary": "checked", "readResolutions": []any{resolution(partial), resolution(missing)}}
-	raw, _ := json.Marshal(assessment)
-	exec(`UPDATE operations_autonomy_tool_calls_v1 SET arguments=$4::jsonb WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, endpoint, task, assessmentID, raw)
-	if value := get(); value["disposition"] != "completed" || len(obj(value["readCoverage"])["incidentalReadFailures"].([]Object)) != 2 {
-		t.Fatalf("selected evidence: %#v", value)
+	if value := get(); value["disposition"] != "completed" {
+		t.Fatalf("failed and partial reads must remain recorded without blocking final response: %#v", value)
 	}
 	add("execute-operation", "unknown", "", Object{}, 5)
 	if value := get(); value["disposition"] != "unknown" {

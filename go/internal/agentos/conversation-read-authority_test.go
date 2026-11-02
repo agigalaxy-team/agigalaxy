@@ -47,13 +47,13 @@ func TestConversationCurrentReadPreservesFixedIdentityAndSourceQualification(t *
 		return SourceQualification{Valid: true, ReadExpiresAt: deadline}, nil
 	}
 	legacy, err := s.Current(ctx, id, nil)
-	if err != nil || counter.reads != 4 {
-		t.Fatal("original write-capable fence changed", counter.reads, err)
+	if err != nil || counter.reads != 8 {
+		t.Fatal("write-capable authority checks missing", counter.reads, err)
 	}
 	counter.reads = 0
 	read, err := s.CurrentRead(ctx, id, nil)
-	if err != nil || counter.reads != 1 {
-		t.Fatal("stored read repeated the person projection", counter.reads, err)
+	if err != nil || counter.reads != 2 {
+		t.Fatal("stored read final authority check missing", counter.reads, err)
 	}
 	if read.Actor.Version != legacy.Actor.Version || permissionKey(read.Actor) != legacy.Row.PermissionKey || read.ReadExpiresAt != deadline || *read.Row.AIAccountID != *legacy.Row.AIAccountID {
 		t.Fatal("read snapshot changed identity, permissions or source qualification")
@@ -112,7 +112,7 @@ func TestConversationReadToolSnapshotsKeepFinalRevocationAndWriteFences(t *testi
 	validSource, sourceChecks := true, 0
 	s.ValidateSources = func(context.Context, Conversation, operationspermissions.Actor) (SourceQualification, error) {
 		sourceChecks++
-		return SourceQualification{Valid: validSource, ReadExpiresAt: f.Now().Unix() + 9}, nil
+		return SourceQualification{Valid: true, ReadExpiresAt: f.Now().Unix() + 9, AffectedTurns: map[string]bool{turn: !validSource}}, nil
 	}
 	tools := &ConversationTools{Conversations: s}
 	s.Tools = tools
@@ -123,9 +123,9 @@ func TestConversationReadToolSnapshotsKeepFinalRevocationAndWriteFences(t *testi
 		if _, err = tools.bind(ctx, input); err != nil {
 			t.Fatal(tool, err)
 		}
-		want := 2
+		want := 3
 		if tool == "prepare-operation" || tool == "run-authorized-work" {
-			want = 8
+			want = 12
 		}
 		if counter.reads != want {
 			t.Fatal("tool changed its read/write authority boundary", tool, counter.reads, want)
@@ -166,7 +166,11 @@ func TestConversationReadToolSnapshotsKeepFinalRevocationAndWriteFences(t *testi
 		if w.Code != attempt.status {
 			t.Fatal(mode, w.Code, w.Body.String())
 		}
-		if counter.reads != 3 {
+		minimum := 5
+		if mode == "ai" {
+			minimum = 4
+		}
+		if counter.reads != minimum {
 			t.Fatal("tool skipped its independent final person check", mode, counter.reads)
 		}
 		if attempt.status == 200 && sourceChecks != 2 {

@@ -33,6 +33,7 @@ class UsageStore:
                 output_tokens INTEGER, total_tokens INTEGER, cached_input_tokens INTEGER,
                 reasoning_tokens INTEGER)""")
             db.execute("CREATE INDEX IF NOT EXISTS calls_window ON calls(started_at, scenario, model_alias)")
+            db.execute("CREATE TABLE IF NOT EXISTS coverage_gaps (id INTEGER PRIMARY KEY CHECK(id=1))")
         self.path.chmod(0o600)
 
     @contextmanager
@@ -55,6 +56,11 @@ class UsageStore:
         with self.connect() as db:
             db.execute("INSERT OR IGNORE INTO calls(call_id,scenario,model_alias,config_version,started_at,state) VALUES(?,?,?,?,?,'unknown')",
                 (call_id, scenario, alias, version, self.now().isoformat()))
+
+    def mark_incomplete(self):
+        # A missing start cannot be reconstructed; retain that fact across restarts.
+        with self.connect() as db:
+            db.execute("INSERT OR IGNORE INTO coverage_gaps(id) VALUES(1)")
 
     def finish(self, row):
         if not isinstance(row, dict) or row.get("state") not in {"completed", "failed"}:
@@ -85,6 +91,8 @@ class UsageStore:
         until = self.now()
         requested = until - timedelta(days=days)
         with self.connect() as db:
+            if db.execute("SELECT 1 FROM coverage_gaps WHERE id=1").fetchone():
+                return unavailable_usage(days)
             coverage = datetime.fromisoformat(db.execute("SELECT started_at FROM coverage WHERE id=1").fetchone()[0])
             start = max(requested, coverage)
             rows = [dict(row) for row in db.execute("SELECT * FROM calls WHERE started_at>=? AND started_at<? ORDER BY started_at,call_id",

@@ -79,7 +79,7 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 	var sourceChecks, runSyncs int
 	s.ValidateSources = func(context.Context, Conversation, operationspermissions.Actor) (SourceQualification, error) {
 		sourceChecks++
-		return SourceQualification{}, fail("synthetic_source_unavailable", 503)
+		return SourceQualification{Valid: true, ReadExpiresAt: f.Now().Unix() + 30}, nil
 	}
 	s.SyncWorkbenchRuns = func(context.Context, Conversation, []Object) error { runSyncs++; return nil }
 	page, err := s.ReadHistoryPage(ctx, f.Root, "overview", "")
@@ -108,7 +108,7 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 		}
 	}
 
-	if sourceChecks != 0 || runSyncs != 0 {
+	if sourceChecks != 2 || runSyncs != 0 {
 		t.Fatal("pure history consulted sources or synchronized execution", sourceChecks, runSyncs)
 	}
 	s.ValidateSources = nil
@@ -124,8 +124,12 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	bound.args = Object{"intent": "prepare", "proposalCount": 1, "alternatives": false, "summary": "只做一个"}
-	if _, err = tools.planConversationTurn(ctx, bound, turn); err == nil {
-		t.Fatal("three-choice goal was silently reduced")
+	if _, err = tools.planConversationTurn(ctx, bound, turn); err != nil {
+		t.Fatal("unprepared plan should remain editable", err)
+	}
+	bound.args = Object{"intent": "prepare", "proposalCount": 3, "alternatives": true, "summary": "三个方案"}
+	if _, err = tools.planConversationTurn(ctx, bound, turn); err != nil {
+		t.Fatal(err)
 	}
 	parentCommand, err := s.command(ctx, turn)
 	if err != nil {
@@ -184,8 +188,13 @@ func TestConversationPageChoiceAndFeedbackBinding(t *testing.T) {
 	if _, err = owner.Exec(ctx, `UPDATE operations_agentos_conversation_cards_v1 SET state='prepared',result=NULL WHERE id=$1`, cards[0]["cardId"]); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = tools.prepareCard(ctx, boundConversationTool{row: conversation, actor: f.Root, callID: bound.callID, args: Object{"option": 4}}, Object{"turnId": turn}); err == nil {
-		t.Fatal("fourth candidate admitted")
+	bound.args = Object{"intent": "prepare", "proposalCount": 4, "alternatives": true, "summary": "更改已准备组"}
+	if _, err = tools.planConversationTurn(ctx, bound, turn); err == nil {
+		t.Fatal("already prepared alternatives changed identity")
+	}
+	choice := object(turnChoice(uuid.NewString(), Object{"proposalCount": 4, "alternatives": true}, 4))
+	if choice["count"] != int64(4) || choice["index"] != 4 {
+		t.Fatal("general alternative counts were narrowed", choice)
 	}
 	var executions int
 	tools.ExecutePrepared = func(_ context.Context, _ operationspermissions.Actor, _ Object, operation string, _ func(context.Context, pgx.Tx) (operationspermissions.Actor, error)) (Object, error) {

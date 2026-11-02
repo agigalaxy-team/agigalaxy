@@ -52,7 +52,7 @@ func TestConversationHistoryPureTextBatchAndIsolation(t *testing.T) {
 	var mode atomic.Int32
 	s.ValidateSources = func(context.Context, Conversation, operationspermissions.Actor) (SourceQualification, error) {
 		sourceChecks.Add(1)
-		return SourceQualification{}, fail("synthetic_source_unavailable", 503)
+		return SourceQualification{Valid: true, ReadExpiresAt: f.Now().Unix() + 30, AffectedTurns: map[string]bool{root: true}}, nil
 	}
 	s.SyncWorkbenchRuns = func(context.Context, Conversation, []Object) error { runSyncs.Add(1); return nil }
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -108,10 +108,13 @@ func TestConversationHistoryPureTextBatchAndIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	runs := page["runs"].([]Object)
-	if len(runs) != 51 || calls.Load() != 2 || sourceChecks.Load() != 0 || runSyncs.Load() != 0 {
+	if len(runs) != 51 || calls.Load() != 2 || sourceChecks.Load() != 1 || runSyncs.Load() != 0 {
 		t.Fatal("unexpected history side effect or truncated text", len(runs), calls.Load(), sourceChecks.Load(), runSyncs.Load())
 	}
 	for _, run := range runs {
+		if run["operationId"] == root && (run["content"] != nil || run["userInput"] != "原用户输入") {
+			t.Fatal("affected answer must be hidden but user input preserved", run)
+		}
 		if run["displayOnly"] != true || run["status"] != nil || run["taskProgress"] != nil {
 			t.Fatal("internal execution fields leaked", run)
 		}
@@ -120,7 +123,7 @@ func TestConversationHistoryPureTextBatchAndIsolation(t *testing.T) {
 		}
 	}
 	operation, err := s.Operation(ctx, f.Root, "overview", root)
-	if err != nil || operation["state"] != "COMPLETED" || calls.Load() != 3 || sourceChecks.Load() != 0 {
+	if err != nil || operation["state"] != "COMPLETED" || calls.Load() != 3 || sourceChecks.Load() != 2 {
 		t.Fatal("original operation consulted sources or failed", operation, calls.Load(), sourceChecks.Load(), err)
 	}
 	foreign := f.Root

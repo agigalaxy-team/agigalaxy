@@ -69,9 +69,11 @@ class NativeReliability(unittest.TestCase):
             authorization=RunAuthorization(provider=GalaxyAuthorization(gateway),context=AuthorizationContext(principal_id='conversation:'+conversation),enforce_tools=False)
             with authorization_scope(lambda:authorization):
                 run=agent.run('核对当前摘要和最近30天搜索概况。',user_id='conversation:'+conversation,session_id=session,metadata={'operationId':str(uuid4())})
-            self.assertEqual([item[0] for item in calls],['summary','query-operations','assess-conversation-task'])
+            self.assertEqual([item[0] for item in calls],['summary','query-operations','assess-conversation-task','assess-conversation-task'])
             self.assertEqual(calls[1][1],{'module':'search','view':'overview','filters':{'days':30}})
             self.assertEqual(calls[2][1],{'disposition':'completed','reason':'只读查询完成','remaining':[]})
+            self.assertEqual(calls[3][1]['disposition'], 'completed')
+            self.assertTrue(calls[3][2]['call_id'].startswith('runtime:task-final:'))
             self.assertTrue(any('invalid-request' in str(message.content) for message in model.observed))
             self.assertTrue(all('__thought__' in message.tool_call_id for message in model.observed))
             stored=db.get_run(run_id=run.run_id,deserialize=False)['run_data']

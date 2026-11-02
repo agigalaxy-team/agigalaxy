@@ -170,6 +170,16 @@ func TestRealDutyDelegatedAIOnlyRoleAndPromptOriginalInterop(t *testing.T) {
 	if e = pool.QueryRow(ctx, `SELECT count(*) FROM operations_autonomy_receipts_v1 WHERE endpoint=$1 AND task_id=$2 AND operation_id=$3`, endpoint, taskID, result["operationId"]).Scan(&receiptCount); e != nil || receiptCount != 1 {
 		t.Fatalf("original receipt count %d %v", receiptCount, e)
 	}
+	// Excluding the current verified call must not admit a different write
+	// while another original operation remains genuinely unresolved.
+	if _, e = pool.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,created_at,updated_at) VALUES($1,$2,$3,'manage-ai-role','{}',$4,'unknown',now(),now())`, endpoint, taskID, uuid.NewString(), uuid.NewString()); e != nil {
+		t.Fatal(e)
+	}
+	blockedInput := a.Object{"taskId": taskID, "callId": uuid.NewString(), "tool": "manage-ai-role", "arguments": toolRole}
+	status, blocked := post("tools/execute", blockedInput, true)
+	if status != 200 || blocked["state"] != "not-admitted" || blocked["code"] != "operations_autonomy_original_operation_unknown" {
+		t.Fatalf("unresolved different operation did not block new write: %d %s", status, encode(blocked))
+	}
 	var judgment *string
 	if e = pool.QueryRow(ctx, `SELECT actor_context->>'judgmentKind' FROM business_admin_audit_v1 WHERE endpoint=$1 AND operation_id=$2`, endpoint, result["operationId"]).Scan(&judgment); e != nil || judgment != nil {
 		t.Fatalf("unbound native run invented judgment %v %v", judgment, e)

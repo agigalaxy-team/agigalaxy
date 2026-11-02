@@ -1,4 +1,4 @@
-"""Turn planning and bounded self-assessment; neither grants business authority."""
+"""Turn planning and optional task progress; neither grants business authority."""
 import json
 from typing import Literal, Annotated
 from pydantic import Field
@@ -9,17 +9,13 @@ from .conversation_turn_state import turn_state, PLAN, ASSESSMENT, ACTIVITY, TAS
 
 def plan_turn_tool(send):
     def plan_turn(run_context: RunContext, fc: FunctionCall,
-            intent: Literal["answer", "prepare"], proposal_count: Literal[1, 3],
+            intent: Literal["answer", "prepare"], proposal_count: Annotated[int, Field(ge=1)],
             alternatives: bool, summary: Annotated[str, Field(max_length=240)]) -> str:
-        """Declare the current user request before preparing; three is for alternatives only, not authority.
+        """Optionally group mutually exclusive alternatives before preparing cards.
 
-        For a choice such as option 2, continue the selected prior proposal without asking again.
-        Three proposals means distinct alternatives, each needing separate human confirmation.
-        The preparation tool schema becomes available after an accepted prepare plan.
-        An answer plan covers reads and analysis; it need not be repeated for each read.
+        Ordinary reads and a single operation do not require a plan. The count
+        describes the requested alternatives, not a limit on the agent's work.
         """
-        if proposal_count == 3 and (intent != "prepare" or not alternatives):
-            return json.dumps({"state":"invalid-request", "reason":"three_requires_alternatives", "effectExecuted":False})
         result = send(run_context, fc, "plan-conversation-turn", {"intent":intent, "proposalCount":proposal_count,
             "alternatives":alternatives, "summary":summary})
         try:

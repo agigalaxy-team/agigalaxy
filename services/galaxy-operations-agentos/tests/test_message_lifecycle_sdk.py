@@ -1,7 +1,7 @@
 import unittest
 
 from agno.tools.function import Function
-from galaxy_agentos.conversation_tools import conversation_tools
+from galaxy_agentos.conversation_tools import conversation_tools, preparation_tools
 
 
 def branch(value, kind):
@@ -22,7 +22,7 @@ def branch(value, kind):
 
 class MessageLifecycleSDKTest(unittest.TestCase):
     def test_real_prepare_schema_distinguishes_draft_save_and_delivery(self):
-        prepare = next(tool for tool in conversation_tools(object()) if tool.__name__ == "prepare_operation")
+        prepare = preparation_tools(object(), domains=["messaging"])[0]
         native = Function.from_callable(prepare)
         native.process_entrypoint()
         save = branch(native.parameters, "message-draft-save")
@@ -40,7 +40,7 @@ class MessageLifecycleSDKTest(unittest.TestCase):
 
 
     def test_real_prepare_schema_separates_notice_from_plan(self):
-        prepare = next(tool for tool in conversation_tools(object()) if tool.__name__ == "prepare_operation")
+        prepare = preparation_tools(object(), domains=["messaging"])[0]
         native = Function.from_callable(prepare)
         native.process_entrypoint()
         expected = {

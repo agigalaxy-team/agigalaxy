@@ -52,7 +52,7 @@ func (t *ConversationTools) planConversationTurn(ctx context.Context, bound boun
 	n, ok := index(a["proposalCount"])
 	intent, summary := text(a, "intent"), text(a, "summary")
 	alternatives, typed := a["alternatives"].(bool)
-	if len(a) != 4 || !ok || (n != 1 && n != 3) || !typed || (intent != "answer" && intent != "prepare") || utf8.RuneCountInString(summary) > 240 || (n == 3 && (!alternatives || intent != "prepare")) || (n == 1 && alternatives) {
+	if len(a) != 4 || !ok || n < 1 || !typed || (intent != "answer" && intent != "prepare") || utf8.RuneCountInString(summary) > 240 || (alternatives && (n < 2 || intent != "prepare")) || (intent == "answer" && alternatives) {
 		return nil, fail("invalid_operations_agentos_request", 400)
 	}
 	s := t.Conversations
@@ -65,10 +65,6 @@ func (t *ConversationTools) planConversationTurn(ctx context.Context, bound boun
 			return nil, err
 		}
 		ids, _ := plan["preparedCardIds"].([]any)
-		oldCount, _ := index(plan["proposalCount"])
-		if oldCount == 3 && n != 3 {
-			return nil, fail("operations_agentos_turn_plan_conflict", 409)
-		}
 
 		if len(ids) > 0 && (plan["proposalCount"] != a["proposalCount"] || plan["alternatives"] != alternatives || plan["intent"] != intent) {
 			// JSON numbers can arrive as either Go integers or decoded floats.
@@ -85,14 +81,14 @@ func (t *ConversationTools) planConversationTurn(ctx context.Context, bound boun
 
 func turnChoice(turn string, plan Object, number int) any {
 	n, _ := index(plan["proposalCount"])
-	if n != 3 || plan["alternatives"] != true {
+	if n < 2 || int64(number) > n || plan["alternatives"] != true {
 		return nil
 	}
 	parent, err := uuid.Parse(turn)
 	if err != nil {
 		return nil
 	}
-	return Object{"groupId": uuid.NewSHA1(parent, []byte("conversation-alternatives")).String(), "index": number, "count": 3, "exclusive": true}
+	return Object{"groupId": uuid.NewSHA1(parent, []byte("conversation-alternatives")).String(), "index": number, "count": n, "exclusive": true}
 }
 
 // A safe retry retains the original requested preparation goal, not a reduced
@@ -103,7 +99,7 @@ func (s *Conversations) inheritedTurnPlan(ctx context.Context, parent *conversat
  SELECT id,result,ARRAY[id] AS path,0 AS depth FROM operations_agentos_conversation_commands_v1 WHERE endpoint=$1 AND id=$2 AND conversation_id=$3 AND operator_id=$4
  UNION ALL SELECT c.id,c.result,l.path||c.id,l.depth+1 FROM operations_agentos_conversation_commands_v1 c JOIN lineage l ON c.id::text=l.result->>'retryOfOperationId'
  WHERE c.endpoint=$1 AND c.conversation_id=$3 AND c.operator_id=$4 AND NOT c.id=ANY(l.path) AND l.depth<64)
- SELECT result->'turnPlan' FROM lineage WHERE result->'turnPlan'->>'intent'='prepare' ORDER BY CASE WHEN result->'turnPlan'->>'proposalCount'='3' THEN 0 ELSE 1 END,depth LIMIT 1`, s.Endpoint, parent.ID, parent.ConversationID, parent.OperatorID).Scan(&plan)
+ SELECT result->'turnPlan' FROM lineage WHERE result->'turnPlan'->>'intent'='prepare' ORDER BY depth LIMIT 1`, s.Endpoint, parent.ID, parent.ConversationID, parent.OperatorID).Scan(&plan)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -111,8 +107,8 @@ func (s *Conversations) inheritedTurnPlan(ctx context.Context, parent *conversat
 		return nil, err
 	}
 	count, ok := index(plan["proposalCount"])
-	if !ok || count != 1 && count != 3 || count == 3 && plan["alternatives"] != true {
+	if !ok || count < 1 {
 		return nil, nil
 	}
-	return Object{"intent": "prepare", "proposalCount": count, "alternatives": count == 3, "summary": text(plan, "summary"), "preparedCardIds": []any{}}, nil
+	return Object{"intent": "prepare", "proposalCount": count, "alternatives": plan["alternatives"] == true, "summary": text(plan, "summary"), "preparedCardIds": []any{}}, nil
 }

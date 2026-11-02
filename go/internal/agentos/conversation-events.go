@@ -33,6 +33,9 @@ func (s *Conversations) Events(ctx context.Context, operator operationspermissio
 		return err
 	}
 	row := *current.Row
+	if current.SourceQualification.restricts(id) {
+		return fail("operations_agentos_source_changed", 409)
+	}
 	status := s.Client.Status(ctx)
 	transport := object(status["conversationTransport"])
 	if status["state"] != "connected" || transport["events"] != true || transport["originalRunLookup"] != true {
@@ -47,8 +50,12 @@ func (s *Conversations) Events(ctx context.Context, operator operationspermissio
 	if err != nil {
 		return err
 	}
-	if _, err = s.Current(ctx, row.ID, &admitted); err != nil {
+	current, err = s.Current(ctx, row.ID, &admitted)
+	if err != nil {
 		return err
+	}
+	if current.SourceQualification.restricts(id) {
+		return fail("operations_agentos_source_changed", 409)
 	}
 	runID := text(run, "runId")
 	if err = yield(Object{"kind": "lease", "operationId": id, "readExpiresAt": expires, "stopAvailable": runID != "" && (run["status"] == "PENDING" || run["status"] == "RUNNING")}); err != nil {
@@ -78,8 +85,12 @@ func (s *Conversations) Events(ctx context.Context, operator operationspermissio
 		if err != nil {
 			return err
 		}
-		if _, err = s.Current(ctx, row.ID, &actor); err != nil {
+		current, err := s.Current(ctx, row.ID, &actor)
+		if err != nil {
 			return err
+		}
+		if current.SourceQualification.restricts(id) {
+			return fail("operations_agentos_source_changed", 409)
 		}
 		if s.now().Unix() >= expires {
 			if err := yield(Object{"kind": "resync", "operationId": id, "eventIndex": event["eventIndex"]}); err != nil {

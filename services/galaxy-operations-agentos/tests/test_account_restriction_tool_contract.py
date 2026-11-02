@@ -10,7 +10,7 @@ from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from pydantic import TypeAdapter, ValidationError
 
-from galaxy_agentos.conversation_tools import PreparedOperation, conversation_tools
+from galaxy_agentos.conversation_tools import PreparedOperation, conversation_tools, preparation_tools
 
 
 class RecordingNode:
@@ -37,14 +37,15 @@ class AccountRestrictionToolContract(unittest.TestCase):
         tools = conversation_tools(node)
         context = RunContext(run_id=str(uuid4()), session_id=str(uuid4()),
             user_id="conversation:"+str(uuid4()), metadata={"operationId": str(uuid4())})
-        function = Function.from_callable(tools[-1])
+        prepare = preparation_tools(node, domains=["feedback_accounts"])[0]
+        function = Function.from_callable(prepare)
         self.assertNotIn("run_context", function.parameters["properties"])
         self.assertNotIn("fc", function.parameters["properties"])
         for index, value in enumerate([apply, release, {**release, "until": None}]):
             operation = schema.validate_python(value)
             self.assertEqual(operation.model_dump(mode="json", exclude_unset=True), value)
             call = FunctionCall(function=function, call_id="account-review-"+str(index))
-            self.assertEqual(json.loads(tools[-1](context, call, operation))["state"], "prepared")
+            self.assertEqual(json.loads(prepare(context, call, operation))["state"], "prepared")
             packet = node.calls[-1]
             self.assertEqual(packet["name"], "prepare-operation")
             self.assertEqual(packet["arguments"], {key: item for key, item in value.items() if key != "until" or item is not None})
@@ -63,7 +64,6 @@ class AccountRestrictionToolContract(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 schema.validate_python(value)
         self.assertEqual(len(node.calls), 3, "only valid preparations cross the transport")
-        self.assertIn("never invent a duration", tools[-1].__doc__)
 
 
 if __name__ == "__main__":

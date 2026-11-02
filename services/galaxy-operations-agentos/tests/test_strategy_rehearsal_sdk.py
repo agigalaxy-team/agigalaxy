@@ -1,7 +1,7 @@
 import unittest
 
 from agno.tools.function import Function
-from galaxy_agentos.conversation_tools import conversation_tools
+from galaxy_agentos.conversation_tools import conversation_tools, preparation_tools
 
 
 def find_branch(value):
@@ -22,7 +22,7 @@ def find_branch(value):
 
 class StrategyRehearsalSDKTest(unittest.TestCase):
     def test_native_schema_describes_real_sample_identity_and_empty_scope(self):
-        prepare = next(tool for tool in conversation_tools(object()) if tool.__name__ == "prepare_operation")
+        prepare = preparation_tools(object(), domains=["strategy"])[0]
         native = Function.from_callable(prepare)
         native.process_entrypoint()
         rehearsal = find_branch(native.parameters)

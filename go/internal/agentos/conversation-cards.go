@@ -235,18 +235,11 @@ func (t *ConversationTools) prepareCard(ctx context.Context, bound boundConversa
 				return false, e
 			}
 			ids, _ := plan["preparedCardIds"].([]any)
-			limit, _ := index(plan["proposalCount"])
-			if limit < 1 {
-				limit = 1
-			}
-			if int64(len(ids)) >= limit {
-				return false, fail("operations_agentos_proposal_limit", 409)
-			}
 			var attempted bool
 			if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations_agentos_conversation_cards_v1 WHERE endpoint=$1 AND turn_id=$2 AND result ? 'confirmationAttemptedAt')`, s.Endpoint, turn).Scan(&attempted); e != nil {
 				return false, e
 			}
-			if attempted {
+			if count, _ := index(plan["proposalCount"]); attempted && plan["alternatives"] == true && int64(len(ids)) < count {
 				return false, fail("operations_agentos_alternative_already_selected", 409)
 			}
 			proposal["choice"] = turnChoice(turn, plan, len(ids)+1)
@@ -415,9 +408,20 @@ func (t *ConversationTools) Card(ctx context.Context, human operationspermission
 	if err != nil {
 		return nil, err
 	}
-	return t.readCard(ctx, human, row, func(ctx context.Context, row *conversationCard) (operationspermissions.Actor, error) {
+	value, err := t.readCard(ctx, human, row, func(ctx context.Context, row *conversationCard) (operationspermissions.Actor, error) {
 		return t.cardActor(ctx, human, row)
 	}, true)
+	if err != nil {
+		return nil, err
+	}
+	qualified, err := t.Conversations.CurrentRead(ctx, row.ConversationID, &human)
+	if err != nil {
+		return nil, err
+	}
+	if qualified.SourceQualification.restricts(row.TurnID) {
+		redactSourceCard(value)
+	}
+	return value, nil
 }
 
 func (t *ConversationTools) readCard(ctx context.Context, human operationspermissions.Actor, row *conversationCard, reader cardActorReader, syncProjection bool) (Object, error) {

@@ -101,6 +101,9 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 	if current.Row.SessionID != sessionID {
 		return out, fail("operations_agentos_scope_denied", 403)
 	}
+	if current.SourceQualification.restricts(turnID) {
+		return out, fail("operations_agentos_source_changed", 409)
+	}
 	digest, err := conversationArgumentsDigest(args, reference)
 	if err != nil {
 		return out, fail("invalid_operations_agentos_request", 400)
@@ -206,14 +209,18 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 		err = checkConversationPublicReference(bound.publicReference, bound.args, object(result["data"]))
 	}
 	if err == nil && (bound.tool == "query-operations" || bound.tool == "read-operation-object" || bound.tool == "read-ai-delegation" || bound.tool == "read-task-operation") {
-		err = t.rememberSources(ctx, bound.row, result["evidenceRefs"])
+		err = t.rememberSources(ctx, bound.row, text(input, "turnId"), result["evidenceRefs"])
 	}
 	if err == nil {
 		currentRead := s.Current
 		if conversationReadTool(bound.tool) {
 			currentRead = s.CurrentRead
 		}
-		_, err = currentRead(ctx, bound.row.ID, nil)
+		var fresh CurrentConversation
+		fresh, err = currentRead(ctx, bound.row.ID, nil)
+		if err == nil && fresh.SourceQualification.restricts(text(input, "turnId")) {
+			err = fail("operations_agentos_source_changed", 409)
+		}
 	}
 	metadata := Object{"tool": bound.tool}
 	if bound.tool == "assess-conversation-task" && err == nil {

@@ -46,6 +46,19 @@ func (s *Conversations) ReadHistory(ctx context.Context, human operationspermiss
 	if err != nil {
 		return nil, err
 	}
+	if current.Row != nil {
+		qualified, err := s.CurrentRead(ctx, current.Row.ID, &human)
+		if err != nil {
+			return nil, err
+		}
+		for _, run := range runs {
+			if qualified.SourceQualification.restricts(text(run, "operationId")) {
+				run["content"] = nil
+				run["events"] = []any{}
+			}
+		}
+		current.ReadExpiresAt = qualified.ReadExpiresAt
+	}
 	deadline := current.ReadExpiresAt
 	if expiry, ok := index(native["readExpiresAt"]); ok && expiry < deadline {
 		deadline = expiry

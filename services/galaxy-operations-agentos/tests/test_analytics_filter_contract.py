@@ -41,7 +41,7 @@ class AnalyticsFilterContract(unittest.TestCase):
             self.assertEqual(result["state"], "invalid-request")
             self.assertFalse(result.get("calendarDateSupported", False))
             self.assertFalse(result["effectExecuted"])
-            self.assertTrue("allowedFilters" in result or result.get("windowRequired") is True)
+            self.assertIn(result["reason"], {"agentos_tool_arguments_invalid", "agentos_query_window_invalid"})
         for kind, filters in [("account-summary", {"day": "2026-10-23"}),
                 ("account-summary", {"days": 1}), ("account", {"days": 7})]:
             result = json.loads(read(context, rcall, kind, account, QueryFilters(**filters)))
@@ -62,8 +62,9 @@ class AnalyticsFilterContract(unittest.TestCase):
         # shared field from every fixed module to hide the analytics mismatch.
         query(context, qcall, "audit", "list", QueryFilters(day="2026-10-23"))
         self.assertEqual(node.calls[-1][2]["filters"], {"day": "2026-10-23"})
-        self.assertIn("not silently substitute", query.__doc__)
-        self.assertIn("lifetime metrics", read.__doc__)
+        # Omission is forwarded and the business service owns the default.
+        query(context, qcall, "analytics", "overview", None)
+        self.assertEqual(node.calls[-1][2]["filters"], {})
 
 
 if __name__ == "__main__":

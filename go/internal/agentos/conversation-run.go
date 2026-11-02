@@ -231,6 +231,8 @@ func (s *Conversations) runWithContext(ctx context.Context, operator operationsp
 		if err := s.requireConversationAvailableWithin(ctx, tx, row, turn.ID); err != nil {
 			return false, err
 		}
+		receipt = copyObject(receipt)
+		receipt["sourceQualificationVersion"] = 1
 		if _, err = tx.Exec(ctx, `INSERT INTO operations_agentos_conversation_commands_v1(id,endpoint,conversation_id,operator_id,message_digest,state,result,created_at) VALUES($1,$2,$3,$4,$5,'dispatching',$6,$7)`, turn.ID, s.Endpoint, row.ID, fresh.ID, turnDigest(turn.Message, turn.TaskID, turn.RetryID), receipt, s.now()); err != nil {
 			return false, err
 		}
@@ -278,6 +280,7 @@ func (s *Conversations) runWithContext(ctx context.Context, operator operationsp
 		return s.Operation(ctx, fresh, domain, turn.ID)
 	}
 	result := copyObject(receipt)
+	delete(result, "sourceQualificationVersion")
 	// The tool may checkpoint before native dispatch returns. Do not merge the
 	// initial progress over a newer root checkpoint when recording the ACK.
 	delete(result, "taskProgress")

@@ -7,7 +7,7 @@ from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from pydantic import TypeAdapter, ValidationError
 
-from galaxy_agentos.conversation_tools import PreparedOperation, conversation_tools
+from galaxy_agentos.conversation_tools import PreparedOperation, conversation_tools, preparation_tools
 
 
 class RecordingNode:
@@ -24,10 +24,8 @@ class PreparedNullabilityContract(unittest.TestCase):
         target = str(uuid4())
         adapter = TypeAdapter(PreparedOperation)
         node = RecordingNode()
-        prepare = conversation_tools(node)[-1]
         context = RunContext(run_id=str(uuid4()), session_id=str(uuid4()),
             user_id="conversation:" + str(uuid4()), metadata={"operationId": str(uuid4())})
-        call = FunctionCall(function=Function.from_callable(prepare), call_id="optional-clearing-null")
         values = [
             {"kind": "content-visibility", "targetKind": "post", "targetId": target,
                 "action": "restore", "until": None, "reason": "合成恢复原因"},
@@ -48,6 +46,9 @@ class PreparedNullabilityContract(unittest.TestCase):
                 "summary": "合成复核说明", "restrictionAction": "release", "hideUntil": None},
         ]
         for value in values:
+            domain = 'feedback_accounts' if value['kind'] in {'feedback-update', 'case-resolve'} else 'content'
+            prepare = preparation_tools(node, domains=[domain])[0]
+            call = FunctionCall(function=Function.from_callable(prepare), call_id="optional-clearing-null")
             result = json.loads(prepare(context, call, adapter.validate_python(value)))
             self.assertEqual(result["state"], "prepared")
             self.assertFalse(result["effectExecuted"])

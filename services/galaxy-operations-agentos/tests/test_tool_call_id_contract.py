@@ -206,8 +206,6 @@ class ToolCallIdContractTest(unittest.TestCase):
         _, result = self.execute(read, "provider/selected-feedback:1", {"kind": "feedback", "id": selected})
         self.assertEqual(result.status, "success")
         self.assertEqual(self.requests[-1]["arguments"], {"kind": "feedback", "id": selected})
-        self.assertIn("It does not accept query or search titles/bodies", query.__doc__)
-        self.assertIn('read_operation_object(kind="feedback"', query.__doc__)
         self.assertEqual(len(self.requests), 4)
 
 

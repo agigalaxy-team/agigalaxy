@@ -9,3 +9,5 @@ docker build -f services/galaxy-operations-agentos/Dockerfile .
 ```
 
 局部纯数据库拒绝合同：`python -m unittest discover -s services/galaxy-operations-agentos/tests -p test_database_contract.py -v`。持久化测试必须先配置专用PG四项测试变量，具体条件见上述正文。运行变量以src/galaxy_agentos/config.py、runtime.env.example为准。
+
+值守任务的模型结束状态表示本轮处理是否结束；`businessState` 和原操作回执分别记录实际业务结果。业务回执失败可以被分析或作为其他获准处理的依据，不能据模型结束把该失败改成成功；未决人工决定或未知写入仍按原事项处理。

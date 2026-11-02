@@ -39,44 +39,80 @@ func TestConversationRememberSourcesVersionsAndRecheckPG(t *testing.T) {
 		t.Fatal(err)
 	}
 	tools := &ConversationTools{Conversations: s}
-	message := Object{"kind": "message-plan", "id": uuid.NewString(), "version": `[1,1,"draft"]`, "controlledSource": true}
-	feedback := Object{"kind": "feedback", "id": uuid.NewString(), "version": 1, "controlledSource": true}
-	refs := []any{message, feedback}
-	if err = tools.rememberSources(ctx, *current.Row, refs); err != nil {
+	first, second := uuid.NewString(), uuid.NewString()
+	ref := Object{"kind": "message-plan", "id": uuid.NewString(), "version": 1, "controlledSource": true}
+	if err = tools.rememberSources(ctx, *current.Row, first, []any{ref}); err != nil {
 		t.Fatal(err)
 	}
-	if err = tools.rememberSources(ctx, *current.Row, refs); err != nil {
+	if err = tools.rememberSources(ctx, *current.Row, first, []any{ref}); err != nil {
 		t.Fatal(err)
 	}
-	changed := copyObject(message)
-	changed["version"] = `[2,1,"draft"]`
-	if err = tools.rememberSources(ctx, *current.Row, []any{changed}); fault.Code(err) != "operations_agentos_source_changed" {
-		t.Fatalf("changed version: %v", err)
+	changed := copyObject(ref)
+	changed["version"] = 2
+	if err = tools.rememberSources(ctx, *current.Row, second, []any{changed}); err != nil {
+		t.Fatal(err)
 	}
-	missing := Object{"kind": "message-plan", "id": uuid.NewString(), "controlledSource": true}
-	if err = tools.rememberSources(ctx, *current.Row, []any{missing}); fault.Code(err) != "operations_agentos_source_qualification_unavailable" {
-		t.Fatalf("missing version: %v", err)
+	if err = tools.rememberSources(ctx, *current.Row, second, []any{Object{"kind": "message-plan", "id": uuid.NewString(), "controlledSource": true}}); fault.Code(err) != "operations_agentos_source_qualification_unavailable" {
+		t.Fatal(err)
 	}
 	var count int
 	if err = owner.QueryRow(ctx, `SELECT count(*) FROM operations_agentos_conversation_sources_v1 WHERE conversation_id=$1`, current.Row.ID).Scan(&count); err != nil || count != 2 {
-		t.Fatalf("saved sources %d: %v", count, err)
+		t.Fatalf("saved %d: %v", count, err)
 	}
-	legacy := Object{"kind": "message-plan", "id": uuid.NewString(), "controlledSource": true}
-	if err = tools.rememberSources(ctx, *current.Row, []any{Object{"kind": "message-plan", "id": legacy["id"], "version": 1, "controlledSource": true}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = owner.Exec(ctx, `UPDATE operations_agentos_conversation_sources_v1 SET evidence_ref=evidence_ref - 'version' WHERE conversation_id=$1 AND evidence_ref->>'id'=$2`, current.Row.ID, legacy["id"]); err != nil {
-		t.Fatal(err)
-	}
-	legacy["version"] = 1
-	if err = tools.rememberSources(ctx, *current.Row, []any{legacy}); fault.Code(err) != "operations_agentos_source_qualification_unavailable" {
-		t.Fatalf("legacy missing version: %v", err)
-	}
-	// Qualification still depends on current source authorization, independent of matching versions.
-	s.ValidateSources = s.SourceValidator(func(_ context.Context, _ operationspermissions.Actor, _ string, _ []Object) (Object, error) {
-		return Object{"valid": false, "refs": []any{}}, nil
+	s.ValidateSources = s.SourceValidator(func(_ context.Context, _ operationspermissions.Actor, _ string, refs []Object) (Object, error) {
+		valid, invalid := []any{}, []any{}
+		for i, v := range refs {
+			if sameConversationJSON(v["version"], 1) {
+				invalid = append(invalid, i)
+			} else {
+				valid = append(valid, Object{"readExpiresAt": f.Now().Unix() + 20})
+			}
+		}
+		return Object{"valid": false, "refs": valid, "invalidIndexes": invalid}, nil
 	})
-	if _, err = s.CurrentRead(ctx, current.Row.ID, nil); fault.Code(err) != "operations_agentos_source_changed" {
-		t.Fatalf("revoked source must fail: %v", err)
+	qualified, err := s.CurrentRead(ctx, current.Row.ID, nil)
+	if err != nil || !qualified.SourceQualification.AffectedTurns[first] || qualified.SourceQualification.AffectedTurns[second] || qualified.Row.ID != current.Row.ID {
+		t.Fatalf("qualification: %#v %v", qualified.SourceQualification, err)
+	}
+}
+
+func TestQualificationRestrictsOnlyAffectedOrUnassociatedLegacyTurns(t *testing.T) {
+	q := SourceQualification{AffectedTurns: map[string]bool{"changed": true}, LegacyUnknown: true, LegacySafeTurns: map[string]bool{"new": true, "changed": true}}
+	for turn, want := range map[string]bool{"old": true, "changed": true, "new": false} {
+		if q.restricts(turn) != want {
+			t.Fatalf("turn %s expected restricted %v", turn, want)
+		}
+	}
+}
+
+func TestSourceQualificationBatchesPastQueryLimit(t *testing.T) {
+	owner, _ := testsupport.PostgreSQL(t)
+	f := operationsfixture.New(t, owner)
+	f.Automation(t)
+	ctx := context.Background()
+	s := &Conversations{Pool: f.Pool, Endpoint: f.Endpoint, Permissions: f.Permissions, Now: f.Now}
+	current, err := s.Session(ctx, f.Root, "overview", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = owner.Exec(ctx, `INSERT INTO operations_agentos_conversation_sources_v1(conversation_id,source_key,evidence_ref,created_at) SELECT $1,md5(i::text),jsonb_build_object('kind','post','id',i,'version',1,'conversationTurnId',$2::text),now() FROM generate_series(1,301) i`, current.Row.ID, uuid.NewString())
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	validator := s.SourceValidator(func(_ context.Context, _ operationspermissions.Actor, _ string, refs []Object) (Object, error) {
+		calls++
+		if len(refs) > 300 {
+			t.Fatal("exceeded revalidation batch")
+		}
+		valid := make([]any, len(refs))
+		for i := range valid {
+			valid[i] = Object{"readExpiresAt": f.Now().Unix() + 20}
+		}
+		return Object{"valid": true, "refs": valid, "invalidIndexes": []any{}}, nil
+	})
+	result, err := validator(ctx, *current.Row, current.Actor)
+	if err != nil || !result.Valid || calls != 2 {
+		t.Fatalf("batches=%d result=%#v err=%v", calls, result, err)
 	}
 }

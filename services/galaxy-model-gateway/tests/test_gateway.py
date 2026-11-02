@@ -45,7 +45,8 @@ class GatewayTest(unittest.TestCase):
         self.assertEqual(runtime_version, "1.108.0")
         with self.assertRaisesRegex(ValueError, "auth_not_configured"):
             Settings(service_key="")
-        settings = Settings(service_key=KEY, models_file=str(BASE / "config/models.empty.yaml"))
+        settings = Settings(service_key=KEY, models_file=str(BASE / "config/models.empty.yaml"),
+            usage_file=str(BASE / "not-a-directory" / "usage.sqlite3"))
         from galaxy_model_gateway.app import create_app
         with tempfile.TemporaryDirectory() as directory:
             import yaml
@@ -66,6 +67,8 @@ class GatewayTest(unittest.TestCase):
             self.assertEqual(status.json()["modelState"], "not-configured")
             self.assertEqual(status.json()["modelCount"], 0)
             self.assertNotIn(KEY, status.text)
+            usage = client.get("/galaxy/usage?days=7", headers=auth)
+            self.assertEqual(usage.json()["availability"]["state"], "unavailable")
             models = client.get("/v1/models", headers=auth)
             self.assertEqual(models.status_code, 200, models.text)
             self.assertEqual(models.json()["data"], [])

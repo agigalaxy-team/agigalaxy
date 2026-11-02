@@ -11,7 +11,7 @@ from uuid import uuid4
 from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from galaxy_agentos.conversation_tools import (_WINDOW_DAYS, _WINDOW_DEFAULT_DAYS, _query_filter_feedback,
-    _analysis_constraints, conversation_tools)
+    conversation_tools, preparation_tools)
 
 
 class Gateway:
@@ -33,58 +33,34 @@ def execute(tool, arguments):
 
 
 class AnalysisSemanticsTests(unittest.TestCase):
-    def test_supported_window_routes_require_explicit_valid_days_and_never_choose_defaults(self):
+    def test_window_omission_uses_service_defaults_and_invalid_values_are_rejected(self):
         for (module, view), allowed in _WINDOW_DAYS.items():
             with self.subTest(module=module, view=view):
-                missing = _query_filter_feedback(module, view, {})
-                self.assertEqual(missing['requiredFilterKeys'], ['days'])
-                self.assertEqual(missing['allowedDays'], allowed)
-                self.assertFalse(missing['dataRead'])
-                self.assertEqual(missing['defaultDays'], _WINDOW_DEFAULT_DAYS[(module, view)])
+                self.assertIsNone(_query_filter_feedback(module, view, {}))
                 for invalid in (0, 91, True, None):
                     self.assertIsNotNone(_query_filter_feedback(module, view, {'days': invalid}))
-                valid = {'days': allowed[0]}
-                if view == 'account':
-                    valid['accountId'] = str(uuid4())
-                self.assertIsNone(_query_filter_feedback(module, view, valid))
-        for module, view in [('maintenance', 'logs'), ('recommendations', 'history'), ('content', 'sections')]:
-            self.assertIsNone(_query_filter_feedback(module, view, {}))
+                self.assertIsNone(_query_filter_feedback(module, view, {'days': allowed[0]}))
 
-    def test_constraints_preserve_original_zero_unknown_samples_rates_period_and_fields(self):
-        original = {'availability': 'available', 'data': {'period': {'days': 30}, 'count': 0,
-            'retention': None, 'samples': 529, 'ctr': 1, 'other': ['original']}, 'coverage': {'complete': False}}
-        before = deepcopy(original)
-        result = _analysis_constraints(original, module='recommendations', view='overview', filters={'days': 7})
-        self.assertEqual(original, before)
-        self.assertEqual({key: result[key] for key in original}, before)
-        self.assertEqual(result['analysisConstraints']['requestedDays'], 7)
-        self.assertEqual(result['data']['period']['days'], 30)
-        self.assertIn('null/unknown', ''.join(result['analysisConstraints']['rules']))
-        self.assertNotIn('inferredCause', json.dumps(result))
-
-    def test_real_sdk_query_missing_days_never_calls_gateway_and_explicit_window_preserves_actual_period(self):
-        gateway = Gateway({'state': 'available', 'data': {'period': {'days': 30}, 'count': 0}})
+    def test_query_passes_omission_and_explicit_window_without_altering_result(self):
+        original = {'state': 'available', 'data': {'period': {'days': 30}, 'count': 0, 'retention': None}}
+        gateway = Gateway(original)
         tool = conversation_tools(gateway, domain='discovery')[0]
-        rejected = execute(tool, {'module': 'recommendations', 'view': 'overview'})
-        self.assertEqual(rejected['reason'], 'agentos_query_window_required')
-        self.assertEqual(gateway.calls, [])
+        self.assertEqual(execute(tool, {'module': 'recommendations', 'view': 'overview'}), original)
+        self.assertEqual(gateway.calls[0][1]['filters'], {})
         actual = execute(tool, {'module': 'recommendations', 'view': 'overview', 'filters': {'days': 7}})
-        self.assertEqual(gateway.calls[0][1]['filters'], {'days': 7})
-        self.assertEqual(actual['data']['period']['days'], 30)
-        self.assertEqual(actual['analysisConstraints']['requestedDays'], 7)
-        self.assertEqual(len(gateway.calls), 1)
+        self.assertEqual(gateway.calls[1][1]['filters'], {'days': 7})
+        self.assertEqual(actual, original)
 
-    def test_real_sdk_maintenance_log_result_has_exact_normalizer_constraint(self):
+    def test_maintenance_log_result_remains_unchanged(self):
         original = {'state': 'available', 'data': {'items': [{'event': 'runtime_event_rejected', 'code': 'other_error'}]}}
         gateway = Gateway(original)
         value = execute(conversation_tools(gateway, domain='maintenance')[0], {'module': 'maintenance', 'view': 'logs'})
-        self.assertEqual(value['data'], original['data'])
-        self.assertIn('非事件名allowlist', value['analysisConstraints']['runtimeEventMeanings']['runtime_event_rejected'])
+        self.assertEqual(value, original)
         self.assertEqual(len(gateway.calls), 1)
 
     def test_real_sdk_feedback_restore_omits_unrequested_note_but_preserves_explicit_note(self):
         gateway = Gateway({'state': 'prepared', 'card': {'state': 'prepared', 'cardId': str(uuid4())}})
-        tool = conversation_tools(gateway, domain='overview')[-1]
+        tool = preparation_tools(gateway, domains=['feedback_accounts'])[0]
         operation = {'kind': 'feedback-update', 'targetId': str(uuid4()), 'category': None, 'module': 'other', 'state': 'pending'}
         value = execute(tool, {'operation': operation})
         self.assertEqual(gateway.calls[0][1], operation)
@@ -104,17 +80,13 @@ class AnalysisSemanticsTests(unittest.TestCase):
         self.assertTrue(proof['sharedDefaultsUnchanged'])
         self.assertEqual({(item['module'], item['view']): item['days'] for item in proof['defaultDays']}, _WINDOW_DEFAULT_DAYS)
 
-    def test_default_metadata_does_not_fill_days_or_request_a_user_choice(self):
+    def test_default_metadata_matches_valid_values_without_filling_filters(self):
         self.assertEqual(set(_WINDOW_DEFAULT_DAYS), set(_WINDOW_DAYS))
-        for (module, view), default in _WINDOW_DEFAULT_DAYS.items():
+        for route, default in _WINDOW_DEFAULT_DAYS.items():
             original = {}
-            feedback = _query_filter_feedback(module, view, original)
+            self.assertIsNone(_query_filter_feedback(*route, original))
             self.assertEqual(original, {})
-            self.assertEqual(feedback['defaultDays'], default)
-            self.assertIn(default, feedback['allowedDays'])
-            self.assertEqual(feedback['reason'], 'agentos_query_window_required')
-            self.assertIn('无需追问', feedback['explanation'])
-            self.assertFalse(feedback['dataRead'])
+            self.assertIn(default, _WINDOW_DAYS[route])
 
 
 if __name__ == '__main__':

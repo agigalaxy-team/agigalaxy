@@ -150,5 +150,31 @@ class ModelProfilesTest(unittest.TestCase):
             zero = safe_record({"litellm_params": {"metadata": metadata}}, {"usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}}, None, None)
             self.assertIsNone(zero["totalTokens"])
 
+    def test_auxiliary_usage_and_token_count_failure_do_not_block_request(self):
+        settings = Settings(service_key=KEY, config_version=VERSION)
+        alias = "galaxy-m" + "1".zfill(32)
+        models = [row(alias, "openai-chat", "http://127.0.0.1:9/v1")]
+        profiles = {alias: profile("openai-chat", "overview")}
+        headers = [(b"authorization", ("Bearer " + KEY).encode()),
+            (b"x-galaxy-model-scenario", b"overview"), (b"x-galaxy-model-config-version", VERSION.encode())]
+        payload = {"model": alias, "messages": [{"role": "user", "content": "original input"}], "store": False, "max_tokens": 512, "reasoning_effort": "medium"}
+        seen = []
+        async def provider(scope, receive, send):
+            seen.append(json.loads((await receive())["body"]))
+            await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]})
+            await send({"type": "http.response.body", "body": b'{"choices":[{"finish_reason":"stop","message":{"content":"ok"}}]}'})
+        def unavailable(*args, **kwargs):
+            raise RuntimeError("local counter unavailable")
+        with TemporaryDirectory() as directory:
+            store = UsageStore(Path(directory) / "usage.sqlite3")
+            with patch.object(store, "start", side_effect=RuntimeError("ledger unavailable")):
+                for ledger in (None, store):
+                    guarded = PrivateSurface(provider, settings, models, profiles, ledger, token_counter=unavailable)
+                    code, _, _ = asyncio.run(exchange(guarded, "/v1/chat/completions", method="POST", headers=headers, payload=payload))
+                    self.assertEqual(code, 200)
+                    self.assertEqual(seen[-1]["messages"], payload["messages"])
+                    self.assertIsNone(seen[-1]["metadata"]["galaxy_input_tokens_estimate"])
+            self.assertEqual(UsageStore(Path(directory) / "usage.sqlite3").summary(7)["availability"]["state"], "unavailable")
+
 
 if __name__ == "__main__": unittest.main()

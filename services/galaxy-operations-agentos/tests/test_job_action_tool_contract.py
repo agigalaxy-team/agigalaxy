@@ -6,7 +6,7 @@ from uuid import uuid4
 from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from pydantic import TypeAdapter, ValidationError
-from galaxy_agentos.conversation_tools import PreparedOperation, DutyPreparedOperation, conversation_tools
+from galaxy_agentos.conversation_tools import PreparedOperation, DutyPreparedOperation, conversation_tools, preparation_tools
 
 
 class NodeRecorder:
@@ -23,11 +23,12 @@ class JobActionToolContract(unittest.TestCase):
         adapter = TypeAdapter(PreparedOperation)
         duty = TypeAdapter(DutyPreparedOperation)
         node = NodeRecorder()
-        prepare = conversation_tools(node)[-1]
         context = RunContext(run_id=str(uuid4()), session_id=str(uuid4()),
             user_id="conversation:" + str(uuid4()), metadata={"operationId": str(uuid4())})
-        function = Function.from_callable(prepare)
         for kind in ("job-cancel", "job-retry", "search-retry"):
+            domain = "search" if kind == "search-retry" else "maintenance"
+            prepare = preparation_tools(node, domains=[domain])[0]
+            function = Function.from_callable(prepare)
             value = {"kind": kind, "targetId": str(uuid4()), "reason": "明确合成任务处理"}
             if kind != "search-retry":
                 value["queue"] = "information-watch"

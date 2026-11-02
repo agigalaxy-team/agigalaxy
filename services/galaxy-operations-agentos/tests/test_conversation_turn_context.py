@@ -31,7 +31,7 @@ class Model:
 
 
 class TurnContextTests(unittest.TestCase):
-    def test_native_loop_loads_preparation_schema_after_accepted_plan(self):
+    def test_native_loop_loads_requested_business_schema(self):
         @dataclass
         class Provider(NativeModel):
             id: str = "local-staged-tools"
@@ -44,9 +44,9 @@ class TurnContextTests(unittest.TestCase):
                 names = [t["function"]["name"] for t in kwargs["tools"]]
                 self.exposed.append(names)
                 if self.calls == 1:
-                    return ModelResponse(role="assistant",tool_calls=[{"id":"plan", "type":"function", "function":{"name":"plan_turn", "arguments":"{}"}}])
+                    return ModelResponse(role="assistant",tool_calls=[{"id":"plan", "type":"function", "function":{"name":"load_business_tools", "arguments":json.dumps({"domains":["feedback_accounts"]})}}])
                 if self.calls == 2:
-                    return ModelResponse(role="assistant",tool_calls=[{"id":"prepare", "type":"function", "function":{"name":"prepare_operation", "arguments":"{}"}}])
+                    return ModelResponse(role="assistant",tool_calls=[{"id":"prepare", "type":"function", "function":{"name":"prepare_feedback_accounts_operation", "arguments":"{}"}}])
                 return ModelResponse(role="assistant",content="方案已准备")
             async def ainvoke(self, messages, **kwargs): return self.invoke(messages, **kwargs)
             def invoke_stream(self, messages, **kwargs): yield self.invoke(messages, **kwargs)
@@ -55,37 +55,35 @@ class TurnContextTests(unittest.TestCase):
             def _parse_provider_response_delta(self, response): return response
         for async_mode in (False, True):
             effects=[]
-            def plan_turn(run_context: RunContext):
-                turn_state(run_context)[PLAN]={"intent":"prepare"}
+            def load_business_tools(run_context: RunContext, domains: list[str]):
+                turn_state(run_context)["loadedBusinessDomains"] = domains
                 return "accepted"
-            def prepare_operation():
+            def prepare_feedback_accounts_operation():
                 effects.append("prepared"); return "card"
             provider=Provider(); install_usage_scope(provider); with_conversation_turn_context(provider)
-            agent=ConversationAgent(model=provider,tools=[plan_turn,prepare_operation],telemetry=False)
+            agent=ConversationAgent(model=provider,tools=[load_business_tools,prepare_feedback_accounts_operation],telemetry=False)
             with patch("builtins.print"):
                 if async_mode:
                     async def collect():return [item async for item in agent.arun("准备方案",stream=True)]
                     asyncio.run(collect())
                 else:list(agent.run("准备方案",stream=True))
-            self.assertNotIn("prepare_operation",provider.exposed[0])
-            self.assertIn("prepare_operation",provider.exposed[1])
+            self.assertNotIn("prepare_feedback_accounts_operation",provider.exposed[0])
+            self.assertIn("prepare_feedback_accounts_operation",provider.exposed[1])
             self.assertEqual(effects,["prepared"])
 
     def test_stage_projection_preserves_explicit_choice_and_original_arguments(self):
         from galaxy_agentos.conversation_turn_context import _stage_tools
-        tools=[{"type":"function","function":{"name":"prepare_operation"}}, {"type":"function","function":{"name":"query_operations"}}]
+        tools=[{"type":"function","function":{"name":"prepare_feedback_accounts_operation"}}, {"type":"function","function":{"name":"query_operations"}}]
         run=RunOutput(run_id="stage")
         token=_RUN.set(run)
         try:
             args=([Message(role="user",content="读取")],None,None,tools,"auto")
             selected,kw=_stage_tools(args,{})
             self.assertEqual(len(selected[3]),1);self.assertIs(args[3],tools);self.assertEqual(len(tools),2)
-            choice={"type":"function","function":{"name":"prepare_operation"}}
+            choice={"type":"function","function":{"name":"prepare_feedback_accounts_operation"}}
             original={"tools":tools,"tool_choice":choice}
             self.assertIs(_stage_tools((),original)[1],original)
-            turn_state(run)[PLAN]={"intent":"answer"}
-            self.assertEqual(len(_stage_tools((),{"tools":tools})[1]["tools"]),1)
-            turn_state(run)[PLAN]={"intent":"prepare"}
+            turn_state(run)["loadedBusinessDomains"]=["feedback_accounts"]
             self.assertIs(_stage_tools(args,{})[0],args)
         finally:_RUN.reset(token)
 
@@ -152,6 +150,7 @@ class TurnContextTests(unittest.TestCase):
             def loader(context):
                 asyncio.run_coroutine_threadsafe(callback(), loop).result(timeout=2)
                 turn_state(context)[TASK_CONTEXT] = {"objective":"原目标", "objectiveAvailable":True}
+                turn_state(context)["sourceQualification"] = {"affectedTurns":[], "legacyUnknown":False, "legacySafeTurns":[]}
             agent._galaxy_authorized_run = loader
             agent = agent.deep_copy()
             self.assertIs(agent._galaxy_authorized_run, loader)

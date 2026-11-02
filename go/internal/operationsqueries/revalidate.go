@@ -15,14 +15,15 @@ func (s *Service) Revalidate(ctx context.Context, actor Actor, domain string, ev
 	if evidenceRefs == nil || len(evidenceRefs) > 300 {
 		return nil, invalid()
 	}
-	refs, invalidRefs := []any{}, []any{}
+	refs, invalidRefs, invalidIndexes := []any{}, []any{}, []any{}
 	memo := map[string]Object{}
-	for _, original := range evidenceRefs {
+	for refIndex, original := range evidenceRefs {
 		read := object(original["read"])
 		tool := str(read["tool"])
 		id := Object{"kind": original["kind"], "id": original["id"]}
 		if !slices.Contains([]string{"query-operations", "read-operation-object"}, tool) {
 			invalidRefs = append(invalidRefs, id)
+			invalidIndexes = append(invalidIndexes, refIndex)
 			continue
 		}
 		raw, e := json.Marshal(read)
@@ -36,6 +37,7 @@ func (s *Service) Revalidate(ctx context.Context, actor Actor, domain string, ev
 			if e != nil {
 				if slices.Contains([]int{403, 404, 409, 410}, fault.Status(e)) {
 					invalidRefs = append(invalidRefs, id)
+					invalidIndexes = append(invalidIndexes, refIndex)
 					continue
 				}
 				return nil, e
@@ -52,9 +54,10 @@ func (s *Service) Revalidate(ctx context.Context, actor Actor, domain string, ev
 		}
 		if current == nil {
 			invalidRefs = append(invalidRefs, id)
+			invalidIndexes = append(invalidIndexes, refIndex)
 			continue
 		}
-		if original["controlledSource"] == true {
+		if original["controlledSource"] == true || original["purpose"] == "public-content" {
 			before, e := identity.Canonical([]any{original["version"]})
 			if e != nil {
 				return nil, e
@@ -63,12 +66,13 @@ func (s *Service) Revalidate(ctx context.Context, actor Actor, domain string, ev
 			if e != nil {
 				return nil, e
 			}
-			if current["controlledSource"] != true || string(before) != string(after) {
+			if (original["controlledSource"] == true && current["controlledSource"] != true) || string(before) != string(after) {
 				invalidRefs = append(invalidRefs, id)
+				invalidIndexes = append(invalidIndexes, refIndex)
 				continue
 			}
 		}
 		refs = append(refs, current)
 	}
-	return Object{"valid": len(invalidRefs) == 0, "refs": refs, "invalidRefs": invalidRefs}, nil
+	return Object{"valid": len(invalidRefs) == 0, "refs": refs, "invalidRefs": invalidRefs, "invalidIndexes": invalidIndexes}, nil
 }

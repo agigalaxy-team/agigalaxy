@@ -1,7 +1,7 @@
 import unittest
 
 from agno.tools.function import Function
-from galaxy_agentos.conversation_tools import conversation_tools
+from galaxy_agentos.conversation_tools import conversation_tools, preparation_tools
 
 
 def find_publish(value):
@@ -22,7 +22,7 @@ def find_publish(value):
 
 class StrategyPublishReceiptSDKTest(unittest.TestCase):
     def test_native_schema_identifies_original_rehearsal_and_current_draft(self):
-        prepare = next(tool for tool in conversation_tools(object()) if tool.__name__ == "prepare_operation")
+        prepare = preparation_tools(object(), domains=["strategy"])[0]
         native = Function.from_callable(prepare)
         native.process_entrypoint()
         publish = find_publish(native.parameters)

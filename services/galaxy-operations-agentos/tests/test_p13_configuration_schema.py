@@ -4,7 +4,7 @@ import unittest
 
 from agno.tools.function import Function
 from galaxy_agentos.conversation_tool_contracts import StrategyDraft
-from galaxy_agentos.conversation_tools import conversation_tools
+from galaxy_agentos.conversation_tools import conversation_tools, preparation_tools
 from galaxy_agentos.p13_configuration import _SCHEMA
 
 
@@ -29,7 +29,7 @@ class P13ConfigurationSchemaTest(unittest.TestCase):
         candidate = json.loads((Path(__file__).parent / "fixtures" / "p13_configuration.json").read_text(encoding="utf-8"))
         draft = StrategyDraft(kind="strategy-draft", configuration=candidate, reason="review the controlled template")
         self.assertEqual(draft.model_dump(mode="json", exclude_unset=True)["configuration"], candidate)
-        prepare = next(tool for tool in conversation_tools(object()) if tool.__name__ == "prepare_operation")
+        prepare = preparation_tools(object(), domains=["strategy"])[0]
         native = Function.from_callable(prepare)
         native.process_entrypoint()
         schema = find_draft(native.parameters)["properties"]["configuration"]

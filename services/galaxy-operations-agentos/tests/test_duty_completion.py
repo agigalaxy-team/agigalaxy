@@ -1,132 +1,51 @@
-import asyncio
-import json
 import unittest
 from types import SimpleNamespace
-from dataclasses import dataclass, field
-from agno.agent import Agent
-from agno.models.base import Model as AgnoModel
+from unittest.mock import patch
 
-from agno.models.message import Message
-from agno.models.response import ModelResponse, ToolExecution
-from galaxy_agentos.duty_completion import DutyCompletionIncomplete, with_duty_completion
+from galaxy_agentos.duty_completion import with_duty_completion
 
 
 class Gateway:
-    def __init__(self, states):
-        self.states = iter(states)
+    def __init__(self, completion):
+        self.completion = completion
     def duty_authorize(self, _user, *, operation):
-        value=next(self.states)
-        return {"task": {"completion": value if isinstance(value, dict) else {"disposition":value}}}
+        return {"task": {"completion": self.completion}}
 
 
-class Model:
-    def __init__(self, values): self.values = iter(values)
-    def response(self, messages, **kwargs): return next(self.values)
-    async def aresponse(self, messages, **kwargs): return next(self.values)
+class DutyDecisionTests(unittest.TestCase):
+    def decide(self, completion, progress):
+        with patch("galaxy_agentos.duty_completion.with_task_loop") as loop:
+            with_duty_completion(object(), Gateway(completion), progress, 30)
+        return loop.call_args.kwargs["decide"]
 
+    def test_natural_completion_and_stale_progress(self):
+        old = {"goalSatisfied": False, "remainingWork": [{"kind": "read", "description": "read"}]}
+        decide = self.decide({"disposition": "completed", "modelAssessment": old}, [])
+        run = SimpleNamespace(user_id="autonomy:test", metadata={})
+        self.assertEqual(decide(run).state, "completed")
+        progress = [old]
+        decide = self.decide({"disposition": "completed", "modelAssessment": None}, progress)
+        self.assertEqual(decide(run).state, "completed")
+        self.assertEqual(progress, [])
 
-def tool(ident, paused=False):
-    return ToolExecution(tool_call_id=ident, tool_name="synthetic", external_execution_required=paused)
+    def test_fresh_optional_progress_continues_once(self):
+        assessment = {"goalSatisfied": False, "remainingWork": [{"kind": "read", "description": "核查"}]}
+        progress = [assessment]
+        decide = self.decide({"disposition": "completed", "modelAssessment": assessment}, progress)
+        run = SimpleNamespace(user_id="autonomy:test", metadata={})
+        result = decide(run)
+        self.assertEqual((result.state, result.remaining), ("continue", ("核查",)))
+        self.assertEqual(decide(run).state, "completed")
 
+    def test_failed_business_fact_does_not_block_fresh_remaining_work(self):
+        assessment = {"goalSatisfied": False, "remainingWork": [{"kind": "action", "description": "采用其他获准方法"}]}
+        decide = self.decide({"disposition": "completed", "businessState": "failed", "modelAssessment": assessment,
+            "pendingHuman": False, "pendingWrite": False}, [assessment])
+        self.assertEqual(decide(SimpleNamespace(user_id="autonomy:test", metadata={})).state, "continue")
 
-@dataclass
-class NativeProvider(AgnoModel):
-    id: str = "local-fixed-provider"
-    name: str = "Local"
-    provider: str = "NoNetwork"
-    calls: int = 0
-    captured: list = field(default_factory=list)
-    def invoke(self, *args, **kwargs):
-        messages = kwargs.get("messages", args[0] if args else [])
-        self.captured.append([getattr(m, "content", None) for m in messages])
-        self.calls += 1
-        return ModelResponse(role="assistant", content="done" if self.calls > 1 else "premature")
-    async def ainvoke(self, *args, **kwargs): return self.invoke(*args, **kwargs)
-    def invoke_stream(self, *args, **kwargs): yield self.invoke(*args, **kwargs)
-    async def ainvoke_stream(self, *args, **kwargs): yield self.invoke(*args, **kwargs)
-    def _parse_provider_response(self, response, **kwargs): return response
-    def _parse_provider_response_delta(self, response): return response
+    def test_actual_business_states_override_progress(self):
+        for disposition, state in (("unknown", "waiting-result"), ("waiting-human", "waiting-human"), ("failed", "failed"), ("continue", "waiting-result")):
+            decide = self.decide({"disposition": disposition, "reasonCode": "original-state"}, [])
+            result = decide(SimpleNamespace(user_id="autonomy:test", metadata={}))
+            self.assertEqual((result.state, result.reason), (state, "original-state"))
 
-class CompletionFactsGateway:
-    def __init__(self): self.calls = 0
-    def duty_authorize(self, _user, *, operation):
-        self.calls += 1
-        return {"task": {"completion": {"disposition": "continue" if self.calls == 1 else "completed",
-            "reasonCode": "read-coverage-incomplete", "nextAction": "核查原范围", "businessState": "not-started",
-            "modelAssessment": {"remainingWork": [{"kind":"read", "description":"核查缺段"}]},
-            "readCoverage": {"unresolved": [{"tool":"inspect-operations", "coverage":"profile-partial", "inspectionOutcome": {
-                "profile":"current-operations-v1", "profileComplete":False, "segments": {"autonomy": {
-                    "availability":"available", "profileComplete":False, "reason":"source-withheld"}}}}],
-                "unverified": [], "incidentalReadFailures": []}}}}
-
-
-class CompletionTests(unittest.TestCase):
-    def test_native_provider_receives_original_closed_completion_facts(self):
-        provider = with_duty_completion(NativeProvider(), CompletionFactsGateway())
-        agent = Agent(model=provider, telemetry=False)
-        result = agent.run("任务", user_id="autonomy:test")
-        self.assertEqual(result.content, "done")
-        self.assertEqual(provider.calls, 2)
-        actual = "\n".join(v for v in provider.captured[1] if isinstance(v, str))
-        for expected in ("read-coverage-incomplete", "核查原范围", "核查缺段", "source-withheld", "autonomy", "有界页"):
-            self.assertIn(expected, actual)
-
-
-    def test_same_run_continues_and_keeps_tool_ids(self):
-        model = with_duty_completion(Model([ModelResponse(content="partial", tool_executions=[tool("one")]),
-            ModelResponse(content="done", tool_executions=[tool("two")])]), Gateway(["continue", "completed"]))
-        run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={})
-        messages = [Message(role="user", content="task")]
-        result = asyncio.run(model.aresponse(messages=messages, run_response=run))
-        self.assertEqual(result.content, "done")
-        self.assertEqual([t.tool_call_id for t in result.tool_executions], ["one", "two"])
-        self.assertEqual(len(messages), 2)
-
-    def test_pause_never_queries_completion(self):
-        model = with_duty_completion(Model([ModelResponse(tool_executions=[tool("pause", True)])]), Gateway([]))
-        run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={})
-        self.assertTrue(model.response(messages=[], run_response=run).tool_executions[0].external_execution_required)
-
-    def test_unrecorded_local_validation_failure_cannot_finish_run(self):
-        model = with_duty_completion(Model([ModelResponse(content="done")]), Gateway([]))
-        run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={"_galaxyDutyValidationLedgerFailed": True})
-        with self.assertRaises(DutyCompletionIncomplete):
-            model.response(messages=[], run_response=run)
-
-    def test_repeated_same_fact_with_new_call_ids_is_not_progress(self):
-        values = [ModelResponse(tool_executions=[ToolExecution(tool_call_id=str(i), tool_name="query_operations", tool_args={"module":"feedback", "view":"list"}, result=json.dumps({"availability":"available", "checkedAt":i, "data":{"items":[]}}))]) for i in range(4)]
-        model = with_duty_completion(Model(values), Gateway(["continue"] * 4))
-        run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={})
-        with self.assertRaises(DutyCompletionIncomplete):
-            model.response(messages=[], run_response=run)
-
-    def test_new_scope_or_changed_fact_resets_progress(self):
-        values = [ModelResponse(tool_executions=[ToolExecution(tool_call_id=str(i), tool_name="query_operations", tool_args={"module":"feedback", "view":"list", "filters":{"state": state}}, result=json.dumps({"availability":"available", "data":{"items":[state]}}))]) for i, state in enumerate(["pending", "pending", "closed", "closed"])]
-        model = with_duty_completion(Model(values), Gateway([{"disposition":"continue", "modelAssessment":{"remainingWork":[{"kind":"read","description":"范围一"}]}},
-                {"disposition":"continue", "modelAssessment":{"remainingWork":[{"kind":"read","description":"范围二"}]}}, "continue", "completed"]))
-        run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={})
-        self.assertIsNotNone(model.response(messages=[], run_response=run))
-
-    def test_failure_alternative_and_many_progress_steps_continue(self):
-        values=[]
-        for i in range(6):
-            values.append(ModelResponse(content="完成" if i==5 else "尝试",tool_executions=[ToolExecution(tool_call_id=str(i),tool_name="query_operations",tool_args={"view":"method"+str(i)},result=json.dumps({"state":"unavailable" if i<5 else "completed"}))]))
-        model=with_duty_completion(Model(values),Gateway(["continue"]*5+["completed"]))
-        run=SimpleNamespace(user_id="autonomy:test",requirements=[],metadata={})
-        result=model.response(messages=[Message(role="user",content="原问题")],run_response=run)
-        self.assertEqual(result.content,"完成"); self.assertEqual(len(result.tool_executions),6)
-    def test_prompt_updates_single_system_without_new_user_messages(self):
-        values=[ModelResponse(tool_executions=[ToolExecution(tool_call_id=str(i),tool_name="query_operations",tool_args={"page":i},result=json.dumps({"state":"available","page":i}))]) for i in range(3)]
-        model=with_duty_completion(Model(values),Gateway(["continue","continue","completed"]))
-        run=SimpleNamespace(user_id="autonomy:test",requirements=[],metadata={}); original=Message(role="user",content="原任务")
-        messages=[Message(role="system",content="原规则"),original]; model.response(messages=messages,run_response=run)
-        self.assertEqual([m.role for m in messages],["system","user"]); self.assertIs(messages[1],original)
-        from galaxy_agentos.duty_completion import _CONTROL_MARKER
-        self.assertEqual(messages[0].content.count(_CONTROL_MARKER),1); self.assertIn("原规则",messages[0].content)
-
-    def test_no_progress_bounded(self):
-        model = with_duty_completion(Model([ModelResponse(content="no") for _ in range(3)]), Gateway(["continue"] * 3))
-        run = SimpleNamespace(user_id="autonomy:test", requirements=[], metadata={})
-        with self.assertRaises(DutyCompletionIncomplete):
-            model.response(messages=[], run_response=run)
-        self.assertEqual(run.metadata["completionFailureCode"], "operations_autonomy_completion_incomplete")

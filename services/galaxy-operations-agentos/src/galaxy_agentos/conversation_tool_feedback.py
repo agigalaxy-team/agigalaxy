@@ -36,8 +36,7 @@ _FEEDBACK_FILTER_ENUMS = {
 
 
 # Exact F14 agentOsQueryArgumentsSchema routes that actually accept days.
-# Requiring a choice here prevents provider-generated omissions from silently
-# selecting different Node defaults. It never infers a window from prose.
+# The business service supplies its published default when days is omitted.
 _WINDOW_DAYS = {
     ("accounts", "summary"): [7, 28],
     ("content", "list"): [7, 28, "all"],
@@ -63,30 +62,14 @@ def _window_filter_feedback(module, view, values):
     if allowed is None:
         return None
     supplied = values.get("days")
-    if "days" in values and type(supplied) in {int, str} and supplied in allowed:
+    if "days" not in values or type(supplied) in {int, str} and supplied in allowed:
         return None
-    return {"state": "invalid-request", "reason": "agentos_query_window_required" if "days" not in values else "agentos_query_window_invalid",
+    return {"state": "invalid-request", "reason": "agentos_query_window_invalid",
         "module": module, "view": view, "requiredFilterKeys": ["days"], "allowedDays": list(allowed),
         "defaultDays": _WINDOW_DEFAULT_DAYS[(module, view)],
-        "windowRequired": True, "dataRead": False, "effectExecuted": False,
+        "windowRequired": False, "dataRead": False, "effectExecuted": False,
         "nextStep": "supply-explicit-supported-days-matching-user-request",
-        "explanation": "该视图必须显式传days。用户指定范围时逐项匹配；未指定时间时可显式采用本视图已发布defaultDays并在答复标注，无需追问。本工具不自动填入范围，也不推断用户意图。"}
-
-
-def _analysis_constraints(result, *, module=None, view=None, filters=None):
-    """Add fixed interpretation limits; preserve every original source value."""
-    constraints = {"requestedDays": (filters or {}).get("days") if (module, view) in _WINDOW_DAYS else None,
-        "rules": [
-            "逐项核对原返回period/basis/coverage；请求days不证明每个指标都采用同一窗口，固定周留存、终身值和当前存量必须分别标明。",
-            "统计0只表示该返回口径观察到0；不能据此排除采集故障、漏报、覆盖不足，或断言确实没有人使用。",
-            "null/unknown不是0；有样本也可能unknown。原因只按来源明确reason/status说明，不猜没样本、未到期、未运行或未定型。",
-            "比例须同时核分子、分母、时间和覆盖范围；高CTR或小样本不能推出用户意愿、兴趣或需求极高。",
-            "feedback业务状态与共同task状态、model状态、人工决定状态分别说明；task/model completed不能证明feedback已关闭或业务处理完成。",
-        ]}
-    if module == "maintenance" and view == "logs":
-        constraints["runtimeEventMeanings"] = {"runtime_event_rejected":
-            "Node runtimeLogEvent对非事件名allowlist输入的安全归一化名称；该名称本身不表示反向代理、访问拦截或非法访问。具体HTTP/安全原因仅认来源明确字段。"}
-    return {**result, "analysisConstraints": constraints}
+        "explanation": "days须使用该视图支持的值；省略时由业务服务采用默认值。"}
 
 
 def _feedback_filter_feedback(values):

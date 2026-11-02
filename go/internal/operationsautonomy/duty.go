@@ -21,14 +21,15 @@ type DutyInput struct {
 	ResourceIDs                                                 []string
 }
 type dutyProof struct {
-	owner        *Service
-	input        DutyInput
-	audit        Object
-	operation    Object
-	continuation bool
-	stored       Object
-	recovery     bool
-	recoveryRun  string
+	owner              *Service
+	input              DutyInput
+	audit              Object
+	pendingOperationID string
+	operation          Object
+	continuation       bool
+	stored             Object
+	recovery           bool
+	recoveryRun        string
 }
 
 var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
@@ -158,7 +159,11 @@ func (s *Service) RequireDutyAction(ctx context.Context, tx pgx.Tx, a Actor, act
 		if obj(row["control_state"])["kind"] == "manual-pause" && has([]string{"requested", "paused"}, str(obj(row["control_state"])["phase"])) {
 			return Actor{}, fault.New("operations_autonomy_pause_requested", 409)
 		}
-		if unresolved, err := s.unresolvedDutyWriteWithin(ctx, tx, row, str(copy.audit["operationId"])); err != nil {
+		exclude := copy.pendingOperationID
+		if exclude == "" {
+			exclude = str(copy.audit["operationId"])
+		}
+		if unresolved, err := s.unresolvedDutyWriteWithin(ctx, tx, row, exclude); err != nil {
 			return Actor{}, err
 		} else if unresolved {
 			return Actor{}, fault.New("operations_autonomy_original_operation_unknown", 409)
@@ -218,6 +223,12 @@ func (s *Service) BindDutyAuditSourceWithin(ctx context.Context, tx pgx.Tx, a Ac
 	}
 	copy := *p
 	copy.audit = nil
+	copy.pendingOperationID = ""
+	// This is an internal exclusion for the verified current tool operation,
+	// not evidence that a native or code source supplied an audit judgment.
+	if r != nil {
+		copy.pendingOperationID = operationID
+	}
 	kind := ""
 	if r != nil && nativeRunID != nil && *nativeRunID != "" && r["native_run_id"] == *nativeRunID {
 		kind = "ai"

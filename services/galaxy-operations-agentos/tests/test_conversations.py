@@ -21,6 +21,7 @@ from galaxy_agentos.authorization import GalaxyAuthorization
 from galaxy_agentos.app import PrivateSurface, run_view
 from galaxy_agentos.config import Settings
 from galaxy_agentos.conversations import conversation_agents, install_conversation_read
+from galaxy_agentos.conversation_tools import preparation_tool_catalog
 from galaxy_agentos.gateway import AuthorityDenied
 
 
@@ -60,7 +61,7 @@ class CurrentReader:
         self.authorize(user_id)
         if tool != "assess-conversation-task" or binding.get("session_id") != self.row["sessionId"] or not binding.get("turn_id"):
             raise AuthorityDenied("synthetic_scope_denied")
-        if arguments != {"disposition":"completed", "reason":"摘要已核对", "remaining":[]}:
+        if arguments not in ({"disposition":"completed", "reason":"摘要已核对", "remaining":[]}, {"disposition":"completed", "reason":"", "remaining":[]}):
             raise AuthorityDenied("synthetic_scope_denied")
         return {"state":"recorded", "taskProgress":{"phase":"completed", "remaining":[]}}
     def conversation_summary(self, user_id, **kwargs):
@@ -81,7 +82,9 @@ class ConversationNativeTest(unittest.TestCase):
             gateway = CurrentReader(row)
             agents = conversation_agents(settings=settings, db=db, gateway=gateway,
                 domains={"overview": "运营概览"}, active_domains={"overview"}, model_factory=LocalModel)
-            self.assertEqual([tool.name for tool in agents[0].tools], ["current_summary", "query_operations", "read_operation_object", "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "plan_turn", "assess_turn", "prepare_operation"])
+            names = [tool.name for tool in agents[0].tools]
+            self.assertEqual(names[:10], ["current_summary", "query_operations", "read_operation_object", "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "plan_turn", "assess_turn", "load_business_tools"])
+            self.assertEqual(set(names[10:]), {name for entry in preparation_tool_catalog().values() for name in entry["tools"]})
             native = AgentOS(id="conversation-native-check", db=db, agents=agents, user_isolation=True,
                 authorization=Authorization(verification_keys=[settings.verification_key], algorithm="HS256",
                     verify_audience=True, audience=settings.audience, issuer=settings.issuer,

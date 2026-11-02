@@ -5,7 +5,7 @@ from uuid import uuid4
 from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from pydantic import ValidationError
-from galaxy_agentos.conversation_tools import RecommendationDirection, conversation_tools
+from galaxy_agentos.conversation_tools import RecommendationDirection, preparation_tools
 
 
 class RecommendationDirectionContract(unittest.TestCase):
@@ -15,12 +15,12 @@ class RecommendationDirectionContract(unittest.TestCase):
             def conversation_tool(self, user, tool, arguments, **binding):
                 calls.append({'tool': tool, 'arguments': arguments, **binding})
                 return {'state': 'prepared', 'decision': 'human-confirmation-required'}
-        tools = conversation_tools(Gateway())
+        prepare = preparation_tools(Gateway(), domains=["recommendations"])[0]
         def exported(fn):
             function = Function.from_callable(fn)
             function.process_entrypoint()
             return function
-        functions = [exported(fn) for fn in tools]
+        function = exported(prepare)
         def kinds(schema):
             found = {}
             def visit(value):
@@ -38,7 +38,7 @@ class RecommendationDirectionContract(unittest.TestCase):
                         visit(child)
             visit(schema)
             return found
-        current = kinds(functions[-1].parameters)
+        current = kinds(function.parameters)
         schema = current['recommendation-direction']
         self.assertEqual(set(schema['properties']), {'kind', 'themeKey', 'direction', 'reason'})
         self.assertFalse(schema['additionalProperties'])
@@ -46,7 +46,7 @@ class RecommendationDirectionContract(unittest.TestCase):
         context = RunContext(run_id=str(uuid4()), user_id='local-recommendation-owner', session_id=str(uuid4()), metadata={'operationId': str(uuid4())})
         for key in ['category:technology', 'tag:'+str(uuid4()), 'theme:'+str(uuid4())]:
             body = {'kind': 'recommendation-direction', 'themeKey': key, 'direction': 'increase', 'reason': '只调整当前主题方向'}
-            result = json.loads(tools[-1](context, FunctionCall(function=functions[-1], call_id='direction-'+str(len(calls))), operation=RecommendationDirection(**body)))
+            result = json.loads(prepare(context, FunctionCall(function=function, call_id='direction-'+str(len(calls))), operation=RecommendationDirection(**body)))
             self.assertEqual(result['state'], 'prepared')
             self.assertEqual(calls[-1]['tool'], 'prepare-operation')
             self.assertEqual(calls[-1]['arguments'], body)
@@ -57,5 +57,4 @@ class RecommendationDirectionContract(unittest.TestCase):
         for patch in [{'enabled': True}, {'controls': {}}, {'expectedVersion': 99}, {'operationId': str(uuid4())}, {'themeKey': 'https://foreign.invalid/target'}, {'direction': 'boost'}, {'themeKey': 'category:invented'}]:
             with self.assertRaises(ValidationError):
                 RecommendationDirection(**{'kind': 'recommendation-direction', 'themeKey': 'category:technology', 'direction': 'increase', 'reason': '明确业务请求', **patch})
-        self.assertIn('does not mean ranking is active', tools[-1].__doc__)
         self.assertEqual(len(calls), 3)

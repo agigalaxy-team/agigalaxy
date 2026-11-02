@@ -22,6 +22,7 @@ class PrivateSurface:
         self.aliases = frozenset(row["model_name"] for row in models)
         self.models_by_alias = {row["model_name"]: row for row in models}
         self.profiles, self.usage_store, self.token_counter = profiles or {}, usage_store, token_counter
+        self.usage_incomplete = False
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "lifespan": return await self.app(scope, receive, send)
@@ -42,7 +43,10 @@ class PrivateSurface:
             return await JSONResponse(status(self.settings, self.models))(scope, receive, send)
         if path == "/galaxy/usage" and method == "GET" and usage_days is not None:
             try:
-                result = await to_thread(self.usage_store.summary, usage_days) if self.usage_store else unavailable_usage(usage_days)
+                if self.usage_incomplete and self.usage_store:
+                    await to_thread(self.usage_store.mark_incomplete)
+                result = (await to_thread(self.usage_store.summary, usage_days)
+                    if self.usage_store and not self.usage_incomplete else unavailable_usage(usage_days))
             except Exception:
                 result = unavailable_usage(usage_days)
             return await JSONResponse(result)(scope, receive, send)
@@ -92,16 +96,14 @@ class PrivateSurface:
                     # The operator timeout limits the actual upstream request,
                     # not just the AgentOS-to-gateway HTTP connection.
                     payload["timeout"] = profile["timeoutSeconds"]
-                    if self.usage_store is None:
-                        return await fail("model_gateway_usage_store_unavailable", 503)
                     try:
                         count = await to_thread(self.token_counter, payload,
                             upstream_model=self.models_by_alias[payload["model"]]["litellm_params"]["model"], responses=is_responses)
                     except Exception:
-                        return await fail("model_gateway_context_count_unavailable", 503)
+                        count = None
                     if type(count) is not int or count < 0:
-                        return await fail("model_gateway_context_count_unavailable", 503)
-                    if count + profile["maxOutputTokens"] > profile["contextWindow"]:
+                        count = None
+                    if count is not None and count + profile["maxOutputTokens"] > profile["contextWindow"]:
                         return await fail("model_gateway_context_window_exceeded", 422)
                     if profile["apiFormat"] == "openai-chat" and profile["reasoningEffort"] is not None:
                         # Explicitly declared compatible API support must be
@@ -133,10 +135,15 @@ class PrivateSurface:
                 # callback overrides, credentials, provider base URLs or roles.
                 metadata = {"galaxy_model_alias": payload["model"], "galaxy_scenario": scene,
                     "galaxy_config_version": version, "galaxy_call_id": str(uuid4())}
+                if profile:
+                    metadata["galaxy_input_tokens_estimate"] = count
                 payload["litellm_metadata" if is_responses else "metadata"] = metadata
                 if self.usage_store:
                     try: await to_thread(self.usage_store.start, metadata)
-                    except Exception: return await fail("model_gateway_usage_store_unavailable", 503)
+                    except Exception:
+                        self.usage_incomplete = True
+                        try: await to_thread(self.usage_store.mark_incomplete)
+                        except Exception: pass
                 encoded = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode()
             except (ValueError, UnicodeError, TypeError, RecursionError):
                 return await fail("model_gateway_request_invalid")

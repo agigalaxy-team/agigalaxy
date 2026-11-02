@@ -59,9 +59,9 @@ class QueryWindowContract(unittest.TestCase):
         # Omission remains omission, not a hidden rewrite of the user's window.
         count = len(gateway.calls)
         omitted = call("recommendations", "overview", {}, "missing-window")
-        self.assertEqual(omitted["state"], "invalid-request")
-        self.assertEqual(omitted["reason"], "agentos_query_window_required")
-        self.assertEqual(len(gateway.calls), count)
+        self.assertEqual(omitted["state"], "available")
+        self.assertEqual(len(gateway.calls), count + 1)
+        self.assertEqual(gateway.calls[-1]["arguments"]["filters"], {})
         count = len(gateway.calls)
         for module, view, filters in [
             ("recommendations", "overview", {"days": 28}),

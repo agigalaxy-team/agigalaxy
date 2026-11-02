@@ -10,13 +10,34 @@ from agno.tools.function import Function
 # builds a RunContext. The SDK otherwise saves the parent ID before forking.
 from agno.agent._run import _find_regenerate_checkpoint, _fork_run
 from .gateway import AuthorityDenied
-from .conversation_turn_state import (bind_turn_state, TURN_STATE, PLAN, ASSESSMENT, ACTIVITY,
+from .conversation_turn_state import (bind_turn_state, turn_state, TURN_STATE, PLAN, ASSESSMENT, ACTIVITY,
     PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK, TASK_PROGRESS, TASK_CONTEXT)
 
 _ATTEMPT_FIELDS = frozenset({"modelCalls", "modelSettingsVersion", "modelSettingsVersions",
     "modelFallbacks", "activeModelFallbackAlias", "toolRecovery", "rolePromptVersion",
     "boundaryVersion", "compactionStatus", "toolCompressionStatus", "_galaxyConversationCallReferences",
     TURN_STATE, PLAN, ASSESSMENT, ACTIVITY, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK, TASK_PROGRESS, TASK_CONTEXT})
+
+def _filter_source_history(session, run_context):
+    qualification = turn_state(run_context).get("sourceQualification")
+    if not isinstance(qualification, dict):
+        raise AuthorityDenied("agentos_source_qualification_unavailable")
+    affected = set(qualification.get("affectedTurns") or [])
+    legacy = qualification.get("legacyUnknown") is True
+    safe = set(qualification.get("legacySafeTurns") or [])
+    if not affected and not legacy:
+        turn_state(run_context).pop("_sourceHistoryRestricted", None)
+        return
+    session.runs = [deepcopy(run) for run in session.runs or []]
+    for run in session.runs:
+        operation = (getattr(run, "metadata", None) or {}).get("operationId")
+        if operation in affected or legacy and operation not in safe or affected and not operation:
+            run.messages = [message for message in run.messages or [] if getattr(message, "role", None) == "user"]
+            run.content = None
+    # No stored summary has per-source provenance. Never expose it when any
+    # original source is invalid; the original database rows remain untouched.
+    turn_state(run_context)["_sourceHistoryRestricted"] = True
+
 
 class ConversationAgent(Agent):
     def deep_copy(self, *, update=None):
@@ -28,7 +49,9 @@ class ConversationAgent(Agent):
     def get_tools(self, run_response, run_context, session, user_id=None):
         from .conversation_compaction import bind_run
         loader = getattr(self, "_galaxy_authorized_run", None)
-        if loader is not None: loader(run_context)
+        if loader is not None:
+            loader(run_context)
+            _filter_source_history(session, run_context)
         bind_run(run_response, run_context)
         bind_turn_state(run_response, run_context)
         return super().get_tools(run_response, run_context, session, user_id=user_id)
@@ -36,7 +59,9 @@ class ConversationAgent(Agent):
     async def aget_tools(self, run_response, run_context, session, user_id=None, check_mcp_tools=True):
         from .conversation_compaction import bind_run
         loader = getattr(self, "_galaxy_authorized_run", None)
-        if loader is not None: await asyncio.to_thread(loader, run_context)
+        if loader is not None:
+            await asyncio.to_thread(loader, run_context)
+            _filter_source_history(session, run_context)
         bind_run(run_response, run_context)
         bind_turn_state(run_response, run_context)
         tools = await super().aget_tools(run_response, run_context, session, user_id=user_id,

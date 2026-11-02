@@ -108,23 +108,24 @@ func TestWorkerOriginalDispatchFenceAndNativeReceiptRecovery(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if original["state"] != "unknown" {
-		t.Fatalf("model ended claimed inspection complete %s", encode(original))
+	if original["state"] != "completed" {
+		t.Fatalf("natural final response did not complete %s", encode(original))
 	}
 	result, e = worker.Execute(ctx, a.Object{"taskId": id})
-	if e != nil || result["state"] != "unknown" {
-		t.Fatalf("original incomplete replay %s %v", encode(result), e)
+	if e != nil || result["state"] != "completed" {
+		t.Fatalf("original completion replay %s %v", encode(result), e)
 	}
 	mu.Lock()
 	p, g := posts, gets
 	mu.Unlock()
-	if p != 1 || g != 3 {
+	if p != 1 || g != 2 {
 		t.Fatalf("native dispatch history POST%d GET%d", p, g)
 	}
 	var effective bool
-	var business, code string
-	if e = pool.QueryRow(ctx, `SELECT effective_check,business_state,code FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, endpoint, id).Scan(&effective, &business, &code); e != nil || effective || business != "not-started" || code != "task-assessment-required" {
-		t.Fatalf("business completion evidence %v %s %s %v", effective, business, code, e)
+	var business string
+	var code *string
+	if e = pool.QueryRow(ctx, `SELECT effective_check,business_state,code FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, endpoint, id).Scan(&effective, &business, &code); e != nil || effective || business != "not-started" || code != nil {
+		t.Fatalf("business completion evidence %v %s %v %v", effective, business, code, e)
 	}
 	if _, e = pool.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='failed',primary_model_usage=NULL,model_usage=NULL WHERE endpoint=$1 AND id=$2`, endpoint, id); e != nil {
 		t.Fatal(e)
@@ -145,7 +146,7 @@ func TestWorkerOriginalDispatchFenceAndNativeReceiptRecovery(t *testing.T) {
 	}
 }
 
-func TestReportRequiresCurrentAssessmentAndOriginalWriteOutcome(t *testing.T) {
+func TestReportPreservesOriginalWriteOutcome(t *testing.T) {
 	pool, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
 	f := operationsfixture.NewEndpoint(t, pool, "https://completion.example.invalid")
@@ -181,7 +182,7 @@ func TestReportRequiresCurrentAssessmentAndOriginalWriteOutcome(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO operations_autonomy_receipts_v1(id,endpoint,task_id,operation_id,action,state,basis,created_at) VALUES(gen_random_uuid(),$1,$2,$3,'test','failed','original-operation-query',now())`, f.Endpoint, id, operation); err != nil {
 		t.Fatal(err)
 	}
-	if got := report(); got["state"] != "failed" || got["businessState"] != "failed" {
+	if got := report(); got["state"] != "completed" || got["businessState"] != "failed" {
 		t.Fatalf("failed receipt: %#v", got)
 	}
 }

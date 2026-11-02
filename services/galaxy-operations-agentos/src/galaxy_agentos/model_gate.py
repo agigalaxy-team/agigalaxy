@@ -20,6 +20,28 @@ def with_current_authority(model, gateway, *, admission=None):
         if not user_id:
             raise AuthorityDenied("agentos_execution_identity_required")
         result = gateway.authorize(user_id, operation="run")
+        from .model_usage import _RUN
+        from .conversation_turn_state import TURN_STATE
+        run = _RUN.get()
+        if user_id.startswith("conversation:") and run is not None:
+            metadata = run.metadata or {}
+            state = metadata.get(TURN_STATE)
+            loaded = (state.get("sourceQualification") if isinstance(state, dict)
+                and state.get("operationId") == metadata.get("operationId")
+                and state.get("runId") == run.run_id else None)
+            if loaded is not None:
+                from .source_qualification import source_qualification
+                current_qualification = source_qualification(result)
+                old_affected = set(loaded.get("affectedTurns") or [])
+                affected = set(current_qualification.get("affectedTurns") or [])
+                old_legacy = loaded.get("legacyUnknown") is True
+                legacy = current_qualification.get("legacyUnknown") is True
+                old_safe = set(loaded.get("legacySafeTurns") or [])
+                safe = set(current_qualification.get("legacySafeTurns") or [])
+                if affected - old_affected or legacy and (not old_legacy or old_safe - safe):
+                    raise AuthorityDenied("agentos_source_qualification_changed")
+                if (run.metadata or {}).get("operationId") in affected:
+                    raise AuthorityDenied("agentos_current_source_changed")
         if admission is not None:
             admission(result)
 

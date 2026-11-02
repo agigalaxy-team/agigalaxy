@@ -67,28 +67,14 @@ func TestInspectionProfileUsesOnlyActualCoverageAndPreservesUnknown(t *testing.T
 		return out
 	}
 	result := get()
-	if result["disposition"] != "continue" {
-		t.Fatalf("partial accepted: %v", result)
-	}
-	coverage := obj(result["readCoverage"])
-	unresolved := coverage["unresolved"].([]Object)
-	if len(unresolved) != 1 || obj(unresolved[0]["inspectionOutcome"])["profileComplete"] != false {
-		t.Fatalf("missing actual segment metadata: %v", coverage)
-	}
-	if len(coverage["incidentalReadFailures"].([]Object)) != 1 {
-		t.Fatalf("unrelated read not visible: %v", coverage)
-	}
-	exec(`UPDATE operations_autonomy_tool_calls_v1 SET code='inspection-current-complete' WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, endpoint, task, partial)
-	result = get()
 	if result["disposition"] != "completed" {
-		t.Fatalf("complete profile should not require unrelated audit: %v", result)
+		t.Fatalf("partial inspection should not be a general completion gate: %v", result)
 	}
 	exec(`UPDATE operations_autonomy_tool_calls_v1 SET code='task-assessment-stale' WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, endpoint, task, assessment)
 	result = get()
-	if result["disposition"] != "continue" || result["reasonCode"] != "task-assessment-required" {
-		t.Fatalf("missing latest assessment: %v", result)
+	if result["disposition"] != "completed" {
+		t.Fatalf("assessment should be optional: %v", result)
 	}
-	exec(`UPDATE operations_autonomy_tool_calls_v1 SET code='task-assessment-current' WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, endpoint, task, assessment)
 	add("execute-operation", "unknown", "", `{}`)
 	result = get()
 	if result["disposition"] != "unknown" || result["businessState"] != "unknown" {

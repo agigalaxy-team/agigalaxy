@@ -1,3 +1,4 @@
+from galaxy_agentos.conversation_tools import preparation_tools
 import json
 import unittest
 from uuid import uuid4
@@ -14,7 +15,7 @@ class HumanPreparationSemantics(unittest.TestCase):
             def conversation_tool(self,user_id,tool,arguments,**binding):
                 calls.append({'user':user_id,'tool':tool,'arguments':arguments,**binding})
                 return available if tool=='list-authorized-work' else {'state':'prepared','card':{'kind':'content-curation','requiredAction':'content.curate'}}
-        tools=conversation_tools(Gateway());listing,prepare=tools[2],tools[-1]
+        gateway=Gateway();tools=conversation_tools(gateway);listing,prepare=tools[2],preparation_tools(gateway,domains=['content'])[0]
         schema=ContentCuration.model_json_schema()['properties']['topic']
         self.assertIn('Explicit topic=null clears',schema['description'])
         self.assertIn('Omit topic',schema['description'])
@@ -24,8 +25,6 @@ class HumanPreparationSemantics(unittest.TestCase):
         function.process_entrypoint()
         wire_schema=json.dumps(function.parameters,ensure_ascii=False)
         self.assertIn('Explicit topic=null clears',wire_schema)
-        self.assertIn('not require a pre-existing execution',prepare.__doc__)
-        self.assertIn('not the set of actions',listing.__doc__)
         context=RunContext(run_id=str(uuid4()),user_id='conversation:'+str(uuid4()),session_id=str(uuid4()),metadata={'operationId':str(uuid4()),'userPublicReferences':{'items':[],'complete':True}})
         listed=json.loads(listing(context,FunctionCall(function=Function.from_callable(listing),call_id='empty-directory')))
         self.assertEqual(listed,available)

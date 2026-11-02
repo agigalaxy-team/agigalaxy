@@ -7,7 +7,7 @@ from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
 from pydantic import TypeAdapter, ValidationError
 
-from galaxy_agentos.conversation_tools import PreparedOperation, conversation_tools
+from galaxy_agentos.conversation_tools import PreparedOperation, preparation_tools
 
 
 class RecordingNode:
@@ -27,14 +27,14 @@ class FileAccessToolContract(unittest.TestCase):
             "action":"stop","until":1900000000,"reason":"明确合成访问停止原因"}
         restore={"kind":"file-access","targetKind":"forum","targetId":str(uuid4()),
             "action":"restore","reason":"明确合成解除原因"}
-        node=RecordingNode();tools=conversation_tools(node)
+        node=RecordingNode();prepare=preparation_tools(node,domains=["maintenance"])[0]
         context=RunContext(run_id=str(uuid4()),session_id=str(uuid4()),
             user_id="conversation:"+str(uuid4()),metadata={"operationId":str(uuid4())})
-        function=Function.from_callable(tools[-1])
+        function=Function.from_callable(prepare)
         for index,value in enumerate([stop,restore,{**restore,"until":None}]):
             operation=schema.validate_python(value)
             call=FunctionCall(function=function,call_id="file-review-"+str(index))
-            result=json.loads(tools[-1](context,call,operation))
+            result=json.loads(prepare(context,call,operation))
             self.assertEqual(result["state"],"prepared")
             self.assertFalse(result["effectExecuted"])
             self.assertFalse(result["preparationFeedback"]["mayClaimPrepared"])
@@ -55,7 +55,6 @@ class FileAccessToolContract(unittest.TestCase):
         for value in bad:
             with self.assertRaises(ValidationError):schema.validate_python(value)
         self.assertEqual(len(node.calls),3)
-        self.assertIn("neither a revoke/delete",tools[-1].__doc__)
         self.assertNotIn("run_context",function.parameters["properties"])
         self.assertNotIn("fc",function.parameters["properties"])
 

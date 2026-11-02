@@ -17,6 +17,7 @@ from .gateway import AuthorityDenied, AuthorityUnavailable, failure_diagnostic, 
 from .conversation_tool_feedback import _preparation_feedback
 from .conversation_turn_state import turn_state, ACTIVITY, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN
 from .tool_schema_feedback import operation_schema_feedback, repair_operation_alias
+from .business_tools import is_preparation_tool
 
 PREPARED_CARD_MESSAGE = "请确认操作。"
 
@@ -40,7 +41,7 @@ def _model_feedback(value):
     if not isinstance(value, dict):
         return value, {}
     # Only the exact closed envelope from the authenticated gateway survives.
-    if (set(value).difference({"state", "reason", "httpStatus", "scope", "retryable", "action", "preparationFeedback", "analysisConstraints"}) == set()
+    if (set(value).difference({"state", "reason", "httpStatus", "scope", "retryable", "action", "preparationFeedback"}) == set()
             and value.get("state") == "invalid-request"
             and isinstance(value.get("reason"), str) and value["reason"] in SAFE_ARGUMENT_ERROR_CODES
             and type(value.get("httpStatus")) is int and value["httpStatus"] in {400, 422}
@@ -176,7 +177,7 @@ def _normalize(name, arguments, schema):
                 filters = {}
             if isinstance(filters, dict) and not any(key in filters and filters[key] != values[key] for key in misplaced):
                 values["filters"] = {**filters, **{key: values.pop(key) for key in sorted(misplaced)}}
-    if name in {"prepare_operation", "execute_operation"}:
+    if is_preparation_tool(name) or name == "execute_operation":
         values = repair_operation_alias(values, schema)
     return repair(values, schema)
 
@@ -202,13 +203,9 @@ def reliable_function(fn, *, on_read_validation_failure=None):
         try:
             on_read_validation_failure(run_context, fc, native.name, values, schema)
         except Exception:
-            if run_context.metadata is None:
-                run_context.metadata = {}
-            run_context.metadata["_galaxyDutyValidationLedgerFailed"] = True
-            function = fc.function.model_copy()
-            function.stop_after_tool_call = True
-            fc.function = function
-            raise RuntimeError("agentos_autonomy_validation_ledger_unavailable") from None
+            # Diagnostics are best-effort; failure to record a rejected read
+            # must not prevent the model from correcting its arguments.
+            _event(native.name, run_context, "validation-record-unavailable")
 
     def invoke(run_context: RunContext, fc: FunctionCall, **arguments):
         if set(fc.arguments or {}).intersection({"run_context", "fc", "agent", "team"}):
@@ -229,7 +226,7 @@ def reliable_function(fn, *, on_read_validation_failure=None):
                     state = value.get("state", value.get("availability", "returned")) if isinstance(value, dict) else "returned"
                     if isinstance(value, dict) and value.get("state") == "invalid-request":
                         record_local_failure(run_context, fc, values)
-                    if native.name == "prepare_operation" and isinstance(value, dict):
+                    if is_preparation_tool(native.name) and isinstance(value, dict):
                         prepared = _preparation_feedback(value)
                         if prepared["preparationFeedback"]["cardPrepared"] is None:
                             turn_state(run_context)[PREPARE_UNKNOWN] = True
@@ -253,7 +250,7 @@ def reliable_function(fn, *, on_read_validation_failure=None):
                     return result
                 except AuthorityUnavailable as error:
                     if native.name not in READ_TOOLS or attempt or getattr(error, "retry_read", True) is False:
-                        if native.name == "prepare_operation":
+                        if is_preparation_tool(native.name):
                             turn_state(run_context)[PREPARE_UNKNOWN] = True
                             return json.dumps({"state":"unknown", "cardPrepared":None, "effectExecuted":False, "retryable":False, "nextStep":"query-original-operation"})
                         uncertain = native.name in EFFECT_TOOLS
@@ -271,16 +268,12 @@ def reliable_function(fn, *, on_read_validation_failure=None):
             # private input. Log only schema-owned names and bounded indices.
             errors = [{"field": ".".join(str(x) if isinstance(x,int) and 0<=x<=1024 or isinstance(x,str) and x in known_fields else '<field>' for x in item['loc'][:8]),
                 "type": item['type'] if re.fullmatch(r'[a-z_]{1,80}',item['type']) else 'validation_error'} for item in error.errors(include_input=False, include_url=False)][:8]
-            counters = run_context.metadata.setdefault("toolRecovery", {}) if isinstance(run_context.metadata, dict) else {}
-            key = native.name + ":" + ",".join(x["field"] + ":" + x["type"] for x in errors)
-            counters[key] = counters.get(key, 0) + 1
-            exhausted = counters[key] > 2
-            _event(native.name, run_context, "invalid-request", errors=errors, exhausted=exhausted)
+            _event(native.name, run_context, "invalid-request", errors=errors)
             return json.dumps({"state": "invalid-request", "message": "工具调用参数不符。", "dataRead": False, "valuesCurrent": False, "errors": errors,
                 "allowedFields": sorted(schema.get('properties',{})),
-                **(operation_schema_feedback(schema, values) if native.name in {"prepare_operation", "execute_operation"} else {}),
+                **(operation_schema_feedback(schema, values) if (is_preparation_tool(native.name) or native.name == "execute_operation") else {}),
                 "effectExecuted": False, "cardPrepared": False, "retryable": True,
-                "nextStep": "correct-arguments", "repeatedValidationFailure": exhausted,
+                "nextStep": "correct-arguments",
                 "instruction": "No card exists from this failed call. Correct the fields against this tool's schema without changing the requested operation; never report success."}, ensure_ascii=False)
 
     return Function(name=native.name, description=native.description, parameters=schema,

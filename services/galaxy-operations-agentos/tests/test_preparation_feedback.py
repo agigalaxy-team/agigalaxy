@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from agno.run.base import RunContext
 from agno.tools.function import Function, FunctionCall
-from galaxy_agentos.conversation_tools import _preparation_feedback, conversation_tools
+from galaxy_agentos.conversation_tools import _preparation_feedback, conversation_tools, preparation_tools
 
 
 class PreparationFeedbackTests(unittest.TestCase):
@@ -50,7 +50,7 @@ class PreparationFeedbackTests(unittest.TestCase):
                 self.calls += 1
                 return {'state': 'invalid-request', 'reason': 'agentos_tool_arguments_invalid', 'effectState': 'not-confirmed'}
         gateway = Gateway()
-        entrypoint = conversation_tools(gateway, domain='overview')[-1]
+        entrypoint = preparation_tools(gateway, domains=['ai_management'])[0]
         function = Function.from_callable(entrypoint)
         function.process_entrypoint()
         function._run_context = RunContext(run_id=str(uuid4()), user_id='conversation:' + str(uuid4()),
@@ -69,7 +69,7 @@ class PreparationFeedbackTests(unittest.TestCase):
         class Gateway:
             def conversation_tool(self, *args, **kwargs):
                 raise AssertionError('a local source rejection must not call Gateway')
-        tool = conversation_tools(Gateway(), domain='overview')[-1]
+        tool = preparation_tools(Gateway(), domains=['ai_management'])[0]
         function = Function.from_callable(tool)
         function.process_entrypoint()
         function._run_context = RunContext(run_id=str(uuid4()), user_id='conversation:' + str(uuid4()),

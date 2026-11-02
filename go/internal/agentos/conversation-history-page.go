@@ -198,6 +198,20 @@ func (s *Conversations) ReadHistoryPage(ctx context.Context, human operationsper
 			runs = append(runs, Object{"runId": item.runID, "operationId": item.operation, "origin": origin, "parentOperationId": parent, "logicalTurnId": item.root, "userInput": input, "content": value["content"], "createdAt": value["createdAt"], "sentAt": item.sentAt.Unix(), "completedAt": value["completedAt"], "displayOnly": true})
 		}
 	}
+	if current.Row != nil {
+		fresh, err := s.CurrentRead(ctx, current.Row.ID, &human)
+		if err != nil {
+			return nil, err
+		}
+		if fresh.Row.ID != current.Row.ID {
+			return nil, fail("operations_agentos_context_changed", 409)
+		}
+		for _, run := range runs {
+			if fresh.SourceQualification.restricts(text(run, "operationId")) {
+				run["content"] = nil
+			}
+		}
+	}
 	at := s.now().Unix()
 	return Object{"domain": domain, "conversationId": readConversationID(current), "runs": runs, "hasMore": hasMore, "nextCursor": next, "contextChanged": false, "checkedAt": at}, nil
 }

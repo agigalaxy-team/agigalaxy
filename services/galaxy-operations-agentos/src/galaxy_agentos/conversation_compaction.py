@@ -77,6 +77,13 @@ class ConversationCompaction(Compaction):
         self.input_budget = input_budget
         super().__init__(**kwargs)
 
+    def archive_for(self, *args, **kwargs):
+        from .conversation_turn_state import turn_state
+        run = _current()
+        if run is not None and turn_state(run).get("_sourceHistoryRestricted"):
+            return None
+        return super().archive_for(*args, **kwargs)
+
     def should_compact(self, messages, **kwargs):
         # Agno's planner reads at most 500 recent runs before the first fold.
         # Fold earlier even when many short turns remain below the token limit.
@@ -107,7 +114,9 @@ class ConversationCompaction(Compaction):
             try:
                 result = super().compact(messages, **kwargs)
                 if result is not None and self.store_compacted_messages and not result.archived:
-                    result = None
+                    from .conversation_turn_state import turn_state
+                    if not turn_state(run).get("_sourceHistoryRestricted"):
+                        result = None
                 if result is None:
                     run.metadata = {**(run.metadata or {}), "compactionStatus": "failed"}
                     if sum(message.role == "user" for message in messages) >= 400:
@@ -134,7 +143,9 @@ class ConversationCompaction(Compaction):
             try:
                 result = await super().acompact(messages, **kwargs)
                 if result is not None and self.store_compacted_messages and not result.archived:
-                    result = None
+                    from .conversation_turn_state import turn_state
+                    if not turn_state(run).get("_sourceHistoryRestricted"):
+                        result = None
                 if result is None:
                     run.metadata = {**(run.metadata or {}), "compactionStatus": "failed"}
                     if sum(message.role == "user" for message in messages) >= 400:

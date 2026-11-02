@@ -1,6 +1,6 @@
 # AgentOS、模型网关与固定策略
 
-Python Agno AgentOS负责原生会话、run、持久队列与HumanReview；Go负责业务计划、当前权威、命令和回执。通用授权及未知操作处理见[接口](interfaces.md#管理身份与原操作)，部署发行见[部署](../operations/deployment.md)。本页只保存原生协议、存储和配置合同。
+Python Agno AgentOS负责原生会话、run、持久队列与HumanReview；Go负责业务计划、当前权威、命令和回执。通用授权及未知操作处理见[接口](interfaces.md#管理身份与原操作)，部署发行见[部署](../operations/deployment.md)。本页保存原生协议、存储和配置合同。本批共同循环与领域工具为当前源码机制；部署和真实运行状态以 [WORK_STATUS](../../WORK_STATUS.md) 为准。
 
 ## 工作台上下文与会话压缩
 
@@ -18,17 +18,17 @@ Python Agno AgentOS负责原生会话、run、持久队列与HumanReview；Go负
 
 ## 连续业务处理与聊天确认
 
-工具声明按当前处理阶段交付：读取、分析及尚未声明制卡的阶段不携带完整 `prepare_operation` 联合参数定义；现有 `plan_turn` 获服务端接受为 prepare 后，下一次原生模型调用即可取得制卡定义。原工具注册、具体对象校验和人工确认不变，不按岗位名称限制，也不靠文本关键词猜测读取或写入意图。显式工具选择保持原意；阶段切换不增加用户轮次、不改历史、不重发操作。
+本批源码保留 Agno 的工具注册与调度，启动时注册各领域准备工具，模型按需调用 `load_business_tools` 加载当前运行所需的领域定义及读取口径。加载只提供工具定义，不授予权限或读取业务数据；每次准备仍由原服务核对当前身份、对象、来源和版本。查询中省略时间窗口时由原业务服务采用合法默认值，明确给出的范围照实传入；返回的 period、basis 和 coverage 决定解释口径。
 
-会话沿用 Agno 原生工具循环，银河在模型响应边界驱动同一原任务。`plan_turn` 只声明当前准备数量等子约束，不限定整个任务只有答复或制卡。`assess_turn` 根据当前工具事实、原目标和剩余工作判断继续、完成、等待确认、等待结果、缺少信息、受阻或中断；新活动使旧评估失效。Go 在原 commands.result 中持久 taskProgress，原操作、重试和确认反馈归属同一根任务；native COMPLETED 只说明本次模型运行结束，不代表业务目标完成。原任务接续即使尚无新工具活动、剩余清单为空，也须经新鲜任务评估，不按普通首轮问候被动完成。剩余工作非空、当前仍有待确认卡或未知业务结果时不得标任务完成；历史失败和取消保留，但不永久阻止后续有效评估。
+会话和 Duty 共用任务循环边界，Agno 仍负责消息配对和工具执行。模型自然结束时会话按原任务持久进度；`assess_turn` 可记录明确的继续、等待、缺少信息或受阻，不要求每个普通任务先评估。`plan_turn` 可为多个互斥备选声明任意正数的分组，不是单卡准备的前提，也不是固定数量的通用门槛。Go 在原 commands.result 中持久 taskProgress，原操作、重试和确认反馈归属同一根任务；native COMPLETED 只表示本次模型运行结束，业务状态由原卡、原操作和实际回执分别确定。
 
 阶段性答复后仍需继续时，运行器在模型调用副本中明确加入接续信号，并在后续工具交换中保持该信号的位置和标识；不以最后一条 assistant 答复直接充当新请求。信号不改变原用户输入、不落入聊天或历史，也不增加重试次数。普通模型答复和等待人工的阶段不插入接续信号。
 
-没有固定接续轮数。相同事实和相同待处理步骤形成的实际循环可判受阻；既有运行时间上限只产生中断，不冒充完成。程序固定边界和新撤权继续生效，未知写入仅核原操作，不重发。卡实际准备齐后等待人工；确认回执作为中间结果，同owner精确读取的原目标及剩余工作交回模型，允许继续查询、准备下一步或最终完成，不将短反馈消息替换成新的全部目标。原目标取不到时明确停止接续，不猜测，也不增加私有全文的第二份持久存储。原目标、同根有序操作历史和本次回执在运行工具装配前必需加载；异步入口将上下文装载及业务工具请求移到线程，允许业务服务回读原运行，避免阻塞同一事件循环。加载失败直接保留原异常并停止该轮，不经引擎会吞异常的普通前置钩子后继续模型调用。
+没有固定接续轮数，也不以重复事实的哈希或失败次数作为通用结束门槛。会话显式标记继续，或 Duty 的新鲜评估明确有剩余工作时，沿原 run 接续；运行时间上限产生中断，不冒充完成。程序固定边界和当前撤权继续生效，未知写入仅核原操作，不重发。确认回执作为中间结果，同 owner 精确读取的原目标及剩余工作交回模型，允许继续查询、准备下一步或最终答复，不把短反馈替换成全部目标。原目标取不到时明确停止接续，不猜测，也不新增私有全文持久副本。原目标、同根有序操作历史和本次回执在运行工具装配前加载；异步入口将上下文及业务工具请求移到线程，加载失败保留原异常并停止该轮。
 
 参考的是 [OpenCode 的流事件、工具状态与 stop/continue 分流](https://github.com/anomalyco/opencode/blob/fe8cd6596f997aba13a0fcab6baf1e2b5a0178bc/packages/core/src/session/runner/step.ts)和 [DeepSeek Harness 的 agent 循环](https://github.com/deepseek-ai/deepseek-harness/blob/ce7073d51254c26cd63b22a60835b8f948deb447/packages/core/agent-loop/src/agent.ts)中的分层方式：分别处理步骤结果、是否继续、工具待决及停止原因；未移植其运行时。Agno 的 followup 建议不当成业务执行接续；模型答复完成、卡已准备和业务完成继续分别记录。
 
-确认卡归属原 `turnId`；`presentation` 提供业务摘要、变更、影响与限制，不把原始命令 JSON 当正文。完整配置按冻结前后源比较，只展开相关差异；缺块或重要变化无法翻译时不可确认。岗位要求仍用专用全文审阅。`choice` 仅表示明确的互斥备选，服务端按原轮事务控制数量和选择；选择一项即关闭其他项。操作侧栏仅摘要和只读详情。普通回复使用业务名称，不复述内部命令或编号；执行反馈只向模型提供业务化差异、真实状态与摘要，原卡和原操作关联仍由服务端保留，不把展示省略当作删除审计。
+确认卡归属原 `turnId`；`presentation` 提供业务摘要、变更、影响与限制，不把原始命令 JSON 当正文。完整配置按冻结前后源比较，只展开相关差异；缺块或重要变化无法翻译时不可确认。岗位要求仍用专用全文审阅。`choice` 仅表示明确的互斥备选，服务端按原轮事务控制分组和选择；选择一项即关闭同组其他项。多方案卡按可用宽度并排或换行，单卡保持原布局。操作侧栏仅摘要和只读详情。普通回复使用业务名称，不复述内部命令或编号；执行反馈只向模型提供业务化差异、真实状态与摘要，原卡和原操作关联仍由服务端保留，不把展示省略当作删除审计。
 
 保存记录读取与实际执行分开：原操作记录按当前会话归属及精确原号读取，内网使用仅限该 GET 的 conversation-record 签名；排队占位记录未写齐绑定时仅返回原号待定，不误报失权；明确身份或原号冲突仍拒绝，终态缺绑定按读取异常处理。不为展示反复核对整段聊天的业务来源。新模型调用、工具、确认及取消仍使用正式执行权限和对象条件。显式重试确认后的回复时，沿同主体、同卡及原反馈链承接原回执，不重复确认业务。沟通状态续期只核当前身份和会话，不回读旧业务资料。同一任务的有序保存卡和结果作为工作进展进入模型上下文，防止只见最后一卡而重复已经完成的步骤；记录不提供新授权，未记录的原始基线不能猜测。
 
@@ -62,7 +62,7 @@ Go通过 `GALAXY_AGENTOS_CONFIG_FILE` 读取严格 `{version:1,endpoint,url,sign
 | `execution:<UUID>` | 已准备的grant、领域、对象、revision和intent，沿专项事项及真实HumanReview等待 |
 | `autonomy:<UUID>` | Go的稳定AI账户、计划、task、purpose/versions；不携带管理浏览器会话，River调度原任务 |
 
-conversation工具源为 `conversation_tools.py`、共享 `galaxy-contracts/src/operations-agentos-query-schema.mjs` / action catalog：current_summary、query_operations、read_operation_object、list_authorized_work、run_authorized_work、prepare_operation分别对应当前摘要、闭合查询、精确对象、获准事项、原事项接续和操作卡准备；read_task_operation读取原AI业务操作的闭合历史回执。Go收到 `{conversationId,sessionId,turnId,runId,callId,tool,arguments}`，这些可信坐标不是模型参数。字段/动作随代码维护，不复制固定工具数；通用查询不接受任意SQL/HTTP或整项command。
+conversation工具源为 `conversation_tools.py`、`business_tools/`、共享 `galaxy-contracts/src/operations-agentos-query-schema.mjs` / action catalog：current_summary、query_operations、read_operation_object、list_authorized_work、run_authorized_work分别对应当前摘要、闭合查询、精确对象、获准事项和原事项接续；load_business_tools按需提供领域准备工具，read_task_operation读取原AI业务操作的闭合历史回执。Go收到 `{conversationId,sessionId,turnId,runId,callId,tool,arguments}`，这些可信坐标不是模型参数。字段/动作随代码维护，不复制固定工具数；通用查询不接受任意SQL/HTTP或整项command。
 
 浏览器 `/v1/operations/agentos` dispatcher提供status/options/executions；原execution的events/runs/review/continue；按domain的conversations/runs、operations/:uuid、cards/:uuid及confirm；全局runs仅audit元数据。实际方法/DTO由dispatcher/schema定义。准备卡必须同时有 `state=prepared`、`card.state=prepared`、真实cardId，preparationFeedback只扩充原结果说明。一般查询仅返回显式安全投影；公开帖子/回复仍带受控来源，私聊/案件/反馈/邮件正文不因模块名或workbench.read进入通用对话。选定内容工具从execution当前选集取引用，不把空集合扩大为全站，不产生画像事件。
 
@@ -77,17 +77,15 @@ conversation工具源为 `conversation_tools.py`、共享 `galaxy-contracts/src/
 
 callbacks为固定private prefix的autonomy/authorize、tools/execute、report。waiting-human在post-tool barrier建立external-execution requirement，续接只注入原操作结果，不再运行writer。人类会话可带taskId进入原卡路径，不把cancelled run重启成后台工作。queue并发2、max_attempts=1、SDK外层3600秒；task冻结roundSeconds为30..3600（默认600），旧任务缺值才用 `GALAXY_AGENTOS_WORK_TIMEOUT_SECONDS`。timeout先写原生cancel cause再取消，Go代码动作也查deadline；事项重叠/事件合并由Go处理。
 
-值守结束由模型目标评估、原生模型状态、真实业务回执分别表达。`assess-task`只声明冻结目标是否满足以及剩余读取、动作或人工事项，不能证明业务效果；评估落在原任务工具账本，其他工具开始或完成后使旧评估失效。Go汇总全部原业务回执和未决写调用：未知写入不能被一次成功读取或模型的完成声明覆盖，失败回执不能变成成功。普通剩余工作在同一个原生run内继续模型与工具步骤，复用原messages、checkpoint和实际调用计数，期限仍是本轮roundSeconds；真实人决暂停优先于补续。连续结束却没有进展时记录技术失败，不编造人工决定。`reconcile-task-operations`只按本任务已经落账的callId、参数和operation核查未知写入，不接受模型提供新操作编号，也不重发原writer。
+值守的可选 `assess-task` 记录冻结目标的进度和剩余工作，不证明业务效果；明确剩余工作可在同一原生 run 中继续，真实人决或原操作待结果沿已有状态等待。普通自然结束不要求额外评估，也不按失败计数或相同内容哈希强制判终；Go 的当前任务状态、未决人决和原业务回执仍分别表达真实结果。`reconcile-task-operations`只按本任务已经落账的 callId、参数和 operation 核查未知写入，不接受模型提供新操作编号，也不重发原 writer。
 
-读取覆盖由原工具账本核对，不能用模型的`goalSatisfied`覆盖尚未取得的结果。跨Go的不可用/非法请求，以及Duty本地Pydantic拒绝的读取，都记录在同一任务账本；本地记录只保合法route/scope与歧义状态，不保非法正文或产生业务效果。同callId只能确认同工具、同可证范围的原失败记录，不能吞掉冲突。参数修复提示由既有发布schema生成，完整策略kind及唯一类名别名也从实际SDK schema提取。补续的进展按已取得事实、范围及真实回执去重，重复错误、新callId或新assessment编号不算进展。有界巡检已通过真实读取与自然结束，仍须把读取完成、业务效果与最终解释准确性分别验收。
+读取结果和失败按原账保存，模型须据实际来源、权限、范围和覆盖解释；一次成功读取不能证明另一项读取成功。校验失败返回当前 schema 可表达的参数反馈，不猜业务选择；读取验证账本的本地记录失败不会阻止模型继续修正。可选 `readResolutions` 保留原证据坐标用途，不再作为通用完成门槛。原 23be 失败及后续 attempt 的最终模型错误仍保留，不能据本批规则变更回写旧记录。
 
-读取限制的处置沿原`readResolutions`合同进入实际SDK及程序裁决：`superseded`只认同任务、同范围的后续完整成功读取；`not-applicable`须明确引用同任务已核选定对象的精确读取或原领域回执，才能将范围外的附带读取保留为旁读失败，不将它改为成功或全量覆盖。原call编号及有界成功依据随补续事实提供，不要求模型猜编号。显式固定巡检、选定目标自身未取得的结果、未知写入及未决人决仍独立约束结束。23be的选定文件已读取且最后评估有效，但额外全站巡检长期部分拒权及未被同scope后续读取覆盖的jobs失败被当作必需读取，最终为completion_incomplete；这份原失败不回写成功。该修复已通过原账形状和实际SDK的隔离检查。后续唯一受控新attempt确已提交5项not-applicable，但统一引用过早成功读取，仅一项满足后续证据时序；已有更晚成功依据未被选用，又追加巡检使评估失效，未完成自然结束验收。该attempt最终为operations_autonomy_model_failed，最后一次非流式模型请求被Gateway以no-final-answer-or-tool/502拒绝，不能沿用首轮completion_incomplete解释最终退出；原账保留且不再新Run。
-
-空参数`inspect-operations`固定以`current-operations-v1`组合现有获准工作台聚合、维护组件与已接入Galaxy River业务队列、7天搜索与分析、30天推荐、有限分页的当前消息计划、当前在办任务及这些任务的原业务回执、当前委派实际目标的岗位要求。机械参数、目标枚举及必要分页由代码处理，首尾核当前权威；岗位要求只是配置数据。`inspectionChecked/profileComplete`只证明这个明确口径取得，不代表全库或全部历史已穷尽。工作台未授权附带项保null及排除清单；关键来源缺数据、未获准或受控来源扣留保持partial。合法榜单/最近页已取得可作为有界事实，样本及供给快照是否完整另列，不能迫使例行巡检扫描全站。真正全量目标仍需相应完整集合。后续读失败按真实规范化scope、窗口和分页坐标或固定inspect承诺的同范围自动关联；模型不再靠编写callId证明完成，未知writer、精确对象未读及范围歧义仍不能被聚合覆盖。
+空参数`inspect-operations`固定以`current-operations-v1`组合现有获准工作台聚合、维护组件与已接入Galaxy River业务队列、7天搜索与分析、30天推荐、有限分页的当前消息计划、当前在办任务及这些任务的原业务回执、当前委派实际目标的岗位要求。机械参数、目标枚举及必要分页由代码处理，首尾核当前权威；岗位要求只是配置数据。`inspectionChecked/profileComplete`只证明这个明确口径取得，不代表全库或全部历史已穷尽。工作台未授权附带项保null及排除清单；关键来源缺数据、未获准或受控来源扣留保持partial。合法榜单/最近页已取得可作为有界事实，样本及供给快照是否完整另列，不能迫使例行巡检扫描全站。真正全量目标仍需相应完整集合。读取失败及覆盖按实际来源和口径报告，未知 writer 仍沿原操作核查。
 
 工作台真实Duty使用原聚合主体及同事务只读身份屏障，避免将`workbench.read`误送入业务写授权；维护保持真实`adopted-galaxy-river-transport`和`includesAllPlatformQueues=false`，按这个范围的可用性、完整计数及组件集合核查，不承诺其它原生队列全集；自治元数据逐条核当前Duty的搜索配置读取权，或反馈/公开内容的真实来源，事件及其它未接来源仍扣留。该机制已上线并通过新任务八段完整读取及自然结束。观察到unhealthy或原操作unknown应如实报告，不要求先把业务修绿才能完成读取；未取得的必需信息仍不能声称已核。历史失败原目标和原记录保留，不回写为成功。
 
-源码允许纯读取计划显式冻结`inspectionProfile=current-operations-v1`，限`ai/ai-human`且actions、grantIds、strategyIds、resourceIds、eventTypes五数组为空。136在原工具账本增加有界`read_outcome`，只保存固定八段的覆盖状态和闭合缺因，不存材料正文；旧记录缺此字段保持未知，不回填历史缺段。补续把实际completion裁决、必需未决范围与附带读取失败分别回给同run，不能只给reasonCode让模型反复宣称全部正常。明确profile之外的可证失败如实保留，但不自动扩大原巡检目标；未知写入和范围歧义仍独立阻止假完成。业务异常是巡检发现，读取其状态不等于要求模型先修复它。此前760842a7原两次inspect均partial且最终未完成，现存账本不足以倒推具体缺段，这些旧任务不回写成功。精确反馈小目标7c1d0b9d已取得完整对象读取和随后有效评估，独立回读一致，无业务写。
+源码允许纯读取计划显式冻结`inspectionProfile=current-operations-v1`，限`ai/ai-human`且actions、grantIds、strategyIds、resourceIds、eventTypes五数组为空。136在原工具账本增加有界`read_outcome`，只保存固定八段的覆盖状态和闭合缺因，不存材料正文；旧记录缺此字段保持未知，不回填历史缺段。实际读取失败与覆盖按原账保留，不自动扩大原巡检目标，也不能把未知写入或范围歧义说成成功。业务异常是巡检发现，读取其状态不等于要求模型先修复它。此前760842a7原两次inspect均partial且最终未完成，现存账本不足以倒推具体缺段，这些旧任务不回写成功。精确反馈小目标7c1d0b9d已取得完整对象读取和随后有效评估，独立回读一致，无业务写。
 
 后续真实profile任务ca2632d9已取得八段完整结果，最后有效评估后自然完成，四次实际模型调用、无业务写，证明有界读取与结束主链可完成；原模型摘要仍把River范围误称全平台，不能把这一摘要当作准确巡检报告。139源码因此把程序事实与AI分析分别交付：inspect的固定范围、窗口、覆盖、授权内安全计数及闭合异常保存到原call的`read_outcome.inspectionReport`，不存检索词、岗位正文、对象材料或受众；原目标评估摘要保留。
 
@@ -101,11 +99,11 @@ API能够连接AgentOS不证明Worker已加载相同运行配置。原health记�
 
 工作台发送先建立同一原操作的本地发送状态并清空编辑框，确认失败才退回文字，不覆盖后续草稿；结果未知只核对原操作。ACK、流式片段与精确原operation结果合并到对应轮次，保留已完成历史；初始进入及真实事件缺口仍可读取当前快照。读取资格使用`/qualification`单独续证，身份/来源真实失效仍执行原边界。 历史`/history`、操作卡`/cards`、沟通条件`/context`和总控管理能力`/management-capabilities`分别读取与呈现，任一慢源不阻塞其他区域。context只用原账本定位最新操作，不冒充模型终态；完成内容由原operation回执合并；同一轮次的并发读取合并，终态后首次取回失败继续核对该原操作，不重发消息。保存卡片不定时核对旧来源；实际点击操作时核对当前条件。 已完成处理的摘要复用严格匹配的已落账终态回执；旧回执缺字段时按同owner、固定AI精确恢复，最多4路并行。单条不可用标明部分覆盖，不让缺少专项回调阻断整个摘要，也不把原对象引用当作当前读取授权。模型摘要反馈依据systemSupport、permissionAllowed、delegated分别给出功能接通、权限与委派事实，不从未授权推断未开发；后台接口与回执保留原始结构，模型只接收业务能力事实视图，不同时重复提供底层授权标志；时间仅转换本轮checkedAt，不从历史补造。管理能力的query/prepare投影各计算一次，摘要的处理记录、业务概览和管理能力并行读取，最终统一复核当前身份与来源。 固定动作和权限目录启动时解析并建索引，不能在每条权限核验时重复解码整份JSON；该索引只保存代码定义，实际人员、AI角色、委派及来源资格仍实时读取。纯读工具使用独立只读资格投影，保留首尾新鲜复核；角色目录读不持有角色更新锁，准备及修改操作保留原锁。自动运行概览按候选任务批量取来源引用，再执行原逐对象检查，不改变统计范围。定向轮次、工具和卡片事件只更新对应资源；补发缺口才重取历史快照。
 
-`store_tool_messages=False`不清除RunOutput.tools或event body。`conversation_storage.py`对普通save、atomic error与attempt-fenced worker写共同投影，移除工具参数/结果、event body/additional_input，保闭合ID/错误/时间/metrics。用户输入/最终回答是会话历史，Go绑定来源失效时轮换/withhold会话；不宣称物理擦除旧行或新增保留期。Duty存元数据与真实usage，目的材料/卡/命令仍归Go账本。trace不含prompt/completion/tool正文或异常原文。
+`store_tool_messages=False`不清除RunOutput.tools或event body。`conversation_storage.py`对普通save、atomic error与attempt-fenced worker写共同投影，移除工具参数/结果、event body/additional_input，保闭合ID/错误/时间/metrics。用户输入和最终回答保留为原会话历史。来源按服务端原轮次与版本关联，失效时只屏蔽受影响的派生正文、卡摘要及模型历史，不退役整段会话；用户原话和其它合格轮次继续保留。旧引用缺少轮次关联时保守屏蔽无法确定来源的旧派生内容，新轮次以服务端标记识别。资格复核分批进行，没有总会话来源数量上限。模型不采用无法证明可读的旧压缩归档，合法消息仍可在本轮临时压缩；原行和归档不删除。Duty存元数据与真实usage，目的材料/卡/命令仍归Go账本。trace不含prompt/completion/tool正文或异常原文。
 
-普通沟通的制卡、确认与结果接续采用本页通用任务循环；操作卡准备完进入等待确认，程序交接通知与本轮持久文本一致。工具后仍可继续修正参数或处理剩余事项，不能用强制 stop_after_tool_call 代替整个任务的完成判断。原卡人工确认和业务回执保持独立；模型native结束不表示业务已经生效。
+普通沟通的制卡、确认与结果接续采用本页共同任务循环。工具后可继续修正参数或处理剩余事项；不以强制 `stop_after_tool_call` 或固定卡数代替任务判断。原卡人工确认和业务回执保持独立，模型 native 结束不表示业务已经生效。
 
-普通会话的多prepare批次在执行前统一返回对应callId的纠正反馈，避免Agno并发批次在首卡成功停步前继续生成其它卡；同批只读仍可正常运行。原会话角色轮04619614实际provider顺序和当前user均正确，模型仍沿旧搜索目标推进，不能归因Gateway或输入丢失。后续provider副本投影仅将`from_history`记录封装为明确的只读引用数据，保其原文、角色、次序及非文本引用，当前system/user和当前工具配对不动；数据库与用户可见历史不改，也不把历史准备表述判成当前未决队列。当前原生retry的问题仍按原请求续接，只有更晚轮次中的旧请求按历史引用读取，不新增一份用户消息。修后同原会话已成功准备并确认AI专用角色及分配，完整回收及各边界验收按实际回执分别记录，不宣称模型从此不会偏离目标。
+同批工具调用按原调用顺序返回结果，不因多次制卡一律拒绝。原生历史保留原消息角色和内容作为上下文资料，不给历史消息套额外 JSON 包装；当前 system/user、工具配对及用户可见记录保持原有边界。retry 沿原请求续接，不新增一份用户消息；历史不能授予当前权限或自动触发旧操作。
 
 操作参数纠正反馈从实际SDK schema生成有界字段约束，包含required、const/enum、format及可表达的嵌套结构；分支冲突、预算不足或未支持的验证条件明确标为不完整，不把省略约束当作完整合同。重复校验失败仍允许按原目标纠参，不通过猜测业务别名、删除未知字段或改换目标绕过。该反馈已上线，真实消息激活的后续行为仍须按实际卡kind及原业务回执验收；准备了其它合法卡不能算原目标完成。精确读取的版本比较用规范化数组承载标量及复合值，缺版本不猜、真实变化仍拒绝，避免字符串或数字版本同值被误报source_changed。完整策略configuration的模型侧结构从现共享Zod合同生成并打包给实际SDK，递归条件按现Go有效深度展开；跨字段、自定义refine、当前权限和CAS仍由Go最终校验，不把模型参数说明当作已验证的策略。
 
@@ -196,7 +194,7 @@ AI查询和准备卡使用持久绑定的人员与AI上下文，由共同主体�
 | 工作台沟通与恢复 | 当前摘要、独立history/cards/context读取、待发队列与原operation恢复 | 原“你好”即agentos_current_authority_denied及普通工具拒权的失败保留；业务源拒权或暂不可用不能被解释为整轮不能沟通。历史与旁卡独立加载、前台内容保留、原号GET及明确未入账busy恢复沿用既有证据；真实双标签串行和时间已核，不为新consumer重复已通过场景。 |
 | 其他AI角色与岗位要求 | `read-ai-delegation`、角色/提示词专用工具；人工卡与Duty委派分别办理 | 岗位要求已通过真实卡修改及原文恢复；历史103772e8参数拒绝、223fbcaf/04619614偏旧目标保留，历史引用投影后同会话已真实创建、分配、撤回并停用角色，独立观察治理analytics.read从无到有再恢复无，旧分配及委派不变。独立Duty任务e76fcba3已完成创建/分配/读取/撤回/停用/读取/评估，13次实际调用、四原回执与最终权限恢复已独立核对。治理岗位在人审赋权窗口真实成功读取analytics概况，证明按新权限跨域使用；不以稍后滑窗数字推断原轮同窗准确，原回答星期错误另保留。岗位要求的存储与恢复不能代替下一真实轮采用新提示词版本，该采用证据仍需补齐。不得修改自身上限、共享/人员角色或模型。 |
 | 完整策略与普通日常维护 | 精确策略版本读取、完整草稿/预演/发布卡；ordinary专用工具仍按原bounds | 生产完整草稿已保存到v5；预演曾将普通对话turn编号误作execution样本，原卡未执行。SDK明确样本身份及无外部样本的含义，制卡前复用真实owner及当前execution资格检查，确认仍完整复核；新卡完整展示所选样本。enabled的business-action配置从现有选定来源、角色、授权及处理器取得程序预演事实，不能借无样本跳过消费者检查。v5的原c5a预演已真实通过、无副作用；发布轮d965仍返回p13_rehearsal_required且无卡，原入参未持久，不能据已有同版本有效预演断言该轮引用了它。原预演摘要已补原ID、版本及历史valid，并另补精确版本的同owner域预演分页发现，不以最近20张卡限制领域真实依据；历史有效不等于当前发布许可。v5后续正式发布已取得recorded原回执，head rev14解除总暂停，两个原策略仍disabled且配置与已审候选一致。800后续同任务接续已自然completed，真实30分钟原调度及业务消费未验且未来派发已停；原误选卡与未留参数的失败不被事后归因或改写。完整目标、结构和授权变更保持人工确认，不能由ordinary权限扩大。 |
-| 自动任务与结束判断 | 原task/Agno durable run、assess、同run补续、原操作reconcile、固定inspect及Worker健康 | 精确反馈小目标7c1d0b9d已通过真实读取、评估及独立回读，无业务写；原失败历史保留。profile ca2632d9已完成八段读取及有效评估，读取/结束主链通过；139上线后d009a700的事实报告、原评估与独立AI分析在详情及工作台真实交付，AI正文仍有范围和日序列错误，质量项未通过。没有机械8次调用上限，不计只读巡检为自动处理业务量。手动pause旧路径会Cancel原native，不能称可恢复暂停；141已补持久请求、真实工具检查点及同原run续接并通过受影响隔离检查；生产首次只读任务自然完成且暂停遇revision冲突，后续23be也曾遇同类冲突，之后已真实进入PAUSED并沿同native续为RUNNING，但最终native ERROR、task failed且无业务写，不能称整体目标完成。142另以独立控制版本和原native/attempt校验控制并发，普通进度不改控制版本；该修复已通过隔离检查，生产采用另验，不以反复刷新抢时机代替修复；原失败码为operations_autonomy_completion_incomplete；同run的Gateway请求均正常完成，必需读取与旁读的程序结束判据正在按原账核修，不能归因为空响应。自然HumanReview的人决暂停与手动按钮是两项独立能力。 |
+| 自动任务与结束判断 | 原task/Agno durable run、assess、同run补续、原操作reconcile、固定inspect及Worker健康 | 精确反馈小目标7c1d0b9d已通过真实读取、评估及独立回读，无业务写；原失败历史保留。profile ca2632d9已完成八段读取及有效评估，读取/结束主链通过；139上线后d009a700的事实报告、原评估与独立AI分析在详情及工作台真实交付，AI正文仍有范围和日序列错误，质量项未通过。没有机械8次调用上限，不计只读巡检为自动处理业务量。手动pause旧路径会Cancel原native，不能称可恢复暂停；141已补持久请求、真实工具检查点及同原run续接并通过受影响隔离检查；生产首次只读任务自然完成且暂停遇revision冲突，后续23be也曾遇同类冲突，之后已真实进入PAUSED并沿同native续为RUNNING，但最终native ERROR、task failed且无业务写，不能称整体目标完成。142另以独立控制版本和原native/attempt校验控制并发，普通进度不改控制版本；该修复已通过隔离检查，生产采用另验，不以反复刷新抢时机代替修复；原失败码为operations_autonomy_completion_incomplete；同run的Gateway请求均正常完成，当时的原账裁决和失败原因保留，不能归因为空响应；本批不再把读取计数作为通用完成门槛。自然HumanReview的人决暂停与手动按钮是两项独立能力。 |
 | 用户账户业务限制 | 当前账户读取、`account-restriction`及原限制/解除回执 | 同AI/grant原决定围栏、原工具调用与审计完整绑定、TaskGet及两种原AI回执读取已通过隔离检查；本轮总控真实限制与恢复未验收，受控附件作者账户须待附件场景完成再处理。账户密码、登录、会话及管理人员权限不因该业务动作获得自动处理权。 |
 | 公开治理、举报申诉 | 选定post/reply与公开案件材料、visibility/curation/batch/case-resolve | 受控公开帖子已用原已发布策略、原selected grant和单一对象的冻结Duty计划，真实完成隐藏与原可见性恢复；两个原业务操作及中间隐藏、最终可见状态均已独立核对，临时岗位配置和策略暂停状态已恢复。它不替代反馈、其它治理动作或eligible范围验收；原人类/其他授权处置不能被新AI决定覆盖。 |
 | 线索触发的私聊审查 | 精确chat-report引用、用途限定材料及已选消息处理 | 源码有专门用途支路，本轮真实线索/材料/消息回执尚未覆盖；普通目录或workbench.read不能扩大为任意私聊读取。 |

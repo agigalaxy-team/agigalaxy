@@ -8,7 +8,7 @@ from agno.tools.function import Function, FunctionCall
 from pydantic import TypeAdapter, ValidationError
 
 from galaxy_agentos.conversation_tools import FileScanRetry, PreparedOperation
-from galaxy_agentos.conversation_tools import SearchApply, SearchRestore, ReadKind, _prepared_arguments, conversation_tools
+from galaxy_agentos.conversation_tools import SearchApply, SearchRestore, ReadKind, _prepared_arguments, conversation_tools, preparation_tools
 
 
 class RecordingNode:
@@ -35,7 +35,7 @@ class SearchReasonContract(unittest.TestCase):
     def test_only_search_preparation_uses_existing_trimmed_one_to_five_hundred(self):
         adapter = TypeAdapter(PreparedOperation)
         node = RecordingNode()
-        prepare = next(tool for tool in conversation_tools(node) if tool.__name__ == "prepare_operation")
+        prepare = preparation_tools(node, domains=["search"])[0]
         context = RunContext(run_id=str(uuid4()), session_id=str(uuid4()),
             user_id="conversation:" + str(uuid4()), metadata={"operationId": str(uuid4())})
         call = FunctionCall(function=Function.from_callable(prepare), call_id="search-reason")

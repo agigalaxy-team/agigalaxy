@@ -125,7 +125,7 @@ func (a *cardReadCountingAuthority) EffectiveWithin(ctx context.Context, tx pgx.
 	return a.Authority.EffectiveWithin(ctx, tx, actor)
 }
 
-func TestConversationCardBatchBoundedParallelAndFreshRevocation(t *testing.T) {
+func TestConversationStoredCardsReadOnlyAndFreshRevocation(t *testing.T) {
 	owner, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
 	f := operationsfixture.New(t, owner)
@@ -156,62 +156,27 @@ func TestConversationCardBatchBoundedParallelAndFreshRevocation(t *testing.T) {
 	}
 	counter := &cardReadCountingAuthority{Authority: f.Permissions.Authority}
 	f.Permissions.Authority = counter
-	var active, peak, recoveries atomic.Int32
+	var recoveries atomic.Int32
 	var revoke atomic.Bool
-	entered, release := make(chan struct{}, 4), make(chan struct{})
-	defer func() {
-		select {
-		case <-release:
-		default:
-			close(release)
-		}
-	}()
-	tools := &ConversationTools{Conversations: s, CardReadPermission: func(string) (string, error) { return "ai.roles.read", nil }, RecoverPrepared: func(ctx context.Context, _ operationspermissions.Actor, _ Object, operation string) (Object, error) {
-		recoveries.Add(1)
-		n := active.Add(1)
-		defer active.Add(-1)
-		for {
-			old := peak.Load()
-			if n <= old || peak.CompareAndSwap(old, n) {
-				break
-			}
-		}
-		select {
-		case entered <- struct{}{}:
-		default:
-		}
-		select {
-		case <-release:
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-		if revoke.CompareAndSwap(true, false) {
+	tools := &ConversationTools{Conversations: s, CardReadPermission: func(string) (string, error) { return "ai.roles.read", nil },
+		RecoverPrepared: func(context.Context, operationspermissions.Actor, Object, string) (Object, error) {
+			recoveries.Add(1)
+			return nil, fail("unexpected_card_recovery", 503)
+		}}
+	s.ValidateSources = func(context.Context, Conversation, operationspermissions.Actor) (SourceQualification, error) {
+		if revoke.Load() {
 			if _, e := owner.Exec(ctx, `UPDATE operations_ai_work_accounts_v1 SET enabled=false WHERE endpoint=$1 AND domain='overview'`, f.Endpoint); e != nil {
-				return nil, e
+				return SourceQualification{}, e
 			}
 		}
-		return Object{"operationId": operation, "state": "unknown", "summary": "Original receipt state"}, nil
-	}}
-	type reply struct {
-		items []Object
-		err   error
+		return SourceQualification{Valid: true, ReadExpiresAt: f.Now().Unix() + 30}, nil
 	}
-	finished := make(chan reply, 1)
-	go func() { items, e := tools.Cards(ctx, f.Root, "overview"); finished <- reply{items, e} }()
-	for range 4 {
-		select {
-		case <-entered:
-		case <-time.After(3 * time.Second):
-			t.Fatal("pending cards remained serial")
-		}
-	}
-	close(release)
-	first := <-finished
-	if first.err != nil || len(first.items) != 30 || recoveries.Load() != 4 || peak.Load() != 4 || counter.checks.Load() >= 30 {
-		t.Fatal("card batch repeated per-card authority/history or recovered terminal cards", len(first.items), first.err, recoveries.Load(), peak.Load(), counter.checks.Load())
+	first, err := tools.Cards(ctx, f.Root, "overview")
+	if err != nil || len(first) != 30 || recoveries.Load() != 0 || counter.checks.Load() >= 30 {
+		t.Fatalf("stored cards must read without recovering original writes: count=%d recoveries=%d checks=%d err=%v", len(first), recoveries.Load(), counter.checks.Load(), err)
 	}
 	revoke.Store(true)
 	if items, e := tools.Cards(ctx, f.Root, "overview"); fault.Status(e) != 403 || items != nil {
-		t.Fatal("revocation after receipt I/O released old cards", items, e)
+		t.Fatal("revocation during final source qualification released cards", items, e)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsqueries"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
@@ -55,17 +56,41 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 	if e != nil {
 		return nil, e
 	}
-	prior, e := t.priorSummaryReads(ctx, a, row, command)
-	if e != nil {
+	availability := Object{}
+	section := func(name string, err error) error {
+		if err == nil {
+			availability[name] = "available"
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if fault.Status(err) == 401 || fault.Status(err) == 403 || fault.Code(err) == "operations_agentos_source_changed" {
+			return err
+		}
+		availability[name] = "unavailable"
+		return nil
+	}
+	prior, err := t.priorSummaryReads(ctx, a, row, command)
+	if e = section("priorReadReceipts", err); e != nil {
 		return nil, e
 	}
-	currentReads, e := t.currentSummaryReads(ctx, a, row, command)
-	if e != nil {
+	if err != nil {
+		prior = nil
+	}
+	currentReads, err := t.currentSummaryReads(ctx, a, row, command)
+	if e = section("currentReadOutcomes", err); e != nil {
 		return nil, e
 	}
-	turns, e := t.summaryTurnOutcomes(ctx, row, command)
-	if e != nil {
+	if err != nil {
+		currentReads = nil
+	}
+	turns, err := t.summaryTurnOutcomes(ctx, row, command)
+	if e = section("turnOutcomes", err); e != nil {
 		return nil, e
+	}
+	if err != nil {
+		turns = nil
 	}
 	var task Object
 	if id := text(command.Result, "taskId"); id != "" {
@@ -73,58 +98,101 @@ func (t *ConversationTools) SummaryContext(ctx context.Context, a operationsperm
 			return nil, fail("operations_agentos_scope_denied", 403)
 		}
 		if readers.BoundedTaskWithin == nil {
-			return nil, fail("operations_agentos_conversation_not_ready", 503)
-		}
-		task, e = postgres.InTx(ctx, t.Conversations.Pool, func(tx pgx.Tx) (Object, error) {
-			fresh, e := t.Conversations.CurrentReadWithin(ctx, tx, row.ID, &a)
-			if e != nil {
-				return nil, e
+			err = fail("operations_agentos_conversation_not_ready", 503)
+		} else {
+			task, err = postgres.InTx(ctx, t.Conversations.Pool, func(tx pgx.Tx) (Object, error) {
+				fresh, e := t.Conversations.CurrentReadWithin(ctx, tx, row.ID, &a)
+				if e != nil {
+					return nil, e
+				}
+				return readers.BoundedTaskWithin(ctx, tx, *fresh.Row, Object{"id": command.ID, "result": command.Result})
+			})
+			if err == nil && task == nil {
+				err = fail("operations_agentos_conversation_not_ready", 503)
 			}
-			return readers.BoundedTaskWithin(ctx, tx, *fresh.Row, Object{"id": command.ID, "result": command.Result})
-		})
-		if e != nil {
+		}
+	} else {
+		err = nil
+	}
+	if e = section("boundedTask", err); e != nil {
+		return nil, e
+	}
+	if err != nil {
+		task = nil
+	}
+	cards, cardsErr := t.summaryCards(ctx, a, row, command, false)
+	if e = section("priorOperationReceipts", cardsErr); e != nil {
+		return nil, e
+	}
+	actionCards, actionsErr := t.summaryCards(ctx, a, row, command, true)
+	if e = section("priorActionReceipts", actionsErr); e != nil {
+		return nil, e
+	}
+	observed, batchErr := t.summaryCardBatch(ctx, a, row, cards, actionCards, readers)
+	if batchErr != nil {
+		if e = section("priorOperationReceipts", batchErr); e != nil {
 			return nil, e
 		}
-		if task == nil {
-			return nil, fail("operations_agentos_conversation_not_ready", 503)
+		if e = section("priorActionReceipts", batchErr); e != nil {
+			return nil, e
 		}
 	}
-	cards, e := t.summaryCards(ctx, a, row, command, false)
-	if e != nil {
-		return nil, e
+	var operations, actions Object
+	if cardsErr == nil && batchErr == nil {
+		operations = t.priorSummaryOperations(cards, observed)
 	}
-	actionCards, e := t.summaryCards(ctx, a, row, command, true)
-	if e != nil {
-		return nil, e
-	}
-	observed, e := t.summaryCardBatch(ctx, a, row, cards, actionCards, readers)
-	if e != nil {
-		return nil, e
-	}
-	operations := t.priorSummaryOperations(cards, observed)
-	actions, e := t.priorSummaryActions(ctx, a, row, command, readers, actionCards, observed)
-	if e != nil {
-		return nil, e
+	if actionsErr == nil && batchErr == nil {
+		actions, err = t.priorSummaryActions(ctx, a, row, command, readers, actionCards, observed)
+		if e = section("priorActionReceipts", err); e != nil {
+			return nil, e
+		}
+		if err != nil {
+			actions = nil
+		}
 	}
 	if e = t.RecheckContext(ctx, a, domain, bound); e != nil {
 		return nil, e
 	}
-	plan, e := postgres.InTx(ctx, t.Conversations.Pool, func(tx pgx.Tx) (Object, error) { return turnPlanWithin(ctx, tx, t.Conversations.Endpoint, command.ID) })
-	if e != nil {
+	plan, err := postgres.InTx(ctx, t.Conversations.Pool, func(tx pgx.Tx) (Object, error) { return turnPlanWithin(ctx, tx, t.Conversations.Endpoint, command.ID) })
+	if e = section("turnPlan", err); e != nil {
 		return nil, e
 	}
-	feedback, e := t.Conversations.receiptFeedback(ctx, *row, command)
-	if e != nil {
+	if err != nil {
+		plan = nil
+	}
+	feedback, err := t.Conversations.receiptFeedback(ctx, *row, command)
+	if e = section("receiptFeedback", err); e != nil {
 		return nil, e
 	}
-	progress, taskContext, e := t.Conversations.conversationTaskContext(ctx, *row, command.ID)
-	if e != nil {
+	if err != nil {
+		feedback = nil
+	}
+	progress, taskContext, err := t.Conversations.conversationTaskContext(ctx, *row, command.ID)
+	if e = section("taskContext", err); e != nil {
 		return nil, e
+	}
+	if err != nil {
+		progress, taskContext = nil, Object{"objective": nil, "objectiveAvailable": false}
+	}
+	availability["taskObjective"] = "unavailable"
+	if taskContext["objectiveAvailable"] == true {
+		availability["taskObjective"] = "available"
 	}
 	if e = t.RecheckContext(ctx, a, domain, bound); e != nil {
 		return nil, e
 	}
-	return Object{"taskProgress": progress, "taskContext": taskContext, "priorReadReceipts": prior, "currentReadOutcomes": currentReads, "turnOutcomes": turns, "boundedTask": task, "priorActionReceipts": actions, "priorOperationReceipts": operations, "turnPlan": plan, "receiptFeedback": feedback}, nil
+	qualified, e := t.Conversations.CurrentRead(ctx, row.ID, &a)
+	if e != nil {
+		return nil, e
+	}
+	progress, taskContext, feedback = restrictTaskContext(qualified.SourceQualification, progress, taskContext, feedback)
+	if qualified.SourceQualification.restricts(command.ID) {
+		plan = nil
+		availability["turnPlan"] = "unavailable"
+	}
+	operations = restrictSummaryReceipts(qualified.SourceQualification, operations, cards)
+	actions = restrictSummaryReceipts(qualified.SourceQualification, actions, actionCards)
+	return Object{"taskProgress": progress, "taskContext": taskContext, "priorReadReceipts": prior, "currentReadOutcomes": currentReads, "turnOutcomes": turns, "boundedTask": task, "priorActionReceipts": actions, "priorOperationReceipts": operations, "turnPlan": plan, "receiptFeedback": feedback, "sectionAvailability": availability}, nil
 }
 
 func (t *ConversationTools) priorSummaryReads(ctx context.Context, a operationspermissions.Actor, row *Conversation, command *conversationCommand) (Object, error) {
@@ -292,4 +360,35 @@ func (t *ConversationTools) priorSummaryOperations(cards []*conversationCard, ob
 	at = t.Conversations.now().Unix()
 	out["checkedAt"], out["readExpiresAt"] = at, at+30
 	return out
+}
+
+func restrictSummaryReceipts(q SourceQualification, value Object, cards []*conversationCard) Object {
+	if value == nil {
+		return nil
+	}
+	denied := map[string]bool{}
+	for _, card := range cards {
+		if q.restricts(card.TurnID) {
+			denied[card.ID] = true
+		}
+	}
+	if len(denied) == 0 {
+		return value
+	}
+	value = copyObject(value)
+	original, _ := value["items"].([]any)
+	if typed, ok := value["items"].([]Object); ok {
+		for _, item := range typed {
+			original = append(original, item)
+		}
+	}
+	filtered := make([]any, 0, len(original))
+	for _, item := range original {
+		id := text(object(item), "cardId")
+		if id != "" && !denied[id] {
+			filtered = append(filtered, item)
+		}
+	}
+	value["items"], value["availability"] = filtered, "partial"
+	return value
 }

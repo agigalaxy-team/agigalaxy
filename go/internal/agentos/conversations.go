@@ -29,17 +29,21 @@ func (row Conversation) View() Object {
 }
 
 type CurrentConversation struct {
-	Row            *Conversation
-	Actor          operationspermissions.Actor
-	ContextChanged bool
-	ReadExpiresAt  int64
+	Row                 *Conversation
+	Actor               operationspermissions.Actor
+	ContextChanged      bool
+	ReadExpiresAt       int64
+	SourceQualification SourceQualification
 }
 
 // SourceQualification is a current read result, not a retained descriptor's
 // old freshness timestamp. Its deadline must include every controlled source.
 type SourceQualification struct {
-	Valid         bool
-	ReadExpiresAt int64
+	Valid           bool
+	ReadExpiresAt   int64
+	AffectedTurns   map[string]bool
+	LegacyUnknown   bool
+	LegacySafeTurns map[string]bool
 }
 type Conversations struct {
 	Pool                  *pgxpool.Pool
@@ -208,12 +212,9 @@ func (s *Conversations) current(ctx context.Context, id string, operator *operat
 			return current, err
 		}
 		if !qualification.Valid {
-			_, err = s.Pool.Exec(ctx, "UPDATE operations_agentos_conversations_v1 SET retired_at=$3,retirement_reason='source-changed' WHERE endpoint=$1 AND id=$2 AND retired_at IS NULL", s.Endpoint, id, s.now())
-			if err != nil {
-				return current, err
-			}
-			return current, fail("operations_agentos_source_changed", 409)
+			return current, fail("operations_agentos_source_qualification_unavailable", 503)
 		}
+		current.SourceQualification = qualification
 		current.ReadExpiresAt = qualification.ReadExpiresAt
 	} else {
 		var refs bool
@@ -227,6 +228,12 @@ func (s *Conversations) current(ctx context.Context, id string, operator *operat
 	}
 	if current.ReadExpiresAt <= s.now().Unix() {
 		return current, fail("operations_agentos_source_qualification_unavailable", 503)
+	}
+	_, err = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (CurrentConversation, error) {
+		return s.currentWithin(ctx, tx, id, operator, readSnapshot)
+	})
+	if err != nil {
+		return current, err
 	}
 	return current, nil
 }
@@ -292,7 +299,7 @@ func (s *Conversations) AuthorizeNative(ctx context.Context, input Object) (Obje
 	}
 	view := row.View()
 	view["rolePrompt"] = prompt
-	out := Object{"allowed": true, "resourceIds": []any{component}, "execution": view, "readExpiresAt": current.ReadExpiresAt}
+	out := Object{"allowed": true, "resourceIds": []any{component}, "execution": view, "readExpiresAt": current.ReadExpiresAt, "sourceQualification": current.SourceQualification.View()}
 	if turn := text(input, "turnId"); turn != "" {
 		command, e := s.command(ctx, turn)
 		if e != nil {
@@ -301,6 +308,7 @@ func (s *Conversations) AuthorizeNative(ctx context.Context, input Object) (Obje
 		if command == nil || command.ConversationID != row.ID || command.OperatorID != row.OperatorID {
 			return nil, fail("operations_agentos_scope_denied", 403)
 		}
+
 		plan, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) { return turnPlanWithin(ctx, tx, s.Endpoint, turn) })
 		if e != nil {
 			return nil, e
@@ -314,11 +322,20 @@ func (s *Conversations) AuthorizeNative(ctx context.Context, input Object) (Obje
 			return nil, e
 		}
 		out["readExpiresAt"] = current.ReadExpiresAt
+		out["sourceQualification"] = current.SourceQualification.View()
 		out["taskProgress"], out["taskContext"] = progress, taskContext
 		feedback, e := s.receiptFeedback(ctx, *row, command)
 		if e != nil {
 			return nil, e
 		}
+		current, e = s.Current(ctx, id, nil)
+		if e != nil {
+			return nil, e
+		}
+		progress, taskContext, feedback = restrictTaskContext(current.SourceQualification, progress, taskContext, feedback)
+		out["sourceQualification"] = current.SourceQualification.View()
+		out["readExpiresAt"] = current.ReadExpiresAt
+		out["taskProgress"], out["taskContext"] = progress, taskContext
 		out["receiptFeedback"] = feedback
 	}
 	return out, nil

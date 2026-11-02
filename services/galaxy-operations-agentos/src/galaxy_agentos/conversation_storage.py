@@ -11,12 +11,13 @@ from copy import copy, deepcopy
 import re
 
 from agno.run.agent import RunEvent
+from .conversation_tools import is_preparation_tool
 from .tool_call_ids import (conversation_call_reference, projected_tool_call_id,
     valid_conversation_reference, valid_run_context_id)
 
 
 TOOL_NAMES = frozenset({"plan_turn", "assess_turn", "current_summary", "query_operations", "read_operation_object",
-    "list_authorized_work", "run_authorized_work", "plan_turn", "assess_turn", "prepare_operation", "execute_operation",
+    "list_authorized_work", "run_authorized_work", "load_business_tools", "prepare_operation", "execute_operation",
     "manage_ai_role", "manage_ai_prompt", "read_ai_delegation", "read_task_operation"})
 EVENT_NAMES = frozenset(event.value for event in RunEvent)
 ERROR_TYPES = frozenset({"AuthorityDenied", "AuthorityUnavailable"})
@@ -87,7 +88,7 @@ def _tool(value, *, reference_ids=False, run_id=None, stored_references=None, pr
     else:
         call_id = projected_tool_call_id(call_id)
     result = {"tool_call_id": call_id,
-        "tool_name": value.get("tool_name") if value.get("tool_name") in TOOL_NAMES else None,
+        "tool_name": value.get("tool_name") if value.get("tool_name") in TOOL_NAMES or is_preparation_tool(value.get("tool_name")) else None,
         "tool_call_error": value.get("tool_call_error") if type(value.get("tool_call_error")) is bool else None,
         "created_at": value.get("created_at") if type(value.get("created_at")) is int else None,
         "metrics": deepcopy(value.get("metrics")) if isinstance(value.get("metrics"), dict) else None}
@@ -117,8 +118,8 @@ def conversation_storage_fields(fields, *, reference_ids=False, run_id=None, sto
     """Project either a complete native RunOutput dictionary or a CAS patch.
 
     User messages and the final assistant reply remain native multi-turn
-    history. Node binds their source references and rotates the session before
-    later reads/runs if a reference is no longer permitted. Tool arguments,
+    history. Node binds source references to their originating turns; later
+    projections omit affected derived content. Tool arguments,
     tool result bodies and event bodies are never that history's authority.
     """
     result = deepcopy(fields)

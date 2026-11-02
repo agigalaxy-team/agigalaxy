@@ -7,7 +7,7 @@ from agno.agent import Agent
 from agno.models.base import Model
 from agno.models.response import ModelResponse
 from agno.tools.function import Function
-from galaxy_agentos.conversation_tools import conversation_tools
+from galaxy_agentos.conversation_tools import conversation_tools, preparation_tools
 from galaxy_agentos.tool_schema_feedback import operation_schema_feedback, repair_operation_alias
 from galaxy_agentos.tool_reliability import reliable_function
 
@@ -20,7 +20,7 @@ class ToolSchemaFeedbackTest(unittest.TestCase):
             def conversation_tool(self, user, name, arguments, **binding):
                 calls.append((name, arguments))
                 return {"state": "prepared", "card": {"state": "prepared", "cardId": str(uuid4())}}
-        prepare = next(tool for tool in conversation_tools(Gateway()) if tool.__name__ == "prepare_operation")
+        prepare = preparation_tools(Gateway(), domains=["messaging"])[0]
         tool = reliable_function(prepare)
         @dataclass
         class Sequence(Model):
@@ -42,7 +42,7 @@ class ToolSchemaFeedbackTest(unittest.TestCase):
                     operation = {"kind": "messaging-state", "targetId": target, "action": "activate"}
                 else:
                     return ModelResponse(role="assistant", content="done")
-                return ModelResponse(role="assistant", tool_calls=[{"id": "call_" + str(self.count), "type": "function", "function": {"name": "prepare_operation", "arguments": json.dumps({"operation":operation})}}])
+                return ModelResponse(role="assistant", tool_calls=[{"id": "call_" + str(self.count), "type": "function", "function": {"name": "prepare_messaging_operation", "arguments": json.dumps({"operation":operation})}}])
             async def ainvoke(self, *args, **kwargs): return self.invoke(*args, **kwargs)
             def invoke_stream(self, *args, **kwargs): yield self.invoke(*args, **kwargs)
             async def ainvoke_stream(self, *args, **kwargs): yield self.invoke(*args, **kwargs)
@@ -55,7 +55,7 @@ class ToolSchemaFeedbackTest(unittest.TestCase):
         self.assertEqual(calls, [("prepare-operation", {"kind":"messaging-state", "targetId":target, "action":"activate"})])
 
     def test_actual_native_prepare_schema_exposes_strategy_contract(self):
-        prepare = next(tool for tool in conversation_tools(object()) if tool.__name__ == "prepare_operation")
+        prepare = preparation_tools(object(), domains=["strategy"])[0]
         native = Function.from_callable(prepare)
         native.process_entrypoint()
         facts = operation_schema_feedback(native.parameters)
@@ -68,13 +68,15 @@ class ToolSchemaFeedbackTest(unittest.TestCase):
             self.assertEqual(set(facts["operationSchemas"][kind]["requiredFields"]), required)
         repaired = repair_operation_alias({"operation": {"kind": "StrategyDraft"}}, native.parameters)
         self.assertEqual(repaired["operation"]["kind"], "strategy-draft")
-        messaging = facts["operationSchemas"]["messaging-state"]
+        messaging_native = Function.from_callable(preparation_tools(object(), domains=["messaging"])[0])
+        messaging_native.process_entrypoint()
+        messaging = operation_schema_feedback(messaging_native.parameters)["operationSchemas"]["messaging-state"]
         self.assertTrue(messaging["schemaComplete"])
         self.assertEqual(messaging["fieldSchemas"]["action"]["enum"], ["activate", "pause", "resume", "stop", "withdraw"])
         self.assertEqual(messaging["fieldSchemas"]["targetId"]["format"], "uuid")
 
     def test_actual_native_nested_role_command_contract_is_schema_owned(self):
-        prepare = next(tool for tool in conversation_tools(object()) if tool.__name__ == "prepare_operation")
+        prepare = preparation_tools(object(), domains=["ai_management"])[0]
         native = Function.from_callable(prepare)
         native.process_entrypoint()
         arguments = {"operation": {"kind": "ai-role-command", "command": {"kind": "role-create", "secret_extra_name": "secret_extra_value"}}}

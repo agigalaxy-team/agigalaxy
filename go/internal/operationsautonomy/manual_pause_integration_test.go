@@ -247,14 +247,20 @@ func TestManualPauseRequestsCheckpointAndContinuesOriginalRun(t *testing.T) {
 		t.Fatalf("old checkpoint changed new request: %s %s %v", currentState, phase, e)
 	}
 	ended, err := svc.Report(ctx, a.Object{"taskId": task, "nativeRunId": native.runID, "modelState": "completed", "status": "completed"})
-	if err != nil || ended["state"] != "failed" {
+	if err != nil || ended["state"] != "completed" || ended["businessState"] != "failed" {
 		t.Fatalf("natural completion lost prior failed business fact: %v %v", ended, err)
 	}
 	var outcome string
-	if e = owner.QueryRow(ctx, `SELECT control_state->>'phase',control_state->>'outcome' FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, f.Endpoint, task).Scan(&phase,&outcome); e != nil || phase != "ended" || outcome != "native-ended" {
+	if e = owner.QueryRow(ctx, `SELECT control_state->>'phase',control_state->>'outcome' FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, f.Endpoint, task).Scan(&phase, &outcome); e != nil || phase != "ended" || outcome != "native-ended" {
 		t.Fatalf("natural completion did not retire request: %s %v", phase, e)
 	}
-	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='paused',control_state=jsonb_set(control_state,'{phase}',to_jsonb('paused'::text)) WHERE endpoint=$1 AND id=$2`, f.Endpoint, task); e != nil { t.Fatal(e) }
-	if _, e = svc.Report(ctx, a.Object{"taskId":task, "nativeRunId":native.runID, "modelState":"completed", "status":"completed"}); e != nil { t.Fatal(e) }
-	if e = owner.QueryRow(ctx, `SELECT control_state->>'outcome' FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, f.Endpoint, task).Scan(&outcome); e != nil || outcome != "native-ended-after-checkpoint" { t.Fatalf("completed after real pause lost checkpoint: %s %v",outcome,e) }
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='paused',control_state=jsonb_set(control_state,'{phase}',to_jsonb('paused'::text)) WHERE endpoint=$1 AND id=$2`, f.Endpoint, task); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = svc.Report(ctx, a.Object{"taskId": task, "nativeRunId": native.runID, "modelState": "completed", "status": "completed"}); e != nil {
+		t.Fatal(e)
+	}
+	if e = owner.QueryRow(ctx, `SELECT control_state->>'outcome' FROM operations_autonomy_tasks_v1 WHERE endpoint=$1 AND id=$2`, f.Endpoint, task).Scan(&outcome); e != nil || outcome != "native-ended-after-checkpoint" {
+		t.Fatalf("completed after real pause lost checkpoint: %s %v", outcome, e)
+	}
 }

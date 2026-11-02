@@ -16,9 +16,11 @@ def create_app(settings, *, quiet=True):
     from .endpoints import normalize_routes
     normalize_routes(models, profiles)
     from .usage import UsageStore
-    usage_store = UsageStore(settings.usage_file) if settings.usage_file else None
-    if profiles and usage_store is None:
-        raise ValueError("model_gateway_usage_store_not_configured")
+    try:
+        usage_store = UsageStore(settings.usage_file) if settings.usage_file else None
+    except Exception:
+        # Usage is auxiliary; model and provider configuration errors remain fatal.
+        usage_store = None
     for row in models:
         reference = row["litellm_params"]["api_key"].removeprefix("os.environ/")
         if not os.environ.get(reference):

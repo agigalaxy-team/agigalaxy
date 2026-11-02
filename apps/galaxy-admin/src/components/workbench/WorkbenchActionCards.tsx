@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import type {WorkbenchActionCard} from "../../lib/workbench/workbench-action-cards";
-import {workbenchCardReason} from "../../lib/workbench/workbench-action-cards";
+import {isWorkbenchChoiceGroup,workbenchCardReason} from "../../lib/workbench/workbench-action-cards";
 import {WorkbenchPromptReview} from './WorkbenchPromptReview';
 
 export function WorkbenchActionCards({cards,verified,available=verified,busy,pendingCardId,pendingDismissCardId=null,dismissBusy=false,onConfirm,onDismiss,now,label='相关处理',readOnly=false}:{cards:WorkbenchActionCard[];available?:boolean;verified:boolean;busy:boolean;pendingCardId:string|null;pendingDismissCardId?:string|null;dismissBusy?:boolean;onConfirm:(card:WorkbenchActionCard)=>void;onDismiss?:(card:WorkbenchActionCard)=>void;now:number;label?:string;readOnly?:boolean}){
  if(!available||!cards.length)return null;
- return <div className={'wb-action-cards'+(cards.length===3&&cards.every(card=>card.choice?.count===3&&card.choice.exclusive&&card.choice.groupId===cards[0].choice?.groupId)?' wb-action-cards--choices':'')} aria-label={label}>{cards.map(card=>{
+ return <div className={'wb-action-cards'+(isWorkbenchChoiceGroup(cards)?' wb-action-cards--choices':'')} aria-label={label}>{cards.map(card=>{
   const live=verified&&(card.stored||card.readExpiresAt>now),pending=pendingCardId===card.cardId||card.state==='processing'||card.state==='unknown';
   const dismissible=live&&!!onDismiss&&card.capability.canDismiss&&(!busy||pendingDismissCardId===card.cardId)&&!dismissBusy;
   const view=card.presentation,notSelected=card.state==='not-selected'||card.result?.state==='not-selected'||card.capability.reason==='not-selected';

@@ -32,7 +32,7 @@ from galaxy_agentos.authorization import GalaxyAuthorization
 from galaxy_agentos.config import Settings
 from galaxy_agentos.tool_call_ids import conversation_call_reference
 from galaxy_agentos.conversation_storage import conversation_database
-from galaxy_agentos.conversation_tools import PreparedOperation, QueryFilters, conversation_tools
+from galaxy_agentos.conversation_tools import PreparedOperation, QueryFilters, conversation_tools, preparation_tools, preparation_tool_catalog
 from galaxy_agentos.conversations import conversation_agents, install_conversation_read
 from galaxy_agentos.gateway import GalaxyGateway, AuthorityDenied, AuthorityUnavailable
 
@@ -127,12 +127,13 @@ class ConversationBusinessToolsTest(unittest.TestCase):
         tools = conversation_tools(gateway)
         context = RunContext(run_id=str(uuid4()), session_id=row["sessionId"],
             user_id="conversation:" + row["id"], metadata={"operationId": str(uuid4())})
+        prepare = preparation_tools(gateway, domains=["strategy"])[0]
         commands=[{"kind": "rule-publish", "key": "business-controls", "reason": "发布"},
             {"kind": "rule-restore", "key": "forum-quota", "versionId": str(uuid4()), "reason": "恢复已确认版本"}]
         for index, command in enumerate(commands):
             operation = schema.validate_python(command)
-            call = FunctionCall(function=Function.from_callable(tools[-1]), call_id="rule-prepare-" + str(index))
-            tools[-1](context, call, operation)
+            call = FunctionCall(function=Function.from_callable(prepare), call_id="rule-prepare-" + str(index))
+            prepare(context, call, operation)
             packet = node.calls[-1][1]
             self.assertEqual(packet["tool"], "prepare-operation")
             self.assertEqual(packet["arguments"], command)
@@ -158,8 +159,9 @@ class ConversationBusinessToolsTest(unittest.TestCase):
         context = RunContext(run_id=str(uuid4()), session_id=row["sessionId"],
             user_id="conversation:" + row["id"], metadata={"operationId": str(uuid4())})
         command = {"kind": "file-cleanup-approve", "planId": str(uuid4())}
-        call = FunctionCall(function=Function.from_callable(tools[-1]), call_id="cleanup-plan-review")
-        tools[-1](context, call, schema.validate_python(command))
+        prepare = preparation_tools(gateway, domains=["maintenance"])[0]
+        call = FunctionCall(function=Function.from_callable(prepare), call_id="cleanup-plan-review")
+        prepare(context, call, schema.validate_python(command))
         path, packet = node.calls[-1]
         self.assertTrue(path.endswith("/tools/execute"))
         self.assertEqual(packet["tool"], "prepare-operation")
@@ -175,7 +177,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 {"kind": "file-cleanup-approve", "planId": "not-a-plan"}]:
             with self.assertRaises(ValidationError): schema.validate_python(invalid)
         self.assertEqual(len(node.calls), 1, "only preparation crosses the Node boundary")
-        function = Function.from_callable(tools[-1])
+        function = Function.from_callable(prepare)
         self.assertNotIn("run_context", function.parameters["properties"])
         self.assertNotIn("fc", function.parameters["properties"])
 
@@ -216,7 +218,6 @@ class ConversationBusinessToolsTest(unittest.TestCase):
         local = json.loads(tools[0](None, None, module="rules", view="cleanup-plans"))
         self.assertEqual(local["state"], "invalid-request")
         self.assertEqual(len(node.calls), 4)
-        self.assertIn("never approve", tools[0].__doc__)
 
     def test_native_agent_invokes_five_business_tools_with_server_context_and_persists_only_tool_metadata(self):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as cleanup:
@@ -232,14 +233,16 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 ("read_operation_object", {"kind": "post", "id": node.object_id}),
                 ("list_authorized_work", {}),
                 ("run_authorized_work", {"execution_id": node.execution_id}),
-                ("prepare_operation", {"operation": {"kind": "feedback-update", "targetId": node.object_id,
+                ("load_business_tools", {"domains": ["feedback_accounts"]}),
+                ("prepare_feedback_accounts_operation", {"operation": {"kind": "feedback-update", "targetId": node.object_id,
                     "state": "processing"}}),
                 ("assess_turn", {"disposition":"needs-information", "reason":"制卡回执未确认", "remaining":["核对原处理"]})]
             model = BusinessToolModel(plan=plan)
             agents = conversation_agents(settings=settings(), db=db, gateway=gateway,
                 domains={"overview": "运营概览"}, active_domains={"overview"}, model_factory=lambda: model)
             names = {tool.name for tool in agents[0].tools}
-            self.assertEqual(names, {"current_summary", "read_ai_delegation", "read_task_operation", "plan_turn", "assess_turn", *(name for name, _ in plan)})
+            self.assertTrue({"current_summary", "read_ai_delegation", "read_task_operation", "plan_turn", "assess_turn", *(name for name, _ in plan)} <= names)
+            self.assertTrue({name for entry in preparation_tool_catalog().values() for name in entry["tools"]} <= names)
             for tool in agents[0].tools:
                 function = tool if isinstance(tool, Function) else Function.from_callable(tool)
                 self.assertNotIn("run_context", function.parameters["properties"])
@@ -264,14 +267,16 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertIn("ToolCallCompleted", response.text)
                 packets = [value for path, value in node.calls if path.endswith("/tools/execute")]
-                self.assertEqual([value["tool"] for value in packets], ["assess-conversation-task" if name == "assess_turn" else name.replace("_", "-") for name, _ in plan])
-                for index, packet in enumerate(packets, 1):
+                expected_tools = ["query-operations", "read-operation-object", "list-authorized-work", "run-authorized-work", "prepare-operation", "assess-conversation-task"]
+                self.assertEqual([value["tool"] for value in packets], expected_tools)
+                for index, packet in enumerate(packets):
                     self.assertEqual(set(packet), {"conversationId", "sessionId", "turnId", "runId", "callId", "tool", "arguments"})
                     self.assertEqual(packet["conversationId"], row["id"])
                     self.assertEqual(packet["sessionId"], row["sessionId"])
                     self.assertEqual(packet["turnId"], operation_id)
                     from galaxy_agentos.tool_call_ids import conversation_call_reference
-                    self.assertEqual(packet["callId"], conversation_call_reference(packet["runId"], "native-call-" + str(index)))
+                    call_index = [1, 2, 3, 4, 6, 7][index]
+                    self.assertEqual(packet["callId"], conversation_call_reference(packet["runId"], "native-call-" + str(call_index)))
                     self.assertNotIn("role", packet)
                 self.assertEqual(packets[3]["arguments"], {"executionId": node.execution_id})
                 self.assertNotIn("operationId", packets[4]["arguments"])
@@ -279,7 +284,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 stored = db.get_run(run_id=packets[0]["runId"], deserialize=False)["run_data"]
                 self.assertNotIn(PUBLIC_TOOL_BODY, json.dumps(stored))
                 self.assertNotIn("forged-by-model", json.dumps(stored))
-                self.assertEqual(len(stored["tools"]), 6)
+                self.assertEqual(len(stored["tools"]), len(plan))
                 self.assertTrue(all(item.get("result") is None and item.get("tool_args") is None for item in stored["tools"]))
                 self.assertTrue(any(item["event"] == "ToolCallCompleted" for item in stored["events"]))
                 history = client.get("/galaxy/conversations/" + row["id"], headers=headers)
@@ -303,7 +308,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 self.assertEqual(stale.status_code, 403, stale.text)
                 self.assertNotIn("当前结果", stale.text)
 
-    def test_prepared_card_stops_native_followup_and_replaces_unconfirmed_content(self):
+    def test_prepared_card_uses_loaded_domain_and_keeps_original_receipt(self):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as cleanup:
             db = SqliteDb(db_file=str(Path(directory) / "prepared.db"), id="prepared-local")
             cleanup.callback(db.db_engine.dispose)
@@ -325,9 +330,9 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 def invoke(self, messages=None, **kwargs):
                     self.calls += 1
                     if self.calls == 1:
-                        return ModelResponse(role="assistant", tool_calls=[{"id":"plan-call", "type":"function", "function":{"name":"plan_turn", "arguments":json.dumps({"intent":"prepare", "proposal_count":1, "alternatives":False, "summary":"处理反馈"})}}])
+                        return ModelResponse(role="assistant", tool_calls=[{"id":"plan-call", "type":"function", "function":{"name":"load_business_tools", "arguments":json.dumps({"domains":["feedback_accounts"]})}}])
                     if self.calls == 2:
-                        return ModelResponse(role="assistant", tool_calls=[{"id":"prepared-call", "type":"function", "function":{"name":"prepare_operation", "arguments":json.dumps({"operation":{"kind":"feedback-update", "targetId":node.object_id, "state":"processing"}})}}])
+                        return ModelResponse(role="assistant", tool_calls=[{"id":"prepared-call", "type":"function", "function":{"name":"prepare_feedback_accounts_operation", "arguments":json.dumps({"operation":{"kind":"feedback-update", "targetId":node.object_id, "state":"processing"}})}}])
                     if self.calls == 3:
                         return ModelResponse(role="assistant", tool_calls=[{"id":"assess-call", "type":"function", "function":{"name":"assess_turn", "arguments":json.dumps({"disposition":"awaiting-confirmation", "reason":"等待确认", "remaining":[]})}}])
                     return ModelResponse(role="assistant", content="已准备确认卡，请人工确认。")
@@ -342,17 +347,15 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                 response = client.post("/agents/galaxy-conversation-overview/runs", headers={**headers,"Idempotency-Key":str(uuid4())}, data={"message":"准备处理", "stream":"true", "background":"false", "session_id":row["sessionId"]})
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertEqual(model.calls, 4)
-                self.assertIn("方案已准备，请在下方确认。当前尚未执行。", response.text)
-                self.assertNotIn("已准备确认卡，请人工确认。", response.text)
+                self.assertIn("已准备确认卡，请人工确认。", response.text)
                 packets = [value for path,value in node.calls if path.endswith("/tools/execute")]
-                self.assertEqual(len(packets), 3)
+                self.assertEqual([packet["tool"] for packet in packets], ["prepare-operation", "assess-conversation-task"])
                 stored = db.get_run(run_id=packets[0]["runId"], deserialize=False)["run_data"]
-                self.assertEqual(stored["content"], "方案已准备，请在下方确认。当前尚未执行。")
-                self.assertNotIn("已准备确认卡，请人工确认。", json.dumps(stored, ensure_ascii=False))
-                self.assertEqual(stored["metadata"]["_galaxyPreparedCardIds"], [card_id])
-                self.assertEqual(client.get("/galaxy/conversations/"+row["id"], headers=headers).json()["runs"][0]["content"], "方案已准备，请在下方确认。当前尚未执行。")
+                self.assertEqual(stored["content"], "已准备确认卡，请人工确认。")
+                self.assertEqual(stored["metadata"]["_galaxyConversationTurnState"]["_galaxyPreparedCardIds"], [card_id])
+                self.assertEqual(client.get("/galaxy/conversations/"+row["id"], headers=headers).json()["runs"][0]["content"], "已准备确认卡，请人工确认。")
 
-    def test_native_stream_continues_after_usage_metadata_copy_and_never_emits_false_card(self):
+    def test_native_stream_preserves_read_result_and_records_completion(self):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as cleanup:
             db=SqliteDb(db_file=str(Path(directory)/"holder.db"),id="holder-local"); cleanup.callback(db.db_engine.dispose)
             row={"id":str(uuid4()),"sessionId":str(uuid4()),"domain":"overview","mode":"conversation","actions":[],"resourceIds":[]}
@@ -362,7 +365,7 @@ class ConversationBusinessToolsTest(unittest.TestCase):
                     self.calls+=1
                     if self.calls==1:
                         return ModelResponse(role="assistant", tool_calls=[{"id":"read-1","type":"function","function":{"name":"query_operations","arguments":json.dumps({"module":"content","view":"list","filters":{"days":7}})}}])
-                    if self.calls==2: return ModelResponse(role="assistant",content="已生成确认卡，请在下方执行。")
+                    if self.calls==2: return ModelResponse(role="assistant",content="已读取，仍需明确处理对象。")
                     if self.calls==3:
                         return ModelResponse(role="assistant",tool_calls=[{"id":"assess-1","type":"function","function":{"name":"assess_turn","arguments":json.dumps({"disposition":"needs-information","reason":"需要明确处理对象","remaining":["明确对象"]})}}])
                     return ModelResponse(role="assistant",content="请明确需要处理的对象。")
@@ -373,13 +376,13 @@ class ConversationBusinessToolsTest(unittest.TestCase):
             with TestClient(app) as client:
                 response=client.post("/agents/galaxy-conversation-overview/runs",headers={"Authorization":"Bearer "+token,"Idempotency-Key":str(uuid4())},data={"message":"查询并准备处理", "stream":"true","background":"false","session_id":row["sessionId"]})
                 self.assertEqual(response.status_code,200,response.text)
-                self.assertEqual(model.calls,4); self.assertNotIn("已生成确认卡",response.text); self.assertIn("请明确需要处理的对象",response.text)
+                self.assertEqual(model.calls,2); self.assertIn("已读取，仍需明确处理对象。",response.text)
                 packets=[value for path,value in node.calls if path.endswith("/tools/execute")]
                 self.assertEqual([p["tool"] for p in packets],["query-operations", "assess-conversation-task"])
                 stored=db.get_run(run_id=packets[0]["runId"],deserialize=False)["run_data"]
-                self.assertEqual(stored["metadata"]["modelCalls"],4)
+                self.assertEqual(stored["metadata"]["modelCalls"],2)
                 self.assertNotIn("_galaxyPreparedCardIds",stored["metadata"])
-                self.assertEqual(stored["content"],"请明确需要处理的对象。")
+                self.assertEqual(stored["content"],"已读取，仍需明确处理对象。")
 
     def test_preparation_stop_is_per_call_and_invalid_card_does_not_stop(self):
         from agno.tools.function import FunctionCall

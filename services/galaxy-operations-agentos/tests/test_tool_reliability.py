@@ -1,3 +1,4 @@
+from galaxy_agentos.conversation_tools import preparation_tools
 import json
 from galaxy_agentos.conversation_turn_state import turn_state
 import unittest
@@ -154,7 +155,8 @@ class ToolReliability(unittest.TestCase):
                     projected, _ = _model_feedback(feedback)
                     self.assertEqual(projected, feedback)
                     projected_query, _ = _model_feedback({**feedback, "analysisConstraints": {"ignored": "SECRET_CANARY"}})
-                    self.assertEqual(projected_query, feedback)
+                    self.assertEqual(projected_query["state"], "unavailable")
+                    self.assertNotIn("SECRET_CANARY", json.dumps(projected_query))
                 else:
                     with self.assertRaises(AuthorityUnavailable) as caught:
                         gateway.request("tools/execute", {}, tool_feedback=True)
@@ -183,7 +185,7 @@ class ToolReliability(unittest.TestCase):
         gateway = GalaxyGateway(SimpleNamespace(service_key="synthetic", authority_url="http://127.0.0.1:1/v1/internal/agentos/"),
             transport=httpx.MockTransport(respond))
         self.addCleanup(gateway.close)
-        function = reliable_function(conversation_tools(gateway)[-1])
+        function = reliable_function(preparation_tools(gateway, domains=['strategy'])[0])
         function._run_context = self.context()
         first = FunctionCall(function=function, call_id="first", arguments={"operation":{"kind":"rule-publish", "key":"business-controls", "reason":"first"}})
         with redirect_stdout(StringIO()):
@@ -283,7 +285,26 @@ class ToolReliability(unittest.TestCase):
             call=FunctionCall(function=fn,call_id='call_bad'+str(attempt),arguments={'module':'CANARY_PRIVATE','view':'overview'})
             call.execute();result=json.loads(call.result)
             self.assertFalse(result['effectExecuted']);self.assertFalse(result['cardPrepared']);self.assertNotIn('CANARY_PRIVATE',call.result)
-        self.assertTrue(result['retryable']);self.assertTrue(result['repeatedValidationFailure']);self.assertEqual(result['nextStep'],'correct-arguments');self.assertEqual(calls,[])
+        self.assertTrue(result['retryable']);self.assertNotIn('repeatedValidationFailure', result);self.assertEqual(result['nextStep'],'correct-arguments');self.assertEqual(calls,[])
+
+    def test_failed_validation_record_does_not_block_feedback_or_next_call(self):
+        calls = []
+        class Gateway:
+            def conversation_tool(self, user, name, arguments, **binding):
+                calls.append(arguments)
+                return {'state': 'available'}
+        def unavailable_record(*args):
+            raise RuntimeError('ledger unavailable')
+        fn = reliable_function(conversation_tools(Gateway())[0], on_read_validation_failure=unavailable_record)
+        fn._run_context = self.context()
+        invalid = FunctionCall(function=fn, call_id='invalid', arguments={'module': 'not-a-module', 'view': 'overview'})
+        invalid.execute()
+        self.assertEqual(json.loads(invalid.result)['state'], 'invalid-request')
+        self.assertFalse(invalid.function.stop_after_tool_call)
+        valid = FunctionCall(function=fn, call_id='valid', arguments={'module': 'recommendations', 'view': 'overview'})
+        valid.execute()
+        self.assertEqual(json.loads(valid.result)['state'], 'available')
+        self.assertEqual(len(calls), 1)
 
     def test_conflicting_filter_is_not_silently_overridden(self):
         class Gateway:

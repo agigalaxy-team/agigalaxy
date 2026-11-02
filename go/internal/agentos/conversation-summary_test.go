@@ -3,6 +3,7 @@ package agentos
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/access"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsai"
@@ -86,6 +87,25 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 	}
 	q.RecheckContext = tools.RecheckContext
 	bound := Object{"conversationId": current.Row.ID, "turnId": turn}
+	if _, e = pool.Exec(ctx, `UPDATE operations_agentos_conversation_commands_v1 SET result=$3 WHERE endpoint=$1 AND id=$2`, endpoint, turn, Object{"taskId": uuid.NewString()}); e != nil {
+		t.Fatal(e)
+	}
+	broken := SummaryContextReaders{BoundedTaskWithin: func(context.Context, pgx.Tx, Conversation, Object) (Object, error) {
+		return nil, errors.New("source unavailable")
+	}}
+	partial, err := tools.SummaryContext(ctx, human, "overview", bound, broken)
+	if err != nil || object(partial["boundedTask"]) != nil || object(partial["sectionAvailability"])["boundedTask"] != "unavailable" || partial["priorReadReceipts"] == nil {
+		t.Fatalf("independent section failed: %#v %v", partial, err)
+	}
+	broken.BoundedTaskWithin = func(context.Context, pgx.Tx, Conversation, Object) (Object, error) {
+		return nil, fail("operations_agentos_authority_changed", 403)
+	}
+	if _, err = tools.SummaryContext(ctx, human, "overview", bound, broken); fault.Code(err) != "operations_agentos_authority_changed" {
+		t.Fatalf("authority failure hidden: %v", err)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE operations_agentos_conversation_commands_v1 SET result='{}' WHERE endpoint=$1 AND id=$2`, endpoint, turn); e != nil {
+		t.Fatal(e)
+	}
 	result, e := q.Summary(ctx, human, "overview", bound)
 	if e != nil {
 		t.Fatal(e)
@@ -208,8 +228,9 @@ func TestActualSummaryCurrentScopeAndPriorReadLedger(t *testing.T) {
 	if _, e = pool.Exec(ctx, `UPDATE operations_agentos_conversation_commands_v1 SET result=$3 WHERE endpoint=$1 AND id=$2`, endpoint, turn, Object{"taskId": uuid.NewString()}); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = q.Summary(ctx, human, "overview", bound); fault.Status(e) != 503 {
-		t.Fatalf("missing bound task reader fabricated %v", e)
+	partialSummary, err := q.Summary(ctx, human, "overview", bound)
+	if err != nil || object(partialSummary["sectionAvailability"])["boundedTask"] != "unavailable" || object(partialSummary["boundedTask"]) != nil {
+		t.Fatalf("missing bound task reader did not remain an unavailable section: %#v %v", partialSummary, err)
 	}
 	if _, e = pool.Exec(ctx, `UPDATE operations_agentos_conversations_v1 SET retired_at=$3,retirement_reason='source-changed' WHERE endpoint=$1 AND id=$2`, endpoint, current.Row.ID, now()); e != nil {
 		t.Fatal(e)

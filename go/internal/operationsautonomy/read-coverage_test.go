@@ -2,22 +2,7 @@ package operationsautonomy
 
 import "testing"
 
-func TestReadCoverageRequiresCompleteMatchingLaterEvidence(t *testing.T) {
-	arg := Object{"module": "maintenance", "view": "overview", "filters": Object{}}
-	calls := []Object{
-		{"call_id": "failed", "tool": "query-operations", "state": "unknown", "code": "invalid_operations_agentos_query", "arguments": arg, "updated_at": "2026-10-29T01:00:00Z"},
-		{"call_id": "other", "tool": "query-operations", "state": "completed", "code": "read-success-complete", "arguments": Object{"module": "audit", "view": "overview", "filters": Object{}}, "updated_at": "2026-10-29T01:00:01Z"},
-		{"call_id": "partial", "tool": "query-operations", "state": "completed", "code": "read-success-partial", "arguments": arg, "updated_at": "2026-10-29T01:00:02Z"},
-	}
-	c := summarizeReadCoverage(calls, nil)
-	if len(c["unresolved"].([]Object)) != 0 {
-		t.Fatalf("bounded partial should cover same requested page: %#v", c)
-	}
-	calls = append(calls, Object{"call_id": "complete", "tool": "query-operations", "state": "completed", "code": "read-success-complete", "arguments": arg, "updated_at": "2026-10-29T01:00:03Z"})
-	c = summarizeReadCoverage(calls, nil)
-	if len(c["unresolved"].([]Object)) != 0 {
-		t.Fatalf("complete original scope did not resolve: %#v", c)
-	}
+func TestReadResultStatusPreservesAvailabilityAndPageOutcome(t *testing.T) {
 	state, code := readResultStatus(Object{"availability": "available", "data": Object{"items": []any{}}, "pagination": Object{"complete": true}})
 	if state != "completed" || code != "read-success-empty-complete" {
 		t.Fatalf("empty %s %s", state, code)
@@ -29,27 +14,6 @@ func TestReadCoverageRequiresCompleteMatchingLaterEvidence(t *testing.T) {
 	state, _ = readResultStatus(Object{"availability": "unavailable"})
 	if state != "failed" {
 		t.Fatalf("unavailable %s", state)
-	}
-}
-
-func TestEmptyPlansOnlyResolveUnspecifiedHistoryWithOriginalEvidence(t *testing.T) {
-	failed := Object{"tool": "query-operations", "arguments": Object{"module": "messaging", "view": "history", "filters": Object{}}}
-	evidence := Object{"tool": "query-operations", "code": "read-success-empty-complete", "arguments": Object{"module": "messaging", "view": "plans", "filters": Object{}}}
-	if !emptyPlansProveNoHistory(failed, evidence) {
-		t.Fatal("complete empty plan list not recognized")
-	}
-	obj(failed["arguments"])["filters"] = Object{"planId": "00000000-0000-0000-0000-000000000001"}
-	if emptyPlansProveNoHistory(failed, evidence) {
-		t.Fatal("explicit plan history cannot be dismissed")
-	}
-	obj(failed["arguments"])["filters"] = Object{}
-	obj(evidence["arguments"])["filters"] = Object{"state": "active"}
-	if emptyPlansProveNoHistory(failed, evidence) {
-		t.Fatal("filtered empty list cannot prove all plans absent")
-	}
-	obj(evidence["arguments"])["filters"] = Object{"after": "1"}
-	if emptyPlansProveNoHistory(failed, evidence) {
-		t.Fatal("later empty page cannot prove all plans absent")
 	}
 }
 
@@ -89,20 +53,5 @@ func TestFixedInspectionOnlyCoversItsDocumentedCurrentScopes(t *testing.T) {
 	evidence["code"] = "inspection-current-complete-empty-plans"
 	if !inspectionCoversFailure(query("messaging", "history", Object{}), evidence) || inspectionCoversFailure(query("messaging", "history", Object{"planId": "00000000-0000-0000-0000-000000000001"}), evidence) {
 		t.Fatal("empty-plan history proof too broad")
-	}
-}
-
-func TestUnresolvedDelegationRetainsOnlyValidatedTarget(t *testing.T) {
-	id := "11111111-1111-4111-8111-111111111111"
-	call := Object{"tool": "read-ai-delegation", "state": "failed", "arguments": Object{"aiAccountId": id}}
-	coverage := summarizeReadCoverage([]Object{call}, nil)
-	unresolved := coverage["unresolved"].([]Object)
-	if len(unresolved) != 1 || obj(unresolved[0]["scope"])["aiAccountId"] != id {
-		t.Fatalf("missing target: %v", coverage)
-	}
-	obj(call["arguments"])["aiAccountId"] = "not-an-id"
-	unresolved = summarizeReadCoverage([]Object{call}, nil)["unresolved"].([]Object)
-	if unresolved[0]["scope"] != nil {
-		t.Fatalf("invalid target leaked: %v", unresolved)
 	}
 }

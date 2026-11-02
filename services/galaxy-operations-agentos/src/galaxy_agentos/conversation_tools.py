@@ -83,14 +83,13 @@ from .conversation_tool_feedback import (
     _WINDOW_DAYS,
     _WINDOW_DEFAULT_DAYS,
     _window_filter_feedback,
-    _analysis_constraints,
     _feedback_filter_feedback,
     _query_filter_feedback,
     _preparation_feedback,
 )
 
 
-def conversation_tools(gateway, *, domain=None):
+def _conversation_tools(gateway, *, domain=None, include_legacy=False):
     preparation_type = _preparation_type(domain)
 
     def send(context, call, name, arguments, *, selected_reference=None):
@@ -109,83 +108,19 @@ def conversation_tools(gateway, *, domain=None):
         result = gateway.conversation_tool(context.user_id, name, arguments, **binding)
         if name == "prepare-operation":
             result = _preparation_feedback(result)
-        elif name in {"query-operations", "read-operation-object"}:
-            result = _analysis_constraints(result, module=arguments.get("module"),
-                view=arguments.get("view"), filters=arguments.get("filters"))
         return json.dumps(result, ensure_ascii=False, allow_nan=False)
 
     def query_operations(run_context: RunContext, fc: FunctionCall,
             module: Module, view: View, filters: QueryFilters | None = None) -> str:
-        """Query a current permitted operations module using its fixed view and filters.
+        """Query a permitted operations module using its views and filters.
 
-        Use the server's real counts, aggregation, pagination and source refs.
-        A partial page is not a total. Filters never accept SQL, URLs, paths,
-        roles or grants. Case directories contain metadata only; this list query
-        never returns case narratives, private chat or message bodies. Only
-        read_operation_object may read the selected public-report case's current
-        service-authorized public-case-review material. An unavailable module
-        is not an empty or zero result.
-
-        system-settings describes configuration and consumer adoption, not service
-        health. Use maintenance/overview for observed runtime and health facts.
-
-        Windowed reads: days is mandatory for each supported window view:
-        accounts/summary 7 or 28; content/list and feedback/list 7,28,all;
-        analytics overview/business/retention/paths/account integers 1..90;
-        recommendations/overview and search/overview 7,30,90. Missing days is
-        rejected locally without a query. Never infer or silently fill the
-        user's choice. If no time range was requested, explicitly use this
-        view's published defaultDays and disclose that window in the answer;
-        no follow-up question is needed. The tool never fills days itself.
-        An explicitly requested range must still match. Do not send days to
-        views that do not support it.
-        Read analysisConstraints with the unchanged original response: zero
-        is not a collection-health diagnosis; null/unknown reasons require an
-        explicit source explanation; ratios need counts and cannot prove user
-        intent. runtime_event_rejected in maintenance logs only normalizes an
-        event name outside the Galaxy allowlist, not a proxy/security finding.
-        Explicitly pass the user's supported days for each
-        requested view; do not rely on another module's default. recommendations
-        overview supports days=7/30/90 and defaults to 30; search overview also
-        supports 7/30/90 but defaults to 7. Their returned period is the event
-        window; recommendations supply is current public stock, not new posts.
-        Missing or uncollected metrics must not be invented as zero.
-        content list supports days=7/28/all (default 7), kind=post or reply,
-        visibility=visible and a requested limit (server cap 20). Omitting kind
-        returns one mixed page, not two samples. Use independent kind queries
-        when separate post/reply samples are requested. Returned pagination and
-        scanLimited determine coverage; a page count is not a total.
-
-        feedback list accepts only category=unclassified/problem/suggestion,
-        module=account/community/chat/work/discovery/other,
-        state=pending/processing/closed, days=7/28/all, after and limit (1..100,
-        default 30). It does not accept query or search titles/bodies. Its list
-        contains metadata only; for the text of a selected real feedback ID,
-        use read_operation_object(kind="feedback", id=that actual ID).
-        An invalid filter response is not a completed read or an empty result.
-
-        Common views: accounts list/summary; content list/sections/tags;
-        analytics overview/business/retention/paths/account; messaging
-        plans/runs/recipients/history; maintenance overview/backups/plans/logs.
-        Other modules use list, overview, history or versions as appropriate.
-        For messaging recipients, pass a real runId and optionally channel
-        inapp or email; these are recipient reads, never message delivery.
-        File cleanup views only read candidates and concrete plan progress;
-        they never approve a plan or remove a file.
-        registered-users list is the configured website registration directory,
-        including identities with no business profile. Use page/pageSize and
-        the returned complete-generation/as-of/count basis; business accounts
-        and businessCreatedAt are not full registrations or registration dates.
-        Directory output excludes email, issuer, subject and security history.
-        system-settings views are read-only safe metadata. General is the
-        current published website configuration; saved admin drafts are not
-        read. Other sections distinguish saved configuration and consumer ACK.
-        No credential values, references, environment or raw errors are exposed.
-        Analytics uses relative days (1..90), not day/from/to calendar dates:
-        overview/business accept days; paths/retention also accept scope=accounts
-        and an optional accountId (accountId requires that scope); account
-        requires accountId and accepts days. Report the returned time basis;
-        do not silently substitute a rolling window for a requested exact date.
+        Use actual counts, pagination and source references. A partial page is
+        not a total; unavailable is not zero. The service supplies defaults
+        for omitted filters; pass the user's explicit supported range. Use the
+        returned period, basis and coverage. Load the relevant business domain
+        for its data definitions and preparation tools. Lists of cases and
+        feedback contain metadata; read an actual selected object for permitted
+        details. Filters do not accept arbitrary paths, SQL, roles or grants.
         """
         if view not in VIEWS[module]:
             return json.dumps({"state": "invalid-request",
@@ -400,6 +335,17 @@ def conversation_tools(gateway, *, domain=None):
 
     query_operations.__doc__ += "\nExact module views: " + "; ".join(
         name + " " + "/".join(sorted(views)) for name, views in VIEWS.items()) + "."
-    return [query_operations, read_operation_object, list_authorized_work,
+    from .business_tools import load_business_tools
+    tools = [query_operations, read_operation_object, list_authorized_work,
         run_authorized_work, task_operation_tool(send), read_ai_delegation,
-        plan_turn_tool(send), assess_turn_tool(send), prepare_operation]
+        plan_turn_tool(send), assess_turn_tool(send), load_business_tools]
+    if include_legacy:
+        tools.append(prepare_operation)
+    return tools
+
+
+def conversation_tools(gateway, *, domain=None):
+    return _conversation_tools(gateway, domain=domain)
+
+
+from .business_tools import preparation_tool_catalog, preparation_tools, is_preparation_tool

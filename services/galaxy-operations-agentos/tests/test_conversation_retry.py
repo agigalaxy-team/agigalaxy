@@ -7,6 +7,7 @@ from contextlib import ExitStack
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 import jwt
 from fastapi.testclient import TestClient
@@ -21,14 +22,14 @@ from agno.os import AgentOS, Authorization
 from agno.os.authz.provider import AuthorizationContext
 from agno.run.authorization import RunAuthorization, authorization_scope
 from agno.run.agent import RunErrorEvent, RunOutput
-from agno.run.base import RunStatus
+from agno.run.base import RunContext, RunStatus
 from galaxy_agentos.app import PrivateSurface, run_view
 from galaxy_agentos.authorization import GalaxyAuthorization
 from galaxy_agentos.config import Settings
 from galaxy_agentos.conversations import conversation_agents
 from galaxy_agentos.conversation_failures import failure_view
-from galaxy_agentos.conversation_retry import ConversationAgent
-from galaxy_agentos.conversation_turn_state import TURN_STATE, PLAN, ACTIVITY, ASSESSMENT, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK
+from galaxy_agentos.conversation_retry import ConversationAgent, _filter_source_history
+from galaxy_agentos.conversation_turn_state import turn_state, TURN_STATE, PLAN, ACTIVITY, ASSESSMENT, PREPARED_CARD_IDS, PREPARED_FINGERPRINTS, PREPARE_UNKNOWN, RECEIPT_FEEDBACK
 from galaxy_agentos.conversation_transport import install_conversation_transport_read
 from galaxy_agentos.gateway import AuthorityDenied, AuthorityUnavailable
 from galaxy_agentos.model_gate import with_current_authority
@@ -63,8 +64,23 @@ class RecoveryModel(Model):
 
 class ConversationRetry(unittest.TestCase):
     def assert_historical_question_once(self, messages, expected):
-        historical = [json.loads(m.content) for m in messages if m.role == "user" and m.from_history and isinstance(m.content, str)]
-        self.assertEqual(sum(item.get("contextType") == "historical-conversation-record" and item.get("content") == expected for item in historical), 1)
+        historical = [m.content for m in messages if m.role == "user" and m.from_history and isinstance(m.content, str)]
+        self.assertEqual(historical.count(expected), 1)
+
+    def test_legacy_trusted_source_projection_preserves_history(self):
+        from galaxy_agentos.source_qualification import source_qualification
+        context = RunContext(run_id=str(uuid4()), session_id=str(uuid4()),
+            user_id='conversation:' + str(uuid4()), metadata={'operationId': str(uuid4())})
+        turn_state(context)['sourceQualification'] = source_qualification({})
+        original = SimpleNamespace(metadata={'operationId': str(uuid4())},
+            messages=[Message(role='user', content='已有问题'), Message(role='assistant', content='已有答复')],
+            content='已有答复')
+        session = SimpleNamespace(runs=[original])
+        _filter_source_history(session, context)
+        self.assertIs(session.runs[0], original)
+        self.assertEqual(session.runs[0].content, '已有答复')
+        self.assertEqual([m.content for m in session.runs[0].messages], ['已有问题', '已有答复'])
+        self.assertNotIn('_sourceHistoryRestricted', turn_state(context))
 
     def test_retry_discards_prior_authority_events_without_bypassing_current_authority(self):
         user, session, old_op, new_op, old_run = (str(uuid4()) for _ in range(5))
