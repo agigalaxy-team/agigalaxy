@@ -109,7 +109,7 @@ func (s *Service) Report(ctx context.Context, input Object) (Object, error) {
 			return nil, fail("operations_autonomy_operation_conflict")
 		}
 		if failure := obj(x["failure"]); failure != nil && !has([]string{"completed", "stopped"}, str(row["state"])) {
-			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET result=jsonb_set(COALESCE(NULLIF(result,'null'::jsonb),'{}'::jsonb),'{failure}',$3::jsonb) WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(failure)); e != nil {
+			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET result=jsonb_set(jsonb_set(COALESCE(NULLIF(result,'null'::jsonb),'{}'::jsonb),'{failure}',$3::jsonb),'{failureNativeRunId}',$4::jsonb) WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(failure), jsonText(x["nativeRunId"])); e != nil {
 				return nil, e
 			}
 		}

@@ -150,7 +150,10 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 		}
 	}
 	out["strategyVersionId"] = obj(obj(row["configuration"])["versionBindings"])["strategyVersionId"]
-	out["failure"] = obj(obj(row["result"])["failure"])
+	out["failure"] = nil
+	if row["state"] == "failed" && str(obj(row["result"])["failureNativeRunId"]) == str(row["native_run_id"]) {
+		out["failure"] = obj(obj(row["result"])["failure"])
+	}
 	out["executionScope"] = "current-execution"
 	if control := obj(row["control_state"]); control["kind"] == "manual-pause" && has([]string{"requested", "paused", "resuming", "ended"}, str(control["phase"])) {
 		pause := Object{"phase": control["phase"], "pauseOperationId": control["pauseOperationId"], "nativeRunId": control["nativeRunId"]}
