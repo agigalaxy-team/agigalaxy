@@ -21,7 +21,7 @@ export function aiRunsHref(location:AiRunLocation,patch:Partial<AiRunLocation>={
 }
 export function aiRunsPath(location:AiRunLocation){return '/v1/operations/agentos/runs?'+new URLSearchParams({page:String(location.page),limit:'25',...(location.domain?{domain:location.domain}:{}),...(location.state?{state:location.state}:{})});}
 export function aiRunDetailPath(id:string){return opaque.test(id)?'/v1/operations/agentos/runs/'+id:null;}
-export function autonomyRunsPath(location:AiRunLocation){return '/v1/operations/autonomy/tasks?'+new URLSearchParams({page:String(location.page),limit:'25',...(location.domain?{domain:location.domain}:{}),...(location.taskState?{state:location.taskState==='awaiting-human'?'waiting-human':location.taskState}:{}),...(location.source?{source:location.source}:{}),...(location.mode?{mode:location.mode}:{})});}
+export function autonomyRunsPath(location:AiRunLocation){return '/v1/operations/autonomy/tasks?'+new URLSearchParams({page:String(location.page),limit:'25',projection:'summary',...(location.domain?{domain:location.domain}:{}),...(location.taskState?{state:location.taskState==='awaiting-human'?'waiting-human':location.taskState}:{}),...(location.source?{source:location.source}:{}),...(location.mode?{mode:location.mode}:{})});}
 export function aiRecordedNumber(value:number|null|undefined){return typeof value==='number'&&Number.isFinite(value)&&value>=0?value.toLocaleString('zh-CN'):'未记录';}
 export function aiDuration(value:number|null|undefined){
  if(typeof value!=='number'||!Number.isFinite(value)||value<0)return '未记录';

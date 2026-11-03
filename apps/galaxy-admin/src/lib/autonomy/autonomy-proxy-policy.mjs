@@ -5,7 +5,7 @@ export const autonomyReadPath=new RegExp('^'+root+'/(?:overview|summary|options|
 export const autonomyWritePath=new RegExp('^'+root+'/(?:enable|settings|tasks(?:/'+uuid+'/(?:control|decisions))?|accounts/'+domain+'/(?:config|run))$','i');
 export function autonomyQueryAllowed(pathname,search){
  if(!autonomyReadPath.test(pathname)&&!autonomyWritePath.test(pathname))return true;
- const keys=pathname===root+'/overview'?['days']:pathname===root+'/tasks'?['page','limit','domain','source','state','mode','targetType','targetId']:[];
+ const keys=pathname===root+'/overview'?['days']:pathname===root+'/tasks'?['page','limit','domain','source','state','mode','targetType','targetId','projection']:[];
  const params=new URLSearchParams(search);
  return search.length<=2048&&[...params.keys()].every(key=>keys.includes(key)&&params.getAll(key).length===1);
 }

@@ -11,7 +11,7 @@ import './autonomy-object.css';
 /** The owning business page stays primary; only actual linked tasks appear. */
 export function AutonomyObjectContext({targetType,targetId,csrfToken,onChanged}:{targetType:string;targetId:string|null|undefined;csrfToken:string;onChanged?:()=>unknown|Promise<unknown>}){
  const permissions=useOperationsPageAccess(),allowed=permissions.includes('autonomy.read');
- const query=new URLSearchParams({targetType,targetId:targetId??'',limit:'5',page:'1'});
+ const query=new URLSearchParams({targetType,targetId:targetId??'',limit:'5',projection:'summary',page:'1'});
  const current=useOperationsRead<AutonomyTasksPage>({path:allowed&&targetId?autonomyBase+'/tasks?'+query:null,clearOnOffline:true,failureMessage:'关联处理记录暂时无法读取。'});
  const changed=async()=>{await current.read();await onChanged?.();};
  if(!allowed||!current.verified||!current.value?.items.length)return null;

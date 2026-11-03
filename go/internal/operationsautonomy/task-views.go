@@ -218,10 +218,13 @@ func (s *Service) GetTask(ctx context.Context, a Actor, id string) (out Object, 
 	})
 }
 func parseTaskQuery(input Object) (Object, error) {
-	if !closed(input, nil, []string{"page", "limit", "domain", "source", "state", "mode", "targetType", "targetId"}) {
+	if !closed(input, nil, []string{"page", "limit", "domain", "source", "state", "mode", "targetType", "targetId", "projection"}) {
 		return nil, invalid()
 	}
 	x := obj(clone(input))
+	if x["projection"] != nil && x["projection"] != "summary" {
+		return nil, invalid()
+	}
 	if _, ok := x["page"]; !ok {
 		x["page"] = 1
 	}
@@ -297,8 +300,30 @@ func (s *Service) Tasks(ctx context.Context, a Actor, input Object) (out Object,
 		}
 		items := []Object{}
 		withheld := false
+		var refs map[string][]Object
+		if q["projection"] == "summary" {
+			ids := make([]string, 0, len(rows))
+			for _, row := range rows {
+				ids = append(ids, str(row["id"]))
+			}
+			refs, e = s.taskSourceRefsForTasksWithin(ctx, tx, ids)
+			if e != nil {
+				return nil, e
+			}
+		}
 		for _, row := range rows {
-			task, e := s.taskViewWithin(ctx, tx, row, actor, true, true)
+			var task Object
+			var e error
+			if q["projection"] == "summary" {
+				// A directory needs status and receipts, not every report body.
+				// Keep the same current source authority before projecting metadata.
+				e = s.checkTargetWithRefsWithin(ctx, tx, actor, row, refs[str(row["id"])])
+				if e == nil {
+					task, e = s.taskViewWithin(ctx, tx, row, actor, true, false)
+				}
+			} else {
+				task, e = s.taskViewWithin(ctx, tx, row, actor, true, true)
+			}
 			if e != nil {
 				var f *fault.Error
 				if !errors.As(e, &f) || f.Status != 403 && f.Status != 404 && f.Status != 409 && f.Status != 410 && f.Status != 503 {

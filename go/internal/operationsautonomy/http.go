@@ -156,7 +156,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		input := Object{}
 		for k, v := range q {
-			if !has([]string{"page", "limit", "domain", "source", "state", "mode", "targetType", "targetId"}, k) || len(v) != 1 {
+			if !has([]string{"page", "limit", "domain", "source", "state", "mode", "targetType", "targetId", "projection"}, k) || len(v) != 1 {
 				e = invalid()
 				break
 			}
