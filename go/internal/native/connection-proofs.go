@@ -23,6 +23,10 @@ type connectionEnvelope struct {
 	KID                 string
 }
 
+// Independent client and authority clocks can straddle a second or differ
+// slightly. The authority still enforces the actual operation expiration.
+const connectionClockSkewSeconds int64 = 30
+
 var connectionUUID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 var connectionHash = regexp.MustCompile(`^[a-f0-9]{64}$`)
 

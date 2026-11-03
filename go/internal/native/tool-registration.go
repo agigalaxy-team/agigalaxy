@@ -25,6 +25,13 @@ func addNativeTool(server *mcp.Server, tool *mcp.Tool, invalidCode string, handl
 	if e != nil {
 		panic("invalid Native tool schema")
 	}
+	// Keep the original validation contract. Also expose object fields outside
+	// union branches: some host model SDKs discard a root oneOf/anyOf entirely.
+	var published map[string]any
+	if json.Unmarshal(b, &published) == nil {
+		projectToolObjectFields(published)
+		tool.InputSchema = published
+	}
 	server.AddTool(tool, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		data := request.Params.Arguments
 		if len(data) == 0 {

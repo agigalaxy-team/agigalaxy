@@ -25,12 +25,15 @@ func registerRuntimeTools(server *mcp.Server, tools *toolRuntime, runtime *Runti
 		}
 		return toolResult(result)
 	})
-	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_connect", Description: "Review connecting the current existing device to its configured authority. No local notes or original conversations are uploaded.", InputSchema: objectSchema(map[string]any{})}, "native_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_connect", Description: "Review connecting this local identity to its configured authority, registering its first control device when needed. No local notes or original conversations are uploaded.", InputSchema: objectSchema(map[string]any{})}, "native_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		plan, e := runtime.PrepareConnect(ctx)
 		if e != nil {
 			return toolError(e)
 		}
 		message := fmt.Sprintf("连接当前银河身份 %s\n服务：%s\n设备：%s\n允许请求的范围：%s\n连接时验证当前控制权；不会上传本机笔记或会话原件，也不启动模型。", plan.GalaxyID, plan.Endpoint, plan.DeviceID, strings.Join(plan.Scopes, "、"))
+		if plan.FirstUse {
+			message = fmt.Sprintf("首次连接银河身份 %s\n服务：%s\n将登记这台本机为该身份的首个控制设备，随后建立连接；本机可以管理自己的身份与设备。\n允许请求的范围：%s\n私钥只留在本机，不上传笔记或会话原件，也不启动模型。", plan.GalaxyID, plan.Endpoint, strings.Join(plan.Scopes, "、"))
+		}
 		return tools.review(ctx, req, plan, message, func(scope *ChoiceScope) (any, error) {
 			connection, e := runtime.ConnectReviewed(ctx, plan, scope)
 			if e != nil {

@@ -19,6 +19,7 @@ type ConnectionSettingsPlan struct {
 	ControlEpoch        *int64   `json:"controlEpoch"`
 	ControlVerification string   `json:"controlVerification"`
 	Scopes              []string `json:"scopes"`
+	FirstUse            bool     `json:"firstUse,omitempty"`
 }
 
 func runtimeRecordWithin(dir, endpoint string) (map[string]any, error) {
@@ -48,7 +49,7 @@ func (r *Runtime) PrepareConnect(ctx context.Context) (ConnectionSettingsPlan, e
 	}
 	active := lease.selection.Active
 	if active == nil {
-		return plan, connectionFailure("native_identity_selection_required")
+		return r.prepareFirstConnect(ctx, lease)
 	}
 	if !connectionSubject.MatchString(active.SubjectID) || !controlUUID(active.DeviceID) || !controlUUID(active.InstallationID) || !connectionGenesis(active.SubjectID, active.GenesisProof) {
 		return plan, connectionFailure("native_identity_selection_invalid")
@@ -114,6 +115,17 @@ func (r *Runtime) PrepareConnect(ctx context.Context) (ConnectionSettingsPlan, e
 	return plan, nil
 }
 func (r *Runtime) ConnectReviewed(ctx context.Context, plan ConnectionSettingsPlan, scope *ChoiceScope) (*ConnectionSnapshot, error) {
+	if plan.FirstUse {
+		nextScope, e := r.firstConnectReviewed(ctx, plan, scope)
+		if e != nil {
+			return nil, e
+		}
+		nextPlan, e := r.PrepareConnect(ctx)
+		if e != nil {
+			return nil, e
+		}
+		return r.ConnectReviewed(ctx, nextPlan, &nextScope)
+	}
 	r.connectMu.Lock()
 	defer r.connectMu.Unlock()
 	if scope == nil || scope.Owner != plan.GalaxyID || scope.Endpoint != plan.Endpoint || scope.DeviceID != plan.DeviceID || scope.Revision != plan.Revision || plan.Endpoint != r.config.Endpoint || !connectionIncludes(plan.Scopes, "binding") {

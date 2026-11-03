@@ -101,7 +101,7 @@ func (a *NativeIdentityAccounts) read(ctx context.Context, l *nativeIdentityLeas
 			}
 		}
 	case "begin":
-		if !nativeAccountProvider(value, l.scope.Endpoint, true) || value["id"] != x.ProviderID || !controlUUID(value["loginId"]) || value["subjectId"] != l.scope.Owner || value["bindingId"] != l.connection.bindingID || value["endpoint"] != l.scope.Endpoint || value["galaxyAuthorization"] != false || !connectionSafeInteger(value["expiresAt"]) || integer(value["expiresAt"]) <= a.runtime.connection.now().Unix() || integer(value["expiresAt"]) > a.runtime.connection.now().Unix()+300 {
+		if !nativeAccountProvider(value, l.scope.Endpoint, true) || value["id"] != x.ProviderID || !controlUUID(value["loginId"]) || value["subjectId"] != l.scope.Owner || value["bindingId"] != l.connection.bindingID || value["endpoint"] != l.scope.Endpoint || value["galaxyAuthorization"] != false || !connectionSafeInteger(value["expiresAt"]) || integer(value["expiresAt"]) <= a.runtime.connection.now().Unix() || integer(value["expiresAt"]) > a.runtime.connection.now().Unix()+300+connectionClockSkewSeconds {
 			return nil, connectionFailure("native_account_link_login_mismatch")
 		}
 		target, e := url.Parse(text(value["authorizationUrl"]))

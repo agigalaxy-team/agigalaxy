@@ -22,7 +22,7 @@ func registerNativeIdentityAccountTools(server *mcp.Server, tools *toolRuntime, 
 	id := materialUUID()
 	action := func(value string) any { return map[string]any{"const": value} }
 	reads := map[string]any{"type": "object", "oneOf": []any{objectSchema(map[string]any{"action": action("providers")}, "action"), objectSchema(map[string]any{"action": action("begin"), "providerId": map[string]any{"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"}}, "action", "providerId"), objectSchema(map[string]any{"action": map[string]any{"type": "string", "enum": []string{"status", "cancel"}}, "id": id}, "action", "id"), objectSchema(map[string]any{"action": action("query"), "id": id, "after": id, "limit": integerSchema(1, 100, 20)}, "action")}}
-	addNativeTool(server, &mcp.Tool{Name: "galaxy_identity_account_read", InputSchema: reads, Description: "Use this installed local plugin to read configured official-account providers, begin the existing OIDC login, read its exact status or this identity’s existing links, or cancel a pending login. Login alone never associates the ID. Keep the returned loginId; never invent a provider, identity or replacement login after an unknown result.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}}, "native_account_link_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	addNativeTool(server, &mcp.Tool{Name: "galaxy_identity_account_read", InputSchema: reads, Description: "Manage the current local identity's official account association. action=query lists already linked accounts; it needs no id (optional id filters one association). action=providers lists available login providers. action=begin starts a new OIDC login and requires providerId from providers. action=status or cancel ONLY inspects/cancels one pending login and requires id equal to its original returned loginId; status is not the account-link listing. Login alone never associates the ID. Keep the returned loginId; never invent an ID or replacement login after an unknown result.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}}, "native_account_link_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input NativeIdentityAccountRead
 		if e := protocol.Decode(req.Params.Arguments, &input); e != nil {
 			return nativeAccountResult(nil, e)
@@ -55,11 +55,14 @@ func registerNativeIdentityAccountTools(server *mcp.Server, tools *toolRuntime, 
 		if e != nil {
 			return nativeAccountResult(nil, e)
 		}
-		raw, e := protocol.Encode(preview)
-		if e != nil {
-			return nativeAccountResult(nil, e)
+		content := uploadObject(uploadObject(preview)["preview"])
+		target := uploadObject(content["target"])
+		action := "关联"
+		if content["action"] == "unlink" {
+			action = "解除关联"
 		}
-		return tools.review(ctx, req, preview, fmt.Sprintf("本人确认准确官方账户与银河ID的现有关联操作：\n%s\n登录本身不建立关联；仅以当前控制设备签署已显示的原意图，不授予新的银河API权限。", raw), func(scope *ChoiceScope) (any, error) { return accounts.ExecuteReviewed(ctx, input.PreviewID, scope) })
+		message := fmt.Sprintf("%s银河账户\n银河ID：%s\n账户标识：%s\n账户服务：%s\n\n仅办理上述账户与本机身份的%s，不增加数据上传或其他操作权限。", action, text(content["subjectId"]), text(target["externalSubject"]), text(target["issuer"]), action)
+		return tools.review(ctx, req, preview, message, func(scope *ChoiceScope) (any, error) { return accounts.ExecuteReviewed(ctx, input.PreviewID, scope) })
 	})
 	addNativeTool(server, &mcp.Tool{Name: "galaxy_identity_account_recover", InputSchema: objectSchema(map[string]any{"id": id}), Description: "Recover this local identity’s original already approved account operation. Omit id to list retained unfinished operations. Read the server’s durable association first; retry only the exact saved signed bytes on the same current binding, without a new login, ID or signature. Keys, bearers and signed packets are not returned.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}}, "native_account_link_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input struct {

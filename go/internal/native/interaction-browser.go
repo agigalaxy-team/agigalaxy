@@ -357,6 +357,9 @@ type interactionChoiceView struct {
 func interactionBrowserView(input BrowserChoiceInput) interactionChoiceView {
 	titles := map[string]string{"galaxy_native_initialize": "创建本机身份", "galaxy_native_connect": "连接银河", "galaxy_local_archive_configure": "保存本机私有原文范围", "galaxy_local_upload_privacy_set": "保存上传类型与范围", "galaxy_local_settings_save": "保存这些选择", "galaxy_local_archive_delete": "删除所选本机原文", "galaxy_local_work_delete": "删除所选本机履历", "galaxy_work_sync_choice": "保存履历到账户", "galaxy_archive_sync_choice": "保存原会话到账户", "galaxy_work_cloud_delete": "删除本人云端履历", "galaxy_archive_cloud_delete": "删除本人云端原会话"}
 	title := titles[input.Name]
+	if input.Name == "galaxy_identity_account_execute" {
+		title = "账户关联"
+	}
 	if title == "" {
 		title = "继续本次操作"
 	}

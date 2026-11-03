@@ -147,8 +147,17 @@ func (h *NativeDeviceHandoff) prepareControl(ctx context.Context, l *nativeIdent
 		return nil, e
 	}
 	nonce, nonceError := base64.RawURLEncoding.Strict().DecodeString(text(challenge["nonce"]))
-	if !connectionExact(challenge, "version", "type", "audience", "request", "nonce", "expiresAt") || integer(challenge["version"]) != 2 || challenge["type"] != "identity-control" || challenge["audience"] != h.runtime.config.Endpoint || !connectionEqual(challenge["request"], request) || response["operationId"] != request["operationId"] || nonceError != nil || len(nonce) != 32 || !connectionSafeInteger(challenge["expiresAt"]) || integer(challenge["expiresAt"]) <= h.runtime.connection.now().Unix() || integer(challenge["expiresAt"]) > h.runtime.connection.now().Unix()+180 || !connectionEqual(response["expiresAt"], challenge["expiresAt"]) {
-		return nil, connectionFailure("device_challenge_changed")
+	if !connectionExact(challenge, "version", "type", "audience", "request", "nonce", "expiresAt") || integer(challenge["version"]) != 2 || challenge["type"] != "identity-control" || challenge["audience"] != h.runtime.config.Endpoint {
+		return nil, connectionFailure("device_challenge_identity_changed")
+	}
+	if !connectionEqual(challenge["request"], request) || response["operationId"] != request["operationId"] {
+		return nil, connectionFailure("device_challenge_request_changed")
+	}
+	if nonceError != nil || len(nonce) != 32 {
+		return nil, connectionFailure("device_challenge_nonce_invalid")
+	}
+	if !connectionSafeInteger(challenge["expiresAt"]) || integer(challenge["expiresAt"]) <= h.runtime.connection.now().Unix() || integer(challenge["expiresAt"]) > h.runtime.connection.now().Unix()+180+connectionClockSkewSeconds || !connectionEqual(response["expiresAt"], challenge["expiresAt"]) {
+		return nil, connectionFailure("device_challenge_expiry_invalid")
 	}
 	if previous == nil {
 		previous = map[string]any{"request": request, "challenge": raw, "expiresAt": challenge["expiresAt"], "state": "prepared"}
