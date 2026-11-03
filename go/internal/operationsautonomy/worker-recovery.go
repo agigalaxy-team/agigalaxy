@@ -20,7 +20,7 @@ func (w *Worker) recoverUnsent(ctx context.Context, old Object) (Object, error) 
 		if e != nil {
 			return nil, e
 		}
-		cfg, e := s.configWithin(ctx, tx, str(ref["domain"]), " FOR SHARE")
+		cfg, e := s.taskConfigWithin(ctx, tx, ref, " FOR SHARE")
 		if e != nil {
 			return nil, e
 		}

@@ -54,8 +54,12 @@ def preparation_tool_catalog():
     return catalog
 
 
-def is_preparation_tool(name):
+def is_business_preparation_tool(name):
     return name == "prepare_operation" or any(name in entry["tools"] for entry in preparation_tool_catalog().values())
+
+
+def is_preparation_tool(name):
+    return name == "request_task" or is_business_preparation_tool(name)
 
 
 def load_business_tools(run_context: RunContext, fc: FunctionCall, domains: list[Literal["content", "feedback_accounts", "messaging", "maintenance", "search", "recommendations", "strategy", "ai_management", "analytics"]]) -> str:

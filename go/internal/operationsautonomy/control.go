@@ -216,7 +216,7 @@ func (s *Service) Control(ctx context.Context, a Actor, id string, input Object,
 		if e != nil {
 			return nil, e
 		}
-		cfg, e := s.configWithin(ctx, tx, str(reference["domain"]), " FOR SHARE")
+		cfg, e := s.taskConfigWithin(ctx, tx, reference, " FOR SHARE")
 		if e != nil {
 			return nil, e
 		}
@@ -533,7 +533,7 @@ func (s *Service) Decide(ctx context.Context, a Actor, id string, input Object, 
 		if e != nil {
 			return nil, e
 		}
-		if _, e = s.configWithin(ctx, tx, str(reference["domain"]), " FOR SHARE"); e != nil {
+		if _, e = s.taskConfigWithin(ctx, tx, reference, " FOR SHARE"); e != nil {
 			return nil, e
 		}
 		row, e := s.taskWithin(ctx, tx, id, " FOR UPDATE")

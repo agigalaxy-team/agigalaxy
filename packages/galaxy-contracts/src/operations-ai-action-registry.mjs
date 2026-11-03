@@ -1,5 +1,8 @@
 import {operationsPermissionCatalog} from './operations-permission-catalog.mjs';
 
+// Human-owned task requests use confirmation, not the AI business-role catalog.
+export const workbenchTaskPreparationKinds=Object.freeze(['task-dispatch']);
+
 // One product action directory. A position's name is context, never an ACL.
 // Permission, human decision and connected handler are separate facts.
 const queryCodes=['search.read','accounts.read','accounts.registered.read','system.settings.read','analytics.read','content.read','sections.read','content.tags.read','cases.read','chat-reports.read','feedback.read','files.read','resources.read','recommendations.read','search-quality.read','notices.read','strategies.read','rules.read','maintenance.read','maintenance.logs.read','audit.read','jobs.read','permissions.read','ai.roles.read','ai.prompts.read'];

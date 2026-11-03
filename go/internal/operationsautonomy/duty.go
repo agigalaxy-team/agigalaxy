@@ -43,7 +43,7 @@ func (s *Service) dutyAuthorizationWithin(ctx context.Context, tx pgx.Tx, input 
 	if e != nil {
 		return e
 	}
-	cfg, e := s.configWithin(ctx, tx, str(reference["domain"]), " FOR SHARE")
+	cfg, e := s.taskConfigWithin(ctx, tx, reference, " FOR SHARE")
 	if e != nil {
 		return e
 	}

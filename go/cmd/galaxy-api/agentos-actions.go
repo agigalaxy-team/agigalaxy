@@ -19,20 +19,35 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 	service := &actions.Service{Pool: conversations.Pool, Endpoint: conversations.Endpoint, Permissions: conversations.Permissions,
 		Autonomy: autonomy, Content: content, Files: files}
 	tools := conversations.Tools
+	connectWorkbenchDispatch(conversations, autonomy)
 	tools.Prepare = func(ctx context.Context, actor p.Actor, row agentos.Conversation, request agentos.Object, operationID string) (agentos.Object, error) {
+		if request["kind"] == "task-dispatch" {
+			return autonomy.PrepareDispatch(ctx, actor, row.Domain, request, operationID)
+		}
 		return service.Prepare(ctx, actor, row.Domain, request, operationID)
 	}
 	tools.PrepareWithReference = func(ctx context.Context, actor p.Actor, row agentos.Conversation, request agentos.Object, operationID string, reference agentos.Object) (agentos.Object, error) {
+		if request["kind"] == "task-dispatch" && reference == nil {
+			return autonomy.PrepareDispatch(ctx, actor, row.Domain, request, operationID)
+		}
 		return service.PrepareWithReference(ctx, actor, row.Domain, request, operationID, reference)
 	}
 	tools.PrepareStored = func(ctx context.Context, actor p.Actor, row agentos.Conversation, proposal agentos.Object, operationID string) (agentos.Object, error) {
 		request, _ := proposal["request"].(map[string]any)
 		reference, _ := proposal["publicReference"].(map[string]any)
+		if request["kind"] == "task-dispatch" && reference == nil {
+			return autonomy.PrepareDispatch(ctx, actor, row.Domain, request, operationID)
+		}
 		return service.PrepareWithReference(ctx, actor, row.Domain, request, operationID, reference)
 	}
 	tools.CardReadPermission = actions.CardReadPermission
 	tools.ExecutePrepared = service.ExecutePrepared
-	tools.RecoverPrepared = service.RecoverPrepared
+	tools.RecoverPrepared = func(ctx context.Context, a p.Actor, proposal agentos.Object, id string) (agentos.Object, error) {
+		if proposal["kind"] == "task-dispatch" {
+			return autonomy.RecoverDispatch(ctx, a, strValue(proposal["domain"]), proposal, id)
+		}
+		return service.RecoverPrepared(ctx, a, proposal, id)
+	}
 	autonomy.ActionReady = service.ActionReady
 	autonomy.QualifyTargetWithin = service.QualifyTargetWithin
 	autonomy.ExecuteDutyOperation = service.ExecuteDutyOperation

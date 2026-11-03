@@ -260,7 +260,7 @@ func (s *Service) BindWorkbenchTaskWithin(ctx context.Context, tx pgx.Tx, in Wor
 	if e != nil {
 		return nil, e
 	}
-	config, e := s.configWithin(ctx, tx, str(reference["domain"]), " FOR SHARE")
+	config, e := s.taskConfigWithin(ctx, tx, reference, " FOR SHARE")
 	if e != nil {
 		return nil, e
 	}

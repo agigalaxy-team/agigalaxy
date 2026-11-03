@@ -45,6 +45,9 @@ func managementCardRead(kind string) (string, error) {
 }
 
 func (t *ConversationTools) cardReadPermission(kind string) (string, error) {
+	if kind == "task-dispatch" {
+		return "workbench.read", nil
+	}
 	if permission, e := managementCardRead(kind); e == nil {
 		return permission, nil
 	}
@@ -95,6 +98,9 @@ func (t *ConversationTools) cardActorWithin(ctx context.Context, tx pgx.Tx, huma
 	}
 	if account == nil {
 		return operationspermissions.Actor{}, fail("operations_ai_work_unassigned", 403)
+	}
+	if text(row.Proposal, "kind") == "task-dispatch" {
+		return s.Permissions.TaskOwnerWithin(ctx, tx, human, row.Domain)
 	}
 	// A completed action can retire its own source. The original card is still
 	// readable through current human/fixed-AI read authority, not that prose lease.

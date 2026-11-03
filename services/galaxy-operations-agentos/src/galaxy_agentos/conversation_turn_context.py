@@ -157,7 +157,7 @@ def _receipt_context(args, kwargs):
 
 def _stage_tools(args, kwargs):
     """Expose the requested business definitions inside the same native run."""
-    from .conversation_tools import preparation_tool_catalog, is_preparation_tool
+    from .business_tools import preparation_tool_catalog, is_business_preparation_tool
     loaded = turn_state(_RUN.get()).get("loadedBusinessDomains") or []
     names = {name for domain, entry in preparation_tool_catalog().items() if domain in loaded
              for name in entry["tools"]}
@@ -169,7 +169,7 @@ def _stage_tools(args, kwargs):
         return args, kwargs
     selected = [tool for tool in tools if not (isinstance(tool, dict)
         and tool.get("type") == "function" and isinstance(tool.get("function"), dict)
-        and is_preparation_tool(tool["function"].get("name")) and tool["function"].get("name") not in names)]
+        and is_business_preparation_tool(tool["function"].get("name")) and tool["function"].get("name") not in names)]
     if len(selected) == len(tools):
         return args, kwargs
     if "tools" in kwargs:

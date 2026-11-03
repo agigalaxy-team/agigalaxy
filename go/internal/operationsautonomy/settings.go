@@ -123,6 +123,9 @@ func (s *Service) recordWithin(ctx context.Context, tx pgx.Tx, a Actor, id, kind
 	if target == nil {
 		target = obj(result["config"])
 	}
+	if target == nil {
+		target = obj(result["dispatch"])
+	}
 	_, e := tx.Exec(ctx, `INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,operator_role,action,operation_id,http_request_id,selection,result,created_at,actor_kind) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'business-operator')`, uuid.NewString(), s.Endpoint, a.ID, a.Role, "autonomy-"+kind, id, a.RequestID, jsonText(Object{"id": target["id"]}), jsonText(Object{"kind": kind, "revision": target["revision"]}), s.now())
 	if e != nil {
 		return nil, e

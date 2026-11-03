@@ -24,6 +24,8 @@ type ConversationTools struct {
 	PrepareStored         func(context.Context, operationspermissions.Actor, Conversation, Object, string) (Object, error)
 	CardReadPermission    func(string) (string, error)
 	ExecutePrepared       func(context.Context, operationspermissions.Actor, Object, string, func(context.Context, pgx.Tx) (operationspermissions.Actor, error)) (Object, error)
+	ConfirmTaskDispatch   func(context.Context, operationspermissions.Actor, string, Object, string, AuthorizeConversation) (Object, error)
+	ReadTaskDispatch      func(context.Context, operationspermissions.Actor, Conversation, Object) (Object, error)
 	RecoverPrepared       func(context.Context, operationspermissions.Actor, Object, string) (Object, error)
 	AuthorizedWork        func(context.Context, operationspermissions.Actor, Conversation, Object) (Object, error)
 	BoundedTaskWithin     func(context.Context, pgx.Tx, Conversation, Object) error
@@ -47,7 +49,7 @@ var toolRoute = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,79}$`)
 // descriptors are still recorded, but they cannot prepare or execute a command.
 func conversationReadTool(tool string) bool {
 	switch tool {
-	case "assess-conversation-task", "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "read-task-operation":
+	case "assess-conversation-task", "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "read-task-operation", "read-dispatched-task":
 		return true
 	}
 	return false
@@ -71,7 +73,7 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
 	switch tool {
-	case "assess-conversation-task", "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "run-authorized-work", "prepare-operation", "read-task-operation":
+	case "assess-conversation-task", "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "run-authorized-work", "prepare-operation", "read-task-operation", "read-dispatched-task":
 	default:
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
@@ -191,6 +193,12 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 			err = fail("operations_agentos_conversation_not_ready", 503)
 		} else {
 			result, err = t.Summary(ctx, bound.actor, bound.row.Domain, Object{"conversationId": bound.row.ID, "turnId": input["turnId"]})
+		}
+	case "read-dispatched-task":
+		if t.ReadTaskDispatch == nil {
+			err = fail("operations_agentos_conversation_not_ready", 503)
+		} else {
+			result, err = t.ReadTaskDispatch(ctx, bound.actor, bound.row, bound.args)
 		}
 	case "prepare-operation":
 		result, err = t.prepareCard(ctx, bound, input)

@@ -65,3 +65,11 @@ test('groups sort options, support partial history and keep unrelated cards sepa
  const groups=workbenchCardGroups(cards);assert.deepEqual(groups.map(group=>group.map(card=>card.cardId)),[[cards[2].cardId,cards[0].cardId],[cards[1].cardId],[cards[4].cardId,cards[3].cardId]]);
  const duplicate=workbenchActionCards([raw(6,choice('a',0)),raw(7,choice('a',0))],'governance');assert.equal(workbenchCardGroups(duplicate).length,2);
 });
+
+test('task assignment card preserves a user goal and separates assignment from completion',()=>{
+ const goal='Compare reports mentioning {"topic":"accessibility"} and track changes.';
+ const value={...base,kind:'task-dispatch',title:'交办持续分析',requiredAction:'autonomy.control',presentation:{summary:'交办持续分析',details:[{label:'工作目标',value:goal},{label:'执行安排',value:'每 37 分钟'}],changes:[],warnings:[],reviewable:true}};
+ const card=parsed(value);assert.equal(card.capability.canConfirm,true);assert.equal(card.presentation.details[0].value,goal);assert.match(html(value),/按此方案处理/);
+ const completed={...value,state:'completed',result:{operationId:base.operationId,state:'completed',summary:'任务已交办，首轮已排队。'}};
+ assert.match(html(completed),/已交办/);assert.doesNotMatch(html(completed),/role="status">已完成/);
+});

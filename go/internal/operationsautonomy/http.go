@@ -23,6 +23,7 @@ var runPath = regexp.MustCompile(`^/v1/operations/autonomy/accounts/(overview|go
 var taskPath = regexp.MustCompile(`^/v1/operations/autonomy/tasks/([0-9a-f-]{36})(?:/(control|decisions))?$`)
 var taskOperationPath = regexp.MustCompile(`^/v1/operations/autonomy/tasks/([0-9a-f-]{36})/operations/([0-9a-f-]{36})$`)
 var operationPath = regexp.MustCompile(`^/v1/operations/autonomy/operations/([0-9a-f-]{36})$`)
+var dispatchReadPath = regexp.MustCompile(`^/v1/operations/autonomy/dispatches/(overview|governance|messaging|discovery|maintenance)/([0-9a-f-]{36})$`)
 
 func readBody(r *http.Request, limit int64) (Object, error) {
 	if r.Header.Get("Content-Type") != "application/json" || r.Header.Get("Content-Encoding") != "" {
@@ -109,6 +110,9 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	notFound := func() { e = fault.New("not_found", 404) }
 	switch {
+	case dispatchReadPath.MatchString(path) && !write && r.URL.RawQuery == "":
+		match := dispatchReadPath.FindStringSubmatch(path)
+		out, e = s.ReadDispatch(r.Context(), actor, match[1], Object{"dispatchId": match[2]})
 	case path == root+"/options" && !write && r.URL.RawQuery == "":
 		out, e = s.Options(r.Context(), actor)
 	case path == root+"/settings" && r.URL.RawQuery == "":

@@ -3,6 +3,7 @@
 import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {AdminIcon} from '../AdminIcons';
 import {ReadStatus} from '../OperationControls';
+import {workbenchCardCompletedLabel} from "../../lib/workbench/workbench-action-cards";
 import type {WorkbenchActionCard} from "../../lib/workbench/workbench-action-cards";
 import {useWorkbenchInteraction} from './WorkbenchInteraction';
 
@@ -12,7 +13,7 @@ function stateLabel(card:WorkbenchActionCard,now:number){
  if(card.state==='not-selected'||card.result?.state==='not-selected'||card.capability.reason==='not-selected')return '未选用';
  if(card.result?.state==='cancelled')return '已取消';
  if(card.result?.state==='failed')return '未完成';
- if(card.state==='completed')return '已完成';
+ if(card.state==='completed')return workbenchCardCompletedLabel(card);
  if(card.state==='processing')return '处理中';
  if(card.state==='unknown')return '结果待核对';
  if(card.state==='prepared'&&card.readExpiresAt>now&&card.capability.canConfirm)return '待确认';

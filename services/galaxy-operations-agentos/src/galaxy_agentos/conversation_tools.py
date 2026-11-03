@@ -91,6 +91,8 @@ from .conversation_tool_feedback import (
 def _conversation_tools(gateway, *, domain=None, include_legacy=False):
     preparation_type = _preparation_type(domain)
 
+    from .conversation_dispatch import dispatch_tools
+
     def send(context, call, name, arguments, *, selected_reference=None):
         if not isinstance(call, FunctionCall) or not call.call_id:
             raise AuthorityDenied("agentos_native_tool_call_required")
@@ -334,7 +336,7 @@ def _conversation_tools(gateway, *, domain=None, include_legacy=False):
     from .business_tools import load_business_tools
     tools = [query_operations, read_operation_object, list_authorized_work,
         run_authorized_work, task_operation_tool(send), read_ai_delegation,
-        plan_turn_tool(send), assess_turn_tool(send), load_business_tools]
+        plan_turn_tool(send), assess_turn_tool(send), load_business_tools, *dispatch_tools(send)]
     if include_legacy:
         tools.append(prepare_operation)
     return tools

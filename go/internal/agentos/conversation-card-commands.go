@@ -38,6 +38,9 @@ func (t *ConversationTools) Confirm(ctx context.Context, human operationspermiss
 		return nil, err
 	}
 	_, err = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (operationspermissions.Actor, error) {
+		if text(row.Proposal, "kind") == "task-dispatch" {
+			return s.Permissions.TaskOwnerWithin(ctx, tx, fresh, domain)
+		}
 		return s.Permissions.HumanAIWithin(ctx, tx, fresh, domain, "prepare", text(row.Proposal, "requiredAction"))
 	})
 	if err != nil {
@@ -104,7 +107,9 @@ func (t *ConversationTools) Confirm(ctx context.Context, human operationspermiss
 	current, err := scopedAuthorize(ctx)
 	var result Object
 	if err == nil {
-		if _, management := managementCardRead(text(row.Proposal, "kind")); management == nil {
+		if text(row.Proposal, "kind") == "task-dispatch" && t.ConfirmTaskDispatch != nil {
+			result, err = t.ConfirmTaskDispatch(ctx, current, domain, row.Proposal, operationID, scopedAuthorize)
+		} else if _, management := managementCardRead(text(row.Proposal, "kind")); management == nil {
 			result, err = s.Permissions.ExecuteManagementAction(ctx, current, row.Proposal, operationID, scopedAuthorize)
 		} else if t.ExecutePrepared != nil {
 			result, err = t.ExecutePrepared(ctx, current, row.Proposal, operationID, func(ctx context.Context, _ pgx.Tx) (operationspermissions.Actor, error) { return scopedAuthorize(ctx) })

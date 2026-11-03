@@ -407,3 +407,5 @@ GRANT SELECT ON web_event_sequence_v1,web_event_log_v1 TO galaxy_api;
 GRANT EXECUTE ON FUNCTION public.galaxy_web_events_promote_v1(integer) TO galaxy_api;
 
 GRANT EXECUTE ON FUNCTION public.galaxy_autonomy_workbench_card_states_v1(text,uuid) TO galaxy_api;
+
+GRANT SELECT,INSERT,UPDATE ON operations_autonomy_dispatches_v1 TO galaxy_api;

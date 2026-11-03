@@ -133,6 +133,9 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 		}
 	}
 	out := Object{}
+	if dispatch := obj(obj(row["configuration"])["dispatch"]); dispatch != nil {
+		out["dispatchId"] = dispatch["id"]
+	}
 	for result, k := range map[string]string{"id": "id", "taskId": "id", "operationId": "id", "title": "title", "domain": "domain", "source": "source", "mode": "mode", "state": "state", "modelState": "model_state", "businessState": "business_state", "revision": "revision", "controlRevision": "control_revision", "aiAccountId": "ai_account_id", "planId": "config_id", "configRevision": "config_revision", "promptVersion": "prompt_version", "planVersion": "plan_version", "delegationVersion": "delegation_version", "nativeRunId": "native_run_id", "nativeAttemptId": "native_attempt_id", "targetType": "target_type", "targetId": "target_id", "summary": "summary", "code": "code", "humanDecision": "human_decision"} {
 		out[result] = row[k]
 	}

@@ -371,6 +371,21 @@ func cardPresentation(p Object) Object {
 		b.add("审阅方式", "请在专用岗位要求审阅区核对完整正文。")
 		return Object{"summary": title, "changes": b.changes, "details": b.details, "warnings": b.warnings, "reviewable": b.valid}
 	}
+	if kind == "task-dispatch" {
+		// A user goal is ordinary text, even when it mentions code or JSON.
+		// It is not a serialized business command to decode or hide.
+		request := object(p["request"])
+		b.add("工作目标", text(request, "goal"))
+		if lines, ok := p["impact"].([]any); ok {
+			for _, v := range lines {
+				if line, ok := v.(string); ok && !strings.HasPrefix(line, "工作目标：") {
+					b.add("执行安排", line)
+				}
+			}
+		}
+		b.add("执行身份", "目标岗位使用自身现有角色和授权，不继承交办人的业务权限。")
+		return Object{"summary": title, "changes": b.changes, "details": b.details, "warnings": b.warnings, "reviewable": b.valid}
+	}
 	// Chunks from preparation are reassembled only when every part is present in order.
 	impacts, ok := p["impact"].([]any)
 	if !ok && p["impact"] != nil {

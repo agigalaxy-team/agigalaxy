@@ -23,7 +23,7 @@ PREPARED_CARD_MESSAGE = "请确认操作。"
 
 EFFECT_TOOLS = frozenset({"run_authorized_work", "execute_operation", "manage_ai_role", "manage_ai_prompt"})
 
-READ_TOOLS = frozenset({"current_summary", "query_operations", "read_operation_object", "list_authorized_work", "inspect_operations", "read_task_operation"})
+READ_TOOLS = frozenset({"current_summary", "query_operations", "read_operation_object", "list_authorized_work", "inspect_operations", "read_task_operation", "read_dispatched_task"})
 
 
 def _closed_failure(name, error):

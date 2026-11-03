@@ -48,7 +48,7 @@ func (w *Worker) Execute(ctx context.Context, input Object) (Object, error) {
 		if e != nil {
 			return claimed{}, e
 		}
-		if _, e = s.configWithin(ctx, tx, str(reference["domain"]), " FOR SHARE"); e != nil {
+		if _, e = s.taskConfigWithin(ctx, tx, reference, " FOR SHARE"); e != nil {
 			return claimed{}, e
 		}
 		row, e := s.taskWithin(ctx, tx, str(input["taskId"]), " FOR UPDATE")
@@ -73,7 +73,7 @@ func (w *Worker) Execute(ctx context.Context, input Object) (Object, error) {
 		if row["dispatch_started_at"] != nil {
 			return claimed{row: row, reconcile: true}, nil
 		}
-		cfg, e := s.configWithin(ctx, tx, str(row["domain"]), "")
+		cfg, e := s.taskConfigWithin(ctx, tx, row, "")
 		if e != nil {
 			return claimed{}, e
 		}
@@ -280,6 +280,9 @@ func (w *Worker) Tick(ctx context.Context) (Object, error) {
 			return false, e
 		}
 		if e := s.EnsureWithin(ctx, tx); e != nil {
+			return false, e
+		}
+		if e := s.scheduleDispatchesWithin(ctx, tx); e != nil {
 			return false, e
 		}
 		configs, e := many(ctx, tx, `SELECT to_jsonb(c) FROM operations_autonomy_configs_v1 c WHERE endpoint=$1 AND enabled ORDER BY domain FOR UPDATE`, s.Endpoint)

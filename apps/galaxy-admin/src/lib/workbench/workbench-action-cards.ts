@@ -1,5 +1,5 @@
 import type {AgentOsDomain} from './agentos-client';
-import {aiWorkPreparationRegistry} from "../../../../../packages/galaxy-contracts/src/operations-ai-action-registry.mjs";
+import {aiWorkPreparationRegistry,workbenchTaskPreparationKinds} from "../../../../../packages/galaxy-contracts/src/operations-ai-action-registry.mjs";
 import {workbenchAiPromptReview,workbenchAiPromptReceipt,type WorkbenchAiPromptReview,type WorkbenchAiPromptReceipt} from "../ai-work-accounts/ai-work-prompt";
 
 export type CardPresentation={summary:string;changes:{label:string;before:string|null;after:string|null}[];details:{label:string;value:string}[];warnings:string[];reviewable:boolean};
@@ -7,6 +7,8 @@ export type WorkbenchActionCard={stored?:boolean;confirmationAttempted:boolean;f
 const kinds=new Set<string>(aiWorkPreparationRegistry.flatMap(entry=>typeof entry.kind==='string'?[entry.kind]:[]));
 // Legacy prompt cards remain visible as records, never as new executable actions.
 kinds.add('ai-work-prompt-save');
+for(const kind of workbenchTaskPreparationKinds)kinds.add(kind);
+export const workbenchCardCompletedLabel=(card:Pick<WorkbenchActionCard,'kind'>)=>card.kind==='task-dispatch'?'已交办':'已完成';
 const states=new Set(['prepared','processing','completed','unknown','not-available','not-selected']);
 const uuid=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const record=(value:unknown):Record<string,unknown>|null=>value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null;
@@ -21,7 +23,7 @@ export function workbenchActionCards(value:unknown,domain:AgentOsDomain):Workben
   const presentationRaw=record(item.presentation),choiceRaw=record(item.choice);
   const clean=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=5000&&!/(?:^\s*[\[{]\s*"|"[A-Za-z_][A-Za-z0-9_]*"\s*:)/u.test(v)&&!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/u.test(v);
   const nullable=(v:unknown)=>v===null||clean(v);
-  const presentationValid=!!presentationRaw&&clean(presentationRaw.summary)&&Array.isArray(presentationRaw.changes)&&presentationRaw.changes.length<=100&&presentationRaw.changes.every(v=>{const r=record(v);return !!r&&clean(r.label)&&nullable(r.before)&&nullable(r.after);})&&Array.isArray(presentationRaw.details)&&presentationRaw.details.length<=100&&presentationRaw.details.every(v=>{const r=record(v);return !!r&&clean(r.label)&&clean(r.value);})&&Array.isArray(presentationRaw.warnings)&&presentationRaw.warnings.length<=100&&presentationRaw.warnings.every(clean)&&typeof presentationRaw.reviewable==='boolean';
+  const presentationValid=!!presentationRaw&&clean(presentationRaw.summary)&&Array.isArray(presentationRaw.changes)&&presentationRaw.changes.length<=100&&presentationRaw.changes.every(v=>{const r=record(v);return !!r&&clean(r.label)&&nullable(r.before)&&nullable(r.after);})&&Array.isArray(presentationRaw.details)&&presentationRaw.details.length<=100&&presentationRaw.details.every(v=>{const r=record(v);return !!r&&clean(r.label)&&(item.kind==='task-dispatch'&&r.label==='工作目标'?typeof r.value==='string'&&r.value.length>0&&r.value.length<=5000&&!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/u.test(r.value):clean(r.value));})&&Array.isArray(presentationRaw.warnings)&&presentationRaw.warnings.length<=100&&presentationRaw.warnings.every(clean)&&typeof presentationRaw.reviewable==='boolean';
   const presentation=presentationValid?presentationRaw as CardPresentation:null;
   const choice=choiceRaw&&typeof choiceRaw.groupId==='string'&&choiceRaw.groupId.length>0&&choiceRaw.groupId.length<=128&&typeof choiceRaw.count==='number'&&Number.isSafeInteger(choiceRaw.count)&&choiceRaw.count>0&&typeof choiceRaw.index==='number'&&Number.isSafeInteger(choiceRaw.index)&&choiceRaw.index>=0&&choiceRaw.index<=choiceRaw.count&&typeof choiceRaw.exclusive==='boolean'?choiceRaw as WorkbenchActionCard['choice']:null;
   const ruleCard=item.kind==='rule-publish'||item.kind==='rule-restore',cleanupCard=item.kind==='file-cleanup-approve',strategyCard=['strategy-draft','strategy-rehearsal','strategy-publish'].includes(item.kind),searchCard=['search-draft-save','search-apply','search-restore'].includes(item.kind),noticeCard=['notice-draft-create','notice-draft-save','notice-state'].includes(item.kind),recommendationCard=['recommendation-policy-save','recommendation-theme-update'].includes(item.kind),tagCard=['content-tag-create','content-tag-update'].includes(item.kind),cleanupPlanCard=['file-cleanup-plan-create','file-cleanup-plan-cancel'].includes(item.kind),fullReviewCard=strategyCard||searchCard||noticeCard||recommendationCard||tagCard||cleanupPlanCard||['messaging-state','message-draft-create','message-draft-save'].includes(item.kind),draftCard=['message-draft-create','message-draft-save'].includes(item.kind),impactLimit=ruleCard?84:cleanupCard?54:fullReviewCard?80:12;

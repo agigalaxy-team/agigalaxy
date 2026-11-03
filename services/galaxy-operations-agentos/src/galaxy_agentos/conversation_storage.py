@@ -18,7 +18,7 @@ from .tool_call_ids import (conversation_call_reference, projected_tool_call_id,
 
 TOOL_NAMES = frozenset({"plan_turn", "assess_turn", "current_summary", "query_operations", "read_operation_object",
     "list_authorized_work", "run_authorized_work", "load_business_tools", "prepare_operation", "execute_operation",
-    "manage_ai_role", "manage_ai_prompt", "read_ai_delegation", "read_task_operation"})
+    "manage_ai_role", "manage_ai_prompt", "read_ai_delegation", "read_task_operation", "read_dispatched_task"})
 EVENT_NAMES = frozenset(event.value for event in RunEvent)
 ERROR_TYPES = frozenset({"AuthorityDenied", "AuthorityUnavailable"})
 _REFERENCE_KIND = "galaxy-conversation-reference-v1"
