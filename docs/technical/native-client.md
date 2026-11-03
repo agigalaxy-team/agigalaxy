@@ -123,11 +123,11 @@ Vercel Skills目录表与MCPorter配置路径是适配线索，各宿主当前�
 
 | 能力 | 当前接线 | 实际范围与剩余路径 |
 |---|---|---|
-| 共用核心、资料范围与生命周期 | `nativebridge` 服务、私有 IPC、多 profile Runtime、薄连接、暂停与明确重启已实现 | 已有 Windows 多连接及资料承接检查；各平台登录边界与容器生命周期分别核对 |
+| 共用核心、资料范围与生命周期 | `nativebridge` 服务、私有 IPC、多 profile Runtime、薄连接、暂停与明确重启已实现 | Windows多连接/资料承接及Linux amd64安装、双MCP、卸载保留身份、明确停止已有实际结果；其他平台登录边界与容器生命周期分别记录 |
 | 身份、设备、账户与恢复 | 原 Go 身份、首设备、连接、账户关联、撤销及恢复工具由共用核心承接 | 已有新 ID 与账户关联实际路径；恢复、其他设备及最终候选的平台范围沿各自结果记录 |
 | 完整 MCP、Skill 与模型参数 | 统一发布 schema 投影，执行前仍按原 schema 校验；工具不缩成固定目录 | 已有 OpenCode＋Gemini 对完整发现目录的实际调用；不据此宣称所有提供商和全部业务完成 |
 | 普通工作观察与环境 | OpenCode 事件、Codex／Claude hook、Hermes插件、DSH事件及私有 ingress已接线 | 只记宿主实际提供的消息、工具与环境；未采内容及未知实际模型保持未知，真实宿主运行范围分别核对 |
-| 自己的模型整理 | `get/pending`返回本页可提交位置，`summary`在原事务自动关联真实来源 | Windows OpenCode真实TUI已由用户模型保存摘要，近期两轮录制未见记录失败；对应候选保留原未发送草稿。其他宿主和模型提供商分别核对 |
+| 自己的模型整理 | `get/pending`返回本页可提交位置，`summary`在原事务自动关联真实来源 | OpenCode真实TUI、Hermes官方CLI和DSH官方SDK已由用户模型完成两轮沟通、事实记录与摘要保存；Codex/Claude真实模型读取和实际hook观察通过。不同模型/平台的范围以当前状态分别记录 |
 | 已选原会话材料 | OpenCode消息与parts、Codex／Claude精确transcript、DSH实时消息及tool/result已有归档调用 | Codex保留所选会话的真实response_item；DSH已选sessionQuery补取与Hermes只读SessionDB原件已接线。Hermes官方DB读取夹具已覆盖中断记录，其他真实宿主路径分别核对；导出说明实际coverage |
 | 履历、原件与个人摘要同步 | 已有选择、持久队列、原操作回执、恢复及云端接口，catalog已标可用 | 真实宿主到私有云的完整选择、上传、删除及接续仍按对应路径验收；生成摘要不启用同步 |
 | 网页与原聊天 | 原对象navigation、当前身份及来源复核、官网接续链接与MCP读取已接线 | 当前Agent按需调用`galaxy_open/return/work_continue`，在原聊天继续处理 |
