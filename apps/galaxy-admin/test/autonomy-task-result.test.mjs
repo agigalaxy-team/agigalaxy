@@ -7,7 +7,7 @@ const section=(facts,options={})=>({availability:'available',complete:true,scope
 test('inspection facts preserve bounded scope, unknown and zero separately from analysis',()=>{
  const task={summary:'原摘要',inspectionReport:{profileComplete:true,accessComplete:false,sections:{maintenance:section({componentTotal:0,queueCounts:{failed:null}},{findingCodes:['maintenance-unhealthy']}),search:section(null,{availability:'not-authorized',complete:false,window:null,coverage:null,findingCodes:['not-authorized']})}},finalAnalysis:{state:'available',text:'分析建议'}};
  const html=renderToStaticMarkup(createElement(AutonomyTaskResult,{task}));
- for(const expected of ['已接入业务队列','不代表全部平台队列','未取得','组件健康异常','未获读取权限','原目标评估摘要','原摘要','AI 分析与建议','分析建议','部分来源当前不可读取'])assert.ok(html.includes(expected),expected);
+ for(const expected of ['已接入业务队列','不代表全部平台队列','未取得','组件健康异常','未获读取权限','本轮评估摘要','原摘要','本轮分析与结果','分析建议','部分来源当前不可读取'])assert.ok(html.includes(expected),expected);
  assert.match(html,/组件总数<\/dt><dd>0<\/dd>/);
 });
 test('withheld or oversized analysis is not presented as complete',()=>{
@@ -20,3 +20,11 @@ test('withheld or oversized analysis is not presented as complete',()=>{
 test('explicitly withheld assessment does not fall back to old summary',()=>{const html=renderToStaticMarkup(createElement(AutonomyTaskResult,{task:{summary:'不得显示旧摘要',assessmentSummary:null,inspectionReport:null,finalAnalysis:null}}));assert.doesNotMatch(html,/不得显示旧摘要/);});
 
 test('created strategies use actual IDs and do not turn partial or denied into empty success',()=>{const render=x=>renderToStaticMarkup(createElement(AutonomyTaskResult,{task:{summary:null,strategyArtifacts:x}}));const found=render({availability:'available',items:[{operationId:'op1',sourceStrategyId:'source1',sourceVersionId:'version1',newStrategyId:'new1',versionId:'version2'}],collectionComplete:true,limit:50});assert.match(found,/strategy=new1/);assert.match(found,/来源模板 source1/);assert.match(found,/version=version2/);const partial=render({availability:'partial',items:[],collectionComplete:false,limit:50});assert.match(partial,/仅显示当前可读取的部分结果/);assert.doesNotMatch(partial,/没有已完成/);assert.match(render({availability:'not-authorized',items:[],collectionComplete:false,limit:50}),/无权读取策略来源/);assert.doesNotMatch(render({availability:'available',items:[],collectionComplete:true,limit:50}),/本任务创建的策略/);});
+
+
+test('task failure shows actual category and status, with honest unknown fallback',()=>{
+ const render=failure=>renderToStaticMarkup(createElement(AutonomyTaskResult,{task:{state:'failed',failure}}));
+ assert.match(render({stage:'model-request',category:'service-unavailable',reportedStatus:502}),/模型服务返回异常 · HTTP 502/);
+ assert.match(render({stage:'execution',category:'unknown',reportedStatus:null}),/具体失败原因未记录/);
+ assert.match(render({stage:'execution',category:'timeout',reportedStatus:null}),/本轮执行超时/);
+});
