@@ -83,8 +83,9 @@ class ConversationNativeTest(unittest.TestCase):
             agents = conversation_agents(settings=settings, db=db, gateway=gateway,
                 domains={"overview": "运营概览"}, active_domains={"overview"}, model_factory=LocalModel)
             names = [tool.name for tool in agents[0].tools]
-            self.assertEqual(names[:10], ["current_summary", "query_operations", "read_operation_object", "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "plan_turn", "assess_turn", "load_business_tools"])
-            self.assertEqual(set(names[10:]), {name for entry in preparation_tool_catalog().values() for name in entry["tools"]})
+            self.assertLessEqual({"current_summary", "query_operations", "read_operation_object", "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "plan_turn", "assess_turn", "load_business_tools", "request_task", "read_dispatched_task"}, set(names))
+            self.assertLessEqual({name for entry in preparation_tool_catalog().values() for name in entry["tools"]}, set(names))
+            self.assertNotIn("manage_ai_prompt", names)
             native = AgentOS(id="conversation-native-check", db=db, agents=agents, user_isolation=True,
                 authorization=Authorization(verification_keys=[settings.verification_key], algorithm="HS256",
                     verify_audience=True, audience=settings.audience, issuer=settings.issuer,

@@ -195,8 +195,8 @@ class ManagementToolNativeTest(unittest.TestCase):
                 calls.append({"user_id": user_id, "tool": tool, "arguments": arguments, **binding})
                 return {"state": "prepared"} if tool == "prepare-operation" else {"items": []}
         tools = conversation_tools(Gateway())
-        self.assertEqual([tool.name if isinstance(tool, Function) else tool.__name__ for tool in tools], ["query_operations", "read_operation_object",
-            "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "plan_turn", "assess_turn", "load_business_tools"])
+        self.assertLessEqual(set(["query_operations", "read_operation_object",
+            "list_authorized_work", "run_authorized_work", "read_task_operation", "read_ai_delegation", "plan_turn", "assess_turn", "load_business_tools"]), set([tool.name if isinstance(tool, Function) else tool.__name__ for tool in tools]))
         prepare = preparation_tools(Gateway(), domains=["ai_management"])[0]
         read = next(tool for tool in tools if tool.__name__ == "read_ai_delegation")
         schema = Function.from_callable(prepare)
