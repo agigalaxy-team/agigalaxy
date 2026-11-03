@@ -74,6 +74,7 @@ func (s *Service) taskSummaryWithin(ctx context.Context, tx pgx.Tx, row Object) 
 		state = "available"
 	}
 	out := Object{"tool": "current-summary", "availability": "available", "basis": "capability-discovery-not-business-inspection", "inspectionChecked": false, "taskVersionBasis": "persisted-task-snapshot-with-current-authority", "task": Object{"taskId": current["id"], "aiAccountId": current["ai_account_id"], "domain": current["domain"], "source": current["source"], "mode": current["mode"], "state": current["state"], "planId": current["config_id"], "configRevision": current["config_revision"], "planVersion": current["plan_version"], "promptVersion": current["prompt_version"], "delegationVersion": current["delegation_version"], "roleVersion": actor.Version}, "sourceTargets": sources["sourceTargets"], "sourceCoverage": sources["sourceCoverage"], "sourceBasis": sources["basis"], "queryAccess": operationsai.QueryAccess(actor.Permissions), "managementCapabilities": management, "managementAvailability": state}
+	out["workContext"] = executionContext(current, obj(current["configuration"]))
 	artifacts, e := s.DutyStrategyArtifactsWithin(ctx, tx, actor, str(current["id"]))
 	if e != nil {
 		return nil, e

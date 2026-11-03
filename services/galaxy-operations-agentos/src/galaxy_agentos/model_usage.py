@@ -56,6 +56,11 @@ def _record_settings_version(metadata, model):
         metadata.pop("modelSettingsVersions", None)
 
 
+def current_model_run():
+    """Reuse the existing invocation scope for bounded runtime metadata."""
+    return _RUN.get()
+
+
 @contextmanager
 def provider_call(model, enabled):
     active = _ACTIVE.get()

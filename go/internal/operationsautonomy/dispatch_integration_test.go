@@ -107,6 +107,23 @@ func TestWorkbenchDispatchIndependentPlanAndOriginalReceipt(t *testing.T) {
 	if _, e = s.ReadDispatch(ctx, sourceActor, "overview", a.Object{"dispatchId": op}); e != nil {
 		t.Fatal("private model receipt read", e)
 	}
+	// A failed invocation can have successful reads, but is not a successful
+	// inspection. The exact native failure must survive the original report.
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET dispatch_started_at=$3,native_run_id='dispatch-native',effective_check=true WHERE endpoint=$1 AND id=$2`, f.Endpoint, taskID, now); e != nil {
+		t.Fatal(e)
+	}
+	failure := a.Object{"stage": "model-request", "category": "service-unavailable", "reportedStatus": 502}
+	if _, e = s.Report(ctx, a.Object{"taskId": taskID, "nativeRunId": "dispatch-native", "modelState": "failed", "status": "failed", "code": "operations_autonomy_model_service_unavailable", "failure": failure}); e != nil {
+		t.Fatal(e)
+	}
+	view, e := s.GetTask(ctx, f.Root, taskID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	failed := view["task"].(map[string]any)
+	if failed["lastValidAt"] != nil || failed["state"] != "failed" || failed["failure"].(map[string]any)["category"] != "service-unavailable" {
+		t.Fatalf("failed inspection projected as success or lost reason: %#v", failed)
+	}
 	// Finishing a round does not stop the recurring assignment. One later due
 	// time produces one new task, even if scheduler wakeups repeat.
 	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='completed',lease_until=NULL WHERE endpoint=$1 AND id=$2`, f.Endpoint, taskID); e != nil {

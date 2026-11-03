@@ -150,6 +150,8 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 		}
 	}
 	out["strategyVersionId"] = obj(obj(row["configuration"])["versionBindings"])["strategyVersionId"]
+	out["failure"] = obj(obj(row["result"])["failure"])
+	out["executionScope"] = "current-execution"
 	if control := obj(row["control_state"]); control["kind"] == "manual-pause" && has([]string{"requested", "paused", "resuming", "ended"}, str(control["phase"])) {
 		pause := Object{"phase": control["phase"], "pauseOperationId": control["pauseOperationId"], "nativeRunId": control["nativeRunId"]}
 		if has([]string{"native-ended", "native-ended-after-checkpoint", "resumed", "stopped", "takeover", "natural-human-review"}, str(control["outcome"])) {
@@ -179,7 +181,7 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 		out[result] = iso(row[k])
 	}
 	out["lastValidAt"] = nil
-	if row["effective_check"] == true {
+	if row["effective_check"] == true && row["state"] == "completed" {
 		out["lastValidAt"] = iso(row["completed_at"])
 	}
 	return out, nil

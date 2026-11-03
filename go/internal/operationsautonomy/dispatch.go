@@ -12,10 +12,17 @@ import (
 // Dispatch is a user-owned work request, independent of a position's routine
 // configuration. Goals are data, not system prompts or new authority.
 func parseDispatch(input Object) (Object, error) {
-	if !closed(input, []string{"kind", "targetDomain", "title", "goal", "trigger", "startNow"}, []string{"mode", "actions", "grantIds", "resourceIds", "strategyIds"}) || input["kind"] != "task-dispatch" || !has(domains, str(input["targetDomain"])) {
+	if !closed(input, []string{"kind", "targetDomain", "title", "goal", "trigger", "startNow"}, []string{"executionGoal", "mode", "actions", "grantIds", "resourceIds", "strategyIds"}) || input["kind"] != "task-dispatch" || !has(domains, str(input["targetDomain"])) {
 		return nil, invalid()
 	}
 	x := obj(clone(input))
+	if work, exists := x["executionGoal"]; exists {
+		v, ok := text(work, 1, 4000, true)
+		if !ok {
+			return nil, invalid()
+		}
+		x["executionGoal"] = v
+	}
 	for k, b := range map[string][2]int{"title": {1, 160}, "goal": {1, 4000}} {
 		v, ok := text(x[k], b[0], b[1], true)
 		if !ok {
@@ -89,6 +96,10 @@ func parseDispatch(input Object) (Object, error) {
 func dispatchConfiguration(base, x Object) Object {
 	cfg := obj(clone(obj(base["configuration"])))
 	cfg["goal"], cfg["mode"], cfg["purpose"] = x["goal"], x["mode"], "operations-"+str(x["targetDomain"])
+	delete(cfg, "executionGoal")
+	if x["executionGoal"] != nil {
+		cfg["executionGoal"] = x["executionGoal"]
+	}
 	// A new request never inherits unrelated actions or grants from routine duty.
 	cfg["plan"] = Object{"strategyIds": x["strategyIds"], "actions": x["actions"], "grantIds": x["grantIds"], "resourceIds": x["resourceIds"], "eventTypes": []any{}}
 	schedule := Object{"kind": "interval", "minutes": 1, "timezone": "Asia/Shanghai"}
@@ -154,7 +165,11 @@ func (s *Service) PrepareDispatch(ctx context.Context, a Actor, source string, i
 		case "event":
 			frequency = "相关事件发生时"
 		}
-		return Object{"schemaVersion": 1, "kind": "task-dispatch", "domain": source, "request": x, "command": command, "requiredAction": "autonomy.control", "target": Object{"kind": "ai-work-account", "id": role.AccountID, "label": label}, "title": x["title"], "impact": []any{"交办岗位：" + label, "执行安排：" + frequency, "工作目标：" + str(x["goal"]), "首次执行：" + map[bool]string{true: "确认后开始", false: "等待触发"}[x["startNow"] == true]}, "basis": []any{"目标岗位现有角色与已选择的正式授权"}, "checkedAt": s.now().Unix(), "readExpiresAt": s.now().Unix() + 30, "decisionSource": "human-required"}, nil
+		out := Object{"schemaVersion": 1, "kind": "task-dispatch", "domain": source, "request": x, "command": command, "requiredAction": "autonomy.control", "target": Object{"kind": "ai-work-account", "id": role.AccountID, "label": label}, "title": x["title"], "impact": []any{"交办岗位：" + label, "执行安排：" + frequency, "工作目标：" + str(x["goal"]), "首次执行：" + map[bool]string{true: "确认后开始", false: "等待触发"}[x["startNow"] == true]}, "basis": []any{"目标岗位现有角色与已选择的正式授权"}, "checkedAt": s.now().Unix(), "readExpiresAt": s.now().Unix() + 30, "decisionSource": "human-required"}
+		if work := str(x["executionGoal"]); work != "" {
+			out["impact"] = append(list(out["impact"]), "每次执行："+work)
+		}
+		return out, nil
 	})
 }
 

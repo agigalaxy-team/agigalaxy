@@ -8,8 +8,22 @@ import (
 var dutyWriters = []string{"execute-operation", "manage-ai-role", "manage-ai-prompt"}
 
 func parseAssessment(args Object) error {
-	if !closed(args, []string{"goalSatisfied", "remainingWork", "summary"}, []string{"readResolutions"}) {
+	if !closed(args, []string{"goalSatisfied", "remainingWork", "summary"}, []string{"scope", "deferredWork", "readResolutions"}) {
 		return invalid()
+	}
+	if scope, exists := args["scope"]; exists && scope != "execution" {
+		return invalid()
+	}
+	if deferred, exists := args["deferredWork"]; exists {
+		items, ok := deferred.([]any)
+		if !ok {
+			return invalid()
+		}
+		for _, item := range items {
+			if _, ok := text(item, 1, 240, true); !ok {
+				return invalid()
+			}
+		}
 	}
 	satisfied, ok := args["goalSatisfied"].(bool)
 	if !ok {

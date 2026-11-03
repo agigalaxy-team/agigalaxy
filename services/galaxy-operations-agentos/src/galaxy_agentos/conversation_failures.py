@@ -5,6 +5,7 @@ conversation model provider exception with a bounded internal code; no provider
 message, response body, model arguments or credentials enter that code.
 """
 from functools import wraps
+from .model_usage import current_model_run
 import re
 
 from agno.exceptions import ModelProviderError, ModelRateLimitError, ContextWindowExceededError
@@ -52,40 +53,75 @@ def _closed_exception(exception):
         model_name=exception.model_name, model_id=exception.model_id)
 
 
-def with_conversation_failures(model):
+def failure_data(value):
+    if not isinstance(value, dict) or set(value) != {"stage", "category", "reportedStatus"}:
+        return None
+    if value["stage"] not in {"model-request", "execution"} or value["category"] not in {"rate-limit", "timeout", "connection", "context-limit", "service-unavailable", "request-rejected", "unknown"}:
+        return None
+    status = value["reportedStatus"]
+    if status is not None and (type(status) is not int or not 400 <= status <= 599):
+        return None
+    return dict(value)
+
+
+def _record_failure(exception=None):
+    run = current_model_run()
+    if run is None:
+        return
+    metadata = run.metadata if isinstance(run.metadata, dict) else {}
+    if exception is None:
+        metadata.pop("runtimeFailure", None)
+    else:
+        metadata["runtimeFailure"] = model_failure(ModelProviderError.classify(exception))
+    run.metadata = metadata
+
+
+def with_model_failures(model):
     """Retain the current model and authority wrappers; add no calls or retries."""
     invoke, ainvoke = model.invoke, model.ainvoke
     invoke_stream, ainvoke_stream = model.invoke_stream, model.ainvoke_stream
 
     @wraps(invoke)
     def checked(*args, **kwargs):
+        _record_failure()
         try:
             return invoke(*args, **kwargs)
         except ModelProviderError as error:
+            _record_failure(error)
             raise _closed_exception(error) from None
 
     @wraps(ainvoke)
     async def achecked(*args, **kwargs):
+        _record_failure()
         try:
             return await ainvoke(*args, **kwargs)
         except ModelProviderError as error:
+            _record_failure(error)
             raise _closed_exception(error) from None
 
     @wraps(invoke_stream)
     def stream(*args, **kwargs):
+        _record_failure()
         try:
             yield from invoke_stream(*args, **kwargs)
         except ModelProviderError as error:
+            _record_failure(error)
             raise _closed_exception(error) from None
 
     @wraps(ainvoke_stream)
     async def astream(*args, **kwargs):
+        _record_failure()
         try:
             async for chunk in ainvoke_stream(*args, **kwargs):
                 yield chunk
         except ModelProviderError as error:
+            _record_failure(error)
             raise _closed_exception(error) from None
 
     model.invoke, model.ainvoke = checked, achecked
     model.invoke_stream, model.ainvoke_stream = stream, astream
     return model
+
+
+# Keep existing conversation imports on the same shared implementation.
+with_conversation_failures = with_model_failures
