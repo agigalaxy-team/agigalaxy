@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "manage-ai-prompt", "read-ai-delegation", "assess-task", "reconcile-task-operations", "inspect-operations"}
+var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "read-ai-delegation", "assess-task", "reconcile-task-operations", "inspect-operations"}
 
 func parseTool(input Object) (Object, error) {
 	if !closed(input, []string{"taskId", "callId", "tool", "arguments"}, []string{"nativeRunId", "nativeAttemptId", "validationFailure"}) || !schemaUUID.MatchString(str(input["taskId"])) || !schemaUUID.MatchString(str(input["callId"])) || !has(toolNames, str(input["tool"])) || obj(input["arguments"]) == nil {

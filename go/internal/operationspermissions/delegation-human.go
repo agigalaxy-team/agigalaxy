@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var managementActions = []string{"read", "create", "update", "assign", "revoke", "prompt-read", "prompt-update"}
+var managementActions = []string{"read", "create", "update", "assign", "revoke", "prompt-read"}
 
 func parseDelegation(input Object) (Object, error) {
 	x := obj(clone(input))
@@ -50,11 +50,20 @@ func safeCeiling(permissions []string) bool {
 	}
 	return true
 }
+func effectiveManagementActions(value any) []any {
+	out := []any{}
+	for _, action := range stringsOf(value) {
+		if contains(managementActions, action) {
+			out = append(out, action)
+		}
+	}
+	return out
+}
 func delegationView(r Object) any {
 	if r == nil {
 		return nil
 	}
-	return Object{"id": r["id"], "sourceAiAccountId": r["source_ai_account_id"], "version": r["version"], "enabled": r["enabled"], "targetAiAccountIds": r["target_ai_account_ids"], "grantablePermissions": r["grantable_permissions"], "allowedManagementActions": r["allowed_management_actions"], "updatedAt": stamp(r["updated_at"])}
+	return Object{"id": r["id"], "sourceAiAccountId": r["source_ai_account_id"], "version": r["version"], "enabled": r["enabled"], "targetAiAccountIds": r["target_ai_account_ids"], "grantablePermissions": r["grantable_permissions"], "allowedManagementActions": effectiveManagementActions(r["allowed_management_actions"]), "updatedAt": stamp(r["updated_at"])}
 }
 func (s *Service) delegationSource(ctx context.Context, tx pgx.Tx) (Object, error) {
 	r, e := one(ctx, tx, "SELECT jsonb_build_object('id',id,'domain',domain,'name',name,'enabled',enabled) FROM operations_ai_work_accounts_v1 WHERE endpoint=$1 AND domain='overview'", s.Endpoint)

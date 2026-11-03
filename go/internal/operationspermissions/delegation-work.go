@@ -20,6 +20,9 @@ type delegatedCurrent struct {
 
 func (s *Service) delegatedCurrentWithin(ctx context.Context, tx pgx.Tx, actor Actor, action string, expected *int64) (delegatedCurrent, error) {
 	var out delegatedCurrent
+	if action == "prompt-update" {
+		return out, fail("operations_ai_prompt_human_only", 403)
+	}
 	read := action == "read" || action == "prompt-read"
 	permission := "ai.roles." + action
 	if action == "prompt-read" {
@@ -245,9 +248,6 @@ func (s *Service) delegatedAvailabilityForIdentity(ctx context.Context, tx pgx.T
 	}
 	if canPrompts {
 		prompts = append(prompts, "read")
-	}
-	if contains(allowed, "prompt-update") && contains(execution.Permissions, "ai.prompts.update") {
-		prompts = append(prompts, "update")
 	}
 	return Object{"canRead": canRoles, "canReadRoles": canRoles, "canReadPrompts": canPrompts, "managementActions": arrayOf(actions), "promptActions": arrayOf(prompts), "targetAiAccountIds": row["target_ai_account_ids"], "delegationId": row["id"], "version": row["version"]}, row, nil
 }

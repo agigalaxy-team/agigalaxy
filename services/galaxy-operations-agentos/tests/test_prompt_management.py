@@ -21,7 +21,6 @@ from agno.tools.function import Function, FunctionCall
 import httpx
 from pydantic import TypeAdapter, ValidationError
 
-from galaxy_agentos.conversation_ai_management import AiPromptCommand
 from galaxy_agentos.conversation_prompt import BOUNDARY_VERSION, ROLE_PREFIX, ROLE_SUFFIX
 from galaxy_agentos.conversation_storage import conversation_storage_fields
 from galaxy_agentos.conversation_tools import DutyPreparedOperation, PreparedOperation, conversation_tools
@@ -205,12 +204,12 @@ class ManagementToolNativeTest(unittest.TestCase):
         # Agno resolves Pydantic's discriminated union into the provider-facing
         # branch schema and does not retain the discriminator mapping itself.
         operation_schema = json.dumps(schema.parameters["properties"]["operation"])
-        self.assertIn('"ai-work-prompt-save"', operation_schema)
+        self.assertNotIn('"ai-work-prompt-save"', operation_schema)
         self.assertIn('"ai-role-command"', operation_schema)
         self.assertIn('"targetAiAccountIds"', operation_schema)
         workbench_mapping = TypeAdapter(PreparedOperation).json_schema()["discriminator"]["mapping"]
         business_mapping = TypeAdapter(DutyPreparedOperation).json_schema()["discriminator"]["mapping"]
-        self.assertEqual(set(workbench_mapping) - set(business_mapping), {"ai-work-prompt-save", "ai-role-command"})
+        self.assertEqual(set(workbench_mapping) - set(business_mapping), {"ai-role-command"})
         self.assertEqual(set(business_mapping) - set(workbench_mapping), {"ordinary-strategy-create-draft"})
         self.assertNotIn('"ordinary-strategy-create-draft"', operation_schema)
         duty_only = {"kind": "ordinary-strategy-create-draft", "sourceStrategyId": str(uuid4()),
@@ -226,7 +225,7 @@ class ManagementToolNativeTest(unittest.TestCase):
             "permissions": ["content.read"], "targetAiAccountIds": [target]}}
         assignment = {"kind": "ai-role-command", "command": {"kind": "assignment-save", "expectedVersion": 2,
             "id": None, "aiAccountId": target, "roleId": str(uuid4()), "enabled": True}}
-        for index, payload in enumerate((prompt, role, assignment)):
+        for index, payload in enumerate((role, assignment)):
             operation = TypeAdapter(PreparedOperation).validate_python(payload)
             call = FunctionCall(function=schema, call_id="prepare-management-" + str(index))
             self.assertEqual(json.loads(prepare(context, call, operation=operation))["state"], "prepared")
@@ -252,43 +251,12 @@ class ManagementToolNativeTest(unittest.TestCase):
             TypeAdapter(PreparedOperation).validate_python({**prompt, "prompt": "x" * 16001})
         self.assertTrue(all(call["tool"] in {"prepare-operation", "read-ai-delegation"} for call in calls))
 
-    def test_duty_prompt_tool_is_allowlisted_typed_and_rechecks_before_each_call(self):
-        task_id, session_id, run_id, target = [str(uuid4()) for _ in range(4)]
-        class Gateway:
-            allowed = ["read-ai-delegation", "manage-ai-prompt"]
-            calls = []
-            def duty_authorize(self, user_id, **kwargs):
-                return {"allowed": True, "task": {"taskId": task_id, "domain": "overview",
-                    "sessionId": session_id, "tools": list(self.allowed)}}
-            def duty_tool(self, user_id, tool, arguments, **binding):
-                self.calls.append({"tool": tool, "arguments": arguments, **binding})
-                return {"state": "completed", "operationId": str(uuid4())}
-        gateway = Gateway()
-        self.assertEqual(duty_tools(gateway, set()), [])
-        tools = duty_tools(gateway, set(gateway.allowed))
-        self.assertEqual([tool.name if isinstance(tool, Function) else tool.__name__ for tool in tools], ["read_ai_delegation", "manage_ai_prompt"])
-        writer = tools[-1]
-        schema = writer
-        schema.process_entrypoint()
-        command_schema = schema.parameters["properties"]["command"]
-        self.assertEqual(set(command_schema["properties"]), {"aiAccountId", "expectedRevision", "expectedPromptVersion", "prompt"})
-        self.assertFalse(command_schema["additionalProperties"])
-        payload = {"aiAccountId": target, "expectedRevision": 6, "expectedPromptVersion": 4, "prompt": "本地获准岗位要求"}
-        command = AiPromptCommand.model_validate(payload)
-        context = RunContext(run_id=run_id, session_id=session_id, user_id="autonomy:" + task_id)
-        call = FunctionCall(function=schema, call_id="prompt-call-1")
-        writer.entrypoint(context, call, command=payload)
-        self.assertEqual(gateway.calls[-1]["arguments"], payload)
-        self.assertEqual(gateway.calls[-1]["tool"], "manage-ai-prompt")
-        self.assertEqual(gateway.calls[-1]["call_id"], call_reference(task_id, run_id, call.call_id))
-        self.assertEqual(gateway.calls[-1]["run_id"], run_id)
-        gateway.allowed = []
-        self.assertEqual(json.loads(writer.entrypoint(context, call, command=payload))["state"], "denied")
-        self.assertEqual(len(gateway.calls), 1)
-        for patch in ({"expectedRevision": 0}, {"expectedPromptVersion": True}, {"operationId": str(uuid4())},
-                {"model": "never-accepted"}, {"prompt": "x" * 16001}):
-            with self.assertRaises(ValidationError):
-                AiPromptCommand.model_validate({**payload, **patch})
+    def test_duty_prompt_writer_is_never_exposed_even_with_legacy_permission(self):
+        tools = duty_tools(object(), {"read-ai-delegation", "manage-ai-prompt"})
+        names = [tool.name if isinstance(tool, Function) else tool.__name__ for tool in tools]
+        self.assertEqual(names, ["read_ai_delegation"])
+        with self.assertRaises(ValidationError):
+            TypeAdapter(PreparedOperation).validate_python({"kind":"ai-work-prompt-save", "aiAccountId":str(uuid4()), "prompt":"no write"})
 
     def test_new_writer_preserves_waiting_human_original_operation_and_scrubs_body(self):
         task_id, session_id, run_id, operation_id = [str(uuid4()) for _ in range(4)]

@@ -149,8 +149,8 @@ func TestHumanAIWorkDelegatedRoleAndPromptOriginalPath(t *testing.T) {
 		t.Fatal("prompt read differs")
 	}
 	promptInput := map[string]any{"operationId": uuid.NewString(), "aiAccountId": target, "expectedRevision": 1, "expectedPromptVersion": 1, "prompt": "New synthetic role-work requirements"}
-	if _, e = service.DelegatedPromptSave(ctx, actor, promptInput, perms.DelegatedOptions{}); e != nil {
-		t.Fatal(e)
+	if _, e = service.DelegatedPromptSave(ctx, actor, promptInput, perms.DelegatedOptions{}); fault.Code(e) != "operations_ai_prompt_human_only" {
+		t.Fatalf("AI prompt write accepted: %v", e)
 	}
 	var config map[string]any
 	if e = owner.QueryRow(ctx, "SELECT configuration FROM operations_autonomy_configs_v1 WHERE id=$1", fixture["configId"]).Scan(&config); e != nil {

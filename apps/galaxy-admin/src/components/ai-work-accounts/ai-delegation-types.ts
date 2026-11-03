@@ -1,5 +1,5 @@
 import type {PermissionAction} from "../permissions/permissions-types";
-export const aiDelegationActionLabels={read:'读取AI专用角色',create:'创建AI专用角色',update:'修改AI专用角色',assign:'分配给获准岗位',revoke:'撤回岗位分配','prompt-read':'查看岗位工作要求','prompt-update':'修改岗位工作要求'} as const;
+export const aiDelegationActionLabels={read:'读取AI专用角色',create:'创建AI专用角色',update:'修改AI专用角色',assign:'分配给获准岗位',revoke:'撤回岗位分配','prompt-read':'查看岗位工作要求'} as const;
 export type AiDelegationAction=keyof typeof aiDelegationActionLabels;
 export const aiDelegationActionKeys=Object.keys(aiDelegationActionLabels) as AiDelegationAction[];
 export type AiDelegationFields={enabled:boolean;targetAiAccountIds:string[];grantablePermissions:string[];allowedManagementActions:AiDelegationAction[]};

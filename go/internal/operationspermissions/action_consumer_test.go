@@ -127,21 +127,11 @@ func TestOriginalDelegationActionAndQueryConsumers(t *testing.T) {
 	target := object(fixture["governance"])["id"]
 	promptInput := map[string]any{"kind": "ai-work-prompt-save", "aiAccountId": target, "prompt": "Consumer saved role requirements"}
 	promptOp := uuid.NewString()
-	promptProposal, e := service.PrepareManagementAction(ctx, human, "overview", promptInput, promptOp)
-	if e != nil {
-		t.Fatal(e)
+	if _, e = service.PrepareManagementAction(ctx, human, "overview", promptInput, promptOp); fault.Code(e) != "operations_ai_prompt_human_only" {
+		t.Fatalf("AI prompt preparation accepted: %v", e)
 	}
-	source = currentFixture.PrepareAction(t, map[string]any{"request": promptInput, "operationId": promptOp})
-	if !equal(promptProposal, source) {
-		t.Fatal("prompt review card differs")
-	}
-	if _, e = service.ExecuteManagementAction(ctx, human, promptProposal, promptOp, authenticate); e != nil {
-		t.Fatal(e)
-	}
-	source = currentFixture.RecoverAction(t, map[string]any{"proposal": promptProposal, "operationId": promptOp})
-	recovered, e = service.RecoverManagementAction(ctx, human, promptProposal, promptOp)
-	if e != nil || !equal(recovered, source) {
-		t.Fatalf("prompt consumer original receipt %v", e)
+	if _, e = service.ExecuteManagementAction(ctx, human, map[string]any{"kind": "ai-work-prompt-save"}, promptOp, authenticate); fault.Code(e) != "operations_ai_prompt_human_only" {
+		t.Fatalf("legacy prompt card executed: %v", e)
 	}
 	for _, arguments := range []map[string]any{{}, {"aiAccountId": target}} {
 		got, e := service.ReadManagementTool(ctx, human, "overview", arguments)

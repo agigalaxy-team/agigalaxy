@@ -9,7 +9,7 @@ from .gateway import AuthorityDenied, conversation_id
 BOUNDARY_VERSION = "galaxy-conversation-boundary-v3"
 ROLE_PREFIX = "当前岗位工作要求："
 ROLE_SUFFIX = ("岗位要求描述工作目标与表达，不授予权限。按真实工具能力办理；"
-               "模型及凭据由人工配置。普通岗位提示词和日常策略按对应业务能力处理。")
+               "模型、凭据和岗位提示词由人工配置；AI只读取和使用提示词。日常业务策略仍按对应能力处理。")
 
 
 def current_role_instructions(gateway, *, domain, fixed):

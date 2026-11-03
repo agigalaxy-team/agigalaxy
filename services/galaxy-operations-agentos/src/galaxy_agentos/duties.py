@@ -176,9 +176,7 @@ def duty_tools(gateway, allowed, progress=None):
     # The delegated role writer is supplied below from the matching closed
     # permission schema; an unavailable handler is never exposed as executable.
     from .duty_role_tools import manage_ai_role
-    from .conversation_ai_management import manage_ai_prompt
     candidates["manage-ai-role"] = manage_ai_role(gateway)
-    candidates["manage-ai-prompt"] = manage_ai_prompt(gateway)
     from .tool_reliability import reliable_function
     from jsonschema import Draft202012Validator, FormatChecker
 

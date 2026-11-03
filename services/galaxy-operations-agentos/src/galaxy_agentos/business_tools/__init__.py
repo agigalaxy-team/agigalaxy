@@ -17,7 +17,7 @@ _GROUPS = {
     "search": ("搜索", (c.SearchRetry, c.SearchDraftSave, c.SearchApply, c.SearchRestore)),
     "recommendations": ("推荐", (c.RecommendationDirection, c.RecommendationPolicySave, c.RecommendationThemeUpdate)),
     "strategy": ("策略与规则", (c.StrategyControl, c.StrategyContinue, c.OrdinaryStrategyDraft, c.OrdinaryStrategyPublish, c.StrategyDraft, c.StrategyRehearsal, c.StrategyPublish, c.RulePublish, c.RuleRestore)),
-    "ai_management": ("AI角色与岗位要求", (c.AiWorkPromptSave, c.AiRoleCommand)),
+    "ai_management": ("AI专用角色", (c.AiRoleCommand,)),
 }
 
 

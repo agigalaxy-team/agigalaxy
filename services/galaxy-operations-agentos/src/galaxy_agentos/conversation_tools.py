@@ -72,7 +72,6 @@ from .conversation_tool_contracts import (
     _prepared_arguments,
     MessageDraftCreate,
     MessageDraftSave,
-    AiWorkPromptSave,
     AiRoleCommand,
 )
 
@@ -239,8 +238,8 @@ def _conversation_tools(gateway, *, domain=None, include_legacy=False):
         ai.prompts.read permit that exact target. A missing scope or denied
         prompt is not permission to inspect other accounts or infer text.
         This tool never changes roles, assignments, prompts or model settings.
-        To request a change in this conversation, prepare_operation a concrete
-        ai-work-prompt-save or ai-role-command card; the person must confirm.
+        Role changes can use an ai-role-command card. Role prompts are configured
+        only by managers in AI work account settings; no AI prompt writer exists.
         """
         arguments = {} if ai_account_id is None else {"aiAccountId": str(ai_account_id)}
         return send(run_context, fc, "read-ai-delegation", arguments)
@@ -279,10 +278,7 @@ def _conversation_tools(gateway, *, domain=None, include_legacy=False):
         A feedback pending/processing/closed status is a business value, distinct
         from common-task/model/human-decision state; report their actual source.
         For AI-only management first read current_summary and the current
-        read_ai_delegation directory. ai-work-prompt-save accepts only the
-        actual allowed aiAccountId and intended ordinary prompt text (up to
-        16000 characters); Galaxy freezes its current revision/prompt/delegation
-        versions. It cannot edit a model, code boundary, goal or running plan.
+        read_ai_delegation directory. Prompts are human-configured and cannot be changed through tools.
         ai-role-command wraps one real role-create/role-update/assignment-save
         command and its current expectedVersion from that directory. Neither
         card grants execution or expands the human-approved delegation ceiling,

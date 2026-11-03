@@ -94,10 +94,13 @@ func (t *ConversationTools) readCardBatch(ctx context.Context, human operationsp
 		presentation := cardPresentation(p)
 		attempted := cardAttempted(&row)
 		canConfirm := row.State == "prepared" && !attempted && presentation["reviewable"] == true
-		if p["kind"] == "ai-work-prompt-save" && object(p["review"]) == nil {
+		if p["kind"] == "ai-work-prompt-save" {
 			canConfirm = false
 		}
 		capability := Object{"canConfirm": canConfirm, "canDismiss": row.State == "prepared" && p["dismissalAllowed"] == true && !attempted, "reason": nil}
+		if p["kind"] == "ai-work-prompt-save" {
+			capability["reason"] = "operations_ai_prompt_human_only"
+		}
 		if presentation["reviewable"] != true {
 			capability["reason"] = "presentation-review-unavailable"
 		}

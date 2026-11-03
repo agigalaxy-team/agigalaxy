@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const BoundaryPrompt = "只处理本任务的用途与获准资料；当前角色、授权、对象条件和人工要求由服务逐次核对。模型结束不等于业务完成。未知结果查询原操作；停止或人工接管后不得继续写入。不得更改模型、凭据、人员授权或绕过人工批准。"
+const BoundaryPrompt = "只处理本任务的用途与获准资料；当前角色、授权、对象条件和人工要求由服务逐次核对。模型结束不等于业务完成。未知结果查询原操作；停止或人工接管后不得继续写入。岗位提示词由人工配置，不得修改。不得更改模型、凭据、人员授权或绕过人工批准。"
 
 func (s *Service) toolsWithin(ctx context.Context, tx pgx.Tx, row Object, actor Actor) ([]string, error) {
 	if s.AIWork == nil {
@@ -50,9 +50,6 @@ func (s *Service) toolsWithin(ctx context.Context, tx pgx.Tx, row Object, actor 
 					tools = append(tools, "manage-ai-role")
 					break
 				}
-			}
-			if has(texts(d["promptActions"]), "update") && has(texts(plan["actions"]), "ai.prompts.update") {
-				tools = append(tools, "manage-ai-prompt")
 			}
 		}
 	}

@@ -62,6 +62,9 @@ func (s *Service) actionHuman(ctx context.Context, actor Actor, domain, purpose,
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Actor, error) { return s.HumanAIWithin(ctx, tx, actor, domain, purpose, action) })
 }
 func (s *Service) PrepareManagementAction(ctx context.Context, operator Actor, domain string, input Object, operationID string) (Object, error) {
+	if input["kind"] == "ai-work-prompt-save" {
+		return nil, fail("operations_ai_prompt_human_only", 403)
+	}
 	x, e := managementRequest(input)
 	if e != nil {
 		return nil, e
@@ -299,6 +302,9 @@ func managementResult(x, command, result Object, operationID string) (Object, er
 	return Object{"operationId": operationID, "state": "completed", "summary": summary, "receipt": receipt}, nil
 }
 func (s *Service) ExecuteManagementAction(ctx context.Context, operator Actor, proposal Object, operationID string, authorize func(context.Context) (Actor, error)) (Object, error) {
+	if proposal["kind"] == "ai-work-prompt-save" || proposal["requiredAction"] == "ai.prompts.update" {
+		return nil, fail("operations_ai_prompt_human_only", 403)
+	}
 	x, body, e := managementCommand(proposal, operationID, false)
 	if e != nil {
 		return nil, e

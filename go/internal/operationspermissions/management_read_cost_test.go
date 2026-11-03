@@ -53,6 +53,7 @@ func TestManagementCapabilitiesReadProjectionsAndRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer realTx.Rollback(ctx)
 	tx := &capabilityCountTx{Tx: realTx}
 	capabilities, err := f.Permissions.ManagementCapabilitiesWithin(ctx, tx, actor)
 	if err != nil {
@@ -61,7 +62,7 @@ func TestManagementCapabilitiesReadProjectionsAndRevocation(t *testing.T) {
 	if stored.reads != 2 || tx.accounts != 2 || tx.assignments != 2 || tx.delegations != 1 {
 		t.Fatalf("person=%d accounts=%d assignments=%d delegations=%d", stored.reads, tx.accounts, tx.assignments, tx.delegations)
 	}
-	if object(object(capabilities["role"])["read"])["available"] != true || object(object(capabilities["prompt"])["update"])["available"] != true || object(capabilities["delegation"])["enabled"] != true {
+	if object(object(capabilities["role"])["read"])["available"] != true || object(object(capabilities["prompt"])["update"])["available"] != false || object(object(capabilities["prompt"])["update"])["systemSupport"] != "human-only" || object(capabilities["delegation"])["enabled"] != true {
 		t.Fatalf("current delegated capability changed: %#v", capabilities)
 	}
 	if err = realTx.Rollback(ctx); err != nil {

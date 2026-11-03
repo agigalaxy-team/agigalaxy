@@ -92,16 +92,8 @@ func TestRealDutyDelegatedAIOnlyRoleAndPromptOriginalInterop(t *testing.T) {
 	}
 	promptMeta := prompt["prompt"].(map[string]any)
 	promptInput := a.Object{"operationId": uuid.NewString(), "aiAccountId": targetID, "expectedRevision": promptMeta["revision"], "expectedPromptVersion": promptMeta["promptVersion"], "prompt": "True task-bound prompt"}
-	saved, e = permissions.DelegatedPromptSave(ctx, actor, promptInput, p.DelegatedOptions{})
-	if e != nil {
-		t.Fatal(e)
-	}
-	if saved == nil {
-		t.Fatal("prompt write missing")
-	}
-	replay, e = permissions.DelegatedPromptSave(ctx, actor, promptInput, p.DelegatedOptions{})
-	if e != nil || replay["replayed"] != true {
-		t.Fatal("prompt receipt replay", e)
+	if _, e = permissions.DelegatedPromptSave(ctx, actor, promptInput, p.DelegatedOptions{}); fault.Code(e) != "operations_ai_prompt_human_only" {
+		t.Fatalf("Duty prompt write accepted: %v", e)
 	}
 	var humanWriter *string
 	var aiWriter, actorKind string

@@ -56,7 +56,7 @@ class PreparationFeedbackTests(unittest.TestCase):
         function._run_context = RunContext(run_id=str(uuid4()), user_id='conversation:' + str(uuid4()),
             session_id=str(uuid4()), metadata={'operationId': str(uuid4())})
         call = FunctionCall(function=function, call_id='explicit-local-call', arguments={'operation': {
-            'kind': 'ai-work-prompt-save', 'aiAccountId': str(uuid4()), 'prompt': 'explicit local prompt'}})
+            'kind': 'ai-role-command', 'command': {'kind':'role-create','expectedVersion':0,'name':'explicit local role','description':'','enabled':True,'permissions':['content.read'],'targetAiAccountIds':[str(uuid4())]}}})
         self.assertTrue(call.execute())
         result = json.loads(call.result)
         self.assertEqual(result['state'], 'invalid-request')
@@ -75,7 +75,7 @@ class PreparationFeedbackTests(unittest.TestCase):
         function._run_context = RunContext(run_id=str(uuid4()), user_id='conversation:' + str(uuid4()),
             session_id=str(uuid4()), metadata={'operationId': str(uuid4())})
         call = FunctionCall(function=function, call_id='explicit-local-call', arguments={'operation': {
-            'kind': 'ai-work-prompt-save', 'aiAccountId': str(uuid4()), 'prompt': 'explicit local prompt'}})
+            'kind': 'ai-role-command', 'command': {'kind':'role-create','expectedVersion':0,'name':'explicit local role','description':'','enabled':True,'permissions':['content.read'],'targetAiAccountIds':[str(uuid4())]}}})
         original = {'state': 'invalid-request', 'reason': 'agentos_public_reference_mismatch', 'effectState': 'not-confirmed'}
         with patch('galaxy_agentos.conversation_tools.tool_public_reference', return_value=(None, original)):
             self.assertTrue(call.execute())

@@ -562,7 +562,7 @@ class RecommendationThemeUpdate(ClosedArguments):
 
 
 from .conversation_message_drafts import MessageDraftCreate, MessageDraftSave, NoticeDraftCreate, NoticeDraftSave, NoticeState
-from .conversation_ai_management import AiWorkPromptSave, AiRoleCommand
+from .conversation_ai_management import AiRoleCommand
 
 
 _BusinessOperation = Union[CleanupPlanCreate, CleanupPlanCancel, ContentTagCreate, ContentTagUpdate, JobCancel, JobRetry, SearchRetry, ContentVisibility, ContentCuration, PublicContentBatch, PrivateCaseMessage, MessageDraftCreate, MessageDraftSave, NoticeDraftCreate, NoticeDraftSave, NoticeState,
@@ -571,7 +571,7 @@ _BusinessOperation = Union[CleanupPlanCreate, CleanupPlanCancel, ContentTagCreat
     OrdinaryStrategyDraft, OrdinaryStrategyPublish, StrategyDraft, StrategyRehearsal, StrategyPublish,
     SearchDraftSave, SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection, RecommendationPolicySave, RecommendationThemeUpdate]
 DutyPreparedOperation = Annotated[Union[_BusinessOperation, OrdinaryStrategyCreateDraft], Field(discriminator="kind")]
-PreparedOperation = Annotated[Union[_BusinessOperation, AiWorkPromptSave, AiRoleCommand], Field(discriminator="kind")]
+PreparedOperation = Annotated[Union[_BusinessOperation, AiRoleCommand], Field(discriminator="kind")]
 
 
 def _preparation_type(domain):

@@ -41,7 +41,7 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 	f := operationsfixture.New(t, owner)
 	automation := f.Automation(t)
 	endpoint, issuer, idRoot := f.Endpoint, f.Issuer, f.IDs["root"]
-	role, err := f.Permissions.SaveRole(ctx, f.Root, Object{"operationId": uuid.NewString(), "expectedVersion": 0, "name": "Conversation service role", "description": "Isolated current AI permission fixture", "subjectScope": "ai-only", "enabled": true, "permissions": []any{"workbench.read", "ai.roles.read", "ai.roles.create", "ai.roles.update", "ai.roles.assign", "ai.roles.revoke", "ai.prompts.read", "ai.prompts.update"}})
+	role, err := f.Permissions.SaveRole(ctx, f.Root, Object{"operationId": uuid.NewString(), "expectedVersion": 0, "name": "Conversation service role", "description": "Isolated current AI permission fixture", "subjectScope": "ai-only", "enabled": true, "permissions": []any{"workbench.read", "ai.roles.read", "ai.roles.create", "ai.roles.update", "ai.roles.assign", "ai.roles.revoke", "ai.prompts.read"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,32 +363,10 @@ func TestDurableConversationOriginalIdentityAndPrivateAuthorization(t *testing.T
 	}
 
 	newToolTurn()
-	promptArgs := Object{"kind": "ai-work-prompt-save", "aiAccountId": object(automation["accounts"])["governance"], "prompt": "按当前已获准的职责核查，保持原数据边界。"}
+	promptArgs := Object{"kind": "ai-work-prompt-save", "aiAccountId": object(automation["accounts"])["governance"], "prompt": "不应由AI写入"}
 	toolInput["callId"], toolInput["arguments"] = "provider.prepare.prompt", promptArgs
-	response = invokeTool(toolInput)
-	var promptPrepared Object
-	_ = json.Unmarshal(response.Body.Bytes(), &promptPrepared)
-	if response.Code != 200 {
-		t.Fatalf("prompt review prepare %d %s", response.Code, response.Body.String())
-	}
-	promptCard := object(promptPrepared["card"])
-	if promptCard["review"] == nil || object(promptCard["capability"])["canConfirm"] != true {
-		t.Fatal("prompt review not available", promptCard)
-	}
-	response = cardCommand(promptCard, "confirm")
-	var promptResult Object
-	_ = json.Unmarshal(response.Body.Bytes(), &promptResult)
-	if response.Code != 200 || promptResult["state"] != "completed" || promptResult["review"] == nil {
-		t.Fatal("prompt confirmation failed", response.Code, response.Body.String())
-	}
-	// Withdrawing the actual delegation removes historical prompt bodies too.
-	withdrawn := copyObject(object(automation["delegationInput"]))
-	withdrawn["operationId"], withdrawn["expectedVersion"], withdrawn["enabled"] = uuid.NewString(), 1, false
-	if _, err = permissions.SaveDelegation(ctx, human, withdrawn); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = service.Tools.Card(ctx, human, "overview", text(promptCard, "cardId")); fault.Status(err) != 403 {
-		t.Fatal("withdrawn delegation still exposes historical prompt review", err)
+	if _, err = service.Tools.Execute(ctx, toolInput); err == nil {
+		t.Fatal("AI prepared a prompt-write card")
 	}
 	if _, err = owner.Exec(ctx, "DELETE FROM operations_operator_sessions_v1"); err != nil {
 		t.Fatal(err)

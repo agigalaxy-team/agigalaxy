@@ -36,7 +36,7 @@ func (f *Fixture) Automation(t *testing.T) Object {
 	if err != nil {
 		t.Fatal(err)
 	}
-	delegationInput := Object{"operationId": uuid.NewString(), "expectedVersion": 0, "enabled": true, "targetAiAccountIds": []any{accounts["governance"]}, "grantablePermissions": []any{"feedback.read", "feedback.update"}, "allowedManagementActions": []any{"read", "create", "update", "assign", "revoke", "prompt-read", "prompt-update"}}
+	delegationInput := Object{"operationId": uuid.NewString(), "expectedVersion": 0, "enabled": true, "targetAiAccountIds": []any{accounts["governance"]}, "grantablePermissions": []any{"feedback.read", "feedback.update"}, "allowedManagementActions": []any{"read", "create", "update", "assign", "revoke", "prompt-read"}}
 	delegation, err := f.Permissions.SaveDelegation(ctx, f.Root, delegationInput)
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +47,7 @@ func (f *Fixture) Automation(t *testing.T) Object {
 func (f *Fixture) Delegated(t *testing.T) Object {
 	t.Helper()
 	ctx := context.Background()
-	role, err := f.Permissions.SaveRole(ctx, f.Root, Object{"operationId": uuid.NewString(), "expectedVersion": 0, "name": "Synthetic overview current role", "description": "Explicit AI management actions", "subjectScope": "ai-only", "enabled": true, "permissions": []any{"ai.roles.read", "ai.roles.create", "ai.roles.update", "ai.roles.assign", "ai.roles.revoke", "ai.prompts.read", "ai.prompts.update"}})
+	role, err := f.Permissions.SaveRole(ctx, f.Root, Object{"operationId": uuid.NewString(), "expectedVersion": 0, "name": "Synthetic overview current role", "description": "Explicit AI management actions", "subjectScope": "ai-only", "enabled": true, "permissions": []any{"ai.roles.read", "ai.roles.create", "ai.roles.update", "ai.roles.assign", "ai.roles.revoke", "ai.prompts.read"}})
 	if err != nil {
 		t.Fatal(err)
 	}

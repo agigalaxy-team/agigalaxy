@@ -88,55 +88,9 @@ func (s *Service) DelegatedPrompt(ctx context.Context, actor Actor, input Object
 		return Object{"prompt": prompt, "delegationVersion": current.Row["version"], "scope": "role-work-requirements", "instructionAuthority": "role-work-requirements-with-fixed-code-boundaries", "checkedAt": s.now(), "readExpiresAt": s.now() + 30}, nil
 	})
 }
+
+// Kept as a rejecting compatibility entry for existing clients and old cards.
+// Human editing uses the existing autonomy configuration page and writer.
 func (s *Service) DelegatedPromptSave(ctx context.Context, actor Actor, input Object, options DelegatedOptions) (Object, error) {
-	x, e := parsePrompt(input, true)
-	if e != nil {
-		return nil, e
-	}
-	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
-		if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,734912410))", s.Endpoint); e != nil {
-			return nil, e
-		}
-		current, e := s.delegatedCurrentWithin(ctx, tx, actor, "prompt-update", options.ExpectedDelegationVersion)
-		if e != nil {
-			return nil, e
-		}
-		if replay, e := s.delegatedReplay(ctx, tx, current.Actor, str(x["operationId"]), "prompt-save", x); e != nil || replay != nil {
-			return replay, e
-		}
-		account, old, e := s.promptTarget(ctx, tx, current, str(x["aiAccountId"]), true)
-		if e != nil {
-			return nil, e
-		}
-		if num(old["revision"]) != num(x["expectedRevision"]) || num(old["prompt_version"]) != num(x["expectedPromptVersion"]) {
-			return nil, fail("operations_ai_prompt_version_changed", 409)
-		}
-		configuration := obj(clone(old["configuration"]))
-		previous := configuration["prompt"]
-		if previous == nil {
-			previous = ""
-		}
-		if previous == x["prompt"] {
-			return nil, fail("operations_ai_prompt_no_change", 409)
-		}
-		configuration["prompt"] = x["prompt"]
-		at := time.Unix(s.now(), 0)
-		humanWriter, aiWriter := s.delegatedWriters(current)
-		row, e := one(ctx, tx, `UPDATE operations_autonomy_configs_v1 SET configuration=$3,revision=revision+1,prompt_version=prompt_version+1,updated_by=$4,updated_by_ai_account_id=$5,updated_at=$6 WHERE endpoint=$1 AND id=$2 AND revision=$7 AND prompt_version=$8 RETURNING to_jsonb(operations_autonomy_configs_v1)`, s.Endpoint, old["id"], jsonText(configuration), humanWriter, aiWriter, at, x["expectedRevision"], x["expectedPromptVersion"])
-		if errors.Is(e, pgx.ErrNoRows) {
-			return nil, fail("operations_ai_prompt_version_changed", 409)
-		}
-		if e != nil {
-			return nil, e
-		}
-		_, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_versions_v1(config_id,revision,configuration,prompt_version,plan_version,delegation_version,operator_id,created_at,managed_by_ai_account_id,management_operation_id,management_delegation_id,management_delegation_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, row["id"], row["revision"], jsonText(row["configuration"]), row["prompt_version"], row["plan_version"], row["delegation_version"], humanWriter, at, aiWriter, x["operationId"], current.Row["id"], current.Row["version"])
-		if e != nil {
-			return nil, e
-		}
-		version := num(current.Row["version"])
-		if _, e = s.delegatedCurrentWithin(ctx, tx, current.Actor, "prompt-update", &version); e != nil {
-			return nil, e
-		}
-		return s.delegatedRecord(ctx, tx, current, str(x["operationId"]), "prompt-save", x, Object{"prompt": promptMetadata(account, row)})
-	})
+	return nil, fail("operations_ai_prompt_human_only", 403)
 }

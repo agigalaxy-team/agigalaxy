@@ -74,7 +74,7 @@ func (s *Service) ManagementCapabilitiesWithin(ctx context.Context, tx pgx.Tx, a
 	for _, action := range []string{"create", "update", "assign", "revoke"} {
 		role[action] = fact("ai.roles."+action, false, active && contains(allowed, action), false, true)
 	}
-	prompt := Object{"scope": "role-work-requirements", "read": fact("ai.prompts.read", true, active && contains(allowed, "prompt-read"), false, true), "update": fact("ai.prompts.update", false, active && contains(allowed, "prompt-update"), false, true)}
+	prompt := Object{"scope": "role-work-requirements", "read": fact("ai.prompts.read", true, active && contains(allowed, "prompt-read"), false, true), "update": fact("ai.prompts.update", false, false, true, true)}
 	ready := func(p string) bool {
 		return s.AIWork != nil && s.AIWork.HandlerReady != nil && s.AIWork.HandlerReady(p)
 	}
