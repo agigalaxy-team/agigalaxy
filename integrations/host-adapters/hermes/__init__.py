@@ -8,6 +8,19 @@ import uuid
 
 log = logging.getLogger("galaxy-work")
 
+_OBSERVATION_ENV = frozenset("""
+PATH PATHEXT SYSTEMROOT WINDIR COMSPEC HOME USERPROFILE HOMEDRIVE HOMEPATH
+APPDATA LOCALAPPDATA PROGRAMDATA TMPDIR TMP TEMP XDG_CONFIG_HOME XDG_DATA_HOME
+XDG_CACHE_HOME XDG_STATE_HOME XDG_RUNTIME_DIR XDG_SESSION_ID XDG_SESSION_TYPE
+DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS LANG LC_ALL LC_CTYPE TZ
+HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY SSL_CERT_FILE SSL_CERT_DIR
+NODE_EXTRA_CA_CERTS REQUESTS_CA_BUNDLE CURL_CA_BUNDLE GALAXY_NATIVE_CONFIG
+GALAXY_NATIVE_DATA_DIR GALAXY_DATA_DIR GALAXY_NATIVE_EXECUTABLE
+""".split())
+
+def observation_env():
+    return {key: value for key, value in os.environ.items() if key.upper() in _OBSERVATION_ENV}
+
 class Host:
     def __init__(self, ctx):
         exe = ctx.get_config("executable", os.environ.get("GALAXY_NATIVE_EXECUTABLE"))
@@ -19,8 +32,9 @@ class Host:
         if config: args += ["--config", config]
         elif data: args += ["--data-dir", data]
         self.ingress_args = [exe, "ingress"] + (["--config", config] if config else (["--data-dir", data] if data else []))
-        self.env = os.environ.copy()
-        if data and not config: self.env.pop("GALAXY_NATIVE_CONFIG", None)
+        self.env = observation_env()
+        if data and not config:
+            self.env = {key: value for key, value in self.env.items() if key.upper() != "GALAXY_NATIVE_CONFIG"}
         self.proc = subprocess.Popen(args, env=self.env, creationflags=subprocess.CREATE_NO_WINDOW if os.name=="nt" else 0, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8")
         self.seq = 0
     def call(self, method, params=None):

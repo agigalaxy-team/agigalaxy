@@ -2,12 +2,13 @@ import {enqueueIngress} from './ingress.mjs';
 import {randomUUID} from 'node:crypto';
 import {createChildRPC} from '../opencode-stable/bridge/child-rpc.mjs';
 import {captureTranscript} from './transcript-archive.mjs';
+import {nativeObservationEnvironment} from './native-environment.mjs';
 
 // The inherited Host channel is private to the adapter, not an MCP tool.
 export function createHostRecorder(options={}) {
   const {host,executable=process.env.GALAXY_NATIVE_EXECUTABLE,dataDirectory=process.env.GALAXY_NATIVE_DATA_DIR}=options;
   const configPath=options.configPath??(options.dataDirectory?undefined:process.env.GALAXY_NATIVE_CONFIG);
-  const env={...process.env};if(dataDirectory&&!configPath)delete env.GALAXY_NATIVE_CONFIG;
+  const env=nativeObservationEnvironment();if(dataDirectory&&!configPath)for(const key of Object.keys(env))if(key.toUpperCase()==='GALAXY_NATIVE_CONFIG')delete env[key];
   const rpc=createChildRPC({executable,command:configPath?'host':'integration-host',configPath,dataDirectory,env,requestTimeoutMs:165000,maxMessageBytes:9*1024*1024});
   const call=(method,params={})=>rpc.request(method,params);
   return {

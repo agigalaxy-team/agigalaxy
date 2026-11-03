@@ -1,5 +1,6 @@
 import {spawn} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
+import {nativeObservationEnvironment} from './native-environment.mjs';
 
 // The CLI durably queues a redacted observation before the shared service is
 // contacted. A retry reuses the same delivery ID; no user content is logged.
@@ -8,7 +9,7 @@ export async function enqueueIngress({executable,configPath,dataDirectory,host,e
  const payload={deliveryId:deliveryId||randomUUID(),observation:{host,sessionId,...observation,...(facts?{environment:facts}:{})}};
  const run=()=>new Promise((resolve,reject)=>{
   const args=['ingress',...(configPath?['--config',configPath]:dataDirectory?['--data-dir',dataDirectory]:[])];
-  const env={...process.env};if(dataDirectory&&!configPath)delete env.GALAXY_NATIVE_CONFIG;
+  const env=nativeObservationEnvironment();if(dataDirectory&&!configPath)for(const key of Object.keys(env))if(key.toUpperCase()==='GALAXY_NATIVE_CONFIG')delete env[key];
   const child=spawn(executable,args,{stdio:['pipe','pipe','ignore'],windowsHide:true,shell:false,env});let output='',settled=false;
   const finish=(err,value)=>{if(settled)return;settled=true;clearTimeout(timer);err?reject(err):resolve(value);};
   const timer=setTimeout(()=>{child.kill();finish(Error('host_ingress_timeout'));},15000);
