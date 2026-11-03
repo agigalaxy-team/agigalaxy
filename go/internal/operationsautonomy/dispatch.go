@@ -105,11 +105,10 @@ func (s *Service) dispatchOwner(ctx context.Context, tx pgx.Tx, a Actor, source,
 	if s.Permissions == nil {
 		return Actor{}, fail("operations_autonomy_unavailable")
 	}
-	human, e := s.Permissions.TaskOwnerWithin(ctx, tx, a, source)
-	if e != nil {
-		return Actor{}, e
-	}
-	return s.actor(ctx, tx, human, "ai.use."+target, nil)
+	// Private model calls carry the permission service's stored-human proof;
+	// web confirmations carry the access gateway's cookie proof. Their issuing
+	// permission service verifies both; neither is reinterpreted as the other.
+	return s.Permissions.TaskOwnerWithin(ctx, tx, a, source, target)
 }
 
 func (s *Service) PrepareDispatch(ctx context.Context, a Actor, source string, input Object, operationID string) (Object, error) {
@@ -171,12 +170,18 @@ func (s *Service) ConfirmDispatch(ctx context.Context, a Actor, source string, p
 		return nil, invalid()
 	}
 	runtime := s.runtime(ctx)
-	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
-		actor, e := s.actor(ctx, tx, a, "autonomy.control", authorize)
-		if e != nil {
-			return nil, e
+	if authorize != nil {
+		fresh, err := authorize(ctx)
+		if err != nil {
+			return nil, err
 		}
-		actor, e = s.dispatchOwner(ctx, tx, actor, source, str(x["targetDomain"]))
+		if fresh.ID != a.ID || fresh.Endpoint != s.Endpoint || fresh.AIProof != nil {
+			return nil, fault.New("business_admin_denied", 403)
+		}
+		a = fresh
+	}
+	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
+		actor, e := s.dispatchOwner(ctx, tx, a, source, str(x["targetDomain"]))
 		if e != nil {
 			return nil, e
 		}
@@ -274,7 +279,7 @@ func (s *Service) ReadDispatch(ctx context.Context, a Actor, source string, args
 		if d == nil {
 			return nil, fail("operations_autonomy_task_not_found")
 		}
-		if _, e = s.actor(ctx, tx, owner, "ai.use."+str(d["domain"]), nil); e != nil {
+		if _, e = s.dispatchOwner(ctx, tx, owner, source, str(d["domain"])); e != nil {
 			return nil, e
 		}
 		// Task metadata is not a route to another position's business materials.

@@ -54,8 +54,14 @@ func TestWorkbenchDispatchIndependentPlanAndOriginalReceipt(t *testing.T) {
 	}
 	s.Pool = poolFor("galaxy_api")
 	request := a.Object{"kind": "task-dispatch", "targetDomain": "overview", "title": "Review unresolved feedback", "goal": "Read unresolved feedback and compare recurring needs; do not change feedback states.", "trigger": a.Object{"kind": "interval", "minutes": 37}, "startNow": true}
+	sourceActor, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (a.Actor, error) {
+		return f.Permissions.StoredHumanAIWithin(ctx, tx, f.Root.ID, "overview", automation["accounts"].(map[string]any)["overview"].(string), "conversation", "workbench.read")
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
 	op := uuid.NewString()
-	proposal, e := s.PrepareDispatch(ctx, f.Root, "overview", request, op)
+	proposal, e := s.PrepareDispatch(ctx, sourceActor, "overview", request, op)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -97,6 +103,9 @@ func TestWorkbenchDispatchIndependentPlanAndOriginalReceipt(t *testing.T) {
 	read, e := s.ReadDispatch(ctx, f.Root, "overview", a.Object{"dispatchId": op})
 	if e != nil || read["enabled"] != true || read["latestTask"].(map[string]any)["state"] != "running" {
 		t.Fatalf("actual dispatch read: %#v %v", read, e)
+	}
+	if _, e = s.ReadDispatch(ctx, sourceActor, "overview", a.Object{"dispatchId": op}); e != nil {
+		t.Fatal("private model receipt read", e)
 	}
 	// Finishing a round does not stop the recurring assignment. One later due
 	// time produces one new task, even if scheduler wakeups repeat.
