@@ -12,8 +12,8 @@ export function discoverCheckTests(root,mode,env=process.env,selectedFiles=[]){
   if(available||!external.has(file))return true;
   separate.push(file);return false;
  };
- const packages=mode==='a2a'?['galaxy-a2a']:['galaxy-contracts','galaxy-client','galaxy-a2a','galaxy-web'];
- const extraRoots=mode==='a2a'?[]:['integrations/host-adapters/opencode-stable/test/',
+ const packages=['galaxy-contracts','galaxy-client','galaxy-web'];
+ const extraRoots=['integrations/host-adapters/opencode-stable/test/',
   'packages/galaxy-official/deploy/test/','packages/galaxy-official/scripts/test/'];
  if(selectedFiles.length){
   const prefixes=[...packages.map(name=>'packages/'+name+'/test/'),...extraRoots];
@@ -39,7 +39,6 @@ export function discoverCheckTests(root,mode,env=process.env,selectedFiles=[]){
   const discovered=readdirSync(resolve(root,'packages',name,'test'))
    .filter(file=>file.endsWith('.test.mjs'))
    .filter(file=>selfContained(file,env.GALAXY_TEST_CHAT_ISOLATED==='1',isolatedChatTests)).sort();
-  if(!discovered.length&&mode==='a2a')throw new Error(`No tests discovered in ${name}`);
   return discovered.map(file=>`packages/${name}/test/${file}`);
  });
  for(const area of extraRoots){

@@ -17,15 +17,9 @@ export interface StableHostApi {
   event?: {on(type: string, handler: (event: HostWorkEvent) => void): Action};
   renderer?: { readonly width: number; readonly height: number };
   lifecycle?: { readonly signal: AbortSignal; onDispose(handler: Action): Action };
-  // Public OpenCode TUI SDK. Appending keeps the host's unsent input and does
-  // not submit it or select/start a model.
-  client?: { tui: { appendPrompt(input: { text: string }): Promise<{ data?: boolean; error?: unknown }> };
-    app?: {log(input: {service: string; level: 'debug'|'info'|'warn'|'error'; message: string; extra: Record<string, unknown>}, options?: {signal?: AbortSignal}): Promise<{error?: unknown}>};
-    session?: {create(input: Record<string, unknown>, options?: {signal?: AbortSignal}): Promise<unknown>;
-      prompt(input: Record<string, unknown>, options?: {signal?: AbortSignal}): Promise<unknown>;
-      messages?(input: {sessionID: string}, options?: {signal?: AbortSignal}): Promise<unknown>;
-      message?(input: {sessionID: string; messageID: string}): Promise<unknown>;
-      abort?(input: {sessionID: string}): Promise<unknown>; update?(input: Record<string, unknown>): Promise<unknown>} };
+  client?: {app?: {log(input: {service: string; level: 'debug'|'info'|'warn'|'error'; message: string; extra: Record<string, unknown>}, options?: {signal?: AbortSignal}): Promise<{error?: unknown}>};
+    session?: {messages?(input: {sessionID: string;directory?:string}, options?: {signal?: AbortSignal}): Promise<unknown>;
+      message?(input: {sessionID: string; messageID: string;directory?:string}): Promise<unknown>} };
   route?: { readonly current: { name: string; params?: { sessionID?: string } }; navigate?(name: string, params?: Record<string, unknown>): void };
   state?: {config?: {model?: string}; mcp?: () => readonly {name: string; status: string}[];
     session: { get?(sessionId:string):{id:string;title:string;directory?:string;workspaceID?:string;time?:{updated:number}}|undefined;messages(sessionId: string): readonly HostObservedMessage[];status?(sessionId:string):{type:string}|undefined };

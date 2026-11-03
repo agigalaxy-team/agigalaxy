@@ -8,6 +8,7 @@ import {createHash} from 'node:crypto';
 import {componentRelease,INITIAL_VERSION} from './release-identifiers.mjs';
 import {buildCompactApp} from '../integrations/native-v2/compact-app/build.mjs';
 import {collectGoNativeLicenses} from './go-native-licenses.mjs';
+import {stageMacOSNotificationBundle} from '../integrations/native-v2/notifications/macos-helper/stage-bundle.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),sha=x=>createHash('sha256').update(x).digest('hex');
 const packageName=path=>path.startsWith('@')?path.split('/').slice(0,2).join('/'):path.split('/')[0];
 // Native bundles have one dependency namespace. Reconcile these two observed
@@ -34,9 +35,10 @@ async function dependencyVersion(name,inputs,sourceDirectory){
 }
 // Normal source build entry for the Go Native candidate. It never changes a
 // previously signed release, installed command, or host configuration.
-export async function buildGoNativeCandidate({destination,sourceDirectory=root,version=INITIAL_VERSION,goExecutable='go',goos=process.platform==='win32'?'windows':process.platform,goarch=process.arch==='x64'?'amd64':process.arch}){
+export async function buildGoNativeCandidate({destination,sourceDirectory=root,version=INITIAL_VERSION,goExecutable='go',goos=process.platform==='win32'?'windows':process.platform,goarch=process.arch==='x64'?'amd64':process.arch,macOSNotificationApp}){
  if(!isAbsolute(destination)||!isAbsolute(sourceDirectory)||typeof goExecutable!=='string'||!goExecutable.trim())throw Error('Absolute candidate/source and nonempty Go command required');
  if(!['windows','linux','darwin'].includes(goos)||!['amd64','arm64'].includes(goarch))throw Error('Unsupported Go Native candidate target');
+ if(macOSNotificationApp&&goos!=='darwin')throw Error('The macOS notification app belongs to a darwin candidate');
  componentRelease('client',version);
  const binary=goos==='windows'?'galaxy.exe':'galaxy';
  // mkdir without recursive/exist-ok protects every existing release directory.
@@ -68,21 +70,30 @@ export async function buildGoNativeCandidate({destination,sourceDirectory=root,v
   const contents=await readFile(source);await mkdir(dirname(join(destination,outputName)),{recursive:true});await writeFile(join(destination,outputName),contents,{flag:'wx'});
   sources[sourceName]=sha(contents);artifacts[outputName]=sha(contents);
  }
- for(const[source,output]of [['integrations/native-v2/skills/galaxy','skills/galaxy'],['integrations/native-v2/codex','host-templates/codex'],['integrations/native-v2/host-capabilities.json','host-capabilities.json']])await candidateAsset(source,output);
+ for(const[source,output]of [['integrations/native-v2/skills/galaxy','skills/galaxy'],['integrations/native-v2/codex','host-templates/codex'],['integrations/native-v2/host-capabilities.json','host-capabilities.json'],['integrations/host-adapters/shared','host-adapters/shared'],['integrations/host-adapters/codex/hook.mjs','host-adapters/codex/hook.mjs'],['integrations/host-adapters/claude-code/hook.mjs','host-adapters/claude-code/hook.mjs'],['integrations/host-adapters/hermes/plugin.yaml','host-adapters/hermes/plugin.yaml'],['integrations/host-adapters/hermes/__init__.py','host-adapters/hermes/__init__.py'],['integrations/host-adapters/deepseek-harness/index.mjs','host-adapters/deepseek-harness/index.mjs'],['integrations/host-adapters/opencode-stable/bridge/child-rpc.mjs','host-adapters/opencode-stable/bridge/child-rpc.mjs']])await candidateAsset(source,output);
  // The Go runtime resolves this fixed resource relative to os.Executable,
  // including when the Native candidate is nested inside a Go core candidate.
  // Copy here once so both callers hash and carry the same original bytes.
  const windowsNotificationHelper='notifications/windows-notify-icon.ps1';
  await candidateAsset('integrations/native-v2/notifications/windows-notify-icon.ps1',windowsNotificationHelper);
  for(const[name,contents]of Object.entries({
-  'README.md':'# Galaxy Go Native candidate\n\nThis local Go Native candidate includes setup, service-config and host-configs commands. Start MCP with the included galaxy binary and the native subcommand, using an explicitly selected GALAXY_NATIVE_CONFIG. OpenCode retains opencode.js as its host UI adapter. No Node business core is bundled.\n\nKeep notifications/windows-notify-icon.ps1 beside the executable in its notifications subdirectory. It is the unchanged original Windows helper; the runtime uses the explicitly configured absolute PowerShell command. Linux retains its original Python helper embedded in Go and requires the selected Python executable (default /usr/bin/python3); no Node notification module is required. macOS requires an explicitly configured signed GalaxyNotifications.app executable; this candidate does not build, sign, install or automatically select an App. These resources do not enable notifications or establish platform acceptance.\n\nThe included skills and host formats retain their original tool references; use the runtime tool list to identify supported actions. Existing host-capabilities.json observations belong to their recorded runtime/version, not this Go candidate. Real host and platform acceptance and migration completion remain pending; building this candidate does not change an installed host.\n',
+  'README.md':'# Galaxy Go Native candidate\n\nRun the included galaxy binary (galaxy.exe on Windows) with install to configure the current user and selected host; use --host when the current host cannot be identified. The same installer supports update, repair and uninstall, preserving existing data. Use --config or GALAXY_NATIVE_CONFIG for an existing service; without one, installation uses local-only mode. The included native and integration-mcp commands connect to the shared Go core. OpenCode uses opencode.js as its host UI adapter; no Node business core is bundled.\n\nKeep notifications/windows-notify-icon.ps1 beside the executable in its notifications subdirectory. It is the unchanged original Windows helper; the runtime uses the explicitly configured absolute PowerShell command. Linux retains its original Python helper embedded in Go and requires the selected Python executable (default /usr/bin/python3); no Node notification module is required. macOS uses an explicitly configured GalaxyNotifications.app executable; an optional prebuilt bundle can be staged without claiming signature, notarization or OS permission verification. This candidate does not sign, install or automatically select an App. These resources do not enable notifications or establish platform acceptance.\n\nThe included skills and host formats retain their original tool references; use the runtime tool list to identify supported actions. The host-capabilities.json file describes host formats and source adapters; it is not a runtime acceptance record. Real host and platform acceptance and migration completion remain separate; building this candidate does not change an installed host.\n',
   'HOSTS.md':'# Host configuration\n\nService Native uses the included platform binary, args ["native"], and the explicit GALAXY_NATIVE_CONFIG path. Local-only Integration uses args ["integration-mcp", "--data-dir", "ABSOLUTE_PATH"] without a service configuration; it does not expose service tools or start uploads. OpenCode uses a thin host adapter and a private Go host channel for local persistence; model calls remain with the selected host SDK. The Go installer generates only the chosen host configuration. Static skills and host templates are included; historical host observations do not establish current Go acceptance.\n'
  })){await writeFile(join(destination,name),contents,{flag:'wx'});artifacts[name]=sha(contents);}
  for(const name of ['LICENSE','NOTICE'])await candidateAsset('integrations/native-v2/legal/'+name,name);
  for(const [name,digest] of Object.entries(goLicenses.files))artifacts[name]=digest;
  sources['scripts/build-native-v2.mjs']=sha(await readFile(join(sourceDirectory,'scripts/build-native-v2.mjs')));
  sources['scripts/go-native-licenses.mjs']=sha(await readFile(join(sourceDirectory,'scripts/go-native-licenses.mjs')));
+ sources['integrations/native-v2/notifications/macos-helper/stage-bundle.mjs']=sha(await readFile(join(sourceDirectory,'integrations/native-v2/notifications/macos-helper/stage-bundle.mjs')));
  const platformResources={windows:{helper:windowsNotificationHelper,command:'explicit-absolute-PowerShell'},linux:{helper:'embedded-original-Python',command:'configured-Python-or-/usr/bin/python3'},darwin:{helper:'externally-configured-signed-GalaxyNotifications.app',bundled:false},platformAcceptance:'pending'};
+ if(macOSNotificationApp){
+  const {artifacts:helperArtifacts,...helper}=await stageMacOSNotificationBundle({source:macOSNotificationApp,destination});
+  Object.assign(artifacts,helperArtifacts);
+  platformResources.darwin={...helper,bundled:true};
+  const readmePath=join(destination,'README.md');
+  const readme=(await readFile(readmePath,'utf8'))+'\nA prebuilt notifications/GalaxyNotifications.app is included in this candidate. Configure its installed absolute command when using notifications. Its original bundle bytes are preserved; resource presence does not establish signature, notarization or desktop acceptance.\n';
+  await writeFile(readmePath,readme);artifacts['README.md']=sha(readme);
+ }
  const manifest={version:2,kind:'galaxy-native-go-local-candidate',component:'client',releaseId:version,backend:'go',target:{goos,goarch},compiler:compiler.trim(),builder:'esbuild '+esbuildVersion,mcp:{command:binary,args:['native']},hostPersistence:{command:binary,args:['host'],transport:'private-jsonl'},artifacts,dependencyResolution,sourceFiles:Object.keys(sources).length,platformResources,publicRelease:false,defaultInstallationChanged:false,migrationComplete:false,hostAcceptance:'pending',modelProvider:'user-host',containsPrivateKeys:false,containsConfiguredAuthority:false};
  const pkg={name:'@galaxy/native-go-candidate',version,private:true,type:'module',license:'Apache-2.0',engines:{node:'>=22.13.0'},exports:{'./opencode':'./opencode.js'},dependencies};
  for(const[name,value]of Object.entries({'package.json':pkg,'native-v2.json':manifest,'source-hashes.json':sources}))await writeFile(join(destination,name),JSON.stringify(value,null,2)+'\n',{flag:'wx'});
@@ -92,7 +103,7 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const input=process.argv.slice(2),options={goExecutable:process.env.GALAXY_BUILD_GO??'go'};
  if(input[0]&&!input[0].startsWith('--'))options.destination=input.shift();
  if(input[0]&&!input[0].startsWith('--'))options.sourceDirectory=input.shift();
- const flags={'--output':'destination','--source':'sourceDirectory','--go':'goExecutable','--version':'version','--goos':'goos','--goarch':'goarch'};
- while(input.length){const flag=input.shift();if(!flags[flag]||!input.length||input[0].startsWith('--'))throw Error('Usage: node scripts/build-native-v2.mjs ABS_NEW [ABS_SOURCE] [--go COMMAND_OR_ABS_GO] [--version VERSION] [--goos windows|linux|darwin] [--goarch amd64|arm64]');options[flags[flag]]=input.shift();}
+ const flags={'--output':'destination','--source':'sourceDirectory','--go':'goExecutable','--version':'version','--goos':'goos','--goarch':'goarch','--macos-notification-app':'macOSNotificationApp'};
+ while(input.length){const flag=input.shift();if(!flags[flag]||!input.length||input[0].startsWith('--'))throw Error('Usage: node scripts/build-native-v2.mjs ABS_NEW [ABS_SOURCE] [--go COMMAND_OR_ABS_GO] [--version VERSION] [--goos windows|linux|darwin] [--goarch amd64|arm64] [--macos-notification-app ABS_APP]');options[flags[flag]]=input.shift();}
  console.log(JSON.stringify(await buildGoNativeCandidate(options)));
 }

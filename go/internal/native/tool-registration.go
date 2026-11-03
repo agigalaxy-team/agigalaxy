@@ -30,6 +30,7 @@ func addNativeTool(server *mcp.Server, tool *mcp.Tool, invalidCode string, handl
 	var published map[string]any
 	if json.Unmarshal(b, &published) == nil {
 		projectToolObjectFields(published)
+		projectModelToolSchema(published)
 		tool.InputSchema = published
 	}
 	server.AddTool(tool, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {

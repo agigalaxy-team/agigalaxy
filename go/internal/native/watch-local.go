@@ -170,11 +170,7 @@ func (h *NativeWatch) StartReviewed(ctx context.Context, l *nativeIdentityLease,
 		return nil, watchFailure("watch_current_binding_grant_required")
 	}
 	if !present {
-		at := h.now() + 86400
-		if at > integer(grant["expiresAt"]) {
-			at = integer(grant["expiresAt"])
-		}
-		expires = at
+		expires = integer(grant["expiresAt"])
 	}
 	if integer(expires) <= h.now() {
 		return nil, watchFailure("watch_expired")

@@ -14,13 +14,15 @@
 
 房间分享另选具体片段和当前可读来源版本，明确接收范围。私人摘要更新不会自动覆盖已分享版本。来源失效后重新核对当前可读部分，撤回正文、外部消息清理与物理归档删除分别记录，未知清理不称永久删除。取得历史接受回执不能判断别人读过或仍能读取。
 
+本机原会话原件与房间摘要分开：使用 `galaxy_local_archive_settings` 查看选择，`galaxy_local_archive_configure` 按实际 schema 让本人选择准确的宿主和会话后，再用 `galaxy_local_archive_list/export` 阅读实际采到的记录。上传是另一项选择；已选原件仍可能只有部分实际记录，不能称完整重建。宿主观察或原件采集是否运行，以当前宿主接线和实际结果分别判断。
+
 ## 可选 Agent 权限与持续关注
 
 通过 `galaxy_chat_agent_grants` 检查当前连接授权，新增权限用 grant，撤销用 revoke。read、draft、respond 与主要响应者各按实际授予范围；权限存在不等于宿主模型已运行。用户未选择参与或缺后台能力时继续原聊天，不自行补后台程序。
 
-用户选定房间、目的、当前 Agent grant 和结束条件后使用 `galaxy_watch_start`。默认按需；普通关注建议 24 小时，长期需明确选择。宿主按实际 nextCheckAt 调度 `galaxy_watch_check`；常规 15 分钟只查变化，错误按返回的退避执行，不把轮询当模型会话。无变化零模型调用，有变化才由用户 Agent 在当前授权范围处理。真实完成后才用原 workId ACK Agent 游标，不写人类已读。
+按用户当前目的使用实际可用的 `galaxy_watch_start/check/status/ack/pause/resume/stop`，不要求先建专用子会话或进菜单。新关注使用当前房间、Agent grant 和用途，期限按实际委托及工具 schema 填写；程序返回的 nextCheckAt/退避用于变化读取，不能替代 Agent 判断工作何时完成。处理完对应材料后使用原 workId ACK Agent 游标，不写人类已读；房间 read/draft/respond 沿当前 grant 执行。
 
-有 `galaxy_watch_host_capabilities` 时先核当前可信配置与有效 reader 限制；能力检查不创建模型 turn。用户明确选择配置的宿主和模型后才用 `galaxy_watch_host_activate`；不能用 CLI 存在、模型列表或协议替身测试宣称实际模型运行。未知宿主工作先用 `galaxy_watch_host_reconcile` 查原 thread/turn/work，不另开推理猜结果。没有可用 driver 时保留前台方式。
+`galaxy_watch_host_capabilities/activate/reconcile` 是已有专用分析执行的可选兼容能力，不是普通Agent读取、参与或持续工作的前置步骤。只在该用途实际需要时使用；旧只读分析不自动扩大为其他任务。原执行结果未知时查询原thread/turn/work，不另开模型猜结果；没有该driver仍可用完整普通MCP工具处理。
 
 暂停先停银河新工作并撤销精确 grant，再按宿主实际能力取消在途子会话；取消请求、确认终止和未知分别报告。恢复使用 `galaxy_watch_resume` 选择新当前 grant 与期限，不复用旧 binding。结束或撤销调用 stop，并核对宿主实际停止；stdio/宿主关闭后银河不会在云端接替模型。关闭界面不等于业务取消，暂停 HelpSession 也不等于暂停 Watch。
 

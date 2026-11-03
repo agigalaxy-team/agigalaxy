@@ -187,6 +187,21 @@ func (p *PrivateSync) run(ctx context.Context) (retry, active bool) {
 	}
 	return false, true
 }
+
+// acquirePrivateSync shares one writer turn between scheduled and explicit flushes.
+func (r *Runtime) acquirePrivateSync(ctx context.Context) (func(), error) {
+	p := r.privateSync
+	if p == nil {
+		return func() {}, nil
+	}
+	select {
+	case p.serial <- struct{}{}:
+		return func() { <-p.serial }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
 func (p *PrivateSync) OnSessionComplete(ctx context.Context, host, sessionID string) (any, error) {
 	if !validID(host) || !validID(sessionID) {
 		return nil, connectionFailure("work_sync_input_invalid")
@@ -209,12 +224,11 @@ func (p *PrivateSync) process(ctx context.Context, host, sessionID string) (any,
 		return nil, e
 	}
 	defer cancel()
-	select {
-	case p.serial <- struct{}{}:
-		defer func() { <-p.serial }()
-	case <-operation.Done():
-		return nil, operation.Err()
+	release, e := p.runtime.acquirePrivateSync(operation)
+	if e != nil {
+		return nil, e
 	}
+	defer release()
 	selected, e := p.runtime.connection.selection(operation)
 	if e != nil {
 		return nil, e
@@ -246,7 +260,7 @@ func (p *PrivateSync) process(ctx context.Context, host, sessionID string) (any,
 	results := []any{}
 	if wc["enabled"] == true {
 		if host == "" {
-			v, e := work.Flush(operation, "")
+			v, e := work.flush(operation, "")
 			if e != nil {
 				return nil, e
 			}
@@ -258,7 +272,7 @@ func (p *PrivateSync) process(ctx context.Context, host, sessionID string) (any,
 			}
 			if record != nil {
 				id := text(uploadObject(uploadObject(record)["work"])["workId"])
-				v, e := work.Flush(operation, id)
+				v, e := work.flush(operation, id)
 				if e != nil {
 					return nil, e
 				}
@@ -268,7 +282,7 @@ func (p *PrivateSync) process(ctx context.Context, host, sessionID string) (any,
 	}
 	if ac["enabled"] == true {
 		if host == "" {
-			v, e := archive.Flush(operation, "")
+			v, e := archive.flush(operation, "")
 			if e != nil {
 				return nil, e
 			}
@@ -281,7 +295,7 @@ func (p *PrivateSync) process(ctx context.Context, host, sessionID string) (any,
 				}
 				session := uploadObject(snapshot)
 				if session["host"] == host && session["sessionId"] == sessionID {
-					v, e := archive.Flush(operation, id)
+					v, e := archive.flush(operation, id)
 					if e != nil {
 						return nil, e
 					}

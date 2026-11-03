@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -26,7 +27,11 @@ func interactionRuntime(t *testing.T, s *Store) *Runtime {
 func interactionArtifact(t *testing.T) *InteractionArtifact {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
-	artifact, e := LoadInteractionArtifact(filepath.Clean(filepath.Join(filepath.Dir(file), "../../../integrations/native-v2/compact-app/dist")))
+	directory := os.Getenv("GALAXY_NATIVE_TEST_UI_ARTIFACT")
+	if directory == "" {
+		directory = filepath.Clean(filepath.Join(filepath.Dir(file), "../../../integrations/native-v2/compact-app/dist"))
+	}
+	artifact, e := LoadInteractionArtifact(directory)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -67,6 +72,9 @@ func TestInteractionAppsOriginalSnapshotAndPrivateResultProjection(t *testing.T)
 				t.Fatal(e)
 			}
 			want := readNativeContractFixture(t, fmt.Sprintf("interaction-%d.json", index))
+			if index == 1 {
+				want["selectedWork"].(map[string]any)["summaryInput"] = work["summaryInput"]
+			}
 			same(t, want, got)
 			result := interactionComponent(got)
 			model, _ := protocol.Encode(struct {

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var installationDependencyName = regexp.MustCompile(`(?i)^(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$`)
+var installationDependencyName = regexp.MustCompile(`(?i)^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$`)
 
 type installationDependency struct {
 	Directory    string

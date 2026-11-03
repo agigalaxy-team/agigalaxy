@@ -5,7 +5,6 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -37,7 +36,7 @@ func installationFixturePackage(t *testing.T) string {
 	if e != nil {
 		t.Fatal(e)
 	}
-	for name, value := range map[string]string{"galaxy.exe": "synthetic binary fixture", "galaxy": "synthetic binary fixture", "galaxy.js": "// original fixture only", "opencode.js": "export function createNativeGalaxyPlugin(options){return options}", "HOSTS.md": "Original-format isolated host instructions", "host-capabilities.json": string(matrix), "package.json": `{"name":"isolated-candidate","dependencies":{}}`} {
+	for name, value := range map[string]string{"galaxy.exe": "synthetic binary fixture", "galaxy": "synthetic binary fixture", "opencode.js": "export function createNativeGalaxyPlugin(options){return options}", "HOSTS.md": "Original-format isolated host instructions", "host-capabilities.json": string(matrix), "package.json": `{"name":"isolated-candidate","dependencies":{}}`} {
 		if e = os.WriteFile(filepath.Join(dir, name), []byte(value), 0700); e != nil {
 			t.Fatal(e)
 		}
@@ -47,7 +46,7 @@ func installationFixturePackage(t *testing.T) string {
 	}
 	return dir
 }
-func TestHostConfigurationNineFormatsAndOriginalAssets(t *testing.T) {
+func TestHostConfigurationSelectedFormatsAndOriginalAssets(t *testing.T) {
 	ctx := context.Background()
 	pkg := installationFixturePackage(t)
 	root := t.TempDir()
@@ -64,10 +63,10 @@ func TestHostConfigurationNineFormatsAndOriginalAssets(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if result["hostCount"] != 9 || result["actualSettingsModified"] != false {
+	if result["hostCount"] != len(hosts) || result["actualSettingsModified"] != false {
 		t.Fatal(result)
 	}
-	paths := []string{"claude-code/.mcp.json", "claude-desktop-chat/claude_desktop_config.fragment.json", "cursor/.cursor/mcp.json", "workbuddy/galaxy-native-v2/mcp.json", "trae-work/mcp.local.json", "codex/galaxy-native-v2/.mcp.json"}
+	paths := []string{"claude-code/.mcp.json", "claude-desktop-chat/claude_desktop_config.fragment.json", "cursor/.cursor/mcp.json", "workbuddy/galaxy-native-v2/mcp.json", "trae-work/mcp.local.json", "codex/galaxy-native-v2/.mcp.json", "copilot-cli/mcp-config.json"}
 	for _, path := range paths {
 		var value map[string]any
 		if _, e = readJSON(filepath.Join(input.Destination, filepath.FromSlash(path)), &value); e != nil {
@@ -76,6 +75,9 @@ func TestHostConfigurationNineFormatsAndOriginalAssets(t *testing.T) {
 		spec := uploadObject(uploadObject(value["mcpServers"])["galaxy"])
 		if spec["command"] != filepath.Join(pkg, "galaxy.exe") || !connectionEqual(spec["args"], []string{"native"}) {
 			t.Fatal("wrong Go command", path, spec)
+		}
+		if path == "copilot-cli/mcp-config.json" && !connectionEqual(spec["tools"], []string{"*"}) {
+			t.Fatal("wrong Copilot CLI tools", spec)
 		}
 	}
 	for _, path := range []string{"opencode/opencode.json", "copilot-vscode/.vscode/mcp.json", "deepseek-harness/mcp-plugin.fragment.json", "codex/config.fragment.toml", "hermes/config.fragment.yaml"} {
@@ -87,33 +89,12 @@ func TestHostConfigurationNineFormatsAndOriginalAssets(t *testing.T) {
 	if _, e = GenerateHostConfigurations(ctx, input); !os.IsExist(e) {
 		t.Fatal("existing output overwritten", e)
 	}
-	// Original JS retains the same asset formats; it runs only against this
-	// disposable source package with an explicitly synthetic old entry.
-	if e = writeJSON(filepath.Join(pkg, "native-v2.json"), map[string]any{"kind": "galaxy-native-v2-local-candidate"}); e != nil {
-		t.Fatal(e)
-	}
-	oldDestination := filepath.Join(root, "original")
-	initializationNode(t, `import {generateHostConfigs} from './integrations/native-v2/host-configs.mjs';console.log(JSON.stringify(await generateHostConfigs({packageDirectory:process.argv[1],configPath:process.argv[2],destination:process.argv[3],hosts:['opencode','claude-code','github-copilot','codex','cursor','workbuddy','trae-desktop','hermes','deepseek-harness'],dataDirectory:process.argv[4],endpoint:'https://api.configuration.invalid'})));`, pkg, config, oldDestination, input.DataDirectory)
 	for _, path := range []string{"workbuddy/galaxy-native-v2/connector-meta.json", "workbuddy/galaxy-native-v2/icon.svg", "codex/galaxy-native-v2/.codex-plugin/plugin.json", "INSTALL.md", "opencode/.agents/skills/galaxy/SKILL.md"} {
-		got, e := os.ReadFile(filepath.Join(input.Destination, filepath.FromSlash(path)))
-		if e != nil {
-			t.Fatal(e)
-		}
-		original, e := os.ReadFile(filepath.Join(oldDestination, filepath.FromSlash(path)))
-		if e != nil {
-			t.Fatal(e)
-		}
-		if strings.HasSuffix(path, ".json") {
-			var a, b any
-			if protocolDecode(got, &a) != nil || protocolDecode(original, &b) != nil || !connectionEqual(a, b) {
-				t.Fatal("original asset differs", path)
-			}
-		} else if string(got) != string(original) {
-			t.Fatal("original asset differs", path)
+		if _, e := os.Stat(filepath.Join(input.Destination, filepath.FromSlash(path))); e != nil {
+			t.Fatal("generated host asset missing", path, e)
 		}
 	}
 }
-func protocolDecode(raw []byte, value any) error { return protocol.Decode(raw, value) }
 
 func TestHostConfigurationOriginalDefaultHosts(t *testing.T) {
 	pkg := installationFixturePackage(t)
@@ -123,11 +104,27 @@ func TestHostConfigurationOriginalDefaultHosts(t *testing.T) {
 		t.Fatal(e)
 	}
 	result, e := GenerateHostConfigurations(context.Background(), HostConfigurationInput{PackageDirectory: pkg, ConfigPath: config, Destination: filepath.Join(root, "generated")})
-	if e != nil || result["hostCount"] != 8 {
+	if e != nil || result["hostCount"] != len(HostConfigurationOptions())-1 {
 		t.Fatal(result, e)
 	}
 	if _, e = os.Stat(filepath.Join(root, "generated", "opencode")); !os.IsNotExist(e) {
 		t.Fatal("default implicitly chose OpenCode")
+	}
+	for _, host := range []struct{ path, key, skill string }{
+		{"copilot-vscode/.vscode/mcp.json", "servers", "copilot-vscode/.github/skills/galaxy/SKILL.md"},
+		{"copilot-cli/mcp-config.json", "mcpServers", "copilot-cli/.copilot/skills/galaxy/SKILL.md"},
+	} {
+		var value map[string]any
+		if present, err := readJSON(filepath.Join(root, "generated", filepath.FromSlash(host.path)), &value); err != nil || !present {
+			t.Fatal("Copilot configuration missing", host.path, err)
+		}
+		spec := uploadObject(uploadObject(value[host.key])["galaxy"])
+		if spec["command"] != filepath.Join(pkg, "galaxy.exe") || !connectionEqual(spec["args"], []string{"native"}) {
+			t.Fatal("wrong Copilot command", host.path, spec)
+		}
+		if _, err := os.Stat(filepath.Join(root, "generated", filepath.FromSlash(host.skill))); err != nil {
+			t.Fatal("Copilot Skill missing", host.skill, err)
+		}
 	}
 }
 
@@ -214,7 +211,7 @@ func TestHostConfigurationJSONCPreservesOtherSettingsAndRejectsChangedReview(t *
 		}
 	}
 }
-func TestInstallationDeclineAndActualTemporaryOpenCodePreparation(t *testing.T) {
+func TestInstallationPreviewServiceConfiguration(t *testing.T) {
 	ctx := context.Background()
 	pkg := installationFixturePackage(t)
 	root := t.TempDir()
@@ -235,35 +232,13 @@ func TestInstallationDeclineAndActualTemporaryOpenCodePreparation(t *testing.T) 
 	if e != nil {
 		t.Fatal(e)
 	}
-	if result, e := PrepareNativeInstallationReviewed(ctx, plan, "", false); e != nil || result["canceled"] != true {
-		t.Fatal(result, e)
+	if plan.Endpoint != "https://api.configuration.invalid" || !plan.NormalStartupConfigured || transport.requests != 1 {
+		t.Fatal(plan, transport.requests)
 	}
 	for _, path := range []string{input.DataDirectory, input.Destination, input.OpenCodeConfigDirectory} {
 		if _, e = os.Stat(path); !os.IsNotExist(e) {
-			t.Fatal("preview or decline created data", path)
+			t.Fatal("preview created data", path, e)
 		}
-	}
-	result, e := PrepareNativeInstallationReviewed(ctx, plan, "organization", true)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if result["prepared"] != true || result["identityCreated"] != true || result["connected"] != false || result["normalStartupConfigured"] != true || transport.requests != 1 {
-		t.Fatal(result, transport.requests)
-	}
-	store, e := NewStore(input.DataDirectory, "https://api.configuration.invalid")
-	if e != nil {
-		t.Fatal(e)
-	}
-	snapshot, e := store.LocalSnapshot(ctx)
-	if e != nil || uploadObject(snapshot["identity"])["subjectType"] != "organization" || uploadObject(uploadObject(snapshot["state"])["integration"])["modules"] == nil {
-		t.Fatal("not prepared local work", e)
-	}
-	if _, e = os.Stat(filepath.Join(input.DataDirectory, "native-v2")); !os.IsNotExist(e) {
-		t.Fatal("installation created Native binding")
-	}
-	plugin, e := os.ReadFile(filepath.Join(input.OpenCodeConfigDirectory, "galaxy-native.tui.mjs"))
-	if e != nil || !strings.Contains(string(plugin), `"backend":"go"`) || strings.Contains(string(plugin), "galaxy.js") {
-		t.Fatal("installed plugin uses old core", e)
 	}
 }
 
@@ -287,12 +262,15 @@ func TestInstallationHoistedThinHostDependenciesAndOriginalScope(t *testing.T) {
 	if e := writeJSON(filepath.Join(pkg, "package.json"), map[string]any{"name": "candidate", "dependencies": map[string]string{"thin-host": "1.0.0"}}); e != nil {
 		t.Fatal(e)
 	}
-	target, e := installationCopyPackage(pkg, filepath.Join(t.TempDir(), "host"))
-	if e != nil {
+	target := filepath.Join(t.TempDir(), "host")
+	if e := hostCopyTree(pkg, target); e != nil {
+		t.Fatal(e)
+	}
+	if e := installationCaptureDependencies(pkg, target); e != nil {
 		t.Fatal(e)
 	}
 	for _, path := range []string{"node_modules/thin-host/package.json", "node_modules/thin-host/node_modules/helper/package.json"} {
-		if e = hostFile(filepath.Join(target, filepath.FromSlash(path))); e != nil {
+		if e := hostFile(filepath.Join(target, filepath.FromSlash(path))); e != nil {
 			t.Fatal("thin graph not captured", path, e)
 		}
 	}
@@ -308,13 +286,8 @@ func TestInstallationHoistedThinHostDependenciesAndOriginalScope(t *testing.T) {
 	if _, e = store.InitializeLocalIdentity(ctx, "person", true, &scope); e != nil {
 		t.Fatal(e)
 	}
-	destination := filepath.Join(t.TempDir(), "pending-install")
-	plan := &NativeInstallationPlan{input: NativeInstallationInput{DataDirectory: store.Directory, Destination: destination, PackageDirectory: pkg, SubjectType: "person"}, scope: scope, service: &ServiceConfigurationInspection{Endpoint: store.Endpoint}}
-	if _, e = PrepareNativeInstallationReviewed(ctx, plan, "", true); e == nil {
+	if e = store.With(ctx, false, func(dir string) error { return store.verifyChoiceWithin(dir, &scope) }); e == nil {
 		t.Fatal("old parent choice accepted")
-	}
-	if _, e = os.Stat(destination); !os.IsNotExist(e) {
-		t.Fatal("old scope wrote install")
 	}
 	normal, e := OpenCodeConfigurationDirectory(map[string]string{"OPENCODE_CONFIG_DIR": filepath.Join(parent, "explicit")}, parent)
 	if e != nil || normal != filepath.Join(parent, "explicit") {

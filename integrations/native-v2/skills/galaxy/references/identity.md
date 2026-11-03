@@ -6,9 +6,11 @@
 
 银河 ID 只由已安装的本机银河创建。没有本机身份时，先用 `galaxy_native_initialize_preview` 核对本机准备，再由 `galaxy_native_initialize` 的真实用户选择创建；已有 ID 则沿用。`galaxy_native_connect` 单独处理所选服务的连接。插件提供身份、数据与工具接入，模型由用户自己的 AI 宿主配置；官方不提供模型推理，插件接通也不证明模型可用。
 
+初始化预览和执行使用同一组实际选择：`initializationPath`、`profile`、`subjectType`、`modules` 和 `uploadPrivacy` 均按当前 schema 与本人选择填写；不需要的字段可采用工具实际默认。初始化只准备本机，连接所选服务、官网账户关联和材料上传分别处理。缺少工具或宿主接入时，可使用当前包提供的安装、修复入口及其实际帮助，保留原身份和资料目录。
+
 ## 从本机关联银河官方账户
 
-只有实际工具列表包含 `galaxy_identity_account_read`、`galaxy_identity_account_prepare`、`galaxy_identity_account_execute` 时才使用此流程。先用 read 的 `action: 'providers'` 取得当前服务真实的账户入口，再用 `action: 'begin'` 和实际 providerId 准备登录。把返回的授权网址交给用户；登录本身不会关联 ID。
+只有实际工具列表包含 `galaxy_identity_account_read`、`galaxy_identity_account_prepare`、`galaxy_identity_account_execute` 时才使用此流程。查询已有绑定用 read 的 `action: 'query'`；返回条目的 `id` 是绑定记录编号，`externalSubject` 才是发行服务中的账户标识，二者与本机 GUID 分开。新登录时先用 read 的 `action: 'providers'` 取得当前服务真实的账户入口，再用 `action: 'begin'` 和实际 providerId 准备登录。把返回的授权网址交给用户；登录本身不会关联 ID。
 
 用 read 的 `action: 'status'` 与原 loginId 核对结果。状态为 `awaiting-local-signature` 后，用 prepare 的 `action: 'link'` 与该 id 取得完整预览，再调用 execute 并传原 previewId，让用户在宿主表单或临时本机审阅页明确允许。核对刚才实际登录的账户与当前 ID；不要用模型填写的 confirmed 代替选择，也不要拿普通网页接续证明当账户关联签名。
 
@@ -26,7 +28,7 @@
 
 工具打开临时本机确认页，由用户进入配置中的固定官网。官网准备自己的设备钥，原设备在本机页显示同一GUID、精确设备和用途后，由用户明确批准。不要替用户点击批准，也不要补造confirmed字段。关闭、过期或窗口被阻止都不表示已批准；临时本地页不变成第二套云服务。
 
-消息只包含限定用途公开证明、设备申请、批准及有限回执，绑定本次窗口、来源、随机值与原导航。握手有效期为180秒；已经完成的持久身份使用仍由当前设备控制和权限决定，不每隔180秒要求重新连接。
+消息只包含限定用途公开证明、设备申请、批准及有限回执，绑定本次窗口、来源、随机值与原导航。握手使用工具返回的有效期；已经完成的持久身份使用仍由当前设备控制和权限决定，不按握手时限周期性重新连接。
 
 ## 处理已有设备、草稿与未知结果
 
@@ -44,6 +46,6 @@
 
 ## 回到同一工作
 
-网页动作结束后用原navigationId调用 `galaxy_return`，刷新同一对象。返回、取消页面或打开方法都不自动提交任务、不取消原承诺，也不形成成功履历。按实际回执说明取得什么、尚缺什么；未知操作和当前材料访问分别处理。
+网页动作结束后用原navigationId调用 `galaxy_return`，刷新同一对象；用户提供官网接续链接时用 `galaxy_work_continue` 读取所选资料，在原聊天继续处理。返回、取消页面或打开方法都不自动提交任务、不取消原承诺，也不形成成功履历。按实际回执说明取得什么、尚缺什么；未知操作和当前材料访问分别处理。
 
 工具或宿主窗口能力缺失时说明当前限制，保留已可用的原生设备授权、普通MCP、网页对象页和原聊天路径。不要临时安装后台、生成替代身份、向任意地址发消息或声称具有未经验证的嵌入界面。

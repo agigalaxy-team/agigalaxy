@@ -1,6 +1,7 @@
 package native
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -121,6 +122,21 @@ func TestRuntimeFactoryHelpWebPreviewPanelLocalBatch(t *testing.T) {
 	}
 	const draft = "synthetic device-only draft must not enter model context"
 	result, model := call("galaxy_panel_draft_save", map[string]any{"viewId": viewID, "expectedRevision": 0, "draft": draft})
+	if len(result.Content) != 1 {
+		t.Fatalf("panel result missing model JSON: %#v", result.Content)
+	}
+	modelText, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatal("panel model JSON is not text")
+	}
+	encodedModel, e := protocol.Encode(result.StructuredContent)
+	if e != nil || !bytes.Equal(encodedModel, []byte(modelText.Text)) {
+		t.Fatal("panel model JSON differs from structured content")
+	}
+	var contentModel map[string]any
+	if e = protocol.Decode([]byte(modelText.Text), &contentModel); e != nil || text(contentModel["viewId"]) != viewID {
+		t.Fatalf("panel model JSON lost view reference: %v %#v", e, contentModel)
+	}
 	visible, e := protocol.Encode(map[string]any{"content": result.Content, "structuredContent": result.StructuredContent})
 	if e != nil {
 		t.Fatal(e)
@@ -183,5 +199,43 @@ func TestRuntimeFactoryHelpWebPreviewPanelLocalBatch(t *testing.T) {
 	}
 	if _, e = os.Stat(file); e != nil {
 		t.Fatal("Close deleted the persisted original Help record", e)
+	}
+}
+
+func TestPanelToolResultComponentPrivacy(t *testing.T) {
+	data := panelMap{
+		"viewId": "view-1", "sessionId": "session-1",
+		"draft":      panelMap{"text": "private-draft", "revision": 2},
+		"replyDraft": panelMap{"text": "private-reply", "revision": 3},
+		"preview":    panelMap{"operationId": "operation-1", "payloadHash": "hash-1", "exact": "private-preview"},
+		"choice":     panelMap{"state": "pending", "operation": "review", "text": "private-choice"},
+	}
+	result := panelToolResult(data, nil)
+	if result.IsError || len(result.Content) != 1 {
+		t.Fatalf("unexpected panel result: %#v", result)
+	}
+	content, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatal("model JSON is not text")
+	}
+	encoded, err := protocol.Encode(result.StructuredContent)
+	if err != nil || !bytes.Equal(encoded, []byte(content.Text)) {
+		t.Fatal("content JSON differs from structured projection")
+	}
+	var model map[string]any
+	if err = protocol.Decode([]byte(content.Text), &model); err != nil {
+		t.Fatal(err)
+	}
+	if model["viewId"] != "view-1" || model["sessionId"] != "session-1" || psObject(model["preview"])["operationId"] != "operation-1" || psObject(model["preview"])["payloadHash"] != "hash-1" {
+		t.Fatalf("content JSON lost references: %#v", model)
+	}
+	for _, private := range []string{"private-draft", "private-reply", "private-preview", "private-choice"} {
+		if strings.Contains(content.Text, private) {
+			t.Fatal("private component content entered model JSON")
+		}
+	}
+	component := psObject(result.Meta["galaxyPanel"])
+	if psObject(component["draft"])["text"] != "private-draft" || psObject(component["replyDraft"])["text"] != "private-reply" || psObject(component["preview"])["exact"] != "private-preview" || psObject(component["choice"])["text"] != "private-choice" {
+		t.Fatal("component lost private content")
 	}
 }

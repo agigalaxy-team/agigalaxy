@@ -19,7 +19,7 @@ export function AgentWorkContinuation({runtime,subjectId,object,title,purpose='�
  const nativeWindow=useSyncExternalStore(subscribeLocalGalaxyWindow,hasLocalGalaxyWindow,()=>false);
  const [feedback,setFeedback]=useState<Feedback|null>(null),[working,setWorking]=useState<string|null>(null),life=useRef({active:false,sequence:0}),inFlight=useRef<string|null>(null);
  useEffect(()=>{const lifecycle=life.current;lifecycle.active=true;return()=>{lifecycle.active=false;lifecycle.sequence++;};},[]);
- const destination=returnTo??window.location.pathname+window.location.search+window.location.hash;
+ const destination=returnTo??(typeof window==='undefined'?'':window.location.pathname+window.location.search+window.location.hash);
  const key=JSON.stringify([runtime?.api.endpoint,subjectId,object,selectedMaterials,destination,purpose]),currentKey=useRef(key);useLayoutEffect(()=>{currentKey.current=key;},[key]);
  const shown=feedback?.key===key?feedback:null;
  async function copy(){
@@ -36,7 +36,7 @@ export function AgentWorkContinuation({runtime,subjectId,object,title,purpose='�
    const request=workContinuationPrompt(title,purpose,link);if(!current())return;
    try{await navigator.clipboard.writeText(request);if(current())setFeedback({key,notice:'已复制，回到自己的 AI 对话发送即可。',request,manual:false,error:false});}
    catch{if(current())setFeedback({key,notice:'请复制请求，回到自己的 AI 对话发送。',request,manual:true,error:false});}
-  }catch{if(current())setFeedback({key,notice:'暂时无法准备这次接续。原页面和选择仍保留，请核对当前连接后再试。',request:'',manual:false,error:true});}
+  }catch{if(current())setFeedback({key,notice:'暂时无法接续，请稍后再试。',request:'',manual:false,error:true});}
   finally{if(lifecycle.active&&ticket===lifecycle.sequence){inFlight.current=null;setWorking(null);}}
  }
  const identityReady=!!runtime&&!!subjectId&&runtime.api.snapshot()?.subjectId===subjectId;

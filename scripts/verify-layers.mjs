@@ -14,7 +14,7 @@ export function catalog(env = process.env) {
     { id: 'go-hub', args: ['scripts/check-go.mjs', 'hub'], scope: 'Current Go Hub regressions; isolated database checks require GALAXY_GO_TEST_PG_BIN' },
     { id: 'go-native', args: ['scripts/check-go.mjs', 'native-client'], scope: 'Current Go Native/local-data regressions; real host installation remains separate' },
     { id: 'proxy', args: ['--test', 'packages/galaxy-official/deploy/test/caddy-candidate.test.mjs', 'packages/galaxy-official/deploy/test/website-deployment-routes.test.mjs'], prerequisite: env.GALAXY_TEST_CADDY_BIN },
-    { id: 'tls', args: ['--test', 'packages/galaxy-official/deploy/test/tls/public-tls.test.mjs'], prerequisite: env.GALAXY_TEST_OPENSSL_BIN },
+    { id: 'transport', args: ['scripts/check-go.mjs', 'transport'], scope: 'Current Go public and peer request boundary checks' },
     { id: 'client-install', args: ['scripts/test-client-install.mjs'], prerequisite: npmCli },
     { id: 'web-build', args: [npmCli, 'run', 'build'], prerequisite: npmCli },
   ];
@@ -62,7 +62,7 @@ export function outcome(layers) {
 async function main() {
   const layers = catalog();
   if (process.argv.length !== 3 || !process.argv[2].startsWith('--layers='))
-    throw new Error('Usage: node scripts/verify-layers.mjs --layers=all|fast,tls,...');
+    throw new Error('Usage: node scripts/verify-layers.mjs --layers=all|fast,transport,...');
   const value = process.argv[2].slice(9);
   const selected = value === 'all' ? layers.map(row => row.id) : value.split(',');
   if (!selected.length || new Set(selected).size !== selected.length || selected.some(id => !layers.some(row => row.id === id)))

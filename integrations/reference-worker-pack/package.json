@@ -1,0 +1,12 @@
+{
+  "name": "@galaxy/reference-worker-pack",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.13.0"
+  },
+  "dependencies": {
+    "@a2a-js/sdk": "1.1.0"
+  }
+}

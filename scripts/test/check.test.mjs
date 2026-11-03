@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 test('JS discovery runs current contracts and UI tests, preserves failures and excludes retired service/core tests', async () => {
   const root = await mkdtemp(join(tmpdir(), 'galaxy-check-runner-'));
   try {
-    for (const path of ['scripts/test', 'scripts/checks', 'packages/galaxy-contracts/test', 'packages/galaxy-a2a/test',
+    for (const path of ['scripts/test', 'scripts/checks', 'packages/galaxy-contracts/test',
       'packages/galaxy-web/test', 'packages/galaxy-client/test', 'packages/galaxy-edge-mcp/test', 'packages/galaxy-core/test', 'packages/galaxy-official/test'])
       await mkdir(join(root, path), { recursive: true });
     await mkdir(join(root, 'node_modules'));
@@ -17,7 +17,7 @@ test('JS discovery runs current contracts and UI tests, preserves failures and e
     await copyFile(new URL('../check.mjs', import.meta.url), join(root, 'scripts/check.mjs'));
     for (const name of ['runner.mjs', 'test-discovery.mjs'])
       await copyFile(new URL('../checks/' + name, import.meta.url), join(root, 'scripts/checks', name));
-    for (const name of ['galaxy-contracts', 'galaxy-client', 'galaxy-a2a', 'galaxy-web'])
+    for (const name of ['galaxy-contracts', 'galaxy-client', 'galaxy-web'])
       await writeFile(join(root, `packages/${name}/test/pass.test.mjs`), `import test from 'node:test'; test('${name} passes', () => {});\n`);
     for (const name of ['galaxy-core', 'galaxy-official', 'galaxy-edge-mcp'])
       await writeFile(join(root, `packages/${name}/test/retired.test.mjs`), "import test from 'node:test'; test('retired source must not run', () => { throw Error('retired'); });\n");
@@ -28,7 +28,7 @@ test('JS discovery runs current contracts and UI tests, preserves failures and e
     };
     const ordinary = run('test');
     assert.equal(ordinary.status, 0, ordinary.stdout + ordinary.stderr);
-    for (const name of ['galaxy-contracts', 'galaxy-client', 'galaxy-a2a', 'galaxy-web']) assert.match(ordinary.stdout, new RegExp(name + ' passes'));
+    for (const name of ['galaxy-contracts', 'galaxy-client', 'galaxy-web']) assert.match(ordinary.stdout, new RegExp(name + ' passes'));
     assert.doesNotMatch(ordinary.stdout, /retired source must not run/);
     const path = 'packages/galaxy-contracts/test/pass.test.mjs';
     const selected = run('test', [path, path]);
@@ -40,12 +40,11 @@ test('JS discovery runs current contracts and UI tests, preserves failures and e
     assert.equal(run('official', [path]).status, 2);
     assert.equal(run('a2a', [path]).status, 2);
     assert.equal(run('lint', [path]).status, 2);
-    const failure = join(root, 'packages/galaxy-a2a/test/fail.test.mjs');
+    const failure = join(root, 'packages/galaxy-web/test/fail.test.mjs');
     await writeFile(failure, "import test from 'node:test'; test('current adapter failure', () => { throw Error('fixture failure'); });\n");
     const failed = run('test');
     assert.equal(failed.status, 1); assert.match(failed.stdout, /current adapter failure/);
     await rm(failure);
-    await rm(join(root, 'packages/galaxy-a2a/test/pass.test.mjs'));
     assert.notEqual(run('a2a').status, 0);
     assert.equal(run('unknown').status, 2);
   } finally {

@@ -31,6 +31,7 @@ export function createGalaxyAdapter(
     recordWork = true,
     onWorkSessionComplete,
     hostPersistence,
+    resumeService,
     connectionUnavailable = false,
   }: {
     readCaseSubmission?: (() => Promise<CaseSubmission | null>) | null;
@@ -49,6 +50,7 @@ export function createGalaxyAdapter(
     }) => Promise<unknown>;
     connectionUnavailable?: boolean;
     hostPersistence?: ReturnType<typeof createHostLocalClient>;
+    resumeService?: () => Promise<void>;
   } = {},
 ) {
   const ownsPersistence = !hostPersistence;
@@ -382,57 +384,8 @@ export function createGalaxyAdapter(
         }
 
         async function returnToWork(result?: HostWorkResult): Promise<void> {
-          if (!result) {
-            closeGalaxy();
-            return;
-          }
-          const page = pageGeneration;
-          if (!api.client?.tui.appendPrompt) {
-            showInfo(
-              activeLanguage === 'zh-CN'
-                ? '带回原工作'
-                : 'Return to original work',
-              (activeLanguage === 'zh-CN'
-                ? '当前宿主没有提供把内容放入原输入的接口。可以阅读以下内容后继续原工作。\n\n'
-                : 'This host cannot append content to the original input. Read the content below before continuing.\n\n') +
-                result.content +
-                (result.sourceUrl ? '\n\n' + result.sourceUrl : ''),
-              closeGalaxy,
-            );
-            return;
-          }
-          const text =
-            '\n\n' +
-            (activeLanguage === 'zh-CN' ? '银河 · ' : 'Galaxy · ') +
-            result.title +
-            '\n\n' +
-            result.content +
-            (result.sourceUrl
-              ? '\n\n' +
-                (activeLanguage === 'zh-CN' ? '来源：' : 'Source: ') +
-                result.sourceUrl
-              : '') +
-            '\n';
-          try {
-            const response = await api.client.tui.appendPrompt({ text });
-            if (closed || page !== pageGeneration) return;
-            if (response.data !== true)
-              throw new Error('host_input_not_confirmed');
-            closeGalaxy();
-          } catch {
-            if (closed || page !== pageGeneration) return;
-            showInfo(
-              activeLanguage === 'zh-CN'
-                ? '原工作输入尚待确认'
-                : 'Original input needs checking',
-              (activeLanguage === 'zh-CN'
-                ? '未能确认内容是否已放入原输入。先回到原工作查看，避免重复加入；这里不会发送给模型。\n\n'
-                : 'The host did not confirm whether content was appended. Check the original input before adding it again. No model prompt was submitted.\n\n') +
-                result.content +
-                (result.sourceUrl ? '\n\n' + result.sourceUrl : ''),
-              closeGalaxy,
-            );
-          }
+          if (!result) return closeGalaxy();
+          showReading(result.title, result.content + (result.sourceUrl ? '\n\n' + result.sourceUrl : ''), closeGalaxy);
         }
 
         async function showQuickInitialize(
@@ -517,6 +470,8 @@ export function createGalaxyAdapter(
         async function purpose(
           kind: 'search' | 'messages' | 'publish' | 'community' | 'continueWeb',
           onBack: Action,
+          originalSessionId = api.route?.current?.name === 'session'
+            ? api.route.current.params?.sessionID : undefined,
         ): Promise<unknown> {
           if (
             nativeTools &&
@@ -525,7 +480,7 @@ export function createGalaxyAdapter(
           ) {
             try {
               if (!(await workRecorder.history.identity()))
-                return showQuickInitialize(() => void purpose(kind, onBack));
+                return showQuickInitialize(() => void purpose(kind, onBack, originalSessionId));
             } catch {
               return showInfo(
                 'Galaxy',
@@ -578,8 +533,13 @@ export function createGalaxyAdapter(
             language: activeLanguage,
             isCurrent: () => !closed && version === connectionGeneration,
             onBack,
-            onReturnWork: returnToWork,
-            readWorkContext: currentWorkContext,
+            onReturnWork: (result?: HostWorkResult) => returnToWork(result),
+            readWorkContext: () => {
+              const route = api.route?.current;
+              if (!originalSessionId || route?.name !== 'session' || route.params?.sessionID !== originalSessionId)
+                return Promise.resolve(null);
+              return currentWorkContext();
+            },
           });
           purposeMenu[kind]();
         }
@@ -683,6 +643,9 @@ export function createGalaxyAdapter(
           if (closed) return;
           const page = nextPage();
           try {
+            await resumeService?.();
+            if (closed || page !== pageGeneration) return;
+            void workRecorder?.refresh();
             if (nativeTools) {
               await showConsole();
               return;
@@ -703,11 +666,13 @@ export function createGalaxyAdapter(
               return;
             }
             await showConsole(status);
-          } catch (error) {
+          } catch {
             if (closed || page !== pageGeneration) return;
             showInfo(
               'Galaxy',
-              `无法打开本机 Galaxy：${String(error instanceof Error ? error.message : error)}`,
+              activeLanguage === 'zh-CN'
+                ? '暂时无法打开本机银河。已有资料保留，请稍后重试。'
+                : 'Galaxy is unavailable on this device. Existing data is retained; try again later.',
               closeGalaxy,
             );
           }
@@ -740,7 +705,7 @@ export function createGalaxyAdapter(
           });
         // Installation normally prepared the identity already. An older/manual
         // install with no identity gets one actual agreement here, not a menu hunt.
-        if (recordWork && nativeTools && workRecorder) {
+        if (recordWork && workRecorder) {
           await workRecorder.ready;
           try {
             if (

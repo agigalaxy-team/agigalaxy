@@ -48,7 +48,7 @@ func TestHostConfigurationLocalOnlyAllHosts(t *testing.T) {
 	}
 }
 
-func TestInstallationLocalOnlyPreservesIdentityAndCarriesRuntime(t *testing.T) {
+func TestInstallationPreviewLocalOnlyDoesNotWrite(t *testing.T) {
 	ctx, pkg, root := context.Background(), installationFixturePackage(t), t.TempDir()
 	input := NativeInstallationInput{LocalOnly: true, Host: "opencode", PackageDirectory: pkg, DataDirectory: filepath.Join(root, "data"), Destination: filepath.Join(root, "install"), OpenCodeConfigDirectory: filepath.Join(root, "profile"), SubjectType: "organization"}
 	plan, err := PreviewNativeInstallation(ctx, input, ServiceConfigurationOptions{})
@@ -59,43 +59,5 @@ func TestInstallationLocalOnlyPreservesIdentityAndCarriesRuntime(t *testing.T) {
 		if _, err = os.Stat(name); !os.IsNotExist(err) {
 			t.Fatal("preview wrote files", name, err)
 		}
-	}
-	first, err := PrepareNativeInstallationReviewed(ctx, plan, "", true)
-	if err != nil || first["localOnly"] != true || first["connected"] != false || first["identityCreated"] != true || first["configPath"] != "" {
-		t.Fatal(first, err)
-	}
-	store, _ := NewStore(input.DataDirectory, "")
-	before, err := store.LocalSnapshot(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	owner := uploadObject(before["identity"])["id"]
-	var profile map[string]any
-	if _, err = readJSON(filepath.Join(input.OpenCodeConfigDirectory, "opencode.json"), &profile); err != nil {
-		t.Fatal(err)
-	}
-	if uploadRows(uploadObject(uploadObject(profile["mcp"])["galaxy"])["command"])[1] != "integration-mcp" {
-		t.Fatal(profile)
-	}
-	// A later installation for another host keeps the selected store and its
-	// existing identity, and points at a copied runtime rather than source files.
-	input.Host, input.Destination = "codex", filepath.Join(root, "codex-install")
-	plan, err = PreviewNativeInstallation(ctx, input, ServiceConfigurationOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := PrepareNativeInstallationReviewed(ctx, plan, "", true)
-	if err != nil || second["packageDirectory"] == pkg {
-		t.Fatal(second, err)
-	}
-	if err = hostFile(filepath.Join(text(second["packageDirectory"]), "galaxy.exe")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = os.Stat(filepath.Join(input.Destination, "galaxy-public-config.json")); !os.IsNotExist(err) {
-		t.Fatal("local installation created a service configuration", err)
-	}
-	after, err := store.LocalSnapshot(ctx)
-	if err != nil || uploadObject(after["identity"])["id"] != owner {
-		t.Fatal("identity changed", err)
 	}
 }

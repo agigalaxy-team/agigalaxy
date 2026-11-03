@@ -18,7 +18,9 @@ go build ./cmd/...
 
 跨语言检查还需要现行 Node 依赖。PostgreSQL 集成检查通过 `GALAXY_GO_TEST_PG_BIN` 指定 `initdb`、`pg_ctl` 所在绝对目录；检查器只创建操作系统临时目录中的独立数据库，监听 loopback，结束后关闭。未提供时会明确跳过，不能据此报告数据库检查通过。它不读取生产 `DATABASE_URL`。
 
-Native 开发入口：`galaxy native --config <现有绝对配置路径>`。只列出当前真正迁入的工具；不得据此改写正式宿主配置。`galaxy identity --config ...` 只读取公开身份资料。`galaxy host --config ...` 是宿主插件继承stdin/stdout的专用JSONL通道，用于原履历／原件持久处理，不是模型工具或网络服务。Go CLI的`host-configs`可生成候选宿主配置，`setup`先展示实际来源和目录、取得本人确认后才办理；当前仅在临时目录检查，不自动安装。命令参数见`galaxy --help`。
+Native 开发入口：`galaxy native --config <现有绝对配置路径>` 提供服务版 MCP，`galaxy identity --config ...` 读取公开身份资料；`galaxy host --config ...` 是宿主插件使用的私有 JSONL 通道，不是模型工具或网络服务。`native`、`host` 与本机模式的 `integration-mcp`、`integration-host` 通过薄连接使用按需启动的共用本机服务；单个连接退出不会关闭该服务。
+
+完整客户端候选使用 `galaxy install`、`update`、`repair` 和 `uninstall` 管理所选当前用户宿主；`--dry-run` 查看计划。缺少 Node 时仍可安装原生 MCP 与 Skill，事实 hook 是否配置另行报告。`galaxy service status` 在服务运行时显示运行版本与已选择的发行版本，需切换时由使用者在合适时机显式执行 `galaxy service restart`；`stop` 记录暂停，`start` 明确恢复。`setup` 保留从所选官网准备公开服务配置并确认的入口，也支持 `--local-only`，实际安装共用同一执行器；`host-configs` 只生成配置文件。参数、自定义宿主、资料保留和候选发行边界见[安装、配置与发行](../docs/technical/native-client.md#安装配置与发行)及 `galaxy --help`。
 
 服务版 Native 当前源码通过 `galaxy_identity_recovery` 的 `set`、`recover`、`resume` 打开限时本机本人操作页，恢复码不作为 MCP 参数或结果。恢复沿用同一 GUID，在所选服务撤销原设备与绑定并轮换下一代恢复码；本人保存新码后，连接须另行选择，本机资料及历史私有内容不会自动恢复。结果未知时查询原控制操作回执，仅本人确认且服务仍记录待提交时重试原签名字节。页面模板编入 Go 二进制，候选构建按 Go 依赖收集其源码摘要；此能力本机定向联测已通过，最终候选及真实宿主／平台验收状态见 [WORK_STATUS](../WORK_STATUS.md)。
 

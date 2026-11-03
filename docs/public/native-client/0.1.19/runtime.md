@@ -109,7 +109,7 @@ OpenCode 的 `/galaxy` 菜单提供“接着网页里的事情”，可粘贴整
 
 peer 还可携带公开的 `authentication` 选择：默认 `{"mode":"none"}` 适用于无凭据对端；Bearer 对端使用 `{"mode":"bearer-environment","variable":"GALAXY_A2A_PEER_<所选名称>_TOKEN"}`。只给该 MCP 子进程注入所选变量；配置、插件、日志与聊天均不放原始值，不永久导出全局环境。启动与 peers 工具不读取变量，实际调用才读取该精确变量；缺失时报告对端授权不可用，不降级成匿名、不借用 Official token。若宿主不能注入所选变量，先使用已有浏览器衔接或处理该宿主配置，不改变协议信任。OAuth、任意请求头和自动凭据发现尚不支持。
 
-配置后额外注册 peers、read、prepare、execute、abort_local 等当前协议工具，准确列表以实际工具发现为准。prepare 返回待审预览，execute 复用既有 MCP elicitation／本机审阅页；它不接受模型传入 confirmed。对端状态和来源单列为 peer-reported，导入 Result 不等于原问题解决。现行源码的生命周期与互通说明见 [A2A 组件](../../../../packages/galaxy-a2a/README.md)及 [Native 工程](../../../technical/native-client.md#a2a-与已选-worker-pack)；源码变化不会自动更新已经签名发布的包。
+配置后额外注册 peers、read、prepare、execute、abort_local 等当前协议工具，准确列表以实际工具发现为准。prepare 返回待审预览，execute 复用既有 MCP elicitation／本机审阅页；它不接受模型传入 confirmed。对端状态和来源单列为 peer-reported，导入 Result 不等于原问题解决。现行源码的生命周期与互通说明见 [Native 工程](../../../technical/native-client.md#a2a-与已选-worker-pack)；源码变化不会自动更新已经签名发布的包。
 
 ## 设备清单与明确撤销
 

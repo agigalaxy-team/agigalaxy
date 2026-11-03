@@ -21,7 +21,7 @@
       "source": "packages/galaxy-official/src/operations/incident.mjs",
       "test": "packages/galaxy-official/test/incident.test.mjs",
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance"
     },
     {
       "id": "T02",
@@ -33,7 +33,7 @@
       "source": "packages/galaxy-official/src/verification/manifest.mjs",
       "test": "packages/galaxy-official/test/manifest.test.mjs",
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance"
     },
     {
       "id": "T03",
@@ -45,7 +45,7 @@
       "source": "packages/galaxy-official/src/identity/authentication/oauth-resource-access.mjs",
       "test": "packages/galaxy-official/test/personal-mcp.test.mjs",
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance"
     },
     {
       "id": "T04",
@@ -57,19 +57,26 @@
       "source": "packages/galaxy-official/src/privacy/data-export.mjs",
       "test": "packages/galaxy-official/test/data-export.test.mjs",
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance"
     },
     {
       "id": "T05",
       "name": "恶意证据URL",
       "attack": "重定向、DNS混合地址或内网地址导致SSRF",
-      "current_control": "共享公网HTTPS限制、固定解析地址、重定向/大小/超时与取消；仅允许受约束来源适配器",
-      "gap": "新增来源须明确注册和验证；未提供任意远程代码适配器",
+      "current_control": "当前公网读取及A2A请求由Go实现；URL与公网地址检查、受约束解析与拨号、重定向/大小/超时及取消处理按实际传输执行。旧Node public-fetch与其专用测试退出当前实现入口。",
+      "gap": "来源注册、所选服务信任、实际TLS部署和宿主运行仍各自核对；源码引用更新不等于本轮重新执行传输测试或完成威胁验收。",
       "tasks": "C00-04",
-      "source": "packages/galaxy-official/src/infrastructure/public-fetch.mjs",
-      "test": "packages/galaxy-client/test/public-transport.test.mjs",
+      "source": "go/internal/publicfetch/public.go",
+      "test": "go/internal/publicfetch/a2a_test.go",
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance",
+      "historical_source": "packages/galaxy-official/src/infrastructure/public-fetch.mjs",
+      "historical_test": "packages/galaxy-client/test/public-transport.test.mjs",
+      "current_source": [
+        "go/internal/publicfetch/public.go",
+        "go/internal/native/a2a-transport.go",
+        "go/internal/native/connection.go"
+      ]
     },
     {
       "id": "T06",
@@ -81,7 +88,7 @@
       "source": "packages/galaxy-official/src/evidence/proofs.mjs",
       "test": "packages/galaxy-official/test/case-moderation.test.mjs",
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance"
     },
     {
       "id": "T07",
@@ -93,7 +100,7 @@
       "source": "packages/galaxy-official/src/domain/contribution-risk.mjs",
       "test": "packages/galaxy-official/test/contribution-risk.test.mjs",
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance"
     },
     {
       "id": "T08",
@@ -105,7 +112,7 @@
       "source": "packages/galaxy-official/src/governance/moderation.mjs",
       "test": "packages/galaxy-official/test/case-moderation.test.mjs",
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance"
     },
     {
       "id": "T09",
@@ -117,7 +124,7 @@
       "source": "packages/galaxy-official/src/infrastructure/resource-budgets.mjs",
       "test": "packages/galaxy-official/test/resource-budgets.test.mjs",
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance"
     },
     {
       "id": "T10",
@@ -129,7 +136,7 @@
       "source": "packages/galaxy-official/src/domain/consent-policy.mjs",
       "test": null,
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance"
     },
     {
       "id": "T11",
@@ -141,7 +148,7 @@
       "source": "packages/galaxy-official/src/worker.mjs",
       "test": "packages/galaxy-official/test/evidence-revalidation.test.mjs",
       "documentation": "docs/technical/interfaces.md",
-      "review_scope": "current source and dated delivery evidence; no claim of full production defense"
+      "review_scope": "dated control observation; source-reference cleanup is not a new security audit or production acceptance"
     }
   ],
   "release_gate": "每个适用威胁的剩余风险需有处置与证据；本文件不证明试点安全已验收",
@@ -166,5 +173,23 @@
       "docs/operations/observability.md"
     ],
     "rule": "The original per-threat current_control text describes its original dated review, not newly validated production defenses."
+  },
+  "historical_reference_scope": "原timestamp及逐项current_control保留对应日期的观察。未提供current_source的source/test字段仅为历史标识，不表示该Node路径仍存在或可作为当前实现入口。",
+  "native_source_update": {
+    "recordedOn": "2026-11-03",
+    "scope": "current source ownership and obsolete-reference cleanup only",
+    "runtime": "Go Native owns client business and public transport",
+    "retained_javascript_roles": [
+      "host diagnostics and UI adapters",
+      "independent reference Worker using its own locked third-party A2A SDK",
+      "offline governance material preparation"
+    ],
+    "current_source_guides": [
+      "docs/technical/native-client.md",
+      "docs/technical/source-and-licensing.md",
+      "integrations/reference-worker-pack/README.md"
+    ],
+    "testsExecuted": false,
+    "all_threats_reaudited": false
   }
 }

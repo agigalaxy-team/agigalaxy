@@ -1,6 +1,7 @@
 import type { Action, Routes, MenuOption } from '../adapter-types.ts';
 import { redactLocalWorkData } from '../../../../packages/galaxy-contracts/src/identity/local-data-redaction.mjs';
 import { setWorkArchiveSelection } from '../work-archive-choice.mjs';
+import { readableToolOutput } from '../../../native-v2/compact-app/presentation.mjs';
 import type { GalaxyMenuSession } from './session-context.ts';
 
 export function createLocalWorkPages(session: GalaxyMenuSession) {
@@ -114,6 +115,7 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
     workId: string,
     onReturn: Action,
     afterSequence = 0,
+    onPrevious: Action = onReturn,
   ) {
     const chinese = session.activeLanguage === 'zh-CN',
       recorder = session.workRecorder;
@@ -128,23 +130,34 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
           afterSequence,
           limit: 6,
         });
+        let archiveSettingsUnavailable = false;
         const archiveSettings =
           detail && recorder.archive && detail.work.host === 'opencode'
-            ? await recorder.archive.settings()
+            ? await recorder.archive.settings().catch(() => {
+                archiveSettingsUnavailable = true;
+                return null;
+              })
             : null;
-        return { detail, archiveSettings };
+        return { detail, archiveSettings, archiveSettingsUnavailable };
       },
-      ({ detail, archiveSettings }) => {
+      ({ detail, archiveSettings, archiveSettingsUnavailable }) => {
         if (!detail) return onReturn();
         const back = () =>
-          void showLocalWorkDetails(workId, onReturn, afterSequence);
+          void showLocalWorkDetails(workId, onReturn, afterSequence, onPrevious);
         const work = detail.work;
         const processingLabels: Record<string, string> = {
           pending: '等待整理',
-          running: '自己的AI正在整理',
+          running: '上次整理状态待核对',
           failed: '整理未完成，原记录保留',
-          'model-unavailable': '等待宿主模型可用',
+          'model-unavailable': '上次整理时模型不可用',
           idle: '当前材料已整理',
+        };
+        const processingLabelsEn: Record<string, string> = {
+          pending: 'Waiting to be organized',
+          running: 'Previous organization status unconfirmed',
+          failed: 'Organization incomplete; source records retained',
+          'model-unavailable': 'Model was unavailable during the previous attempt',
+          idle: 'Current material organized',
         };
         const outcomeLabels: Record<string, string> = {
           unknown: '尚无明确整体结果',
@@ -177,17 +190,19 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
                   : 'Observed material has been recorded; no AI summary yet.')) +
                 '\n\n' +
                 (chinese ? '整理状态：' : 'Summary state: ') +
-                (chinese
-                  ? processingLabels[work.processing?.state || 'pending']
-                  : work.processing?.state || 'pending') +
+                (work.pending && work.processing?.state === 'idle'
+                  ? chinese ? '有新记录待整理' : 'New records waiting to be organized'
+                  : chinese
+                    ? processingLabels[work.processing?.state || 'pending'] || '状态暂不可用'
+                    : processingLabelsEn[work.processing?.state || 'pending'] || 'Status unavailable') +
                 '\n' +
                 (chinese ? '工作结果：' : 'Reported outcome: ') +
-                (chinese ? outcomeLabels[work.outcome] : work.outcome) +
+                (chinese ? outcomeLabels[work.outcome] || '尚无明确整体结果' : work.outcome || 'Unknown') +
                 (work.processing?.state === 'failed'
                   ? '\n\n' +
                     (chinese
-                      ? '工作记录仍可阅读。有新材料或切换模型后会自动继续整理。'
-                      : 'Work records remain readable. New material or a model change resumes summarization automatically.')
+                      ? '工作记录仍可阅读。可在原工作中继续整理尚未覆盖的材料。'
+                      : 'Work records remain readable. The remaining material can be organized in the original work.')
                   : ''),
               back,
             ),
@@ -199,6 +214,18 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
               });
           },
         };
+        if (archiveSettingsUnavailable) {
+          options.push({
+            number: 'a',
+            title: chinese ? '原会话保存设置暂不可读' : 'Message saving settings unavailable',
+            description: chinese ? '工作记录仍可阅读，稍后可重试。' : 'Work records remain readable; try again later.',
+          });
+          routes.a = () => session.showInfo(
+            chinese ? '原会话保存设置暂不可读' : 'Message saving settings unavailable',
+            chinese ? '工作记录仍可阅读，稍后可重试。' : 'Work records remain readable; try again later.',
+            back,
+          );
+        }
         if (detail.environments.length) {
           options.push({
             number: 'e',
@@ -305,7 +332,18 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
                   );
               }
               await recorder.refresh();
-              if (stillReading()) back();
+              if (stillReading())
+                session.showInfo(
+                  chinese ? '保存设置已更新' : 'Saving settings updated',
+                  selected
+                    ? chinese
+                      ? '已停止为这段工作另存消息，已有记录仍保留。'
+                      : 'New messages will no longer be saved for this work. Existing records remain.'
+                    : chinese
+                      ? '已为这段工作开启本机消息保存。'
+                      : 'Local message saving is enabled for this work.',
+                  back,
+                );
             } catch {
               if (stillReading())
                 session.showInfo(
@@ -357,13 +395,18 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
                 observation.details.role ||
                 observation.kind,
             );
+            const excerpt = observation.kind === 'tool'
+              ? readableToolOutput(observation.content?.excerpt)
+              : observation.content?.excerpt;
+            const structured = observation.kind === 'tool' && !!observation.content?.excerpt && !excerpt;
             options.push({
               number,
               title: observation.details.tool
                 ? detailName
                 : eventLabels[detailName] || detailName,
               description:
-                observation.content?.excerpt?.slice(0, 100) ||
+                excerpt?.slice(0, 100) ||
+                (structured ? (chinese ? '工具返回了结构化结果' : 'Structured tool result') : '') ||
                 observation.occurredAt ||
                 observation.observedAt,
             });
@@ -372,7 +415,8 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
                 observation.details.tool
                   ? detailName
                   : eventLabels[detailName] || detailName,
-                (observation.content?.excerpt ||
+                (excerpt ||
+                  (structured ? (chinese ? '工具返回了结构化结果，可在原会话中查看。' : 'The tool returned structured data; view it in the original session.') : '') ||
                   (chinese
                     ? '此项记录来源与状态，未保存正文。'
                     : 'This entry contains source and status, without body text.')) +
@@ -481,7 +525,8 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
                         part.type === 'text'
                           ? part.text
                           : part.type === 'tool'
-                            ? part.state?.output || part.state?.error
+                            ? readableToolOutput(part.state?.output || part.state?.error) ||
+                              ((part.state?.output || part.state?.error) ? (chinese ? '工具返回了结构化结果，可在原会话中查看。' : 'The tool returned structured data; view it in the original session.') : '')
                             : '',
                       )
                       .filter(Boolean)
@@ -533,13 +578,13 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
             title: chinese ? '后续过程记录' : 'More observations',
           });
           routes.n = () =>
-            void showLocalWorkDetails(workId, onReturn, detail.nextAfter);
+            void showLocalWorkDetails(workId, onReturn, detail.nextAfter, back);
         }
         session.showSelect({
           title: work.title,
           options,
           routes,
-          onBack: onReturn,
+          onBack: onPrevious,
         });
       },
       chinese

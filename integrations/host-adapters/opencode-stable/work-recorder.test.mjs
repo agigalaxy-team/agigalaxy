@@ -4,27 +4,22 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHostLocalClient} from './bridge/host-local-client.mjs';
-import {randomUUID} from 'node:crypto';
 const executable=process.env.GALAXY_GO_TEST_BINARY;
 const test=(name,fn)=>nodeTest(name,{skip:!executable&&'Set GALAXY_GO_TEST_BINARY to the development Go executable'},fn);
 import {createOpenCodeWorkRecorder} from './work-recorder.mjs';
-import {createOpenCodeWorkSummarizer} from './work-summarizer.mjs';
-import {setTimeout as delay} from 'node:timers/promises';
 
 async function setup(t){
   const directory=await mkdtemp(join(tmpdir(),'galaxy-work-host-'));
   const closers=[];
   // Node runs after hooks in registration order. Keep shutdown and directory
-  // removal in one hook so pending summary/fact writes finish before removal.
+  // removal in one hook so pending fact writes finish before removal.
   t.after(async()=>{for(const close of closers.reverse())await close();await rm(directory,{recursive:true,force:true});});
   const host=createHostLocalClient({dataDirectory:directory,localOnly:true,executable});
   closers.push(()=>host.close());
   await host.initialize({initializationPath:'personal-galaxy'});
-  const history={...host.history,recordNote:({host:origin,sessionId,sourceId=randomUUID(),text,title='',sourceKind='model-report'})=>host.history.observe({host:origin,sessionId,sourceId,kind:'claim',title,source:{kind:sourceKind},content:{excerpt:text,originalLength:text.length,retained:'full'},details:{statementOnly:true}})};
+  const history=host.history;
   return{directory,history,beforeCleanup:close=>closers.push(close)};
 }
-async function eventually(predicate){for(let i=0;i<100;i++){if(await predicate())return;await delay(10);}assert.fail('Asynchronous host processing did not finish');}
-
 test('actual event shapes record foreground text and tools without opening a Galaxy menu; restart reconciles without duplicates',async t=>{
   const {history,beforeCleanup}=await setup(t),handlers=new Map(),messages=[],parts=new Map();
   const api={app:{version:'fixture'},route:{current:{name:'session',params:{sessionID:'foreground'}}},
@@ -56,35 +51,6 @@ test('actual event shapes record foreground text and tools without opening a Gal
   await recorder.close();
 });
 
-test('the SDK model call actually saves an incremental sourced summary; model failure leaves facts pending',async t=>{
-  const {history,beforeCleanup}=await setup(t);
-  const first=await history.recordNote({host:'opencode',sessionId:'original',sourceId:'statement',text:'We drafted a report, but have not reviewed the conclusions.'});
-  let calls=0,createInput,promptInput;
-  const sdk={create:async input=>{createInput=input;return{data:{id:'summary-child'}};},
-    prompt:async input=>{calls++;promptInput=input;return{data:{info:{id:'generated-message'},parts:[{type:'text',text:JSON.stringify({title:'Report draft',summary:'A draft exists; conclusions remain unreviewed.',outcome:'partial'})}]}};},
-    update:async()=>({data:{}}),abort:async()=>({data:{}})};
-  let summarizer=createOpenCodeWorkSummarizer({client:{session:sdk}},history,{delayMs:0});beforeCleanup(()=>summarizer.close());
-  summarizer.schedule({galaxyId:first.galaxyId,workId:first.workId,sessionId:'original',model:{providerID:'fixture',modelID:'user-selected'}});
-  await eventually(async()=>!(await history.get({workId:first.workId})).work.pending);
-  assert.equal(calls,1);
-  assert.deepEqual(createInput.permission,[{permission:'*',pattern:'*',action:'deny'}]);
-  assert.equal(promptInput.sessionID,'summary-child');
-  assert.equal(promptInput.model.modelID,'user-selected');
-  assert.equal(promptInput.format,undefined,'the tool-denied child does not request host tool-based structured output');
-  assert.deepEqual(JSON.parse(promptInput.parts[0].text.split('\n').at(-1)).outputSchema.required,['title','summary','outcome']);
-  const summary=(await history.get({workId:first.workId})).summaries[0];
-  assert.equal(summary.execution.messageId,'generated-message');
-  assert.equal(summary.sourceKind,'user-model');
-  await summarizer.close();
-  await history.recordNote({host:'opencode',sessionId:'original',sourceId:'new-material',text:'A later unresolved question.'});
-  summarizer=createOpenCodeWorkSummarizer({client:{session:{...sdk,prompt:async()=>{throw Error('fixture provider unavailable');}}}},history,{delayMs:0});
-  summarizer.schedule({galaxyId:first.galaxyId,workId:first.workId,sessionId:'original',model:{providerID:'fixture',modelID:'user-selected'}});
-  await eventually(async()=>(await history.pending({workId:first.workId})).processing.state==='failed');
-  assert.equal((await history.pending({workId:first.workId})).observations.length,1);
-  assert.equal((await history.get({workId:first.workId})).summaries.length,1);
-  await summarizer.close();
-});
-
 test('an explicit archive selection backfills only that host session from real message responses',async t=>{
   const {history,beforeCleanup}=await setup(t),owner=await history.identity();
   const calls=[],captured=[];let enabled=false;
@@ -105,35 +71,6 @@ test('an explicit archive selection backfills only that host session from real m
   await recorder.close();
 });
 
-test('a temporary model failure resumes automatically without another menu action',async t=>{
- const {history,beforeCleanup}=await setup(t),work=await history.recordNote({host:'opencode',sessionId:'original',text:'We compared two outlines; neither has been approved.'});
- let calls=0;const archived=[];
- const api={client:{session:{create:async()=>({data:{id:'summary-'+calls}}),prompt:async()=>{
-  if(++calls===1)throw Error('synthetic temporary provider failure');
-  return{data:{info:{id:'recovered-summary'},parts:[{type:'text',text:JSON.stringify({title:'Outline comparison',summary:'Two outlines were compared. Approval remains unknown.',outcome:'unknown'})}]}};
- },update:async input=>{archived.push(input.sessionID);return{data:{}};}}}};
- const summarizer=createOpenCodeWorkSummarizer(api,history,{delayMs:0,retryDelaysMs:[10,20]});beforeCleanup(()=>summarizer.close());
- summarizer.schedule({galaxyId:work.galaxyId,workId:work.workId,sessionId:'original',model:{providerID:'own',modelID:'configured'}});
- await eventually(async()=>!(await history.get({workId:work.workId})).work.pending);
- assert.equal(calls,2);assert.equal((await history.get({workId:work.workId})).work.outcome,'unknown');assert.equal(archived.length,2);
-});
-
-test('the same failed material has a finite retry budget; a model switch resumes its retained work',async t=>{
- const {history,beforeCleanup}=await setup(t),work=await history.recordNote({host:'opencode',sessionId:'original',text:'A result still needs review.'});
- let calls=0;
- const sdk={create:async()=>({data:{id:'child-'+calls}}),prompt:async input=>{
-  calls++;if(input.model.modelID==='unavailable')throw Error('synthetic unavailable provider');
-  return{data:{info:{},parts:[{type:'text',text:JSON.stringify({title:'Pending review',summary:'The reported result remains unreviewed.',outcome:'unknown'})}]}};
- },update:async()=>({data:{}})};
- const summarizer=createOpenCodeWorkSummarizer({client:{session:sdk}},history,{delayMs:0,retryDelaysMs:[5,10]});beforeCleanup(()=>summarizer.close());
- const request={galaxyId:work.galaxyId,workId:work.workId,sessionId:'original',model:{providerID:'own',modelID:'unavailable'}};
- summarizer.schedule(request);await eventually(()=>calls===3);await delay(25);
- for(let i=0;i<5;i++){summarizer.schedule(request);await delay(5);}
- assert.equal(calls,3,'Idle reconciliation does not spend model requests indefinitely.');assert.equal((await history.pending({workId:work.workId})).observations.length,1);
- summarizer.schedule({...request,model:{providerID:'own',modelID:'restored'}},{modelChanged:true});
- await eventually(async()=>!(await history.get({workId:work.workId})).work.pending);assert.equal(calls,4);
-});
-
 test('history uses the real host session title and a late title revision cannot rename current work',async t=>{
  const {history,beforeCleanup}=await setup(t),handlers=new Map();let session={id:'foreground',title:'研究材料整理',time:{updated:10}};
  const api={route:{current:{name:'session',params:{sessionID:'foreground'}}},event:{on:(type,handler)=>{handlers.set(type,handler);return()=>handlers.delete(type);}},
@@ -146,16 +83,61 @@ test('history uses the real host session title and a late title revision cannot 
  assert.equal((await history.list()).items[0].title,'研究材料与结论草稿');
 });
 
-test('the actual SDK model-switch ModelRef.id becomes prompt.modelID without a manual summary action',async t=>{
- const {history,beforeCleanup}=await setup(t),handlers=new Map(),messages=[],parts=new Map(),prompts=[];
- const sdk={create:async()=>({data:{id:'summary-child'}}),prompt:async input=>{prompts.push(input);return{data:{info:{},parts:[{type:'text',text:JSON.stringify({title:'Current writing',summary:'The writing goal is recorded; the result remains unknown.',outcome:'unknown'})}]}};},update:async()=>({data:{}})};
- const api={client:{session:sdk},route:{current:{name:'session',params:{sessionID:'foreground'}}},event:{on:(type,handler)=>{handlers.set(type,handler);return()=>handlers.delete(type);}},
+test('model selection is recorded as an environment fact without starting a model',async t=>{
+ const {history,beforeCleanup}=await setup(t),handlers=new Map(),messages=[],parts=new Map();let prompts=0;
+ const api={client:{session:{create:async()=>{prompts++;throw Error('unexpected model call');}}},route:{current:{name:'session',params:{sessionID:'foreground'}}},event:{on:(type,handler)=>{handlers.set(type,handler);return()=>handlers.delete(type);}},
   state:{session:{messages:()=>messages,status:()=>({type:'idle'})},part:id=>parts.get(id)||[],mcp:()=>[]}};
  const recorder=createOpenCodeWorkRecorder(api,{history,pollMs:60000});beforeCleanup(()=>recorder.close());await recorder.ready;
  const created=Date.now()+10,message={id:'writing-goal',sessionID:'foreground',role:'user',time:{created},model:{providerID:'own',modelID:'old-model'}};
  messages.push(message);parts.set(message.id,[{id:'body',messageID:message.id,sessionID:'foreground',type:'text',text:'Draft an outline without claiming it is approved.'}]);
  handlers.get('message.updated')({type:'message.updated',properties:{sessionID:'foreground',info:message}});
  handlers.get('session.next.model.switched')({type:'session.next.model.switched',properties:{sessionID:'foreground',timestamp:created+1,model:{providerID:'own',id:'new-model'}}});await recorder.refresh();
- for(let i=0;i<300&&!prompts.length;i++)await delay(10);
- assert.equal(prompts.length,1);assert.deepEqual(prompts[0].model,{providerID:'own',modelID:'new-model'});
+ const detail=await history.get({host:'opencode',sessionId:'foreground'});
+ assert.equal(prompts,0);assert.ok(detail.environments.some(item=>item.facts.selectedModel==='own/new-model'));
+ assert.ok(detail.work.pending);assert.ok((await history.pending({workId:detail.work.workId})).observations.length);
+});
+
+test('tool states use their own revision when host event timestamps are reused',async t=>{
+  const {history,beforeCleanup}=await setup(t),handlers=new Map(),messages=[],partList=new Map(),warnings=[];
+  const api={route:{current:{name:'session',params:{sessionID:'foreground'}}},
+    event:{on:(type,handler)=>{handlers.set(type,handler);return()=>handlers.delete(type);}},
+    state:{session:{messages:()=>messages},part:id=>partList.get(id)||[],mcp:()=>[]},
+    ui:{toast:warning=>warnings.push(warning)}};
+  const recorder=createOpenCodeWorkRecorder(api,{history,pollMs:60000});beforeCleanup(()=>recorder.close());await recorder.ready;
+  const timestamp=Date.now()+10,info={id:'assistant-reused-time',sessionID:'foreground',role:'assistant',time:{created:timestamp}};
+  const part={id:'tool-reused-time',sessionID:'foreground',messageID:info.id,type:'tool',tool:'fixture',callID:'call',state:{status:'pending'}};
+  messages.push(info);partList.set(info.id,[part]);
+  const send=()=>handlers.get('message.part.updated')({type:'message.part.updated',properties:{sessionID:'foreground',part,time:timestamp}});
+  send();await recorder.refresh();
+  part.state={status:'running',time:{start:timestamp}};send();await recorder.refresh();
+  part.state={status:'error',error:'fixture error',time:{start:timestamp,end:timestamp}};send();await recorder.refresh();
+  const result=await history.get({host:'opencode',sessionId:'foreground'}),states=result.observations.filter(item=>item.source?.partId===part.id).map(item=>item.details.status);
+  assert.ok(states.includes('pending')&&states.includes('running')&&states.includes('error'));
+  assert.equal(warnings.length,0);
+});
+
+test('unselected large attachments stay out of fact recording and tool lengths remain exact',async t=>{
+  const {history,beforeCleanup}=await setup(t),owner=await history.identity(),handlers=new Map(),messages=[],parts=new Map();
+  let captures=0;
+  const archive={settings:async()=>({galaxyId:owner.id,settings:{enabled:false,sessions:[]}}),
+    captureMessage:async()=>{captures++;return{captured:true};}};
+  const api={route:{current:{name:'session',params:{sessionID:'foreground'}}},
+    event:{on:(type,handler)=>{handlers.set(type,handler);return()=>handlers.delete(type);}},
+    state:{session:{messages:()=>messages},part:id=>parts.get(id)||[],mcp:()=>[]},ui:{toast:()=>{}}};
+  const recorder=createOpenCodeWorkRecorder(api,{history,archive,pollMs:60000});beforeCleanup(()=>recorder.close());await recorder.ready;
+  const created=Date.now()+10,info={id:'large-message',sessionID:'foreground',role:'assistant',time:{created,completed:created+1}};
+  const large='x'.repeat(10*1024*1024);
+  messages.push(info);parts.set(info.id,[
+    {id:'large-file',sessionID:'foreground',messageID:info.id,type:'file',filename:'evidence.bin',mime:'application/octet-stream',url:'data:application/octet-stream;base64,'+large},
+    {id:'large-tool',sessionID:'foreground',messageID:info.id,type:'tool',tool:'fixture',callID:'call',state:{status:'completed',output:large,time:{start:created,end:created+1}}}
+  ]);
+  handlers.get('message.updated')({type:'message.updated',properties:{sessionID:'foreground',info}});
+  await recorder.refresh();
+  const detail=await history.get({host:'opencode',sessionId:'foreground',limit:200});
+  const file=detail.observations.find(item=>item.source?.partId==='large-file'),tool=detail.observations.find(item=>item.source?.partId==='large-tool');
+  assert.equal(file?.details?.filename,'evidence.bin');
+  assert.equal(file?.details?.hostReferenceOnly,true);
+  assert.equal(tool?.content?.originalLength,large.length);
+  assert.equal(tool?.content?.excerpt?.length,1200);
+  assert.equal(captures,0);
 });

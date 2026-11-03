@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -27,23 +26,10 @@ import (
 )
 
 func TestControlConsentAndRetainedReceiptInterop(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
 	dir := t.TempDir()
-	var origin string
-	run := func(mode string) []byte {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/device-client-fixture.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN="+origin, "GALAXY_GO_TEST_SKIP_BOOTSTRAP=true")
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original JS %s: %v %s", mode, e, out)
-		}
-		return out
-	}
-	prepareControlFixture(t, pool, dir, false)
+	fixture := prepareControlFixture(t, pool, dir, false)
 	var state struct {
 		DeviceID, PublicKeyPEM, OwnerPrivate, InstallationID string
 		Genesis                                              struct {
@@ -73,7 +59,7 @@ func TestControlConsentAndRetainedReceiptInterop(t *testing.T) {
 	}
 	server := httptest.NewServer(Handler{Service: service})
 	defer server.Close()
-	origin = server.URL
+	origin := server.URL
 	call := func(method, path string, input any, bearer string) (int, map[string]any) {
 		t.Helper()
 		b, _ := json.Marshal(input)
@@ -127,16 +113,7 @@ func TestControlConsentAndRetainedReceiptInterop(t *testing.T) {
 	if code != 200 || replayed["chainHead"] != receipt["chainHead"] {
 		t.Fatal("original control receipt not retained")
 	}
-	_ = run("client-consent")
-	tokenRaw, e := os.ReadFile(filepath.Join(dir, "credential.txt"))
-	if e != nil {
-		t.Fatal(e)
-	}
-	token := string(tokenRaw)
-	actor, e := service.Authenticate(ctx, token, "consent")
-	if e != nil {
-		t.Fatal(e)
-	}
+	actor, _ := bindControlFixture(t, service, fixture, []string{"binding", "history", "consent"})
 	payload := `{"title":"controlled forum intent"}`
 	intent := ConsentIntent{Version: 1, ID: uuid.NewString(), SubjectID: actor.SubjectID, BindingID: actor.BindingID, Endpoint: service.Endpoint, ObjectID: "controlled-forum-post", Action: "forum.post.publish", Purpose: "public-profile", Recipient: service.Endpoint, Fields: []string{"title"}, Visibility: "Public", Viewers: []string{}, PayloadHash: identity.Digest([]byte(payload)), PolicyVersion: "0.1", IssuedAt: now, ExpiresAt: now + 600}
 	intentRaw, _ := json.Marshal(intent)
@@ -171,21 +148,9 @@ func TestControlConsentAndRetainedReceiptInterop(t *testing.T) {
 	if e != nil || capture.Authorization.ChainHead == nil || capture.Authorization.CallerBindingID != actor.BindingID || !contains(capture.Authorization.CredentialScopes, "consent") {
 		t.Fatalf("atomic consent metadata: %+v %v", capture, e)
 	}
-	locator, _ := json.Marshal(map[string]any{"id": intent.ID, "action": intent.Action, "objectId": intent.ObjectID, "payloadJson": payload})
-	if e = os.WriteFile(filepath.Join(dir, "consent-locator.json"), locator, 0600); e != nil {
-		t.Fatal(e)
-	}
 	var signatureEnvelope, payloadText, chainHead string
 	if e = pool.QueryRow(ctx, "SELECT signature_envelope,signed_payload_text,control_event_hash FROM consents WHERE id=$1", intent.ID).Scan(&signatureEnvelope, &payloadText, &chainHead); e != nil || signatureEnvelope == "" || payloadText != string(intentRaw) || chainHead != *capture.Authorization.ChainHead {
 		t.Fatalf("stored consent evidence mismatch: %v", e)
-	}
-	var originalGrant ConsentRequirement
-	if e = json.Unmarshal(run("js-consent-create"), &originalGrant); e != nil {
-		t.Fatal(e)
-	}
-	_, e = postgres.InTx(ctx, api, func(tx pgx.Tx) (ConsentIntent, error) { return service.RequireConsentWithin(ctx, tx, originalGrant) })
-	if e != nil {
-		t.Fatalf("Go did not read original JS signed grant: %v", e)
 	}
 	requirement.PayloadJSON = `{ "title":"controlled forum intent"}`
 	_, e = postgres.InTx(ctx, api, func(tx pgx.Tx) (ConsentIntent, error) { return service.RequireConsentWithin(ctx, tx, requirement) })
@@ -232,29 +197,30 @@ func TestControlConsentAndRetainedReceiptInterop(t *testing.T) {
 		t.Fatal(e)
 	}
 	operation := ReceiptOperation{"choice-snapshot", snapshot, version, requestHash}
-	writeLocator := func(op ReceiptOperation) {
-		b, _ := json.Marshal(op)
-		if e = os.WriteFile(filepath.Join(dir, "receipt-locator.json"), b, 0600); e != nil {
-			t.Fatal(e)
+	queryReceipt := func(op ReceiptOperation) map[string]any {
+		t.Helper()
+		issued, err := service.ReceiptChallenge(ctx, ReceiptChallengeInput{actor.SubjectID, ReceiptControl{actor.DeviceID, *actor.KeyID, 1}, op, strings.Repeat("A", 43)})
+		if err != nil {
+			t.Fatal(err)
 		}
+		challenge := issued["challenge"].(string)
+		result, err := service.ReceiptQuery(ctx, ReceiptQueryInput{Challenge: challenge, Signature: sign(owner, challenge, "galaxy-receipt-status-response+jws")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result
 	}
-	writeLocator(operation)
-	var result struct {
-		Result map[string]any
-		Calls  int
-	}
-	out := run("receipt-client")
-	if e = json.Unmarshal(out, &result); e != nil || result.Calls != 2 || result.Result["state"] != "acknowledged" || strings.Contains(string(out), "must never appear") || result.Result["contentReturned"] != false {
-		t.Fatalf("retained receipt: %s %v", out, e)
+	result := queryReceipt(operation)
+	out, _ := json.Marshal(result)
+	if result["state"] != "acknowledged" || strings.Contains(string(out), "must never appear") || result["contentReturned"] != false {
+		t.Fatal("retained receipt", result)
 	}
 	operation.RequestHash = strings.Repeat("b", 64)
-	writeLocator(operation)
-	if e = json.Unmarshal(run("receipt-client"), &result); e != nil || result.Result["state"] != "conflict" {
+	if result = queryReceipt(operation); result["state"] != "conflict" {
 		t.Fatal("receipt mismatch not distinguished")
 	}
 	operation.VersionID = uuid.NewString()
-	writeLocator(operation)
-	if e = json.Unmarshal(run("receipt-client"), &result); e != nil || result.Result["state"] != "absent" {
+	if result = queryReceipt(operation); result["state"] != "absent" {
 		t.Fatal("receipt absence not retained")
 	}
 	service.ReceiptStatusDeadline = func() (int64, error) { return now, nil }

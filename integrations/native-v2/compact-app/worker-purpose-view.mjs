@@ -28,8 +28,8 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
   const a=el('a','下载当前信息');a.download='galaxy-worker.json';a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(value,null,2));detail.append(a);return detail;}
  const associationId=()=>current?.selected?.association?.associationId??current?.preview?.associationId??current?.actionResult?.associationId;
  const peerId=()=>current?.selected?.association?.peerId??current?.preview?.peerId??current?.actionResult?.peerId;
- async function read(id=associationId(),poll=false,{quiet=false}={}){return invoke(tool.read,id?{action:poll?'poll':'get',associationId:id,...(a2a?{peerId:peerId()}:{})}:{action:'list'},{quiet});}
- async function invoke(name,args,{quiet=false,recover=true}={}){
+ async function read(id=associationId(),poll=false,{quiet=false,peer}={}){return invoke(tool.read,id?{action:poll?'poll':'get',associationId:id,...(a2a?{peerId:peer??peerId()}:{})}:{action:'list'},{quiet});}
+ async function invoke(name,args,{quiet=false,recover=true,appendList=false}={}){
   const background=name===tool.read&&quiet;
   if(destroyed||busy||background&&reading)return;const token=generation,startedIntent=intent;clearTimeout(timer);clearTimeout(choiceTimer);
   // A focus read must not disable the control that the user is entering the
@@ -37,14 +37,19 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
   if(background)reading=true;else setBusy(true);if(!quiet)status.textContent='正在取得当前内容…';
   const stale=()=>destroyed||token!==generation||background&&(startedIntent!==intent||busy);
   try{const response=await call(name,args);if(stale())return;
-   const data=workerComponentResult(response);
+   let data=workerComponentResult(response);
    if(response?.isError)throw Object.assign(new Error(data.error??'worker_host_unavailable'),{associationId:data.associationId??associationId()});
    if(data.resultType==='input_required'){review.replaceChildren(el('p','请在宿主显示的选择中核对内容与范围。'));status.textContent='等待你的选择。';return;}
    if(data.state==='user-choice-needs-browser'){await showBrowserChoice(data);return;}
    if(data.state==='declined'){browserChoice=null;browserChoiceUrl=null;review.replaceChildren();status.textContent='本次操作已取消。';return;}
+   if(name===tool.read&&current?.ownerScope&&data?.ownerScope===current.ownerScope){
+    if(appendList){const seen=new Set((current.associations??[]).map(row=>JSON.stringify([row.peerId??null,row.associationId])));const additions=(data.associations??[]).filter(row=>!seen.has(JSON.stringify([row.peerId??null,row.associationId])));data={...current,...data,selected:current.selected,preview:current.preview,actionResult:current.actionResult,associations:[...(current.associations??[]),...additions]};}
+    else if(['get','poll'].includes(args.action)&&current.associations?.length&&!data.associations?.length)data={...data,associations:current.associations,nextAfter:current.nextAfter,listPeerId:current.listPeerId,earlierAssociationsAvailable:current.earlierAssociationsAvailable};
+   }
    receive(data);
    return data;
   }catch(error){if(stale())return;
+   if(appendList&&current){status.textContent='暂时无法读取更多工作，当前内容仍保留。';return;}
    const id=error.associationId??associationId();
    // A lost return may have committed. Query that association, never execute
    // the handle or generate another operation merely to make an error disappear.
@@ -133,8 +138,8 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
   }else status.textContent='';
   const associations=next.associations??[];
   if(associations.length){const list=el('details');list.open=!a&&!next.preview;list.append(el('summary',a?'其他工作':'已有工作'));
-   for(const row of associations){const item=el('div',undefined,'operation-row');item.append(button(row.purpose??'已有工作',()=>read(row.associationId)),el('p',row.sourceUnavailable?'当前内容暂不可读取。':nativeStateLabel(row.state)??'可继续查看','muted'));list.append(item);}other.append(list);
-   if(next.earlierAssociationsAvailable)list.append(el('p','还有较早的工作，可在原聊天按需要取得。','muted'));
+   for(const row of associations){const item=el('div',undefined,'operation-row');item.append(button(row.purpose??'已有工作',()=>read(row.associationId,false,{peer:row.peerId})),el('p',row.sourceUnavailable?'当前内容暂不可读取。':nativeStateLabel(row.state)??'可继续查看','muted'));list.append(item);}other.append(list);
+   if(next.nextAfter)list.append(button('更多工作',()=>invoke(tool.read,{action:'list',after:next.nextAfter,...(a2a&&next.listPeerId?{peerId:next.listPeerId}:{})},{appendList:true}),true));
   }else if(!a&&!next.preview&&!next.actionResult)content.append(el('h2',a2a?'想让所选服务处理什么？':'想让 Worker 处理什么？'),el('p','在原聊天说明目标，AI 会沿用当前工作准备所需内容。'));
   if(displayMode&&supportsDisplayMode())actions.append(button('展开',()=>displayMode(),true));
   for(const d of root.querySelectorAll('details'))if(expanded.includes(d.querySelector('summary')?.textContent))d.open=true;

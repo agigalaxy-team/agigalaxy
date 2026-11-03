@@ -17,6 +17,10 @@ const packageSchema = (name, prefix, scopedDependencies = false) => z.object({ n
     dependencies: z.record(z.string().regex(scopedDependencies ? /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/ : /^[a-z][a-z0-9.-]*$/), z.string().regex(/^\d+\.\d+\.\d+$/)),
     lockSha256: hash, sourceHashesSha256: hash,
   }).strict();
+const nativeGoPackageSchema=packageSchema('@galaxy/native-go-candidate','galaxy-native-go',true).extend({
+  filename:z.string().regex(/^galaxy-native-go-\d+\.\d+\.\d+(?:-(?:windows|linux|darwin)-(?:amd64|arm64))?\.tgz$/),
+  target:z.object({goos:z.enum(['windows','linux','darwin']),goarch:z.enum(['amd64','arm64'])}).strict().optional(),
+});
 const schema = z.discriminatedUnion('kind', [z.object({ ...common, kind: z.literal('galaxy-client-release'),
   package: packageSchema('@galaxy/client', 'galaxy-client'),
   conformance: z.object({ profile: z.literal('galaxy-conformance/2'), reportSha256: hash,
@@ -31,7 +35,7 @@ const schema = z.discriminatedUnion('kind', [z.object({ ...common, kind: z.liter
     sourceSha256: hash, artifactsSha256: hash, scope: z.literal('local-stdio-http-fixtures'),
     actualHostAcceptance: z.literal(false) }).strict(),
 }).strict(), z.object({ ...common, kind: z.literal('galaxy-native-go-release'),
-  package: packageSchema('@galaxy/native-go-candidate', 'galaxy-native-go', true),
+  package: nativeGoPackageSchema,
   protocolAcceptance: z.object({ profile: z.literal('galaxy-native-go/1'), reportSha256: hash,
     sourceSha256: hash, artifactsSha256: hash, scope: z.literal('candidate-package-integrity'),
     actualHostAcceptance: z.literal(false) }).strict(),
@@ -39,7 +43,8 @@ const schema = z.discriminatedUnion('kind', [z.object({ ...common, kind: z.liter
   if (value.expiresAt <= value.issuedAt || value.expiresAt - value.issuedAt > 30 * 86400)
     context.addIssue({ code: 'custom', message: 'Release validity must be at most 30 days.' });
   const prefix = {'galaxy-client-release':'galaxy-client','galaxy-native-host-release':'galaxy-native-host','galaxy-native-client-release':'galaxy-native-client','galaxy-native-go-release':'galaxy-native-go'}[value.kind];
-  if (value.package.filename !== `${prefix}-${value.package.version}.tgz`
+  const suffix=value.kind==='galaxy-native-go-release'&&value.package.target?`-${value.package.target.goos}-${value.package.target.goarch}`:'';
+  if (value.package.filename !== `${prefix}-${value.package.version}${suffix}.tgz`
     || new Set(value.package.exports).size !== value.package.exports.length)
     context.addIssue({ code: 'custom', message: 'Release package metadata mismatch.' });
 });

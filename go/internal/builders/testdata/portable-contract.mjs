@@ -14,5 +14,5 @@ if(process.argv[2]==='portable-verify'){
  if(snapshot.id!==r.id||snapshot.id!==statement.id||snapshot.id!==reportId||snapshot.builderId!==builderId||statement.builderId!==snapshot.builderId||statement.declarationId!==snapshot.declarationId||statement.declarationHash!==snapshot.declarationHash||snapshot.reportHash!==digest(JSON.stringify(statement))||snapshot.assessorId===snapshot.ownerId||snapshot.checkedAt!==r.issuedAt||snapshot.expiresAt!==r.expiresAt||statement.observedAt>snapshot.checkedAt||statement.expiresAt<snapshot.expiresAt)throw Error('Conformance snapshot mismatch');
  console.log(JSON.stringify({verified:true}));
 }else if(process.argv[2]==='probe-sdk'){
- const {sdkPeer}=await import('../../../../packages/galaxy-a2a/test/sdk-peer.mjs');const peer=await sdkPeer();try{console.log(JSON.stringify(input?{reply:await peer.post(peer.endpoint,{bodyJson:JSON.stringify(input)}),requests:peer.requests}:{card:peer.card}));}finally{await peer.close();}
+ const {sdkPeer}=await import('../../../../integrations/reference-worker-pack/test/sdk-peer.mjs');const peer=await sdkPeer();try{console.log(JSON.stringify(input?{reply:await peer.post(peer.endpoint,{bodyJson:JSON.stringify(input)}),requests:peer.requests}:{card:peer.card}));}finally{await peer.close();}
 }else throw Error('mode required');

@@ -201,6 +201,18 @@ func (s *Store) WorkGet(ctx context.Context, q WorkQuery) (any, error) {
 		for _, r := range sr {
 			summaries = append(summaries, summaryView(r))
 		}
+		var summaryInput any
+		if len(rows) > 0 {
+			var previous map[string]any
+			if len(sr) > 0 {
+				previous = sr[0]
+			}
+			last := integer(rows[len(rows)-1]["sequence"])
+			through := integer(previous["through_sequence"])
+			if q.AfterSequence <= through && last > through {
+				summaryInput = workSummaryInput(owner, work["id"], integer(previous["revision"]), last)
+			}
+		}
 		er, e := rowsMaps(ctx, db, "SELECT * FROM work_environments WHERE owner_id=? AND host=? AND session_id=? ORDER BY version", owner, work["host"], work["session_id"])
 		if e != nil {
 			return e
@@ -209,7 +221,7 @@ func (s *Store) WorkGet(ctx context.Context, q WorkQuery) (any, error) {
 		for _, r := range er {
 			environments = append(environments, environmentView(r))
 		}
-		out = map[string]any{"work": view, "observations": observations, "nextAfter": next, "summaries": summaries, "environments": environments}
+		out = map[string]any{"work": view, "observations": observations, "nextAfter": next, "summaryInput": summaryInput, "summaries": summaries, "environments": environments}
 		return nil
 	})
 	return out, e

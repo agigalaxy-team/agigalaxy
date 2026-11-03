@@ -97,12 +97,6 @@ func (h *NativeWatch) Check(ctx context.Context, l *nativeIdentityLease, id stri
 			captured["nextCheckAt"] = w["nextCheckAt"]
 			return nil
 		}
-		if pending != nil && pending["owner"] == h.instanceID && !host {
-			capture("work-pending")
-			captured["workId"] = pending["workId"]
-			captured["nextCheckAt"] = w["nextCheckAt"]
-			return nil
-		}
 		if !force && integer(w["nextCheckAt"]) > h.now() && pending == nil {
 			capture("not-due")
 			captured["nextCheckAt"] = w["nextCheckAt"]
@@ -171,11 +165,17 @@ func (h *NativeWatch) Check(ctx context.Context, l *nativeIdentityLease, id stri
 			return map[string]any{"state": "task-ended", "modelCalls": 0}, nil
 		}
 	}
-	page, messages, e := h.messages(ctx, l, w, text(w["after"]))
+	pending := uploadObject(w["pending"])
+	after := text(w["after"])
+	if pending != nil {
+		if saved, ok := pending["after"].(string); ok {
+			after = saved
+		}
+	}
+	page, messages, e := h.messages(ctx, l, w, after)
 	if e != nil {
 		return nil, e
 	}
-	pending := uploadObject(w["pending"])
 	items := nativeWatchItems(messages, l.scope.Owner, w, pending)
 	hash := nativeWatchHash(items)
 	if host && pending != nil && (text(pending["sourceHash"]) == "" || pending["sourceHash"] != hash) {
@@ -190,6 +190,10 @@ func (h *NativeWatch) Check(ctx context.Context, l *nativeIdentityLease, id stri
 		next = pending["next"]
 	}
 	work := map[string]any{"workId": workID, "roomId": w["roomId"], "items": items, "next": next, "complete": page["complete"]}
+	if pending != nil {
+		work["after"] = after
+		work["sourceChanged"] = text(pending["sourceHash"]) == "" || pending["sourceHash"] != hash
+	}
 	accepted := false
 	_, _, e = h.state(ctx, l, func(state map[string]any) error {
 		current := uploadObject(uploadObject(state["watches"])[id])
@@ -197,11 +201,15 @@ func (h *NativeWatch) Check(ctx context.Context, l *nativeIdentityLease, id stri
 			return nil
 		}
 		current["failures"] = 0
+		current["lease"] = nil
+		if pending != nil {
+			accepted = true
+			return nil
+		}
 		current["nextCheckAt"] = h.now() + 900
 		if page["next"] != nil {
 			current["nextCheckAt"] = h.now()
 		}
-		current["lease"] = nil
 		if len(items) > 0 {
 			current["pending"] = map[string]any{"workId": workID, "next": next, "owner": h.instanceID, "sourceHash": hash, "after": w["after"]}
 		} else {
@@ -218,10 +226,13 @@ func (h *NativeWatch) Check(ctx context.Context, l *nativeIdentityLease, id stri
 		return map[string]any{"state": "stopped-during-check", "modelCalls": 0}, nil
 	}
 	out = map[string]any{"state": "unchanged", "modelCalls": 0, "invokeUserAgent": false}
-	if len(items) > 0 {
+	if pending != nil || len(items) > 0 {
 		out["state"] = "work-ready"
 		out["work"] = work
 		out["invokeUserAgent"] = true
+		if pending != nil {
+			out["nextCheckAt"] = w["nextCheckAt"]
+		}
 	}
 	return out, nil
 }

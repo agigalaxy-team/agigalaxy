@@ -58,6 +58,10 @@ func TestNavigationOriginalJournalPathsAndReturnScope(t *testing.T) {
 		t.Fatal("journal return ID differs", resumed, e)
 	}
 	delete(resumed, "navigationId")
+	if resumed["url"] != runtime.config.Website+text(opened["targetPath"]) {
+		t.Fatal("original website location lost", resumed)
+	}
+	delete(resumed, "url")
 	if !connectionEqual(resumed, fixture["resumed"]) {
 		t.Fatal("journal return differs", resumed, fixture["resumed"])
 	}

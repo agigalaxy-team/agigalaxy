@@ -2,6 +2,8 @@ package deviceauth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/devicefixture"
@@ -44,4 +46,47 @@ func prepareControlFixture(t *testing.T, pool *pgxpool.Pool, dir string, bootstr
 		t.Fatal(e)
 	}
 	return f
+}
+
+// bindControlFixture issues a real session through the device service. The
+// same-package test cannot import deviceauthfixture without an import cycle.
+func bindControlFixture(t *testing.T, service *Service, f devicefixture.Fixture, scopes []string) (Actor, string) {
+	t.Helper()
+	ctx := context.Background()
+	key, err := identity.PrivatePEM([]byte(f.OwnerPrivate))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sign := func(payload, typ string) string {
+		signature, err := identity.SignIdentityPayload(key, payload, typ)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return signature
+	}
+	challenge, err := service.BindingChallenge(ctx, BindingInput{SubjectID: f.Genesis.ID, GenesisProof: f.Genesis.GenesisProof, InstallationID: f.InstallationID, Scopes: scopes, Control: &BindingControl{DeviceID: f.DeviceID, KeyID: identity.Digest([]byte(f.PublicKeyPEM)), Epoch: 1}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bound, err := service.Bind(ctx, BindInput{Challenge: challenge["challenge"], Signature: sign(challenge["challenge"], "galaxy-binding-response+jws"), ClientSession: challenge["clientSession"]}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		t.Fatal(err)
+	}
+	credential := base64.RawURLEncoding.EncodeToString(secret)
+	preview, err := service.Challenge(ctx, ChallengeInput{BindingID: bound.BindingID, CredentialHash: identity.Digest([]byte(credential))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Activate(ctx, ActivateInput{Challenge: preview["challenge"], Signature: sign(preview["challenge"], "galaxy-session-response+jws")}, nil); err != nil {
+		t.Fatal(err)
+	}
+	actor, err := service.Authenticate(ctx, credential, scopes[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return actor, credential
 }

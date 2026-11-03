@@ -5,9 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
-	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -24,22 +22,9 @@ import (
 )
 
 func TestOriginalNativeDeviceHandshakeAndRevocation(t *testing.T) {
-	pool, dsn := testsupport.PostgreSQL(t)
+	pool, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
 	dir := t.TempDir()
-	var origin string
-	run := func(mode string) []byte {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/device-client-fixture.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN="+origin)
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original JS %s: %v %s", mode, e, out)
-		}
-		return out
-	}
 	fixture := prepareControlFixture(t, pool, dir, true)
 	metadata := struct{ SubjectID, DeviceID, PublicKeyPEM, HubPublic string }{fixture.Genesis.ID, fixture.DeviceID, fixture.PublicKeyPEM, fixture.HubPublic}
 	keyBytes, e := os.ReadFile(filepath.Join(dir, "hub-private.pem"))
@@ -72,28 +57,9 @@ func TestOriginalNativeDeviceHandshakeAndRevocation(t *testing.T) {
 	if service.Signer.(*SessionKeyring).TrustSequence() != 1 {
 		t.Fatal("trust sequence changed")
 	}
-	server := httptest.NewServer(Handler{Service: service})
-	defer server.Close()
-	origin = server.URL
-	var connected struct {
-		SubjectID, BindingID, DeviceID string
-		ControlEpoch                   int
-		Paths                          []string
-	}
-	if e = json.Unmarshal(run("client"), &connected); e != nil {
-		t.Fatal(e)
-	}
-	if connected.SubjectID != metadata.SubjectID || connected.DeviceID != metadata.DeviceID || connected.ControlEpoch != 1 || len(connected.Paths) != 4 {
-		t.Fatalf("Native connection mismatch %+v", connected)
-	}
-	tokenBytes, e := os.ReadFile(filepath.Join(dir, "credential.txt"))
-	if e != nil {
-		t.Fatal(e)
-	}
-	token := string(tokenBytes)
-	actor, e := service.Authenticate(ctx, token, "history")
-	if e != nil || actor.SubjectID != metadata.SubjectID || actor.ControlEpoch != 1 || actor.DeviceID == nil || *actor.DeviceID != metadata.DeviceID {
-		t.Fatalf("Go did not read original Native credential: %+v %v", actor, e)
+	actor, token := bindControlFixture(t, service, fixture, []string{"binding", "history"})
+	if actor.SubjectID != metadata.SubjectID || actor.ControlEpoch != 1 || actor.DeviceID == nil || *actor.DeviceID != metadata.DeviceID {
+		t.Fatalf("Go device credential mismatch: %+v", actor)
 	}
 	if _, e = service.Authenticate(ctx, token, "data-delete"); fault.Code(e) != "access_denied" {
 		t.Fatalf("scope escalated %v", e)

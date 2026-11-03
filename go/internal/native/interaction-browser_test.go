@@ -213,7 +213,7 @@ func TestInteractionBrowserActualIsolatedHeadlessChoiceAndWindowClose(t *testing
 			run := func(scope *ChoiceScope) (any, error) { calls++; return store.configureArchive(ctx, selection, scope) }
 			pending := interactionChoice(t, browser, input, run)
 			before := calls
-			script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const context=await browser.newContext();const page=await context.newPage();await page.goto(process.argv[1]);const action=process.argv[2];if(action==='window-close'){await page.close();}else{await page.getByRole('button',{name:action==='allow'?'允许本次操作':'取消',exact:true}).click();const text=await page.textContent('body');if(!text.includes(action==='allow'?'已允许本次显示的操作':'已取消'))throw Error('actual form response mismatch');}await context.close();console.log(JSON.stringify({isolatedHeadless:true,action}));}finally{await browser.close();}`
+			script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const context=await browser.newContext();const page=await context.newPage();await page.goto(process.argv[1]);const action=process.argv[2];if(action==='window-close'){await page.close();}else{await page.getByRole('button',{name:action==='allow'?'允许本次操作':'取消',exact:true}).click();const text=await page.textContent('body');if(!text.includes(action==='allow'?'已允许':'已取消'))throw Error('actual form response mismatch');}await context.close();console.log(JSON.stringify({isolatedHeadless:true,action}));}finally{await browser.close();}`
 			result := initializationNode(t, script, text(pending["url"]), action)
 			if result["isolatedHeadless"] != true {
 				t.Fatal(result)

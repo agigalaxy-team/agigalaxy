@@ -30,7 +30,7 @@ func NewNativeNavigation(runtime *Runtime, options NavigationOptions) *NativeNav
 	if options.Timeout <= 0 {
 		options.Timeout = 10 * time.Second
 	}
-	return &NativeNavigation{runtime, options}
+	return &NativeNavigation{runtime: runtime, options: options}
 }
 func navigationSchema() map[string]any {
 	var value map[string]any
@@ -422,5 +422,5 @@ func (n *NativeNavigation) Resume(ctx context.Context, id string) (map[string]an
 	if e = authority.check(operation); e != nil {
 		return nil, e
 	}
-	return map[string]any{"navigationId": id, "origin": parsed["origin"], "object": object, "data": data, "current": current, "sourceError": sourceError, "state": state, "businessMutation": false, "returnedToHost": "host-controlled", "closedWindowDoesNotCancel": true}, nil
+	return map[string]any{"navigationId": id, "origin": parsed["origin"], "object": object, "url": n.runtime.config.Website + path, "data": data, "current": current, "sourceError": sourceError, "state": state, "businessMutation": false, "returnedToHost": "host-controlled", "closedWindowDoesNotCancel": true}, nil
 }

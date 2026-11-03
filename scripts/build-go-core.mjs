@@ -16,7 +16,7 @@ const jsonStream=text=>text.trim()?text.trim().split(/\r?\n(?=\{)/).map(value=>J
 
 // Build construction only. Release mode selects the deployable Go format; it
 // never installs services, migrates databases, or asserts platform acceptance.
-export async function buildGoCore({destination,sourceDirectory=root,goExecutable='go',releaseId,configurationVersion,goos=platform[process.platform],goarch=architecture[process.arch],includeNative=true,mode='candidate'}={}){
+export async function buildGoCore({destination,sourceDirectory=root,goExecutable='go',releaseId,configurationVersion,goos=platform[process.platform],goarch=architecture[process.arch],includeNative=true,mode='candidate',macOSNotificationApp}={}){
  if(![destination,sourceDirectory].every(v=>typeof v==='string'&&isAbsolute(v))||typeof goExecutable!=='string'||!goExecutable.trim()||!label(releaseId)||!label(configurationVersion))throw Error('Absolute new output/source, nonempty Go command and explicit release/configuration labels required');
  if(!['windows','linux','darwin'].includes(goos)||!['amd64','arm64'].includes(goarch))throw Error('Unsupported Go candidate target');
  if(!['candidate','release'].includes(mode))throw Error('Build mode must be candidate or release.');
@@ -46,7 +46,7 @@ export async function buildGoCore({destination,sourceDirectory=root,goExecutable
   // The same standalone Native builder includes compact Apps, host adapter,
   // templates, original platform resources and Native license. Resources are
   // copied only by that builder, before its manifest and this inventory.
-  const built=await buildGoNativeCandidate({destination:join(destination,'native'),sourceDirectory,goExecutable,goos,goarch});
+  const built=await buildGoNativeCandidate({destination:join(destination,'native'),sourceDirectory,goExecutable,goos,goarch,macOSNotificationApp});
   native=built.manifest;
   entries.native='native/'+(goos==='windows'?'galaxy.exe':'galaxy');
  }
@@ -98,6 +98,6 @@ export async function buildGoCore({destination,sourceDirectory=root,goExecutable
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const args=process.argv.slice(2),options={};
- while(args.length){const key=args.shift();if(key==='--without-native'){options.includeNative=false;continue;}const names={'--output':'destination','--source':'sourceDirectory','--go':'goExecutable','--release':'releaseId','--configuration-version':'configurationVersion','--goos':'goos','--goarch':'goarch','--mode':'mode'};if(!names[key]||!args.length||args[0].startsWith('--'))throw Error('Usage: node scripts/build-go-core.mjs --output ABS_NEW --release LABEL --configuration-version LABEL [--go COMMAND_OR_ABS_GO] [--source ABS_SOURCE] [--goos linux|windows|darwin] [--goarch amd64|arm64] [--without-native] [--mode candidate|release]');options[names[key]]=args.shift();}
+ while(args.length){const key=args.shift();if(key==='--without-native'){options.includeNative=false;continue;}const names={'--output':'destination','--source':'sourceDirectory','--go':'goExecutable','--release':'releaseId','--configuration-version':'configurationVersion','--goos':'goos','--goarch':'goarch','--mode':'mode','--macos-notification-app':'macOSNotificationApp'};if(!names[key]||!args.length||args[0].startsWith('--'))throw Error('Usage: node scripts/build-go-core.mjs --output ABS_NEW --release LABEL --configuration-version LABEL [--go COMMAND_OR_ABS_GO] [--source ABS_SOURCE] [--goos linux|windows|darwin] [--goarch amd64|arm64] [--without-native] [--mode candidate|release] [--macos-notification-app ABS_APP]');options[names[key]]=args.shift();}
  console.log(JSON.stringify(await buildGoCore(options)));
 }

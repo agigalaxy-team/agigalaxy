@@ -6,7 +6,6 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"sort"
-	"strings"
 )
 
 func nativeCompactUIAdvertised(req *mcp.CallToolRequest) bool {
@@ -62,7 +61,11 @@ func panelToolResult(data panelMap, req *mcp.CallToolRequest) *mcp.CallToolResul
 	if len(component) > 0 {
 		meta["galaxyPanel"] = component
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: panelPresentation(model)}}, StructuredContent: model, Meta: meta}
+	encoded, err := protocol.Encode(model)
+	if err != nil {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "当前内容暂不可用。"}}}
+	}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(encoded)}}, StructuredContent: model, Meta: meta}
 }
 func panelToolError(e error, hostView bool) *mcp.CallToolResult {
 	code := panelCode(e)
@@ -268,102 +271,4 @@ func registerNativePanelTools(server *mcp.Server, tools *toolRuntime, runtime *R
 		})
 	}
 	return panel.Close
-}
-
-func panelPresentation(data panelMap) string {
-	if data["error"] != nil {
-		return "当前内容暂时无法取得。保留原输入，稍后重试或继续原工作。"
-	}
-	if data["url"] != nil && data["schemaVersion"] == nil {
-		prefix := "可以打开当前内容："
-		if data["launched"] == true {
-			prefix = "已请求打开当前内容。"
-		}
-		return prefix + "\n" + text(data["url"])
-	}
-	if data["draft"] != nil && data["schemaVersion"] == nil {
-		return "笔记已保存在本机。"
-	}
-	lines := []string{}
-	add := func(v any) {
-		if panelNonempty(v) {
-			switch value := v.(type) {
-			case string:
-				lines = append(lines, value)
-			case jstext.String:
-				lines = append(lines, value.Decoded())
-			}
-		}
-	}
-	if data["sourceError"] != nil || data["helpError"] != nil {
-		add("部分内容暂不可用，请继续原工作或稍后重试。")
-	}
-	source := psObject(data["source"])
-	if source != nil {
-		add(panelDefault(source["title"], "当前工作"))
-		add(source["summary"])
-		method := psObject(source["method"])
-		if panelNonempty(method["solutionStrategy"]) {
-			add(method["problemPattern"])
-			add("解决方法：" + text(method["solutionStrategy"]))
-			if panelNonempty(method["applicableScope"]) {
-				add("适用范围：" + text(method["applicableScope"]))
-			}
-			limitations := helpStrings(method["limitations"])
-			if len(limitations) > 0 {
-				add("限制：" + strings.Join(limitations, "；"))
-			}
-		}
-		messages := trustArray(psObject(source["conversation"])["messages"])
-		if len(messages) > 0 {
-			add("当前已读取的消息：")
-			if len(messages) > 5 {
-				messages = messages[len(messages)-5:]
-			}
-			for _, v := range messages {
-				m := psObject(v)
-				add(text(panelDefault(m["authorLabel"], "成员")) + "：" + text(panelDefault(m["text"], "这条消息已撤回。")))
-			}
-		}
-	}
-	count := 0
-	for _, v := range trustArray(psObject(data["help"])["offers"]) {
-		offer := psObject(v)
-		if offer["state"] == "current" && count < 4 {
-			count++
-			add(offer["helpDescription"])
-			add(offer["userFacingReason"])
-		}
-	}
-	if preview := psObject(data["preview"]); preview != nil {
-		label := map[string]string{"publish-task": "发布请求", "task-event": "更新请求", "participation-propose": "申请参与", "participation-event": "更新参与情况", "context-grant": "分享材料", "context-event": "调整材料范围"}[text(preview["kind"])]
-		if label == "" {
-			label = "本次操作"
-		}
-		add("已准备" + label + "，请查看内容与范围。")
-	}
-	operationLabel := func(v any) string {
-		label := map[string]string{"prepared": "待发送", "absent": "尚未发送", "submitting": "正在发送", "unknown": "正在确认是否发送", "acknowledged": "已完成", "conflict": "内容发生变化", "declined": "已取消", "accepted": "已发送", "proposed": "已申请", "revoked": "已撤销", "active": "进行中", "open": "进行中", "closed": "已结束", "pending": "正在发送", "retracted": "已撤回", "expired": "已过期", "available": "可使用"}[text(v)]
-		if label == "" {
-			return "已更新"
-		}
-		return label
-	}
-	if result := psObject(data["actionResult"]); result != nil {
-		add(operationLabel(result["state"]))
-	}
-	if result := psObject(data["messageResult"]); result != nil {
-		if result["state"] == "accepted" {
-			add("消息已发送。")
-		} else {
-			add(operationLabel(result["state"]))
-		}
-	}
-	if data["handoff"] != nil {
-		add("可以带着当前结果继续原工作。")
-	}
-	if len(lines) == 0 {
-		return "在原工作中说明想取得的帮助，银河将沿用已有内容和身份继续。"
-	}
-	return strings.Join(lines, "\n\n")
 }

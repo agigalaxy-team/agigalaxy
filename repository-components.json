@@ -238,7 +238,7 @@
         "go/internal/native/runtime.go"
       ],
       "configurationInputs": [
-        "integrations/native-v2/prepare-service-config.mjs",
+        "go/internal/native/service-configuration.go",
         "integrations/native-v2/host-capabilities.json",
         "opencode.json",
         ".opencode/tui.json"
@@ -276,7 +276,7 @@
       "id": "a2a",
       "kind": "client",
       "roots": [
-        "packages/galaxy-a2a",
+        "go/internal/native",
         "integrations/reference-worker-pack"
       ],
       "dependsOn": [
@@ -294,16 +294,19 @@
         ]
       ],
       "sourceEntries": [
-        "packages/galaxy-a2a/src/protocol/bridge.mjs",
-        "packages/galaxy-a2a/src/hosts/host-flow-v2.mjs"
+        "go/internal/native/a2a-host.go",
+        "go/internal/native/a2a-tools.go",
+        "go/internal/native/a2a-work.go",
+        "integrations/reference-worker-pack/worker.mjs"
       ],
       "configurationInputs": [
-        "packages/galaxy-a2a/package.json"
+        "integrations/reference-worker-pack/package.json",
+        "integrations/reference-worker-pack/package-lock.json"
       ],
-      "artifact": "source-protocol-adapter",
+      "artifact": "go-native-a2a-and-reference-peer",
       "dataOwner": "Peer reports preserve their issuer and scope; local decision and account authorization remain separate.",
       "interfaces": [
-        "Package exports: root, host, host-v2, facts-v2 and discovery"
+        "Go Native A2A and Worker MCP tools; reference Worker uses the third-party A2A protocol"
       ],
       "files": []
     },

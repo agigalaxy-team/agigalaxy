@@ -382,13 +382,6 @@ export function createHistoryPages(session: GalaxyMenuSession) {
       };
       const outcomeLabel = (value: unknown) =>
         outcomes[String(value)]?.[chinese ? 0 : 1] ?? plain(value);
-      const refreshed = page.refresh
-        ? `${chinese ? '按当前可见来源重算 / 检查时间' : 'Rebuilt from current visible sources / checked at'}: ${new Date(page.refresh.checkedAt * 1000).toISOString()}`
-        : '';
-      const ci = page.pageSummary?.ciSources;
-      const ciSummary = ci
-        ? `${chinese ? '本页 CI Proof / 来源组 / 重复记录' : 'Page CI proofs / source groups / duplicate records'}: ${ci.proofRecordCount} / ${ci.sourceGroupCount} / ${ci.duplicateProofRecordCount}; ${chinese ? '不作为独立证据计数' : 'not an independent evidence count'}`
-        : '';
       const options = items.map((item, index) => ({
         number: String(index + 1),
         title: plain(item.title),
@@ -397,7 +390,7 @@ export function createHistoryPages(session: GalaxyMenuSession) {
       const routes: Routes = {};
       const render = () =>
         session.showSelect({
-          title: `${chinese ? 'Galaxy / 可见履历' : 'Galaxy / Visible history'}\n${chinese ? '端点报告的记录；不代表能力认证' : 'Endpoint-reported records; not capability certification'}\n${refreshed}\n${ciSummary}\n${page.search?.windowLimited ? (chinese ? '已达到本次扫描上限；请翻页继续，不代表全库无匹配。' : 'Scan window reached; continue to next page. This is not a complete search.') : ''}\n${items.length ? '' : chinese ? '本页暂无匹配履历' : 'No matching history on this page'}`,
+          title: `${chinese ? 'Galaxy / 可见履历' : 'Galaxy / Visible history'}\n${page.search?.windowLimited ? (chinese ? '本次未查遍全部记录。' : 'This search did not cover all records.') : ''}\n${items.length ? '' : chinese ? '本页暂无匹配履历' : 'No matching history on this page'}`,
           options,
           routes,
           onBack: back,
@@ -497,7 +490,7 @@ export function createHistoryPages(session: GalaxyMenuSession) {
               const choices: Routes = {
                 1: render,
                 6: () =>
-                  session.showInfo(plain(item.title), sourceText, actions),
+                  session.showReading(plain(item.title), sourceText, actions),
               };
               if (connectionController.recordSearchFeedback) {
                 entries.push({
@@ -749,7 +742,7 @@ export function createHistoryPages(session: GalaxyMenuSession) {
           ...item.matchReasons.map(plain),
         ].join('\n');
         routes[index + 1] = () =>
-          session.showInfo(
+          session.showReading(
             plain(item.title),
             [
               sourceReadingText(

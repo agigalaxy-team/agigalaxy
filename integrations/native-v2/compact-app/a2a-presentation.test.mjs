@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {a2aParticipantContent,describeNativeChoice} from '../presentation/native-result.mjs';
 import {workerPanelText} from './worker-result.mjs';
+import {readableToolOutput} from './presentation.mjs';
+
+test('tool output retains authored content without displaying machine metadata',()=>{
+ assert.equal(readableToolOutput(JSON.stringify({content:[{type:'text',text:'实际工具正文'}],revisionBasis:'local-observation'})),'实际工具正文');
+ assert.equal(readableToolOutput(JSON.stringify({message:'需要继续核对',metadata:{text:'内部说明'},sourceVersion:'unknown'})),'需要继续核对');
+ assert.equal(readableToolOutput(JSON.stringify({revisionBasis:'local-observation',sourceVersion:'unknown',sequence:12,metadata:{message:'内部元信息'}})),'');
+ assert.equal(readableToolOutput(JSON.stringify({content:[{type:'text',text:JSON.stringify({revisionBasis:'local-observation'})}]})),'');
+ assert.equal(readableToolOutput('{"message":"尚未完整'), '');
+ assert.equal(readableToolOutput('普通文本结果'),'普通文本结果');
+ assert.equal(readableToolOutput('```json\n{"key":"value"}\n```'),'```json\n{"key":"value"}\n```');
+});
 test('A2A separates only the exact matching system source prefix and retains authored limits and protocol bytes',()=>{
  const associationId='a3d7f7e1-4765-4262-9b99-71a549b78f69',responseHash='b'.repeat(64),prefix=`External A2A participant report; no independent Verification, acceptance or Resolution. Association ${associationId}; response SHA256 ${responseHash}; artifacts remain selected summaries/hashes in the private local journal.`;
  const preview={action:'result',associationId,exact:{source:{responseHash},payload:{schemaVersion:2,kind:'result-recorded',reportedOutcome:'partial',summary:'合计：42',limitations:prefix+' 仅完成所选计算。'}}},bytes=JSON.stringify(preview);

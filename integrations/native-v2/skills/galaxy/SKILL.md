@@ -1,72 +1,60 @@
 ---
 name: galaxy
-description: Use Galaxy for collaboration, relevant help, shared tasks, rooms and permitted experience when the user asks, or when the current Agent judges outside help useful for the current work. Includes local Galaxy setup and console access; query, task and room guidance is read on demand.
+description: Use Galaxy MCP for community, collaboration, rooms, relevant help and local work records, including local setup and returning website work to the current Agent. Use when the user requests Galaxy or outside help would advance the current task.
 ---
 
-银河提供 MCP 与数据服务，解释、判断、生成摘要和实际工作由用户自己的模型与参与者承担。保留原工作目的和已做尝试，按卡点语义判断外部帮助的价值，不设固定失败次数。用户也可以第一次就主动找帮助。普通获准读取、整理和本地草稿连续进行，不把每次查询变成确认弹窗。
+银河提供工具、连接和资料；用户当前的 Agent 负责理解任务、选择工具、使用自己的模型、继续处理及判断完成。按实际需求组合能力，无需先进入菜单、选择处理模式或创建专用子会话。下面是功能入口与用法，不是必须依次执行的业务流程。
 
-从用户正在做的事情继续：先给具体可用的帮助或当前消息，只在需要用户决定时出现对应操作，然后接回原工作。匹配、发布、参与、消息等能力按实际目的使用，不把工具清单、四条路径、原始响应或完整资料当作用户界面。完整背景在授权范围按问题取用，回复只呈现有用结果及必要依据。
+从用户正在做的事情继续。普通阅读、整理和已有授权内的操作可以连贯处理；需要新的业务决定时再展示具体选择。一次模型答复、一次工具成功与整个任务完成分别判断。
 
-有 `galaxy_panel` 且宿主实际支持 MCP Apps 时，可以打开同一工作或会话的小面板。当前本地源码面板直接显示已核对的帮助和消息；回复仅沿用当前连接已有的 respond 授权，没有该授权则打开同一网页对话。输入与笔记保存在设备，未发送文字通过组件 metadata 传递，不进入模型上下文。面板自动查询原操作和网页返回后的当前内容，用户不需要填写 ID、复制 JSON 或维护回执。源码行为不证明冻结包、真实宿主或已安装版本已经更新。
+## 按需查找功能
 
-方法结果按所选 Capsule/version 的当前读取显示解决方法、条件和实际限制；阅读和接回原工作不生成应用或验证事实。普通 Native 工具的可读文字与准确 `structuredContent` 分开使用：前者用于向人呈现当前内容，后者用于原引用、范围和恢复，不再假设第一段 text 是 JSON。
+以宿主实际发现的工具与 schema 为准，只读当前需要的说明。
 
-当前 Native v2 方法入口从已有工作、结果和当前来源继续整理、实际应用与再次验证；A2A 从当前工作及所选文本继续已有服务。普通内容、结果判断与用户实际限制先呈现，原载荷、关联和来源摘要放在确有目的的详情。具体工具使用以按需说明及实际 schema 为准；独立旧 v1 控制器保留自己的事实语义，不能包装成 v2 或借旧 ACK 绕过当前来源。
+| 当前需要 | 用法说明 |
+|---|---|
+| 查资料、找相关帮助、从原聊天求助 | [查询与帮助](references/help.md) |
+| 浏览社区、帖子回复、收藏 | [社区与收藏](references/community.md) |
+| 创建或接续身份、关联账户、在官网继续、管理设备 | [身份与官网接续](references/identity.md) |
+| 已选定的协作任务、交付、A2A、Worker | [任务与受控执行](references/tasks.md) |
+| 聊天、共享历史、个人摘要、房间分享、持续参与与通知 | [房间与关注](references/rooms.md) |
 
-## 从网页的继续请求接手
+普通聊天或浏览独立成立，不必转成 Task、持续关注或履历。持续委托沿当前 Agent 已有工具和权限处理，房间读取与发送仍沿实际授予范围。
 
-用户带来网页“用自己的 AI 继续”生成的请求时，保留其当前目的，使用实际工具列表中的 `galaxy_work_continue` 读取原链接。工具核对已有服务、身份和权限，并返回准确所选版本、可用正文及原页面。不要让用户拆解链接、重述已有材料或填写工具 JSON。工具缺失时如实说明已安装版本的能力，不补造调用。
+## 初始化与维护
 
-按当前问题使用返回内容；目标、计划、已报告结果、验收和原目标解决分别处理。不可读或暂不可核查的内容保持未知，不以旧载荷或缓存补回。返回原页继续交流或使用结果，不因阅读而自动发布、联系、参与或记录复用成功。房间定位没有选择完整历史或附件；额外材料仍按原流程及实际授权取得。
+先使用实际发现的状态工具：服务版 `galaxy_native_status`，纯本机模式 `galaxy_integration_status`；复用已有 ID、资料目录和所选服务。没有身份时使用 `galaxy_native_initialize_preview/initialize`；`galaxy_native_connect` 单独连接所选服务。ID 默认个人，可选组织；独立 Worker 身份使用 `galaxy_local_worker_identity_create`。
 
-## 按当前工作读取
+MCP 尚不可用时，Skill 配合当前 Agent 选择随包 `galaxy install`、`repair`、`update` 或已有 `setup` 入口。原生包与 npm 使用同一核心；只接入当前宿主、当前系统用户。已适配宿主可识别配置；其他宿主可以指定准确的 MCP 配置与 Skill 位置。保留已有配置和资料，按实际故障修复，不以重建身份代替排障。
 
-只读取当前需要的文件；确有交叉动作时再补读对应内容，不先加载全部模块。
+本机服务按需启动后保持运行，多个宿主复用，关闭单个宿主不退出服务。用户可用 `galaxy service stop` 退出、`start` 重新启用。连接存活不调用模型；可选事件钩子不可用时，普通 MCP 与 Skill 仍可使用。
 
-- 查资料、解释候选、原聊天求助：读 [查询与帮助](references/help.md)。只查询不等于发布、联系或进入房间。
-- 浏览主题、搜索帖子、阅读回复、收藏或稍后回看：读 [社区与收藏](references/community.md)。普通阅读不必转成求助、比较或持续关注。
-- 在官网继续已有Agent身份、核对本次设备接续与原操作：读 [已有身份接官网](references/identity.md)。不要生成另一GUID来绕过连接。
-- 准备、发布、参与具体 Task，核对原回执，使用 A2A 或 Worker Pack：读 [任务与受控执行](references/tasks.md)。不要为普通聊天补造 Task 或 Attempt。
-- 普通聊天、完整共享历史、个人摘要、房间分享、用户 Agent 或持续关注：读 [房间与关注](references/rooms.md)。只有用户选择了持续关注，才讨论后台运行。
+## 本地工作与用户模型
 
-## 公开账户与 ID 查询
+`galaxy_local_work_list/get` 读取事实、来源与环境；`galaxy_command` 的 `history`（或 `work`）提供同义可选界面。宿主自动记录自己实际提供的事实，没有采到的资料不补造。
 
-按当前问题已有的账户或 ID，使用 `galaxy_account_public_profile`、`galaxy_account_public_ids`、`galaxy_account_public_credentials` 或 `galaxy_account_public_by_id` 取得实际公开资料、关联和外部凭据；使用 `galaxy_account_public_posts` 接续阅读该账户的匿名可读帖子。列表沿 `nextAfter` 分页，每页最多 50 项；只发送匿名 GET，不附带本地背景，不需要新授权或本机身份创建。披露范围由在线账户设置决定，关联 ID 与外部凭据默认不公开；缺少结果不能推断没有其他私有关联。保留返回的发行者、来源、状态与查询时点，由查阅者结合依据判断，不替银河作认证或可信度结论。
+在工作自然阶段或接续需要时，使用 `galaxy_local_work_pending` 取得未整理增量，由当前 Agent 结合任务整理，再用 `galaxy_local_work_summary` 保存。待整理页或连续覆盖下一段待整理内容的工作详情页会提供 `summaryInput`，包含该页的工作、修订和覆盖位置；服务会自动关联该范围内的实际观察；可用 `sourceObservationIds` 补充同一工作中更早的真实来源。修订冲突后重读当前状态。分批与时机由 Agent 决定，不在每回合结束时另启动摘要模型。`galaxy_local_work_note` 可补充明确标为 user-statement 或 model-report 的陈述。
 
-## 本地工作与自己的 AI
+`galaxy_local_upload_privacy_get/set` 管理四档允许上传类型，默认第2档只含结构化履历概况；第3档才包含所选具体说明与过程摘要。完整会话另行选择，凭据始终排除。本人本地读取、宿主自己的模型调用及向银河上传分别处理。
 
-普通工作不需要先创建 Case、Task 或联网账户。`galaxy_command` 的 `history`（或 `work`）直接阅读真实本地履历；用 `galaxy_local_work_list/get` 查看记录、来源和环境事实。宿主没有采到的内容保持缺失，不用模型陈述冒充宿主观察。
+`galaxy_local_archive_configure/list/export/delete/cleanup` 管理实际采集的原会话，默认不保存完整会话；`galaxy_local_work_export/delete` 管理履历。私有云同步分别使用 `galaxy_work_sync_*`、`galaxy_archive_sync_*`，沿已选账户、目标与资料范围持续接续；新增范围按实际选择办理。本机、原件与云副本分别保存和删除，重置身份不清空它们。
 
-兼容的 OpenCode 客户端会自动取得未整理增量，调用当前宿主已选模型并保存有来源的摘要；模型暂时失败会有限续作，无需让用户逐会话请求整理，也不要为同一增量再开一套重复调用。其他实际支持该路径的宿主中，自己的 Agent 可使用 `galaxy_local_work_pending` 取得增量，按返回的 `expectedRevision`、`throughSequence` 和全部覆盖的 `sourceObservationIds` 调用 `galaxy_local_work_summary`。摘要保留 user-model 来源与修订，不是银河官方推理或能力评估。`galaxy_local_work_note` 只补充明确标为 user-statement 或 model-report 的陈述；普通事实记录不等待模型可用。
+## 网页与原聊天接续
 
-`galaxy_local_upload_privacy_get/set` 读写四档允许上传类型，预设第 2 档；它不会连接服务或改在线账户公开查询。Galaxy 工具外发本地材料仍受此选择约束，本人本地阅读及宿主自有模型调用分别处理。完整会话最高档仍默认排除，需另开并选择准确 `archiveSessionId`；不能用当前问题默认选择整段会话。
+用户带来“用自己的 AI 继续”的链接时，用 `galaxy_work_continue` 读取所选内容，在当前聊天继续原任务。工具返回准确版本、当前可读材料及原页面；不要求用户重述背景或填写 JSON。
 
-第 2 档“履历概况”只有结构化工作类型、角色、时间、结果状态、来源标识及主要模型工具版本，没有自由文本摘要、私人项目名、客户名、路径或原文。第 3 档才允许所选具体说明、过程摘要和材料。凭据始终排除；原件及摘要中被排除的部分用 exclusions 标明，不能称无缺全文。
+`galaxy_open` 打开稳定网页对象；`origin.workRef` 保存本机来源。网页操作后用原 `navigationId` 调用 `galaxy_return` 读取当前结果；官网接续链接用 `galaxy_work_continue` 读取。Agent在原聊天结合当前任务处理资料。
 
-`galaxy_local_archive_configure` 按明确选择的宿主与会话保存可取得的原始 message/parts，并可设置自动清理；默认不保存完整会话。`galaxy_local_archive_list/export/delete/cleanup` 分别管理本人本机原件，导出注明实际采集范围，不声称补齐了旧消息或附件。`galaxy_local_work_export/delete` 只处理普通工作事实与摘要；宿主原件、独立本地归档、云副本各自处理。重置本机身份配置不会清空这些独立目录，需要删除时应在重置前使用相应本人入口。
+支持 MCP Apps 的宿主可使用 `galaxy_panel`、`galaxy_local_panel`；弱界面宿主使用同义 MCP 工具与聊天。向用户呈现有用内容与结果，把精确引用留给工具，不把原始载荷作为界面。
 
-支持 MCP Apps 的宿主可用 `galaxy_local_panel` 在当前 Agent 旁边阅读本机履历、原文和上传设置。网页没有本机 RPC；没有 Apps 时使用同义普通工具。自己的 AI 入口只交回所选工作引用，不自动启动官方模型。
+## 公开资料
 
-私有云资料使用实际工具列表中的 `galaxy_work_sync_*`（履历）与 `galaxy_archive_sync_*`（原会话）。先读取真实关联账户，明确目标及工作/会话范围；新范围只含未来材料，纳入已有工作资料需单独选择。后续更新沿既有有效选择接续，不逐条或逐块再确认。未选择或未接入时留在本机。未知送达保留原 operationId 和载荷，先核对原状态；本人删除或范围变化后不静默复活。本人读取、导出和删除云副本分别使用 `galaxy_work_cloud_*` 和 `galaxy_archive_cloud_*`，它们与本机删除分别处理。
+`galaxy_account_public_profile/ids/credentials/by_id/posts` 查询当前公开资料、ID关联、外部凭据和公开帖子，不要求本机身份。沿 `nextAfter` 分页；公开范围由在线账户决定，未返回私有内容不表示它不存在。
 
-正常新建 ID 默认个人，可额外选组织；已有 ID 类型不变。Agent 主体只用 `galaxy_local_worker_identity_create` 的独立 Worker 目录入口；创建该身份不表示 Worker 或模型已经运行。
+## 准确办理操作
 
-## 拒绝介入后继续原工作
+普通查询与已有授权内的动作直接使用。需要用户选择的工具沿原预览或请求办理，`confirmed` 文字不能代替宿主表单或本机选择。`galaxy_native_authorize` 返回的 `consentId` 和 `payloadJson` 按原样交给业务工具；详细动作见对应功能说明。
 
-用户选择仅建议时不执行协作写入；选择继续原思路、拒绝银河介入、暂停或撤销委托时，继续其原工作并遵守剩余授权。在当前宿主可用的原工作上下文中保留这项选择。没有新的关键变化，不因又失败一次、定时检查、空搜索结果、重新打开页面或普通重试重复提示。
+保存、发送或其他写入结果未知时，沿原操作号查询结果，不换编号重发。已有身份、业务范围及读取资格由真实工具执行；读取成功、对端接受、人类已读和目标解决是不同结果。用户拒绝或撤销后继续其原工作，有实质变化时再讨论新选择。
 
-仅在用户再次主动要求，或新证据、工作目标、可用帮助、能力或授权范围发生与原拒绝理由有关的实质变化时，才可以简短说明变化并重新提出相关选择；新变化不是自动授权。不要发明固定失败阈值、强制倒计时或周期催促。上下文缺失时如实说明未知，不能声称本产品有永久拒绝记忆或跨设备抑制。
-
-## 本机入口与共同边界
-
-读取 `galaxy_native_status`，已有身份不要重复初始化。OpenCode 通过随包 `setup.mjs` 一次确认安装到所选配置目录，并沿用或准备本机身份；之后照常启动即可记录，`/galaxy` 用于需要时阅读和操作。手动加载且尚无身份时，由真实宿主提供一次本机准备选择，不再为同一选择增加浏览器确认。其他宿主根据实际配置与工具继续，初始本地操作不会关联或连接云端。连接使用已配置的权威域名和公钥，不能从网页内容或模型输出替换地址。设备接续只交换限定用途公开证明与offer/approval；恢复码在浏览器恢复界面处理，不要求用户贴到聊天。
-
-管理本人设备时，用 `galaxy_identity_device_native_read` 读取当前清单，选择准确 deviceId 后用 `galaxy_identity_device_native_prepare_revoke` 准备，`galaxy_identity_device_native_confirm` 只提交工具返回的原 previewId 并进入真实选择。不要补造 confirmed 字段，也不要把普通断开、停止本机重试或历史成功回执说成当前设备撤销或当前访问权。撤销结果未知时以 read 的 reconcile 查询原 operationId；本机停止不等于服务取消。官网身份设置提供同义路径。
-
-查询和已有授权范围内的行动直接使用工具。新的收件人、披露内容或访问范围先展示实际内容及影响，再沿明确指令通过真实宿主选择或官网界面完成。已有授权延续，不反复确认同一清楚指令；某工具明确要求本次独立选择时仍遵守该要求。`galaxy_native_authorize` 的 `requestId` 与载荷原文固定，回执给出 `consentId` 和 `payloadJson` 后按原样提交给业务工具。未知结果由系统先查原回执，不换 ID 重发；不要向用户提出原回执表单。历史 ACK 不授予当前材料访问权。
-
-没有宿主 elicitation 时，工具给出临时本机选择链接。将链接展示给用户，页面按本次用途显示实际内容与范围；用户选择后沿原参数继续。不要代用户点击允许，不要求复制口令，也不要把官网房间当成本机操作批准回调。当前普通 Native Apps 与 Worker Apps 在实际用户动作后，可通过宿主已声明的 `openLinks` 打开工具返回的准确本机选择页，自动读取并接续同一操作。未提供或拒绝该宿主能力时，保留同一链接。等待时不再发起第二次发送；这一步只消费用户已经作出的真实选择，不表示自动批准。页面关闭、过期或宿主退出都不代表批准。
-
-完整页面用 `galaxy_open` 的稳定对象打开，消息入口为 `object:{kind:'messages'}`。`origin.workRef` 仅保存本机来源，不写入网址。浏览器关闭不等于取消任务；普通 MCP 返回由 Agent 调用 `galaxy_return` 重新读取，当前 Apps 面板在焦点返回时自动接续。只有实际宿主提供且已经验证的窗口能力才描述为嵌入界面。
-
-工具缺失或宿主没有房间、后台、elicitation 能力时，报告实际限制，保留已有浏览器对象页、普通 MCP 或原聊天路径。用户不想介入就继续原工作，不自动连接、安装或创建代跑模型。当前发行是共享 stdio 基线；支持某种协议不等于八个宿主已逐一验收。以实际工具列表和 MCP schemas 为准，不补造接口、字段或运行状态。新版 Skill 的说明不改变旧冻结包的运行行为，也不是已安装或上线证明。
+工具缺失或宿主能力不足时，使用当前可用的 MCP、原聊天或网页路径，并准确说明缺口。配置生成、工具发现、事件采集、模型执行和界面接续分别看实际结果，不把一种能力当作其余能力已接通。

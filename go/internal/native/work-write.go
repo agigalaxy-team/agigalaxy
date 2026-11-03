@@ -334,7 +334,7 @@ func (s *Store) BeginWorkCapture(ctx context.Context, x WorkEnvironmentInput) (a
 	})
 	return out, e
 }
-func (s *Store) ObserveWork(ctx context.Context, x WorkObservationInput) (any, error) {
+func normalizeWorkObservation(x *WorkObservationInput) error {
 	if x.Content != nil {
 		copy := *x.Content
 		x.Content = &copy
@@ -343,19 +343,28 @@ func (s *Store) ObserveWork(ctx context.Context, x WorkObservationInput) (any, e
 		x.Details = json.RawMessage(`{}`)
 	}
 	if !optionalID(x.GalaxyID) || !validID(x.Host) || !validID(x.SessionID) || !validID(x.SourceID) || !isOne(x.Kind, "message", "tool", "session", "artifact", "claim", "gap") || !isOne(x.Source.Kind, "host-event", "user-statement", "model-report", "tool-report", "external-material") || !optionalID(x.Source.MessageID) || !optionalID(x.Source.PartID) || !optionalID(x.Source.EventID) || protocol.TextLength(x.Source.Locator) > 2048 || protocol.TextLength(x.Title) > 180 || !validWorkTime(x.OccurredAt) || !objectJSON(x.Details) || (len(x.Environment) > 0 && !objectJSON(x.Environment)) || (x.Revision != nil && *x.Revision < 0) {
-		return nil, workInvalid()
+		return workInvalid()
 	}
 	if x.Content != nil {
 		if x.Content.Retained == "" {
 			x.Content.Retained = "none"
 		}
 		if protocol.TextLength(x.Content.Excerpt) > 4000 || !isOne(x.Content.Retained, "none", "excerpt", "full") || (x.Content.OriginalLength != nil && *x.Content.OriginalLength < 0) {
-			return nil, workInvalid()
+			return workInvalid()
 		}
+	}
+	return nil
+}
+func (s *Store) ObserveWork(ctx context.Context, x WorkObservationInput) (any, error) {
+	if e := normalizeWorkObservation(&x); e != nil {
+		return nil, e
 	}
 	safe, e := localdata.Redact(x)
 	if e != nil {
 		return nil, e
+	}
+	if prior, ok := ctx.Value(hostIngressExclusionsKey{}).([]localdata.Exclusion); ok {
+		safe.Exclusions = mergeWorkExclusions(safe.Exclusions, prior)
 	}
 	raw, e := localdata.Encode(safe.Value)
 	if e != nil {
@@ -388,6 +397,15 @@ func (s *Store) ObserveWork(ctx context.Context, x WorkObservationInput) (any, e
 	}
 	var out any
 	e = s.historyWrite(ctx, x.GalaxyID, nil, func(db *sql.DB, id string) error {
+		if delivery, ok := ctx.Value(hostIngressDeliveryKey{}).(string); ok {
+			queued, err := oneMap(ctx, db, "SELECT delivery_id FROM host_observation_ingress WHERE owner_id=? AND delivery_id=?", id, delivery)
+			if err != nil {
+				return err
+			}
+			if queued == nil {
+				return fault.New("local_work_ingress_cancelled", 409)
+			}
+		}
 		work, e := findWork(ctx, db, id, WorkQuery{Host: x.Host, SessionID: x.SessionID})
 		if e != nil {
 			return e
@@ -479,7 +497,7 @@ func (s *Store) SubmitWorkSummary(ctx context.Context, x WorkSummaryInput) (any,
 	if x.Outcome == "" {
 		x.Outcome = "unknown"
 	}
-	if !optionalID(x.GalaxyID) || !validID(x.WorkID) || x.ExpectedRevision < 0 || x.ThroughSequence < 0 || len(x.SourceObservationIDs) < 1 || len(x.SourceObservationIDs) > 500 || x.Title == "" || protocol.TextLength(x.Title) > 180 || x.Summary == "" || protocol.TextLength(x.Summary) > 12000 || protocol.TextLength(x.Model) > 256 || !isOne(x.Outcome, "unknown", "reported-success", "reported-failure", "partial", "cancelled") {
+	if !optionalID(x.GalaxyID) || !validID(x.WorkID) || x.ExpectedRevision < 0 || x.ThroughSequence < 0 || len(x.SourceObservationIDs) > 500 || x.Title == "" || protocol.TextLength(x.Title) > 180 || x.Summary == "" || protocol.TextLength(x.Summary) > 12000 || protocol.TextLength(x.Model) > 256 || !isOne(x.Outcome, "unknown", "reported-success", "reported-failure", "partial", "cancelled") {
 		return nil, workInvalid()
 	}
 	for _, id := range x.SourceObservationIDs {
@@ -523,27 +541,24 @@ func (s *Store) SubmitWorkSummary(ctx context.Context, x WorkSummaryInput) (any,
 		if x.ThroughSequence <= after || x.ThroughSequence > integer(work["last_sequence"]) {
 			return fault.New("local_work_summary_coverage_invalid", 400)
 		}
-		covered, e := rowsMaps(ctx, db, "SELECT id FROM work_observations WHERE work_id=? AND sequence>? AND sequence<=?", work["id"], after, x.ThroughSequence)
+		covered, e := rowsMaps(ctx, db, "SELECT id FROM work_observations WHERE work_id=? AND sequence>? AND sequence<=? ORDER BY sequence", work["id"], after, x.ThroughSequence)
 		if e != nil {
 			return e
 		}
 		sources := []string{}
 		set := map[string]bool{}
-		for _, v := range x.SourceObservationIDs {
-			if !set[v] {
-				sources = append(sources, v)
-				set[v] = true
-			}
-		}
 		if len(covered) == 0 {
 			return fault.New("local_work_summary_sources_invalid", 400)
 		}
 		for _, r := range covered {
-			if !set[text(r["id"])] {
-				return fault.New("local_work_summary_sources_invalid", 400)
-			}
+			v := text(r["id"])
+			sources = append(sources, v)
+			set[v] = true
 		}
-		for _, v := range sources {
+		for _, v := range x.SourceObservationIDs {
+			if set[v] {
+				continue
+			}
 			r, e := oneMap(ctx, db, "SELECT id FROM work_observations WHERE id=? AND work_id=? AND sequence<=?", v, work["id"], x.ThroughSequence)
 			if e != nil {
 				return e
@@ -551,6 +566,8 @@ func (s *Store) SubmitWorkSummary(ctx context.Context, x WorkSummaryInput) (any,
 			if r == nil {
 				return fault.New("local_work_summary_sources_invalid", 400)
 			}
+			sources = append(sources, v)
+			set[v] = true
 		}
 		revision := x.ExpectedRevision + 1
 		created := localNow()
@@ -638,6 +655,9 @@ func (s *Store) deleteWork(ctx context.Context, q WorkQuery, scope *ChoiceScope)
 		}
 		if work == nil {
 			return fault.New("local_work_unavailable", 404)
+		}
+		if e = deleteHostIngressWithin(ctx, db, id, text(work["id"]), text(work["host"]), text(work["session_id"])); e != nil {
+			return e
 		}
 		for _, table := range []string{"work_observations", "work_summaries", "work_summary_state"} {
 			if _, e = db.ExecContext(ctx, "DELETE FROM "+table+" WHERE work_id=?", work["id"]); e != nil {

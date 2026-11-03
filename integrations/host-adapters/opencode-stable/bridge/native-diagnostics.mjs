@@ -30,6 +30,7 @@ const codes=new Set(['EACCES','EADDRINUSE','EAGAIN','EBUSY','ECANCELED','ECONNAB
   'host_protocol_invalid','host_rpc_failed','host_rpc_unknown','host_closed','host_process_shutdown_unconfirmed',
   'host_model_execution_unavailable','host_model_interrupted','host_model_summary_failed',
   'local_work_model_failed','local_work_model_session_invalid','local_work_model_interrupted','local_work_model_output_invalid',
+  'local_work_input_invalid','local_work_observation_too_large','local_work_source_revision_conflict','local_work_ingress_cancelled',
   'local_work_summary_revision_conflict','local_work_recording_unavailable','local_archive_selection_unavailable',
   'host_messages_unavailable','local_archive_capture_unavailable','selected_archive_sync_unavailable',
   'request_timeout','request_failed','request_aborted','unauthorized','binding_revoked','invalid_session','session_expired',
@@ -76,6 +77,8 @@ export function nativeDiagnosticFields(input={}){
   if(stages.has(input.stage))output.stage=input.stage;
   if(outcomes.has(input.outcome))output.outcome=input.outcome;
   for(const key of ['requestId','upstreamRequestId'])if(typeof input[key]==='string'&&uuid.test(input[key]))output[key]=input[key];
+  if(typeof input.sourceId==='string'&&/^(?:session-title|session-status|(?:message|part|event):[A-Za-z0-9_-]{1,160})$/.test(input.sourceId))output.sourceId=input.sourceId;
+  if(typeof input.revisionProvided==='boolean')output.revisionProvided=input.revisionProvided;
   if(registeredTools.has(input.tool))output.tool=input.tool;
   if(methods.has(input.method))output.method=input.method;
   if(['opencode','codex','claude-code','copilot'].includes(input.host))output.host=input.host;

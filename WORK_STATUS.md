@@ -1,6 +1,33 @@
 # 当前工作
 
-2026-11-03客户端原始资料核对已完成，结果集中更新[Native工程的功能核对](docs/technical/native-client.md#功能实现核对2026-11-03)。按早期用户原话及10月15—19日后续澄清，对照本线d62a681源码与已有实际结果，分开实现、接线、实测和发行。主要缺口是跨宿主普通工作自动采集/整理、真实嵌入交互、只读Watch以外的完整持续参与、完整帮助协作/同步实测、通用安装维护及正式多平台发行。最新CLI Agent实测目录没有工作履历库，不把此前成功查询扩大为自动积累已验收；旧catalog的remote-sync planned与9月宿主记录也不作为今天状态。此次只更新功能核对与状态，无业务源码、账户或服务变更。
+## 通用插件与本机共用服务（2026-11-03，进行中）
+
+独立工作区 `05-build/worktrees/native-hosts`，分支 `work/native-hosts-20261103`；现行方案见 [Native工程](docs/technical/native-client.md)。主线工作区与已有身份、资料保持原样。完整MCP＋Skill由当前Agent按真实任务组合，不新增固定Watch编排、子模型摘要循环或强制菜单。
+
+已接通：同用户共用Go服务、多资料范围、MCP与Host薄连接、明确退出和恢复；统一install/update/repair/uninstall、当前宿主用户级配置、release复用、npm引导及跨平台候选封包。原始资料仍按本人选择采集，当前Agent负责自然阶段的整理；不默认上传完整会话。
+
+旧实现已退出当前源码与交付主链路：Node连接、导出、删除、公网传输、自定义JS A2A、旧安装配置脚本、自动摘要器和相应废弃测试/对端，归档在整个项目外 `D:/ChatGPT/work/galaxy-native-hosts-20261103/withdrawn-node-business/`、`withdrawn-node-installation/`、`withdrawn-client-orchestration-20261103/`。安装、依赖、组件清单、CI和检查入口已改接现行Go实现。参考Worker保留其真实第三方SDK；现用离线治理准备归Official脚本，`galaxy-client/src/node/`只保留现用日志工具，不是另一套Native核心。归档不参与源码分析、构建或安装。
+
+本批必要实测结果：
+- 共用服务的双资料范围、关闭单宿主保持运行、重接、主动暂停、启动与同版重启通过；原ID保持。实际install→repair→第二宿主→uninstall及npm引导通过，无关MCP配置和资料保留。
+- OpenCode 1.18.31真实TUI及现有Gemini完整工具目录调用通过。最新两轮真实模型先正常沟通，再读取并整理实际履历，3项工具完成、持久化1份摘要、录制失败为0，原会话和未发送草稿保持。
+- 录制器已从可变事件对象改为当前SDK事实的有限投影；完整原件仅在精确选择后另取。6项真实Go录制检查通过，包含10 MiB附件和长工具输出，未选原件不传输。之前的来源修订冲突和模型超时等原失败保留于项目外。
+- 七处设备/生命周期Go夹具的真实隔离PostgreSQL场景通过；私有同步的宿主结束与MCP并发写入、取消等待及原回执丢失恢复通过，没有重复创建原操作。
+- Codex/Claude真实hook→Go原件导出、重复通知、完整尾行、工具调用/结果及锁释放通过。Hermes使用固定上游SessionDB、当前Python插件与真实Go完成4条选中原件及中断尾部导出，重复结束通知不重复采集；不等同于完整Hermes应用模型验收。DSH已接真实接口，尚缺完整宿主运行验收。
+- 用户已明确网页接续只需本地Agent可读MCP：专用网页回调、返回队列、claim/ack、OpenCode轮询和投递菜单均已移出源码归档。实际网页React组件在独立无头浏览器复制接续请求，再经真实Go MCP的work_continue/return读取当前资料通过；项目正文来自隔离HTTP夹具，不冒充真实在线项目或整站验收。
+- Windows候选运行和Linux/macOS交叉构建、归档执行位通过；其余平台桌面运行、macOS签名公证与容器实际运行未验收。受影响TypeScript检查通过，不扩大为全部平台完成。
+
+本批补齐了纯MCP的关注pending重复读取：当前Agent能读原窗口当前可读材料，撤回后不补旧正文，明确ACK原位置；定向真实连接夹具通过。Worker/A2A列表增加真实游标，TUI与Apps接“更多”，不再只截最近32项；Worker回归通过，A2A分页夹具首次缺少重编码后card信任hash导致失败，修正夹具后跨peer分页/范围核对通过，未降低产品信任校验。工具结果呈现提取实际正文，内部JSON不直接显示，呈现用例与TypeScript通过。
+
+最新整包候选在外部 `universal-runtime/delivery-mcp-1150-{windows,linux,darwin}/`（amd64），同一组生成 `delivery-npm-1150/` 和 `delivery-container-1150/`，未发布。1115同一安装/引导实现的Windows平台包与launcher已实际npm pack→离线安装，再经装入的launcher完成install/repair/第二宿主/uninstall；整版release复用、原ID和无关配置保留。实际最新Windows候选的OpenCode TUI安装、MCP、菜单→履历→原聊天、草稿与ID保持、关闭宿主服务继续及最终退出通过（opencode-tui-fixture-tILEv9）。DSH契约适配→Go完成4条事实/选中原件及重放去重/会话隔离，非完整DSH宿主。
+
+MCP结果再次收束：Worker/A2A和普通panel统一单条JSON Content，与原StructuredContent使用同一模型投影；精确后续引用可被只消费Content的宿主模型取得，组件私文仍只在原Meta。移除因此失去消费者的Go人类摘要副本及JS旧result包装，界面保留实际JS renderer。3项定向Go检查通过；factory夹具首次缺少源目录内UI产物，现可直接复用已生成候选UI，不为验收重复构建/复制源码。实际OpenCode＋现有Gemini单次提问完成panel→取得viewId→refresh同一视图，两次工具均成功；首轮继承HTTP代理时API socket关闭、未进入工具的失败保留，沿已成功隔离TUI的最小环境再次执行后通过，没有增加重试/超时或修改产品引擎。
+
+真实宿主进一步接通：Codex CLI 0.152.1 app-server和Claude Code 2.1.309各实际发现当前配置的390个服务工具（不等于配置之外的可选Worker/A2A工具），无模型调用。Hermes固定上游官方PluginManager、MCP discovery及registry真实调度本机status通过（36工具）；DSH固定源MCP插件＋官方Cordis/Tools/Executor也发现36工具并真实调用status，未创建模型会话；其首次清理因夹具Windows路径斜杠比较失败，已明确停止该隔离服务、修正夹具，原失败保留，不伪称应用失败。Hermes工具环境为Python3.12，部分系统site-packages；DSH其余官方npm依赖版本匹配但不声称字节对应固定commit。
+
+剩余工作集中在对应宿主的完整模型/GUI及适用平台实机验收和正式发行：上述官方MCP调用与DB原件结果不代替完整Hermes/DSH模型会话。Linux/macOS桌面、容器实际运行和签名公证尚未验收；本轮不擅自上架发布。已确认不建设自动向原聊天投递的额外机制，不再把它列作待决。原始身份、私有资料和正式宿主配置不重建；证据、原失败及候选均在项目外 `D:/ChatGPT/work/galaxy-native-hosts-20261103/`。
+
+本轮成果仅在独立本地分支；尚未上传、正式发行或部署，未改变生产数据库、认证、模型及真实宿主配置。下方既有工作结果不代表本轮所有范围完成。
 
 ## 2026-11-03：真实客户端创建ID、官网账户绑定与首次Agent调用（完成）
 

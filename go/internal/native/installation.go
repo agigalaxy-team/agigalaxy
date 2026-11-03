@@ -2,7 +2,6 @@ package native
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -167,123 +166,6 @@ func hostDirectoryCheck(path string) error {
 	return e
 }
 
-// PrepareNativeInstallationReviewed performs the existing local install only
-// after the caller presents this exact plan. It never starts the host or binds
-// a remote identity. Files in separate directories are not a global transaction.
-func PrepareNativeInstallationReviewed(ctx context.Context, plan *NativeInstallationPlan, subject string, confirmed bool) (map[string]any, error) {
-	if plan == nil || !confirmed {
-		return map[string]any{"prepared": false, "canceled": true, "identityCreated": false, "connected": false, "actualSettingsModified": false}, nil
-	}
-	if subject == "" {
-		subject = plan.input.SubjectType
-	}
-	if !isOne(subject, "person", "organization") {
-		return nil, hostConfigurationFailure("setup_subject_type_invalid")
-	}
-	input := plan.input
-	service := plan.service
-	store, e := NewStore(input.DataDirectory, service.Endpoint)
-	if e != nil {
-		return nil, e
-	}
-	if e = store.With(ctx, false, func(dir string) error { return store.verifyChoiceWithin(dir, &plan.scope) }); e != nil {
-		return nil, e
-	}
-	if _, e = hostCandidate(input.PackageDirectory); e != nil {
-		return nil, e
-	}
-	executable := ""
-	if input.Host == "opencode" {
-		executable, e = FindOpenCodeExecutable(input.OpenCodePath, "")
-		if e != nil {
-			return nil, e
-		}
-	}
-	if e = os.MkdirAll(filepath.Dir(input.Destination), 0700); e != nil {
-		return nil, e
-	}
-	if e = os.Mkdir(input.Destination, 0700); e != nil {
-		return nil, e
-	}
-	configPath := ""
-	if !input.LocalOnly {
-		configPath = filepath.Join(input.Destination, "galaxy-public-config.json")
-		raw, e := hostJSON(Configuration{Version: 2, Endpoint: service.Endpoint, Website: service.Website, DataDirectory: input.DataDirectory, TrustedKeys: service.TrustedKeys})
-		if e != nil {
-			return nil, e
-		}
-		if e = hostWriteNew(configPath, raw); e != nil {
-			return nil, e
-		}
-	}
-	packageDirectory := input.Destination
-	if input.Host == "opencode" {
-		packageDirectory = input.OpenCodeConfigDirectory
-	}
-	installedPackage, e := installationCopyPackage(input.PackageDirectory, packageDirectory)
-	if e != nil {
-		return nil, e
-	}
-	generatedInput := HostConfigurationInput{LocalOnly: input.LocalOnly, PackageDirectory: installedPackage, ConfigPath: configPath, Destination: filepath.Join(input.Destination, "host-configs"), Hosts: []string{input.Host}, DataDirectory: input.DataDirectory, Endpoint: service.Endpoint}
-	generated, e := GenerateHostConfigurations(ctx, generatedInput)
-	if e != nil {
-		return nil, e
-	}
-	var installed map[string]any
-	var local map[string]any
-	if input.Host == "opencode" {
-		if e = store.With(ctx, false, func(dir string) error { return store.verifyChoiceWithin(dir, &plan.scope) }); e != nil {
-			return nil, e
-		}
-		configPlan, e := PreviewOpenCodeConfiguration(ctx, input.OpenCodeConfigDirectory, generatedInput)
-		if e != nil {
-			return nil, e
-		}
-		installed, e = InstallOpenCodeConfigurationReviewed(ctx, configPlan, true)
-		if e != nil {
-			return nil, e
-		}
-		local, e = installationPrepareLocal(ctx, store, subject, &plan.scope)
-		if e != nil {
-			return nil, e
-		}
-	}
-	var launcher, launchCommand any
-	if input.Host == "opencode" && executable != "" {
-		path := filepath.Join(input.Destination, "run-opencode.mjs")
-		source := "import {spawn} from 'node:child_process';\nconst child=spawn(" + hostJSONString(executable) + ",process.argv.slice(2),{stdio:'inherit',windowsHide:true,env:{...process.env,OPENCODE_CONFIG_DIR:" + hostJSONString(input.OpenCodeConfigDirectory) + "}});\nchild.once('error',()=>{process.stderr.write('OpenCode could not start. Check that it is still installed at the selected location.\\n');process.exitCode=1;});\nchild.once('exit',code=>{process.exitCode=code??1;});\n"
-		if e = hostWriteNew(path, []byte(source)); e != nil {
-			return nil, e
-		}
-		launcher = path
-		quoted := "'" + strings.ReplaceAll(path, "'", "'\"'\"'") + "'"
-		if runtime.GOOS == "windows" {
-			quoted = "'" + strings.ReplaceAll(path, "'", "''") + "'"
-		}
-		launchCommand = "node " + quoted
-	}
-	var hostConfig any
-	if installed != nil {
-		hostConfig = installed["directory"]
-	}
-	selectedSubject := any(subject)
-	if local != nil {
-		selectedSubject = local["subjectType"]
-	}
-	result := map[string]any{"prepared": true, "host": input.Host, "website": service.Website, "endpoint": service.Endpoint, "configPath": configPath, "packageDirectory": installedPackage, "dataDirectory": input.DataDirectory, "destination": input.Destination, "hostDirectory": generated["destination"], "launcher": launcher, "launchCommand": launchCommand, "openCodeInstalled": nil, "hostConfigDirectory": hostConfig, "normalStartupConfigured": plan.NormalStartupConfigured, "subjectType": selectedSubject, "identityCreated": local != nil && local["created"] == true, "existingIdentityPreserved": local != nil && local["existingIdentityPreserved"] == true, "connected": false, "actualSettingsModified": installed != nil, "publicConfigurationSha256": service.PublicConfigurationSHA256}
-	if input.Host == "opencode" {
-		result["openCodeInstalled"] = executable != ""
-	}
-	result["localOnly"] = input.LocalOnly
-	raw, e := hostJSON(result)
-	if e != nil {
-		return nil, e
-	}
-	if e = hostWriteNew(filepath.Join(input.Destination, "installation.json"), raw); e != nil {
-		return nil, e
-	}
-	return result, nil
-}
 func installationPrepareLocal(ctx context.Context, store *Store, subject string, scope *ChoiceScope) (map[string]any, error) {
 	var existing map[string]any
 	e := store.With(ctx, false, func(dir string) error {
@@ -333,31 +215,4 @@ func installationPrepareLocal(ctx context.Context, store *Store, subject string,
 		return nil, e
 	}
 	return map[string]any{"created": true, "identity": owner, "subjectType": subject, "existingIdentityPreserved": false}, nil
-}
-func installationCopyPackage(source, configurationDirectory string) (string, error) {
-	if e := os.MkdirAll(configurationDirectory, 0700); e != nil {
-		return "", e
-	}
-	if e := hostDirectory(configurationDirectory); e != nil {
-		return "", e
-	}
-	root := filepath.Join(configurationDirectory, "galaxy-native")
-	if e := os.MkdirAll(root, 0700); e != nil {
-		return "", e
-	}
-	if e := hostDirectory(root); e != nil {
-		return "", e
-	}
-	target := filepath.Join(root, "client-"+uuid.NewString())
-	relative, e := filepath.Rel(source, target)
-	if e != nil || relative == "." || (!strings.HasPrefix(relative, ".."+string(filepath.Separator)) && relative != ".." && !filepath.IsAbs(relative)) {
-		return "", hostConfigurationFailure("setup_path_invalid")
-	}
-	if e = hostCopyTree(source, target); e != nil {
-		return "", e
-	}
-	if e = installationCaptureDependencies(source, target); e != nil {
-		return "", e
-	}
-	return target, nil
 }

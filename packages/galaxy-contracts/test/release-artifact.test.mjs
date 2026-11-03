@@ -3,6 +3,21 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync, createHash } from 'node:crypto';
 import { signRelease, verifyRelease } from "../src/release-artifact.mjs";
 
+test('Go native releases bind platform metadata and retain the historical package form',async()=>{
+ const digest=value=>createHash('sha256').update(value).digest('hex'),artifact=Buffer.from('Go platform bundle'),report=Buffer.from('package integrity'),now=2000000000;
+ const {privateKey,publicKey}=generateKeyPairSync('ed25519');
+ const base={version:1,kind:'galaxy-native-go-release',publisher:'fixture',purpose:'local-validation',issuedAt:now,expiresAt:now+60,
+  package:{name:'@galaxy/native-go-candidate',version:'0.1.0',filename:'galaxy-native-go-0.1.0.tgz',sha256:digest(artifact),bytes:artifact.length,exports:['./opencode'],dependencies:{},lockSha256:digest('lock'),sourceHashesSha256:digest('source')},
+  protocolAcceptance:{profile:'galaxy-native-go/1',reportSha256:digest(report),sourceSha256:digest('source'),artifactsSha256:digest('artifacts'),scope:'candidate-package-integrity',actualHostAcceptance:false}};
+ const options={trustedKeys:new Map([['fixture',{publicKey,notBefore:now,notAfter:now+120}]]),publisher:'fixture',artifact,report,now,expectedPackage:'@galaxy/native-go-candidate'};
+ for(const item of [base,{...base,package:{...base.package,filename:'galaxy-native-go-0.1.0-windows-amd64.tgz',target:{goos:'windows',goarch:'amd64'}}}]){
+  const signed=await signRelease(item,{privateKey,kid:'fixture'});
+  assert.deepEqual((await verifyRelease(signed,options)).manifest,item);
+ }
+ await assert.rejects(signRelease({...base,package:{...base.package,filename:'galaxy-native-go-0.1.0-linux-arm64.tgz',target:{goos:'windows',goarch:'amd64'}}},{privateKey,kid:'fixture'}));
+ await assert.rejects(signRelease({...base,package:{...base.package,target:{goos:'windows',goarch:'amd64'}}},{privateKey,kid:'fixture'}));
+});
+
 test('release JWS binds exact package/report and caller-pinned publisher/key lifetime', async () => {
   const sha = bytes => createHash('sha256').update(bytes).digest('hex');
   const artifact = Buffer.from('synthetic tarball'), report = Buffer.from('synthetic report');

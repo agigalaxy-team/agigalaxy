@@ -33,6 +33,48 @@ type workerFailureTransport struct {
 	consentPosts int
 }
 
+func TestWorkerPanelResultContentCarriesUsableReferences(t *testing.T) {
+	data := map[string]any{
+		"associations": []any{map[string]any{"associationId": "association-1", "purpose": "工作"}},
+		"nextAfter":    "next-page",
+		"preview":      map[string]any{"handle": "handle-1", "previewHash": "hash-1", "exact": map[string]any{"text": "private-preview"}},
+	}
+	for _, componentOnly := range []bool{false, true} {
+		r := workerPanelResult(data, componentOnly)
+		if r.IsError || len(r.Content) != 1 {
+			t.Fatalf("componentOnly=%v: unexpected result %#v", componentOnly, r)
+		}
+		content, ok := r.Content[0].(*mcp.TextContent)
+		if !ok {
+			t.Fatalf("componentOnly=%v: JSON content is not text", componentOnly)
+		}
+		var model map[string]any
+		if err := json.Unmarshal([]byte(content.Text), &model); err != nil {
+			t.Fatal(err)
+		}
+		preview := uploadObject(model["preview"])
+		associations := uploadRows(model["associations"])
+		if len(associations) != 1 || uploadObject(associations[0])["associationId"] != "association-1" || model["nextAfter"] != "next-page" || preview["handle"] != "handle-1" || preview["previewHash"] != "hash-1" {
+			t.Fatalf("componentOnly=%v: missing usable references: %s", componentOnly, content.Text)
+		}
+		structured, err := protocol.Encode(r.StructuredContent)
+		if err != nil || !bytes.Equal(structured, []byte(content.Text)) {
+			t.Fatalf("componentOnly=%v: content differs from structured result", componentOnly)
+		}
+		if componentOnly {
+			if _, exists := preview["exact"]; exists || preview["exactContentInComponent"] != true {
+				t.Fatal("component-only JSON disclosed exact content", content.Text)
+			}
+			private := uploadObject(uploadObject(r.Meta["galaxyWorker"])["preview"])
+			if uploadObject(private["exact"])["text"] != "private-preview" {
+				t.Fatal("component did not retain exact content")
+			}
+		} else if uploadObject(preview["exact"])["text"] != "private-preview" {
+			t.Fatal("ordinary model JSON lost exact preview", content.Text)
+		}
+	}
+}
+
 func (w *workerFailureTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if r.URL.Path == "/v1/consents" {
 		w.consentPosts++
@@ -199,6 +241,56 @@ func TestWorkerPackActualSourcesAndDoubleAbsentRenewal(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer session.Close()
+	t.Run("association pagination", func(t *testing.T) {
+		_, release, lease, err := r.identityLease(ctx, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer release()
+		old := map[string]bool{}
+		put := func() string {
+			id := uuid.NewString()
+			row := map[string]any{"associationId": id, "workerId": "worker", "owner": map[string]any{"subjectId": lease.scope.Owner, "endpoint": r.config.Endpoint}}
+			if err := workerPutRow(ctx, lease, row, nil, true); err != nil {
+				t.Fatal(err)
+			}
+			return id
+		}
+		for i := 0; i < 40; i++ {
+			old[put()] = true
+		}
+		first, err := host.Read(ctx, map[string]any{"action": "list"})
+		if err != nil || len(uploadRows(first["associations"])) != 32 || text(first["nextAfter"]) == "" {
+			t.Fatal(first, err)
+		}
+		seen := map[string]bool{}
+		for _, v := range uploadRows(first["associations"]) {
+			seen[text(uploadObject(v)["associationId"])] = true
+		}
+		inserted := put()
+		for cursor := text(first["nextAfter"]); cursor != ""; {
+			page, err := host.Read(ctx, map[string]any{"action": "list", "after": cursor, "limit": 7})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, v := range uploadRows(page["associations"]) {
+				id := text(uploadObject(v)["associationId"])
+				if seen[id] || id == inserted {
+					t.Fatal("duplicate/new head", id)
+				}
+				seen[id] = true
+			}
+			cursor = text(page["nextAfter"])
+		}
+		for id := range old {
+			if !seen[id] {
+				t.Fatal("missing original", id)
+			}
+		}
+		if _, err := host.Read(ctx, map[string]any{"action": "list", "after": uuid.NewString()}); err == nil {
+			t.Fatal("unknown cursor accepted")
+		}
+	})
 	toolCall := func(name string, input any) map[string]any {
 		t.Helper()
 		v, e := session.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: input})

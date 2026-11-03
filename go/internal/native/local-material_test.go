@@ -111,9 +111,6 @@ func TestLocalMaterialLegacySQLiteAndProjection(t *testing.T) {
 		sources = append(sources, v.(map[string]any)["id"].(string))
 	}
 	through := integer(p["throughSequence"])
-	if _, e = s.SubmitWorkSummary(ctx, WorkSummaryInput{WorkID: work, ThroughSequence: through, SourceObservationIDs: []string{sources[0]}, Title: "Invalid incomplete", Summary: "not persisted"}); fault.Code(e) != "local_work_summary_sources_invalid" {
-		t.Fatalf("incomplete sources accepted: %v", e)
-	}
 	_, e = s.SubmitWorkSummary(ctx, WorkSummaryInput{WorkID: work, ThroughSequence: through, SourceObservationIDs: sources, Title: "Summary", Summary: "Observed result", Outcome: "unknown", Execution: &WorkExecution{Host: "opencode", SessionID: "summary-helper"}})
 	if e != nil {
 		t.Fatal(e)

@@ -27,7 +27,7 @@ type HostConfigurationInput struct {
 }
 
 func HostConfigurationOptions() []map[string]string {
-	return []map[string]string{{"id": "opencode", "label": "OpenCode"}, {"id": "claude-code", "label": "Claude Code"}, {"id": "github-copilot", "label": "GitHub Copilot（VS Code）"}, {"id": "codex", "label": "Codex"}, {"id": "cursor", "label": "Cursor"}, {"id": "workbuddy", "label": "WorkBuddy"}, {"id": "trae-desktop", "label": "TRAE / TraeWork"}, {"id": "hermes", "label": "Hermes Agent"}, {"id": "deepseek-harness", "label": "DeepSeek Harness"}}
+	return []map[string]string{{"id": "opencode", "label": "OpenCode"}, {"id": "claude-code", "label": "Claude Code"}, {"id": "github-copilot", "label": "GitHub Copilot（VS Code）"}, {"id": "github-copilot-cli", "label": "GitHub Copilot CLI"}, {"id": "codex", "label": "Codex"}, {"id": "cursor", "label": "Cursor"}, {"id": "workbuddy", "label": "WorkBuddy"}, {"id": "trae-desktop", "label": "TRAE / TraeWork"}, {"id": "hermes", "label": "Hermes Agent"}, {"id": "deepseek-harness", "label": "DeepSeek Harness"}}
 }
 func hostConfigurationFailure(code string) error { return fault.New(code, 409) }
 func hostFile(path string) error {
@@ -284,6 +284,10 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 	if selected["github-copilot"] {
 		add("copilot-vscode/.vscode/mcp.json", map[string]any{"servers": map[string]any{"galaxy": spec}})
 		addSkill("copilot-vscode/.github/skills/galaxy")
+	}
+	if selected["github-copilot-cli"] {
+		add("copilot-cli/mcp-config.json", map[string]any{"mcpServers": map[string]any{"galaxy": managedUserMCPSpec("github-copilot-cli", entry, commandArgs, environment)}})
+		addSkill("copilot-cli/.copilot/skills/galaxy")
 	}
 	if selected["codex"] {
 		config := "[mcp_servers.galaxy]\ncommand = " + hostJSONString(entry) + "\nargs = " + hostJSONString(commandArgs) + "\n"

@@ -182,7 +182,7 @@ export function createHostDialogs(session: GalaxyMenuSession) {
   function showRules(onReturn: Action) {
     showInfo(
       'Galaxy / 交互规则',
-      `数字是主入口：输入本屏显示的 [1]–[9] 可直接选择。\n\n[0] 只在 Galaxy 控制台主页退出；在二级页面返回 Galaxy 控制台或上一步。\nEsc 在任何 Galaxy 页面直接退出到聊天；Enter 与方向键可使用 OpenCode 的原生选择器。\n\n${divider()}\n浏览、返回和退出不会写入本机状态。只有确认初始化或未来明确标注的确认操作才会改变本机 Galaxy。`,
+      `输入本屏显示的数字或字母可直接选择；也可以用方向键和 Enter。\n\n[0] 返回上一页或原聊天；Esc 回到原聊天。\n\n${divider()}\n浏览、返回和退出不会更改工作记录。需要保存的操作会显示结果。`,
       onReturn,
     );
   }

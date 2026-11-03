@@ -148,7 +148,32 @@ func (h *NativeWorkerHost) Read(ctx context.Context, input any) (map[string]any,
 			return nil, e
 		}
 		items := []any{}
-		for _, id := range rows.Keys() {
+		keys := rows.Keys()
+		for _, id := range keys {
+			owner := a2aObject(a2aObject(rows.Values()[id])["owner"])
+			if owner["subjectId"] != l.scope.Owner || owner["endpoint"] != h.runtime.config.Endpoint {
+				return nil, a2aError("original Worker association owner changed")
+			}
+		}
+		start := len(keys) - 1
+		if after := text(value["after"]); after != "" {
+			start = -1
+			for i := len(keys) - 1; i >= 0; i-- {
+				if keys[i] == after {
+					start = i - 1
+					break
+				}
+			}
+			if start == -1 && (len(keys) == 0 || keys[0] != after) {
+				return nil, a2aError("invalid Worker association cursor")
+			}
+		}
+		limit := 32
+		if n, ok := value["limit"].(float64); ok {
+			limit = int(n)
+		}
+		for i := start; i >= 0 && len(items) < limit; i-- {
+			id := keys[i]
 			row := a2aObject(rows.Values()[id])
 			owner := a2aObject(row["owner"])
 			if owner["subjectId"] != l.scope.Owner || owner["endpoint"] != h.runtime.config.Endpoint {
@@ -160,7 +185,12 @@ func (h *NativeWorkerHost) Read(ctx context.Context, input any) (map[string]any,
 			}
 			items = append(items, item)
 		}
-		return map[string]any{"associations": items}, l.check(ctx)
+		more := start-len(items) >= 0
+		var next any
+		if more {
+			next = text(a2aObject(items[len(items)-1])["associationId"])
+		}
+		return map[string]any{"associations": items, "nextAfter": next, "earlierAssociationsAvailable": more}, l.check(ctx)
 	}
 	id := text(value["associationId"])
 	if id == "" {

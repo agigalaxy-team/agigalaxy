@@ -1,5 +1,5 @@
 const contentLabels = {
-  title: '标题', summary: '内容', text: '内容', description: '说明', goal: '希望得到什么',
+  title: '标题', summary: '内容', content: '内容', text: '内容', description: '说明', goal: '希望得到什么',
   currentSituation: '目前情况', purpose: '用途', reason: '原因', limitations: '适用限制',
   message: '消息', name: '名称', filename: '文件', fileName: '文件', label: '材料', url: '链接',
   requestedScope: '需要的帮助', resultSummary: '结果', outcome: '结果', notes: '补充说明',
@@ -14,10 +14,27 @@ export const operationLabel = value => ({prepared: '待发送', absent: '尚未�
   accepted: '已发送', proposed: '已申请', revoked: '已撤销', active: '进行中', open: '进行中', closed: '已结束',
   pending: '正在发送', retracted: '已撤回', expired: '已过期', available: '可使用'}[value] ?? '已更新');
 
+// A tool's bounded excerpt may be only the beginning of structured output.
+// Show authored text, but do not present partial machine records as prose.
+export function readableToolOutput(value, depth=0) {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  const text = value.trimStart();
+  if (text[0] !== '{' && text[0] !== '[') return value;
+  if(depth>=4)return '';
+  try {
+    const parsed=JSON.parse(text);
+    if(parsed&&typeof parsed==='object')return readableContent(parsed,{
+      allowedKeys:new Set(['content','text','message','summary','description','resultSummary']),
+      skipKeys:new Set(['metadata','details','execution','environment','debug']),
+    }).map(row=>readableToolOutput(row.text,depth+1)).filter(Boolean).join('\n\n');
+  } catch {}
+  return /^\{\s*"(?:[^"\\]|\\.)+"\s*:/.test(text) || /^\[\s*\{\s*"/.test(text) ? '' : value;
+}
+
 // Exact references, hashes and payloads stay in structuredContent. The human
 // surface uses the actual authored content; it never turns an object dump into
 // a purported explanation or invents names for opaque subject references.
-export function readableContent(value, {limit = 24, maxText = 16000} = {}) {
+export function readableContent(value, {limit = 24, maxText = 16000, allowedKeys, skipKeys} = {}) {
   const rows = [], seen = new Set();
   function walk(object, depth = 0) {
     if (!object || depth > 5 || rows.length >= limit) return;
@@ -25,10 +42,10 @@ export function readableContent(value, {limit = 24, maxText = 16000} = {}) {
     if (typeof object !== 'object') return;
     for (const [key, item] of Object.entries(object)) {
       if (rows.length >= limit) break;
-      if (contentLabels[key] && typeof item === 'string' && item.trim()) {
+      if (contentLabels[key] && (!allowedKeys || allowedKeys.has(key)) && typeof item === 'string' && item.trim()) {
         const text = item.slice(0, maxText), signature = contentLabels[key] + '\0' + text;
         if (!seen.has(signature)) { seen.add(signature); rows.push({label: contentLabels[key], text}); }
-      } else if (!/(?:id|hash|proof|signature|authorization|receipt|secret|token|key|revision|version)$/i.test(key)) walk(item, depth + 1);
+      } else if (!skipKeys?.has(key) && !/(?:id|hash|proof|signature|authorization|receipt|secret|token|key|revision|version)$/i.test(key)) walk(item, depth + 1);
     }
   }
   walk(value); return rows;

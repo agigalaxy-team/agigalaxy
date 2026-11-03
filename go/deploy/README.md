@@ -51,7 +51,7 @@ Information 的环境变量名见 `information-worker.env.example`，只复用�
 
 Native 入口为 `native/galaxy native`，使用明确的 `GALAXY_NATIVE_CONFIG`；宿主安装与平台限制见该子包 README。不要用新建身份、覆盖数据目录或重发操作处理升级/未知回执。
 
-Native 平台资源由同一个 `buildGoNativeCandidate` 构建口复制，独立 Native 候选和 core 内的 `native/` 使用相同布局。Windows 原 helper 位于二进制同级的 `notifications/windows-notify-icon.ps1`，不要单独搬走可执行文件；实际 PowerShell 命令仍来自显式可信配置。Linux 原 Python helper 嵌入 Go，目标机须有选定的 Python（缺省 `/usr/bin/python3`）。macOS 继续要求显式配置已签名 `GalaxyNotifications.app/Contents/MacOS/GalaxyNotifications`，候选不自动构建、签名、安装或选择 App。复制资源不启用通知，也不证明目标平台通知已验收。包内 `native-v2.json` 的资源归属及 root `go-core-artifact.json` 文件摘要对应实际候选；Native 子包仍如实保留其本机平台验收状态，root manifest 也不从构建推断 `migrationComplete:true`。
+Native 平台资源由同一个 `buildGoNativeCandidate` 构建口复制，独立 Native 候选和 core 内的 `native/` 使用相同布局。Windows 原 helper 位于二进制同级的 `notifications/windows-notify-icon.ps1`，不要单独搬走可执行文件；实际 PowerShell 命令仍来自显式可信配置。Linux 原 Python helper 嵌入 Go，目标机须有选定的 Python（缺省 `/usr/bin/python3`）。macOS 仍须显式配置已准备的 `GalaxyNotifications.app/Contents/MacOS/GalaxyNotifications` 绝对路径。若 Native 候选实际包含 `notifications/GalaxyNotifications.app`，Go 安装器会随完整候选复制该 bundle；配置应指向复制后的已安装版本。无此资源时可使用明确配置的外部 app。候选与安装器不会自动签名、公证、启用或选择 App，签名和目标平台能力须独立核验。复制资源不启用通知，也不证明目标平台通知已验收。包内 `native-v2.json` 的资源归属及 root `go-core-artifact.json` 文件摘要对应实际候选；Native 子包仍如实保留其本机平台验收状态，root manifest 也不从构建推断 `migrationComplete:true`。
 
 ## AI Agent 部署核对
 

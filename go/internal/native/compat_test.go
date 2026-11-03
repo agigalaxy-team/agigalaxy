@@ -48,6 +48,9 @@ func fixture(t *testing.T) (*Store, map[string]any) {
 	if e = json.Unmarshal(b, &expected); e != nil {
 		t.Fatal(e)
 	}
+	get := expected["get"].(map[string]any)
+	pending := expected["pending"].(map[string]any)
+	get["summaryInput"] = map[string]any{"galaxyId": pending["galaxyId"], "workId": pending["workId"], "expectedRevision": pending["expectedRevision"], "throughSequence": pending["throughSequence"]}
 	s, e := NewStore(dir, "https://galaxy.invalid")
 	if e != nil {
 		t.Fatal(e)
@@ -154,6 +157,11 @@ func TestRetainedMaterialMatchesOriginalPendingAndExport(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	position := pending.(map[string]any)["summaryInput"].(map[string]any)
+	if position["workId"] != work || integer(position["throughSequence"]) != integer(pending.(map[string]any)["throughSequence"]) || integer(position["expectedRevision"]) != integer(pending.(map[string]any)["expectedRevision"]) {
+		t.Fatal("pending summary position does not match its page")
+	}
+	delete(pending.(map[string]any), "summaryInput")
 	same(t, want["pending"], pending)
 	exported, e := s.WorkExport(ctx, WorkQuery{WorkID: work})
 	if e != nil {

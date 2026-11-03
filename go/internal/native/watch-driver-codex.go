@@ -42,7 +42,7 @@ type watchCodex struct {
 }
 
 func newWatchCodex(command, cwd string, disabled []string) *watchCodex {
-	args := []string{"app-server", "--stdio", "-c", "mcp_servers={}"}
+	args := []string{"app-server", "-c", "mcp_servers={}"}
 	for _, name := range watchCodexFeatures {
 		args = append(args, "-c", "features."+name+"=false")
 	}

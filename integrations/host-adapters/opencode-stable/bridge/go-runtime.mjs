@@ -6,7 +6,8 @@ const resultValid=value=>value&&typeof value==='object'&&(Array.isArray(value.co
 // preserve the original requestState for a caller's explicit UI continuation.
 export function createGoRuntimeBridge({configPath=process.env.GALAXY_NATIVE_CONFIG,executable=process.env.GALAXY_NATIVE_EXECUTABLE,dataDirectory,requestTimeoutMs=30000,onInputRequest,onDiagnostic}={}){
  const localOnly=!configPath;
- const rpc=createChildRPC({executable,configPath,dataDirectory:localOnly?dataDirectory:undefined,requestTimeoutMs,command:localOnly?'integration-mcp':'native',onDiagnostic});
+ const env=localOnly?{...process.env}:undefined;if(env)for(const key of Object.keys(env))if(key.toUpperCase()==='GALAXY_NATIVE_CONFIG')delete env[key];
+ const rpc=createChildRPC({executable,configPath,dataDirectory:localOnly?dataDirectory:undefined,env,requestTimeoutMs,command:localOnly?'integration-mcp':'native',onDiagnostic});
  let starting,closed=false;
  const lifetime=new AbortController();
  const context={'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientInfo':{name:'galaxy-opencode-native',version:'1'},'io.modelcontextprotocol/clientCapabilities':{elicitation:{form:{}}}};
@@ -49,5 +50,5 @@ export function createGoRuntimeBridge({configPath=process.env.GALAXY_NATIVE_CONF
   await rpc.notify({jsonrpc:'2.0',method:'notifications/galaxy/host-session-complete',params:{galaxyId,host,sessionId}},connection);
   return {state:'submitted',completionConfirmed:false};
  }
- return Object.freeze({call,sessionComplete,close(){closed=true;lifetime.abort();return rpc.close();}});
+ return Object.freeze({call,sessionComplete,resume(){rpc.resume();},close(){closed=true;lifetime.abort();return rpc.close();}});
 }

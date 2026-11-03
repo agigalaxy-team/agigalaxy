@@ -10,7 +10,6 @@ import {createNativeRuntimeBridge} from '../native-runtime-bridge.mjs';
 import {createHostLocalClient} from './host-local-client.mjs';
 import {createHostInputHandler} from './host-input.mjs';
 import {createOpenCodeWorkRecorder} from '../work-recorder.mjs';
-import {createOpenCodeWorkSummarizer} from '../work-summarizer.mjs';
 const executable=process.env.GALAXY_GO_TEST_BINARY;
 const data=result=>JSON.parse(result.content[0].text);
 async function fixture(t){
@@ -37,7 +36,7 @@ test('real Go MCP child preserves requestState, exact choices, cancellation and 
  const firstClose=bridge.close();assert.equal(firstClose,bridge.close());await firstClose;await assert.rejects(bridge.call('galaxy_local_work_list'),/native_bridge_closed/);
 });
 
-test('real Go host persists foreground observations and own SDK summaries; MCP reads the same original store',{skip:!executable&&'Set GALAXY_GO_TEST_BINARY to the development Go executable'},async t=>{
+test('real Go host persists foreground observations; MCP exposes pending work from the same original store',{skip:!executable&&'Set GALAXY_GO_TEST_BINARY to the development Go executable'},async t=>{
  const f=await fixture(t),host=createHostLocalClient({executable,configPath:f.configPath}),bridge=createNativeRuntimeBridge({backend:'go',executable,configPath:f.configPath});f.close(host.close);f.close(bridge.close);
  assert.deepEqual(await host.history.identity(),{id:f.identity.id});
  const handlers=new Map(),messages=[],parts=new Map(),notices=[];
@@ -49,13 +48,9 @@ test('real Go host persists foreground observations and own SDK summaries; MCP r
  handlers.get('session.idle')({id:'session-done',type:'session.idle',properties:{sessionID:'foreground'}});await recorder.refresh();await eventually(()=>notices.length>0&&recorder.status().archiveSync?.state==='submitted');assert.deepEqual(notices[0],{galaxyId:f.identity.id,host:'opencode',sessionId:'foreground'});assert.equal(recorder.status().archiveSync.completionConfirmed,false);
  const work=(await host.history.get({host:'opencode',sessionId:'foreground',limit:100})).work;
  assert.ok(work.workId);const observed=await host.history.get({workId:work.workId});assert.ok(observed.observations.some(item=>item.content?.excerpt?.includes('synthetic draft')));
- let createInput,promptInput;
- const sdk={create:async input=>{createInput=input;return{data:{id:'own-summary-child'}};},prompt:async input=>{promptInput=input;return{data:{info:{id:'own-summary-result'},parts:[{type:'text',text:JSON.stringify({title:'Synthetic draft',summary:'Draft observed; result unknown.',outcome:'unknown'})}]}};},update:async()=>({data:{}}),abort:async()=>({data:{}})};
- const summarizer=createOpenCodeWorkSummarizer({client:{session:sdk}},host.history,{delayMs:0});f.close(()=>summarizer.close());
- summarizer.schedule({galaxyId:f.identity.id,workId:work.workId,sessionId:'foreground',model:{providerID:'synthetic-host',modelID:'chosen-model'}});
- await eventually(async()=>!(await host.history.get({workId:work.workId})).work.pending);
- assert.deepEqual(createInput.permission,[{permission:'*',pattern:'*',action:'deny'}]);assert.equal(promptInput.model.modelID,'chosen-model');
- const detail=await host.history.get({workId:work.workId});assert.equal(detail.summaries[0].sourceKind,'user-model');assert.equal(detail.summaries[0].execution.messageId,'own-summary-result');
+ const pending=data(await bridge.call('galaxy_local_work_pending',{workId:work.workId}));
+ assert.ok(pending.observations.some(item=>item.content?.excerpt?.includes('synthetic draft')));
+ const detail=await host.history.get({workId:work.workId});assert.equal(detail.work.pending,true);
  await assert.rejects(host.history.observe({galaxyId:'unrelated',host:'opencode',sessionId:'foreground',sourceId:'forged',kind:'message',source:{kind:'host-event'},details:{}}),/local_work_identity_changed/);
  assert.equal((await host.archive.captureMessage({galaxyId:f.identity.id,host:'opencode',sessionId:'unselected',messageId:'not-selected',message:{id:'not-selected',role:'user'},parts:[]})).captured,false);
  await recorder.close();assert.equal(handlers.size,0);

@@ -6,7 +6,9 @@
 
 [Native 客户端说明](../../docs/technical/native-client.md)描述身份、连接、工具、工作资料、预览和结果返回。模型由用户的宿主提供，适配器不创建模型账户、不替换模型设置，也不因打开菜单自动扩大权限。
 
-OpenCode stable 的 /galaxy 提供社区、帮助、消息、本地履历、设置和原工作接续。安装后的普通工作采集使用其公开事件接口；其他宿主的配置生成不自动具有相同后台事件能力。
+OpenCode stable 的 /galaxy 提供社区、帮助、消息、本地履历、设置和原工作接续；当前 Agent 也可按目标直接使用可用 MCP 工具。宿主事实记录、MCP 工具发现、Skill 加载和原会话接续分别依赖实际接线与宿主能力，不能从配置生成推断事件已采集。
+
+本机原件须本人明确选择准确宿主和会话。Codex/Claude 的候选 hook 在选中后读取宿主提供的精确 transcript 路径，DeepSeek Harness 可采集选中会话实际收到的消息事件；均以实际可取得的记录和脱敏结果为范围，不代表完整重建。原件上传另行选择，当前源码接线不代表候选包或真实宿主已验收。
 
 宿主可向 createGalaxyAdapter 或 createConfiguredGalaxyAdapter 提供 nativeTools.call 和可选 readWorkContext，使用当前获准的前台 Native 工具桥。当前身份、设备、连接或许可变化后，旧内容和预览需要失效；取消与返回保留独立输入，不静默重新派发。
 

@@ -2,6 +2,8 @@ package native
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -165,12 +167,13 @@ func (h *NativeA2aWork) Read(ctx context.Context, l *nativeIdentityLease, input 
 		}
 		return h.data(l, map[string]any{"selected": view}), nil
 	}
-	rows := []any{}
-	more := false
+	type associationRef struct{ peer, id, cursor string }
+	refs := []associationRef{}
+	listPeerID := text(input["peerId"])
 	for _, v := range h.host.Peers() {
 		peer := uploadObject(v)
 		id := text(peer["id"])
-		if selected := text(input["peerId"]); selected != "" && selected != id {
+		if listPeerID != "" && listPeerID != id {
 			continue
 		}
 		value, e := h.read(ctx, l, id, "list", "")
@@ -178,37 +181,62 @@ func (h *NativeA2aWork) Read(ctx context.Context, l *nativeIdentityLease, input 
 			return nil, e
 		}
 		journal := uploadRows(value)
-		start := len(journal) - 32
+		for i := len(journal) - 1; i >= 0; i-- {
+			associationID := text(uploadObject(journal[i])["id"])
+			raw, _ := json.Marshal([]string{listPeerID, id, associationID})
+			refs = append(refs, associationRef{id, associationID, base64.RawURLEncoding.EncodeToString(raw)})
+		}
+	}
+	start := 0
+	if after := text(input["after"]); after != "" {
+		start = -1
+		for i, ref := range refs {
+			if ref.cursor == after {
+				start = i + 1
+				break
+			}
+		}
 		if start < 0 {
-			start = 0
-		} else if start > 0 {
-			more = true
-		}
-		for i := len(journal) - 1; i >= start; i-- {
-			view, e := h.readable(ctx, l, id, text(uploadObject(journal[i])["id"]), false)
-			if e != nil {
-				return nil, e
-			}
-			row := identityClone(view["association"])
-			p := uploadObject(view["peer"])
-			state := uploadObject(p["peer"])["state"]
-			if state == nil {
-				state = p["status"]
-			}
-			if state != nil {
-				row["state"] = state
-			}
-			if view["sourceUnavailable"] != nil {
-				row["sourceUnavailable"] = view["sourceUnavailable"]
-			}
-			rows = append(rows, row)
+			return nil, a2aError("invalid A2A association cursor")
 		}
 	}
-	if len(rows) > 32 {
-		rows = rows[:32]
-		more = true
+	limit := 32
+	if input["limit"] != nil {
+		limit = int(integer(input["limit"]))
 	}
-	return h.data(l, map[string]any{"associations": rows, "earlierAssociationsAvailable": more}), nil
+	if limit < 1 || limit > 100 {
+		return nil, a2aError("invalid A2A page limit")
+	}
+	end := start + limit
+	if end > len(refs) {
+		end = len(refs)
+	}
+	rows := []any{}
+	for _, ref := range refs[start:end] {
+		view, e := h.readable(ctx, l, ref.peer, ref.id, false)
+		if e != nil {
+			return nil, e
+		}
+		row := identityClone(view["association"])
+		p := uploadObject(view["peer"])
+		state := uploadObject(p["peer"])["state"]
+		if state == nil {
+			state = p["status"]
+		}
+		if state != nil {
+			row["state"] = state
+		}
+		if view["sourceUnavailable"] != nil {
+			row["sourceUnavailable"] = view["sourceUnavailable"]
+		}
+		rows = append(rows, row)
+	}
+	more := end < len(refs)
+	var next any
+	if more {
+		next = refs[end-1].cursor
+	}
+	return h.data(l, map[string]any{"associations": rows, "earlierAssociationsAvailable": more, "nextAfter": next, "listPeerId": listPeerID}), nil
 }
 func (h *NativeA2aWork) Prepare(ctx context.Context, l *nativeIdentityLease, input map[string]any) (map[string]any, error) {
 	h.mu.Lock()

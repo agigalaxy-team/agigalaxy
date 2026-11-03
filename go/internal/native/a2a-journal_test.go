@@ -5,11 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 )
 
-func TestA2aOriginalJournalRoundTripReservationAndCAS(t *testing.T) {
+func TestA2aJournalRoundTripReservationAndCAS(t *testing.T) {
 	ctx := context.Background()
 	dir := filepath.Join(t.TempDir(), "private")
 	s, _ := NewStore(dir, "https://official.invalid")
@@ -25,15 +23,13 @@ func TestA2aOriginalJournalRoundTripReservationAndCAS(t *testing.T) {
 	if _, e = os.Stat(dir); !os.IsNotExist(e) {
 		t.Fatal("read created directory", e)
 	}
-	input := filepath.Join(t.TempDir(), "scope.json")
-	if e = writeJSON(input, scope); e != nil {
+	id := "00000000-0000-4000-8000-000000000001"
+	_, e = j.change(ctx, id, 0, nil, func(map[string]any) (map[string]any, error) {
+		return map[string]any{"id": id, "caseId": "case", "attemptId": "attempt", "status": "dispatching", "operations": []any{map[string]any{"id": "original-op", "requestHash": "original-hash", "outcome": "dispatching"}}}, nil
+	})
+	if e != nil {
 		t.Fatal(e)
 	}
-	original := initializationNode(t, `import {readFile} from 'node:fs/promises';import {createJournal} from './packages/galaxy-a2a/src/storage/journal.mjs';const scope=JSON.parse(await readFile(process.argv[2],'utf8')),j=createJournal(process.argv[1],scope);await j.change('00000000-0000-4000-8000-000000000001',0,()=>({id:'00000000-0000-4000-8000-000000000001',caseId:'case',attemptId:'attempt',status:'dispatching',operations:[{id:'original-op',requestHash:'original-hash',outcome:'dispatching'}]}));console.log(JSON.stringify({scopeHash:j.scopeHash,links:await j.list()}));`, dir, input)
-	if original["scopeHash"] != j.scopeHash {
-		t.Fatal("JSON.stringify scope hash differs", j.scopeHash, original)
-	}
-	id := "00000000-0000-4000-8000-000000000001"
 	link, e := j.get(ctx, id)
 	if e != nil || link["status"] != "dispatching" {
 		t.Fatal(link, e)
@@ -46,8 +42,15 @@ func TestA2aOriginalJournalRoundTripReservationAndCAS(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	again := initializationNode(t, `import {readFile} from 'node:fs/promises';import {createJournal} from './packages/galaxy-a2a/src/storage/journal.mjs';const j=createJournal(process.argv[1],JSON.parse(await readFile(process.argv[2],'utf8')));console.log(JSON.stringify({links:await j.list()}));`, dir, input)
-	row := uploadObject(uploadRows(again["links"])[0])
+	reopened, e := newA2aJournal(s, scope)
+	if e != nil || reopened.scopeHash != j.scopeHash {
+		t.Fatal("journal scope changed on reopen", e)
+	}
+	again, e := reopened.list(ctx)
+	if e != nil || len(again) != 1 {
+		t.Fatal("journal could not be read after reopen", e)
+	}
+	row := uploadObject(again[0])
 	if row["status"] != "unknown" || integer(row["revision"]) != 2 || text(uploadObject(uploadRows(row["operations"])[0])["requestHash"]) != "original-hash" {
 		t.Fatal("original reservation lost", again)
 	}
@@ -77,7 +80,7 @@ func TestA2aOriginalJournalRoundTripReservationAndCAS(t *testing.T) {
 	}
 }
 
-func TestA2aCurrentFactsMatchOriginalAndRejectScopeWithdrawal(t *testing.T) {
+func TestA2aCurrentFactsAndScopeWithdrawal(t *testing.T) {
 	ctx := context.Background()
 	subject := "GUID0123456789ABCDEFGHIJKLMNOPQR"
 	caseID := "00000000-0000-4000-8000-000000000001"
@@ -91,14 +94,9 @@ func TestA2aCurrentFactsMatchOriginalAndRejectScopeWithdrawal(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	file := filepath.Join(t.TempDir(), "facts.json")
-	if e = writeJSON(file, map[string]any{"current": current, "task": task, "selected": selected, "caseId": caseID, "attemptId": attemptID, "subjectId": subject}); e != nil {
-		t.Fatal(e)
-	}
-	original := initializationNode(t, `import {readFile} from 'node:fs/promises';import {createA2aFactsV2} from './packages/galaxy-a2a/src/facts/facts-v2.mjs';const x=JSON.parse(await readFile(process.argv[1],'utf8'));const r=await createA2aFactsV2({readCase:async()=>x.current,readTask:async()=>x.task}).resolve(x);console.log(JSON.stringify(r));`, file)
-	if !connectionEqual(facts, original["factContext"]) {
-		a, _ := protocol.Encode(facts)
-		t.Fatal(string(a), original)
+	want := map[string]any{"version": 2, "attemptRef": map[string]any{"id": attemptID, "version": 1}, "origin": map[string]any{"kind": "attempt", "id": attemptID, "version": 1}, "taskId": taskID, "participationId": "p", "scopeVersion": 2, "participationScopeVersion": 4}
+	if !connectionEqual(facts, want) {
+		t.Fatal("resolved facts do not match the selected Attempt and Task", facts)
 	}
 	if _, _, e = reader.resolve(ctx, caseID, attemptID, subject, nil, facts); e != nil {
 		t.Fatal("frozen source rejected", e)

@@ -77,8 +77,14 @@ func New(t *testing.T, pool *pgxpool.Pool, dir string, scopes []string) Fixture 
 // NewEndpoint additionally creates an authenticated synthetic session.
 func NewEndpoint(t *testing.T, pool *pgxpool.Pool, dir string, scopes []string, endpoint string) Fixture {
 	t.Helper()
-	ctx := context.Background()
 	prepared := PrepareEndpoint(t, pool, dir, scopes, endpoint)
+	return Bind(t, prepared, dir, scopes)
+}
+
+// Bind uses the existing Go device authority to issue a real scoped session.
+func Bind(t *testing.T, prepared Fixture, dir string, scopes []string) Fixture {
+	t.Helper()
+	ctx := context.Background()
 	m, svc := prepared.Materials, prepared.Service
 	key, e := identity.PrivatePEM([]byte(m.OwnerPrivate))
 	if e != nil {
@@ -117,6 +123,13 @@ func NewEndpoint(t *testing.T, pool *pgxpool.Pool, dir string, scopes []string, 
 		t.Fatal(e)
 	}
 	if e = os.WriteFile(filepath.Join(dir, "credential.txt"), []byte(credential), 0600); e != nil {
+		t.Fatal(e)
+	}
+	connection, e := json.Marshal(map[string]string{"bindingId": binding.BindingID})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile(filepath.Join(dir, "connection.json"), connection, 0600); e != nil {
 		t.Fatal(e)
 	}
 	return Fixture{Materials: m, Service: svc, Actor: actor, Credential: credential}

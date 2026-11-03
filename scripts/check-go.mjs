@@ -8,15 +8,17 @@ export const componentPackages = Object.freeze({
   hub: ['./internal/databaseschema', './internal/runtimeconfig', './internal/httpboundary',
     './internal/operationspermissions', './internal/operationsstrategies'],
   'native-client': ['./internal/native', './internal/localdata'],
+  a2a: ['./internal/native'],
+  transport: ['./internal/publicfetch'],
 });
 
 export function checkGo(component, { env = process.env } = {}) {
   const packages = componentPackages[component];
-  if (!packages) throw new Error('Usage: node scripts/check-go.mjs hub|native-client');
+  if (!packages) throw new Error('Usage: node scripts/check-go.mjs hub|native-client|a2a|transport');
   console.log(`[galaxy-go-check] ${component}: ${packages.join(' ')}`);
   if (!env.GALAXY_GO_TEST_PG_BIN)
     console.log('[galaxy-go-check] Isolated PostgreSQL integration is not configured; its skipped tests are not behavior acceptance.');
-  const result = spawnSync(env.GALAXY_BUILD_GO || 'go', ['test', '-count=1', ...packages], {
+  const result = spawnSync(env.GALAXY_BUILD_GO || 'go', ['test', '-count=1', ...(component === 'a2a' ? ['-run', 'A2[Aa]'] : []), ...packages], {
     cwd: fileURLToPath(new URL('../go/', import.meta.url)), env, stdio: 'inherit', shell: false, windowsHide: true,
   });
   if (result.error) console.error(`[galaxy-go-check] ${result.error.message}`);

@@ -3,18 +3,7 @@ package native
 // This is an additive description for SDKs that only inspect object properties.
 // Original union branches remain present and remain the server's validator.
 func projectToolObjectFields(schema map[string]any) {
-	for _, value := range schema {
-		switch child := value.(type) {
-		case map[string]any:
-			projectToolObjectFields(child)
-		case []any:
-			for _, item := range child {
-				if object, ok := item.(map[string]any); ok {
-					projectToolObjectFields(object)
-				}
-			}
-		}
-	}
+	forEachToolSubschema(schema, projectToolObjectFields)
 	if schema["type"] != "object" || schema["properties"] != nil {
 		return
 	}
@@ -68,7 +57,7 @@ func projectToolObjectFields(schema map[string]any) {
 			}
 		}
 		if len(unique) == 1 {
-			properties[name] = unique[0]
+			properties[name] = copyToolSchemaValue(unique[0])
 			continue
 		}
 		// String discriminators commonly mix const and enum in different branches.
@@ -101,7 +90,7 @@ func projectToolObjectFields(schema map[string]any) {
 		if allStrings {
 			properties[name] = map[string]any{"type": "string", "enum": values}
 		} else {
-			properties[name] = map[string]any{"anyOf": unique}
+			properties[name] = map[string]any{"anyOf": copyToolSchemaValue(unique)}
 		}
 	}
 	schema["properties"], schema["required"] = properties, required

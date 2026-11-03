@@ -50,7 +50,8 @@ func TestOriginalDeviceOIDCSignedAssociationAndRegistryInterop(t *testing.T) {
 		return out
 	}
 	var metadata struct{ SubjectID string }
-	metadata.SubjectID = deviceauthfixture.Prepare(t, pool, dir, []string{"binding", "history"}).Materials.Genesis.ID
+	prepared := deviceauthfixture.Prepare(t, pool, dir, []string{"binding", "history"})
+	metadata.SubjectID = prepared.Materials.Genesis.ID
 	api, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_api")
 	if e != nil {
 		t.Fatal(e)
@@ -63,10 +64,8 @@ func TestOriginalDeviceOIDCSignedAssociationAndRegistryInterop(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	handshake := httptest.NewServer(deviceauth.Handler{Service: devices})
-	origin = handshake.URL
-	node("device-client-fixture.mjs", "client")
-	handshake.Close()
+	prepared.Service = devices
+	deviceauthfixture.Bind(t, prepared, dir, []string{"binding", "history"})
 	tokenBytes, _ := os.ReadFile(filepath.Join(dir, "credential.txt"))
 	token := string(tokenBytes)
 	actor, e := devices.Authenticate(ctx, token, "binding")

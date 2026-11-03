@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -19,6 +18,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/deviceauthfixture"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport/devicefixture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -28,22 +28,9 @@ import (
 func TestRetirementActualDeviceGatesAndReceiptDeadline(t *testing.T) {
 	ownerPool, _ := testsupport.PostgreSQL(t)
 	ctx := context.Background()
-	root, _ := filepath.Abs(filepath.Join("..", "..", ".."))
 	dir := t.TempDir()
 	now := int64(2000000000)
-	var origin string
-	node := func(script, mode string) []byte {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go", script), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN="+origin, "GALAXY_GO_TEST_SKIP_BOOTSTRAP=true")
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original fixture %s %s: %v %s", script, mode, e, out)
-		}
-		return out
-	}
-	devicefixture.New(t, ownerPool, dir)
+	materials := devicefixture.New(t, ownerPool, dir)
 	var state struct {
 		DeviceID, PublicKeyPEM, OwnerPrivate, InstallationID string
 		Genesis                                              struct {
@@ -91,8 +78,8 @@ func TestRetirementActualDeviceGatesAndReceiptDeadline(t *testing.T) {
 	}
 	server := httptest.NewServer(controller.Handler(deviceauth.Handler{Service: service, Next: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })}))
 	defer server.Close()
-	origin = server.URL
-	_ = node("device-client-fixture.mjs", "client-consent")
+	origin := server.URL
+	deviceauthfixture.Bind(t, deviceauthfixture.Fixture{Materials: materials, Service: service}, dir, []string{"binding", "history", "consent"})
 	token, e := os.ReadFile(filepath.Join(dir, "credential.txt"))
 	if e != nil {
 		t.Fatal(e)

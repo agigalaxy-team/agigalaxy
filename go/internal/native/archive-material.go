@@ -143,6 +143,9 @@ func (s *Store) CaptureArchiveMessage(ctx context.Context, x ArchiveCaptureInput
 		if source == nil {
 			source = m["createdAt"]
 		}
+		if source == nil {
+			source = m["timestamp"]
+		}
 		var when time.Time
 		switch v := source.(type) {
 		case json.Number:

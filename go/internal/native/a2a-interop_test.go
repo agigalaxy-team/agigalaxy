@@ -27,7 +27,7 @@ import (
 func a2aOriginalPeer(t *testing.T) (string, string) {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
-	script := `import {sdkPeer} from './packages/galaxy-a2a/test/sdk-peer.mjs';import {createServer} from 'node:http';const peer=await sdkPeer(),server=createServer(async(req,res)=>{try{let bodyJson='';for await(const b of req)bodyJson+=b;const value=await peer.post(peer.endpoint,{bodyJson,credential:'synthetic-peer-token'});res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify(value))}catch{res.writeHead(500);res.end()}});await new Promise(r=>server.listen(0,'127.0.0.1',r));console.log(JSON.stringify({url:'http://127.0.0.1:'+server.address().port,cardJson:JSON.stringify(peer.card)}));process.stdin.resume();process.stdin.once('end',async()=>{await new Promise(r=>server.close(r));await peer.close()});`
+	script := `import {sdkPeer} from './integrations/reference-worker-pack/test/sdk-peer.mjs';import {createServer} from 'node:http';const peer=await sdkPeer(),server=createServer(async(req,res)=>{try{let bodyJson='';for await(const b of req)bodyJson+=b;const value=await peer.post(peer.endpoint,{bodyJson,credential:'synthetic-peer-token'});res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify(value))}catch{res.writeHead(500);res.end()}});await new Promise(r=>server.listen(0,'127.0.0.1',r));console.log(JSON.stringify({url:'http://127.0.0.1:'+server.address().port,cardJson:JSON.stringify(peer.card)}));process.stdin.resume();process.stdin.once('end',async()=>{await new Promise(r=>server.close(r));await peer.close()});`
 	command := exec.Command("node", "--input-type=module", "-e", script)
 	command.Dir = filepath.Clean(filepath.Join(filepath.Dir(file), "../../.."))
 	stdout, e := command.StdoutPipe()
@@ -211,6 +211,124 @@ func TestA2aNativeGoCaseActualSDKUnknownOriginalHistoryAndResult(t *testing.T) {
 	if e != nil || a2aInteger(readBack["version"]) != 3 {
 		t.Fatal("real Go Case Result missing", readBack, e)
 	}
+	t.Run("association pages across peers", func(t *testing.T) {
+		var cfg map[string]any
+		if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+			t.Fatal(err)
+		}
+		peers := cfg["peers"].([]any)
+		second := map[string]any{}
+		for k, v := range peers[0].(map[string]any) {
+			second[k] = v
+		}
+		second["id"] = "peer-two"
+		second["peerPrincipal"] = "other-fixture-user"
+		// Re-encoding the JSON object orders card fields differently; trust the
+		// exact encoded AgentCard that this fixture actually submits.
+		cardRaw, err := json.Marshal(second["agentCard"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		orderedCard, err := protocol.DecodeOrdered(cardRaw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cardBytes, err := protocol.EncodeJS(orderedCard)
+		if err != nil {
+			t.Fatal(err)
+		}
+		second["cardHash"] = a2aHash(cardBytes)
+		peers[0].(map[string]any)["cardHash"] = second["cardHash"]
+		cfg["peers"] = append(peers, second)
+		encoded, err := json.Marshal(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		both, err := NewNativeA2a(r, encoded, A2aOptions{Post: post, ReadEnvironment: func(string) (string, bool) { return "synthetic-peer-token", true }, Now: now})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer both.Close()
+		journals := map[string]*a2aJournal{}
+		old := map[string]bool{text(link["id"]): true}
+		put := func(peer string) string {
+			id := uuid.NewString()
+			j := journals[peer]
+			_, err := j.change(ctx, id, 0, nil, func(map[string]any) (map[string]any, error) {
+				return map[string]any{"id": id, "caseId": uuid.NewString(), "attemptId": uuid.NewString(), "status": "pending"}, nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return id
+		}
+		for _, peer := range []string{"peer", "peer-two"} {
+			_, done, _, _, journal, err := both.adapter(ctx, peer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			journals[peer] = journal
+			done()
+			for i := 0; i < 35; i++ {
+				old[put(peer)] = true
+			}
+		}
+		_, done, lease, err := r.identityLease(ctx, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer done()
+		work := NewNativeA2aWork(both)
+		defer work.Close()
+		first, err := work.Read(ctx, lease, map[string]any{"action": "list"})
+		if err != nil || len(uploadRows(first["associations"])) != 32 || text(first["nextAfter"]) == "" {
+			t.Fatal(first, err)
+		}
+		filtered, err := work.Read(ctx, lease, map[string]any{"action": "list", "peerId": "peer"})
+		if err != nil || filtered["listPeerId"] != "peer" || text(filtered["nextAfter"]) == "" || first["listPeerId"] != "" {
+			t.Fatal(filtered, first, err)
+		}
+		if _, err := work.Read(ctx, lease, map[string]any{"action": "list", "after": filtered["nextAfter"]}); err == nil {
+			t.Fatal("filtered cursor accepted for unfiltered list")
+		}
+		if _, err := work.Read(ctx, lease, map[string]any{"action": "list", "peerId": "peer", "after": first["nextAfter"]}); err == nil {
+			t.Fatal("unfiltered cursor accepted for filtered list")
+		}
+		seen := map[string]bool{}
+		seenPeers := map[string]bool{}
+		add := func(page map[string]any) {
+			for _, v := range uploadRows(page["associations"]) {
+				row := uploadObject(v)
+				id := text(row["associationId"])
+				if seen[id] {
+					t.Fatal("duplicate", id)
+				}
+				seen[id] = true
+				seenPeers[text(row["peerId"])] = true
+			}
+		}
+		add(first)
+		inserted := put("peer")
+		for cursor := text(first["nextAfter"]); cursor != ""; {
+			page, err := work.Read(ctx, lease, map[string]any{"action": "list", "after": cursor, "limit": int64(9)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			add(page)
+			cursor = text(page["nextAfter"])
+		}
+		if seen[inserted] || !seenPeers["peer"] || !seenPeers["peer-two"] {
+			t.Fatal("unexpected page contents", seenPeers)
+		}
+		for id := range old {
+			if !seen[id] {
+				t.Fatal("missing original", id)
+			}
+		}
+		if _, err = work.Read(ctx, lease, map[string]any{"action": "list", "after": "bad-cursor"}); err == nil {
+			t.Fatal("unknown cursor accepted")
+		}
+	})
 	secondAttempt := uuid.NewString()
 	submit(map[string]any{"schemaVersion": 2, "eventId": secondAttempt, "caseId": caseID, "expectedVersion": 3, "actorId": scope.Owner, "kind": "attempt-start", "role": "reviewer", "strategy": "Selection may change during external I/O", "inputScopeSummary": "Only chosen text", "permissionScope": []any{"selected-text"}})
 	interrupted, e := host.Prepare(ctx, map[string]any{"peerId": "peer", "action": "send", "caseId": caseID, "attemptId": secondAttempt, "attemptVersion": 1, "text": "work"})

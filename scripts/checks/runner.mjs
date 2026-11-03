@@ -26,9 +26,9 @@ export function runChecks({root,mode='all',env=process.env,testFiles=[]}){
   }
   return 0;
  }
- if(mode==='core'||mode==='official'){
+ if(mode==='core'||mode==='official'||mode==='a2a'){
   if(testFiles.length){console.error('Go checks select current packages through scripts/check-go.mjs; old JS test selection is unavailable.');return 2;}
-  return run(mode==='core'?'current Go Native':'current Go Hub',['scripts/check-go.mjs',mode==='core'?'native-client':'hub']);
+  return run(mode==='core'?'current Go Native':mode==='a2a'?'current Go A2A':'current Go Hub',['scripts/check-go.mjs',mode==='core'?'native-client':mode==='a2a'?'a2a':'hub']);
  }
  if(mode!=='lint'){
   let selection;

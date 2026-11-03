@@ -2,12 +2,133 @@ package native
 
 import (
 	"context"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+func TestWatchPendingForegroundRereadAndWithdrawnWindowAck(t *testing.T) {
+	ctx := context.Background()
+	store, meta, transport := connectionServiceFixture(t)
+	runtime, err := NewRuntime(store, meta.Configuration, ConnectionOptions{HTTPClient: &http.Client{Transport: transport}, Now: func() time.Time { return time.Unix(meta.Now, 0) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer runtime.Close()
+	if _, err = runtime.Restore(ctx); err != nil {
+		t.Fatal(err)
+	}
+	operation, release, lease, err := runtime.identityLease(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	room, grant := "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"
+	items := []any{map[string]any{"messageId": "00000000-0000-4000-8000-000000000003", "subjectId": "fixture-other-person", "state": "accepted", "sequence": "5", "text": "A current room message"}}
+	cursorCalls := 0
+	// Keep the real local connection fixture; script only the room reads and
+	// cursor receipt needed to exercise the Native pending-window contract.
+	transport.setHook(func(response *http.Response, request *http.Request) (*http.Response, error) {
+		var value map[string]any
+		readInput := func() map[string]any {
+			if request.GetBody == nil {
+				t.Error("watch request has no replayable JSON body")
+				return nil
+			}
+			body, err := request.GetBody()
+			if err != nil {
+				t.Error(err)
+				return nil
+			}
+			defer body.Close()
+			raw, err := io.ReadAll(body)
+			if err != nil {
+				t.Error(err)
+				return nil
+			}
+			input, err := connectionObject(raw)
+			if err != nil {
+				t.Error(err)
+			}
+			return input
+		}
+		switch request.URL.Path {
+		case "/v2/chat/rooms/" + room + "/agent-grants":
+			value = map[string]any{"items": []any{map[string]any{"grantId": grant, "state": "active", "bindingId": lease.connection.bindingID, "expiresAt": meta.Now + 3600}}}
+		case "/v2/chat/rooms/" + room + "/history":
+			if input := readInput(); input["after"] != "0" || input["agentGrantId"] != grant {
+				t.Error("pending reread changed its original start or grant", input)
+			}
+			value = map[string]any{"messages": items, "scannedThrough": "5", "complete": true}
+		case "/v2/chat/rooms/" + room + "/cursor":
+			cursorCalls++
+			if input := readInput(); input["kind"] != "agent" || input["agentGrantId"] != grant || input["sequence"] != "5" {
+				t.Error("ACK changed the original Agent cursor window", input)
+			}
+			value = map[string]any{"kind": "agent", "agentGrantId": grant, "sequence": "5"}
+		default:
+			return response, nil
+		}
+		response.Body.Close()
+		response.StatusCode = http.StatusOK
+		response.Body = io.NopCloser(strings.NewReader(hostJSONString(value)))
+		return response, nil
+	})
+	watch := NewNativeWatch(runtime)
+	started, err := watch.StartReviewed(operation, lease, map[string]any{"roomId": room, "agentGrantId": grant, "purpose": "Read current room material"}, &lease.scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := text(uploadObject(uploadRows(started["items"])[0])["id"])
+	first, err := watch.Check(operation, lease, id, false, false)
+	if err != nil || first["state"] != "work-ready" {
+		t.Fatal("initial work not prepared", first, err)
+	}
+	workID := text(uploadObject(first["work"])["workId"])
+	before, err := watch.row(operation, lease, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, withdrawn := range []bool{false, true} {
+		if withdrawn {
+			items = []any{}
+		}
+		result, err := watch.Check(operation, lease, id, false, false)
+		work := uploadObject(result["work"])
+		if err != nil || result["state"] != "work-ready" || work["workId"] != workID || work["after"] != "0" || work["next"] != "5" || work["sourceChanged"] != withdrawn {
+			t.Fatal("original pending work cannot be reread", result, err)
+		}
+		wantItems := 1
+		if withdrawn {
+			wantItems = 0
+		}
+		if len(uploadRows(work["items"])) != wantItems {
+			t.Fatal("reread did not expose current permitted material", work)
+		}
+		after, err := watch.row(operation, lease, id)
+		if err != nil || !connectionEqual(before["pending"], after["pending"]) || before["nextCheckAt"] != after["nextCheckAt"] || cursorCalls != 0 {
+			t.Fatal("reading changed or acknowledged the pending window", after, err)
+		}
+	}
+	if _, err = watch.VerifyHostWork(operation, lease, id, workID); fault.Code(err) != "watch_source_changed" {
+		t.Fatal("analysis execution accepted changed source material", err)
+	}
+	acked, err := watch.Ack(operation, lease, id, workID)
+	if err != nil || acked["state"] != "processed" || acked["humanRead"] != false || cursorCalls != 1 {
+		t.Fatal("explicit Agent ACK cannot finish the withdrawn original window", acked, err)
+	}
+	after, err := watch.row(operation, lease, id)
+	if err != nil || after["pending"] != nil || after["after"] != "5" {
+		t.Fatal("ACK did not clear the original pending window", after, err)
+	}
+}
 
 func TestRemoteChatOriginalInputDefaultsRefinementsAndStrictTools(t *testing.T) {
 	id := "00000000-0000-4000-8000-000000000001"

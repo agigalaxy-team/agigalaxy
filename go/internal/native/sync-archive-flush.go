@@ -9,6 +9,14 @@ import (
 // Flush reconciles saved original jobs before preparing the current selected
 // source window. Unknown delivery stops that source; it never rotates its ID.
 func (a *ArchiveUpload) Flush(ctx context.Context, archiveID string) (any, error) {
+	release, e := a.runtime.acquirePrivateSync(ctx)
+	if e != nil {
+		return nil, e
+	}
+	defer release()
+	return a.flush(ctx, archiveID)
+}
+func (a *ArchiveUpload) flush(ctx context.Context, archiveID string) (any, error) {
 	if archiveID != "" && !controlUUID(archiveID) {
 		return nil, connectionFailure("archive_sync_input_invalid")
 	}

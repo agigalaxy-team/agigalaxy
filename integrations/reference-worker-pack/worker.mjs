@@ -4,10 +4,10 @@ import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
-// Resolve the repository's existing locked dependency. This does not install,
+// Resolve this Worker's locked dependency. This does not install,
 // execute downloaded code, load a model, or interpret arbitrary shell input.
-const require = createRequire(new URL('../../packages/galaxy-a2a/package.json', import.meta.url));
-const sdkPackage = JSON.parse(await readFile(new URL('../../packages/galaxy-a2a/node_modules/@a2a-js/sdk/package.json', import.meta.url)));
+const require = createRequire(new URL('./package.json', import.meta.url));
+const sdkPackage = JSON.parse(await readFile(new URL('./node_modules/@a2a-js/sdk/package.json', import.meta.url)));
 if (sdkPackage.version !== '1.1.0') throw new Error('Reference Worker requires the reviewed A2A SDK 1.1.0.');
 const { AgentCard, Task, TaskState, Role } = await import(pathToFileURL(require.resolve('@a2a-js/sdk')).href);
 const { AgentEvent, DefaultRequestHandler, InMemoryTaskStore, JsonRpcTransportHandler, ServerCallContext } =

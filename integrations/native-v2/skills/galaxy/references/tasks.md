@@ -1,6 +1,6 @@
 # Task 与受控执行
 
-本文件用于已经选定的 Task/Participation、需要提交的协作动作或实际可用的 A2A/Worker。查询候选时先读 [查询与原聊天帮助](help.md)；普通聊天不需要造一个 Task。用户自己的模型继续解释和处理原工作。
+本文件用于已有或拟进行的 Task/Participation、需要提交的协作动作或实际可用的 A2A/Worker。需要发现候选时可读 [查询与原聊天帮助](help.md)；已有准确对象时沿其来源继续，普通聊天不需要造一个 Task。用户自己的模型继续解释和处理原工作。
 
 正式发布、申请或确认承接任务使用Agent中的既有银河身份。需要在官网继续时读[已有身份接官网](identity.md)，保留原对象与草稿，不让用户在浏览器另建一套GUID。普通阅读、草稿和社区表达不附加正式任务条件；设备接续、账号验证和业务确认分别完成。原生工具本已沿当前Native身份工作，不为每次动作重开接续页。
 
@@ -10,7 +10,7 @@
 
 从当前真实对象读取 ID、版本、参与者、Scope 与来源权限。阅读资料、推荐某人、选入联系清单、发邀请、接受参与和完成交付分别表示不同事实。发布与联系独立：发布结果未知不猜测是否已发布，也不以联系名单替代已收到邀请的回执。不要补造 Case、Attempt、参与者或收到的回应。
 
-现有 `galaxy_help_publish` 路径仍使用独立准确的 Task Consent。提交原 `consentId` / `payloadJson`，未知先用 `galaxy_help_reconcile` 查询原 operationId，不另建 Task 猜结果。新的精确动作路径依次使用 `galaxy_help_prepare_action`、`galaxy_help_action_preview`、`galaxy_help_execute_action` 和 `galaxy_help_reconcile_action`；以工具实际 schema 和当前返回为准。
+现有 `galaxy_help_publish` 路径仍使用独立准确的 Task Consent。提交原 `consentId` / `payloadJson`，未知先用 `galaxy_help_reconcile` 查询原 operationId，不另建 Task 猜结果。精确动作路径按当前需要使用 `galaxy_help_prepare_action`、`galaxy_help_action_preview`、`galaxy_help_execute_action` 或 `galaxy_help_reconcile_action`；执行须引用实际预览，未知结果沿原操作查询。具体字段以工具 schema 和当前返回为准。
 
 Prepare/preview 中核对动作、准确收件人、可见范围、材料原文、来源版本、业务 operationId、payloadHash 和 authorizationRequestId。调用 execute 只能使用同一预览的精确引用，通过真实宿主选择或本机审阅页；模型的 confirmed 布尔值不是 Consent。改正文、收件人、范围或来源后重做预览，不套用旧确认。普通 MCP 必须给用户足够审阅信息，不能因没有 Apps 而把确认所需内容隐藏。
 

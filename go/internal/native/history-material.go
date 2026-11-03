@@ -14,6 +14,9 @@ func summaryView(r map[string]any) any {
 func environmentView(r map[string]any) any {
 	return map[string]any{"id": r["id"], "version": r["version"], "observedAt": r["observed_at"], "facts": decoded(r["facts_json"]), "exclusions": array(r["exclusions_json"])}
 }
+func workSummaryInput(owner string, workID any, revision, through int64) map[string]any {
+	return map[string]any{"galaxyId": owner, "workId": workID, "expectedRevision": revision, "throughSequence": through}
+}
 func (s *Store) WorkPending(ctx context.Context, q WorkQuery) (any, error) {
 	if e := workLimit(&q, "pending"); e != nil {
 		return nil, e
@@ -72,7 +75,11 @@ func (s *Store) WorkPending(ctx context.Context, q WorkQuery) (any, error) {
 		if summary != nil {
 			previous = map[string]any{"title": summary["title"], "summary": summary["summary"], "outcome": summary["outcome"], "exclusions": array(summary["exclusions_json"])}
 		}
-		out = map[string]any{"galaxyId": owner, "workId": work["id"], "expectedRevision": integer(summary["revision"]), "afterSequence": after, "throughSequence": through, "observations": observations, "environments": environments, "hasMore": hasMore, "processing": processing, "previousSummary": previous}
+		var summaryInput any
+		if len(observations) > 0 {
+			summaryInput = workSummaryInput(owner, work["id"], integer(summary["revision"]), through)
+		}
+		out = map[string]any{"galaxyId": owner, "workId": work["id"], "expectedRevision": integer(summary["revision"]), "afterSequence": after, "throughSequence": through, "summaryInput": summaryInput, "observations": observations, "environments": environments, "hasMore": hasMore, "processing": processing, "previousSummary": previous}
 		return nil
 	})
 	return out, e

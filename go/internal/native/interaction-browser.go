@@ -312,15 +312,10 @@ func (b *BrowserChoices) serve(w http.ResponseWriter, r *http.Request) {
 				entry.state = "declined"
 			}
 		}
-		state := entry.state
 		b.mu.Unlock()
-		message := "已取消。本次操作没有获得授权。"
-		if state == "accepted" {
-			message = "已允许本次显示的操作。回到原聊天继续。"
-		} else if state == "consumed" {
-			message = "本次允许已用于原操作，不能再次授权。"
-		}
-		interactionResponse(w, 200, "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>银河本机选择</title><p>"+message+"</p>")
+		// Keep the same review layout and make refresh a read of the choice,
+		// rather than resubmitting the browser's previous POST.
+		http.Redirect(w, r, r.URL.Path, http.StatusSeeOther)
 		return
 	}
 	if r.Method != "GET" {

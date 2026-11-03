@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/native"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/nativebridge"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"log/slog"
 	"os"
 	"os/signal"
-	"path/filepath"
+	"syscall"
 )
 
 func run(ctx context.Context, args []string) error {
@@ -31,6 +32,14 @@ func run(ctx context.Context, args []string) error {
 		return hostConfigurationsCommand(ctx, args[1:])
 	case "setup":
 		return setupCommand(ctx, args[1:])
+	case "install", "update", "repair", "uninstall":
+		return managedClientCommand(ctx, args[0], args[1:])
+	case "ingress":
+		return hostIngressCommand(ctx, args[1:])
+	case "service":
+		return nativeServiceCommand(ctx, args[1:])
+	case "native-service":
+		return nativebridge.Run(ctx)
 	}
 	configPath := os.Getenv("GALAXY_NATIVE_CONFIG")
 	for i := 1; i < len(args); i++ {
@@ -49,35 +58,12 @@ func run(ctx context.Context, args []string) error {
 		return e
 	}
 	switch args[0] {
-	case "host":
-		return native.ServeHost(ctx, store, os.Stdin, os.Stdout)
-	case "native":
-		runtime, e := native.NewRuntime(store, c, native.ConnectionOptions{})
-		if e != nil {
-			return e
+	case "host", "native":
+		channel := nativebridge.MCP
+		if args[0] == "host" {
+			channel = nativebridge.Host
 		}
-		defer runtime.Close()
-		var artifacts []*native.InteractionArtifact
-		executable, e := os.Executable()
-		if e != nil {
-			return e
-		}
-		artifactDirectory := filepath.Join(filepath.Dir(executable), "dist")
-		if _, e = os.Stat(artifactDirectory); e == nil {
-			artifact, e := native.LoadInteractionArtifact(artifactDirectory)
-			if e != nil {
-				return e
-			}
-			artifacts = append(artifacts, artifact)
-		} else if !os.IsNotExist(e) {
-			return e
-		}
-		s, e := native.NewRuntimeToolServer(store, runtime, artifacts...)
-		if e != nil {
-			return e
-		}
-		runtime.ResumePrivateSync(0)
-		return s.Run(ctx, native.HostSessionTransport(runtime, &mcp.StdioTransport{}))
+		return relayNative(ctx, nativebridge.Profile{ConfigurationPath: configPath}, channel)
 	case "identity":
 		v, e := store.Identity(ctx)
 		if e != nil {
@@ -94,9 +80,13 @@ func run(ctx context.Context, args []string) error {
 	}
 }
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if e := run(ctx, os.Args[1:]); e != nil {
+		if errors.Is(e, nativebridge.ErrPaused) {
+			slog.Info("galaxy service stopped", "code", "native_service_paused")
+			os.Exit(75)
+		}
 		slog.Error("galaxy command failed", "code", fault.Code(e))
 		os.Exit(1)
 	}

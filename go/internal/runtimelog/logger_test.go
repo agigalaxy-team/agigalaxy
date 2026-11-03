@@ -258,7 +258,7 @@ func TestDailyRotationOnActualAcceptedWrite(t *testing.T) {
 
 func TestRelocatedSDKAndPlatformDiagnosticLocations(t *testing.T) {
 	for _, name := range []string{
-		"packages/galaxy-client/src/node/connection.mjs",
+		"packages/galaxy-client/src/node/runtime-logger.mjs",
 		"packages/galaxy-contracts/src/verification.mjs",
 		"packages/galaxy-official/deploy/maintenance-agent/runtime.mjs",
 		"go/internal/native/identity-recovery.go",

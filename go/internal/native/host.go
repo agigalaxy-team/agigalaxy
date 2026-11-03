@@ -16,6 +16,17 @@ import (
 // These persistence operations are never exposed in the model's MCP tool list.
 // Calls execute once in input order; a broken pipe is not a reason to replay writes.
 func ServeHost(ctx context.Context, store *Store, input io.Reader, output io.Writer) error {
+	locks := newTranscriptLocks(store)
+	defer locks.close()
+	return serveHost(ctx, input, output, func(ctx context.Context, method string, params json.RawMessage) (any, error) {
+		if method == "archive.transcript.acquire" || method == "archive.transcript.release" {
+			return locks.call(ctx, method, params)
+		}
+		return store.hostCall(ctx, method, params)
+	})
+}
+
+func serveHost(ctx context.Context, input io.Reader, output io.Writer, call func(context.Context, string, json.RawMessage) (any, error)) error {
 	scanner := bufio.NewScanner(input)
 	scanner.Buffer(make([]byte, 64*1024), 9*1024*1024)
 	for scanner.Scan() {
@@ -34,7 +45,7 @@ func ServeHost(ctx context.Context, store *Store, input io.Reader, output io.Wri
 		}
 		var result any
 		if e == nil {
-			result, e = store.hostCall(ctx, request.Method, request.Params)
+			result, e = call(ctx, request.Method, request.Params)
 		}
 		response := map[string]any{"id": request.ID}
 		if e != nil {
@@ -68,6 +79,16 @@ func hostDecode[T any](raw json.RawMessage) (T, error) {
 
 func (s *Store) hostCall(ctx context.Context, method string, params json.RawMessage) (any, error) {
 	switch method {
+	case "history.sourceCursor", "history.advanceSourceCursor":
+		return s.hostSourceCursor(ctx, method, params)
+	case "history.drainIngress":
+		x, e := hostDecode[struct {
+			GalaxyID string `json:"galaxyId,omitempty"`
+		}](params)
+		if e != nil {
+			return nil, e
+		}
+		return s.DrainHostIngress(ctx, x.GalaxyID)
 	case "local.deletion.rememberPreview", "local.deletion.observe", "local.deletion.list":
 		return s.hostDeletionCall(ctx, method, params)
 	case "local.snapshot", "local.integrationStatus", "local.connectionStatus", "local.resetIntegration":

@@ -91,10 +91,10 @@ func newToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArti
 	}
 	rt := &toolRuntime{store: store, key: key, choices: map[string]*choiceRecord{}, browser: NewBrowserChoices(store, nil)}
 	serverName := "galaxy-native-v2"
-	serverInstructions := "Development Go migration: only listed tools are implemented. An existing saved connection may be resumed by status; a new connection choice requires the person's confirmation. No implicit upload, model use, identity creation or device change. Preserve current identity and original operations; this is not the complete migrated client."
+	serverInstructions := "Galaxy provides composable tools and data. The current Agent chooses tools and decides how to advance the user's task; menus and specialized readers are optional. Reuse the current identity, connection and work. Tool schemas describe actual choices and permissions. Query original operations when a write result is unknown. Model execution remains with the user's host."
 	if runtime == nil {
 		serverName = "galaxy-integration-mcp"
-		serverInstructions = "Galaxy Integration Pack is local-only in Founding Beta. Treat /Galaxy as a state-aware entry: initialize only on first use or after the user explicitly requests a configuration change. Start by listing initialization paths and previewing the requested plan. Do not call galaxy_integration_initialize until the user has reviewed the plan and explicitly confirmed the local module selection. No current module uploads Case content, publishes Proof, creates a remote account, or claims independent verification. Open a browser only when the user explicitly requests the configured official website and confirms the dedicated website-opening action."
+		serverInstructions = "Galaxy local tools manage identity and local records without a connected service. Use the tools needed for the current task; /Galaxy is an optional interface. Reuse an existing identity and records. For initialization or configuration changes, use the tool's preview and actual user-choice mechanism. Reading status does not initialize, upload or call a model. Service-dependent functions require a configured connection."
 	}
 	s := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: "0.3.0-go-development"}, &mcp.ServerOptions{Instructions: serverInstructions})
 	var closeServices func()
@@ -231,7 +231,7 @@ func newToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArti
 	registerHistoryMaterial(s, store)
 	registerInitializationTools(s, rt)
 	registerLocalMaterialTools(s, rt)
-	listProps := map[string]any{"galaxyId": stringSchema(), "host": stringSchema(), "limit": integerSchema(1, 100, 20), "after": map[string]any{"type": "string", "pattern": "^[0-9]+$"}}
+	listProps := map[string]any{"galaxyId": localMaterialIdentitySchema(), "host": stringSchema(), "limit": integerSchema(1, 100, 20), "after": map[string]any{"type": "string", "pattern": "^[0-9]+$"}}
 	addNativeTool(s, &mcp.Tool{Name: "galaxy_local_work_list", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Description: "Read current identity's actual local work history without creating an identity, connecting or running a model.", InputSchema: objectSchema(listProps)}, "local_work_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var x struct {
 			GalaxyID string `json:"galaxyId"`
@@ -255,8 +255,8 @@ func newToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArti
 		}
 		return toolResult(v)
 	})
-	getProps := map[string]any{"galaxyId": stringSchema(), "workId": stringSchema(), "host": stringSchema(), "sessionId": stringSchema(), "afterSequence": map[string]any{"type": "integer", "minimum": 0, "default": 0}, "limit": integerSchema(1, 200, 100)}
-	addNativeTool(s, &mcp.Tool{Name: "galaxy_local_work_get", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Description: "Read actually retained observations and own-model summaries for the selected current-identity work.", InputSchema: objectSchema(getProps)}, "local_work_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	getProps := map[string]any{"galaxyId": localMaterialIdentitySchema(), "workId": stringSchema(), "host": stringSchema(), "sessionId": stringSchema(), "afterSequence": map[string]any{"type": "integer", "minimum": 0, "default": 0}, "limit": integerSchema(1, 200, 100)}
+	addNativeTool(s, &mcp.Tool{Name: "galaxy_local_work_get", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Description: "Read retained observations and own-model summaries for the selected work. When a page covers the next unsummarized observations, summaryInput gives their exact summary position.", InputSchema: objectSchema(getProps)}, "local_work_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var q WorkQuery
 		if e := protocol.Decode(req.Params.Arguments, &q); e != nil {
 			return toolError(e)
@@ -286,7 +286,7 @@ func newToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArti
 		}
 		return toolResult(v)
 	})
-	props := map[string]any{"galaxyId": stringSchema(), "enabled": map[string]any{"type": "boolean"}, "sessions": map[string]any{"type": "array", "maxItems": 500, "items": objectSchema(map[string]any{"host": stringSchema(), "sessionId": stringSchema()}, "host", "sessionId")}, "autoCleanAfterDays": map[string]any{"type": []string{"integer", "null"}, "minimum": 1, "maximum": 36500, "default": nil}}
+	props := map[string]any{"galaxyId": localMaterialIdentitySchema(), "enabled": map[string]any{"type": "boolean"}, "sessions": map[string]any{"type": "array", "maxItems": 500, "items": objectSchema(map[string]any{"host": stringSchema(), "sessionId": stringSchema()}, "host", "sessionId")}, "autoCleanAfterDays": map[string]any{"type": []string{"integer", "null"}, "minimum": 1, "maximum": 36500, "default": nil}}
 	addNativeTool(s, &mcp.Tool{Name: "galaxy_local_archive_configure", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}, Description: "Choose exact existing host/session scopes for private local original capture and optional cleanup. Requires actual person input; no upload.", InputSchema: objectSchema(props, "enabled", "sessions")}, "local_archive_input_invalid", rt.configure)
 	if runtime == nil {
 		registerIntegrationTools(s, rt)

@@ -14,8 +14,10 @@ activates a host. A recorded PackUse remains the participant's reported use;
 
 ## Run the reviewed process
 
-Use an already installed Node executable (24.13 or later) and the repository's
-existing package-local A2A dependency. The example logical endpoint identifies
+Use an already installed Node executable (24.13 or later). Install the locked
+third-party SDK with `npm ci --prefix integrations/reference-worker-pack`.
+This reference owns its dependency; it does not load a retired Node Galaxy client.
+The example logical endpoint identifies
 the selected interface; the process listens only on a randomly assigned
 `127.0.0.1` port. It is not a public TLS listener or an authentication service.
 
@@ -43,7 +45,7 @@ The optional IPC protocol accepts only `observations` (counts and versions) and
 `shutdown`. Shutdown clears active timers, closes the loopback listener and exits.
 Execution does not spawn additional processes or use the network for arithmetic.
 
-## Explicit owner flow
+## Galaxy integration
 
 `createReferenceWorkerManifest({source, sourceHash, licenseSource})` creates the
 existing strict manifest. Supply the actual reviewed source digest, source and
@@ -51,41 +53,19 @@ license reference; no download, signature, installation or execution happens in
 this function. Register it with the existing signed Builder client. A source
 hash or declaration is not a professional certification or a capability score.
 
-`createWorkerPackHostFlowV2({runtime, a2a, packUses, workers})` is a thin user-host
-composition. `workers` is trusted host configuration containing an exact peer,
-Builder/manifest/hash, source hash and version, never a model-supplied command.
-It reuses the existing normal owner connection and both operation journals.
-
-- `prepareStart` selects the Worker, exact current owned Case/Attempt version,
-  actual Configuration, purpose and only the explicitly chosen input text.
-  `execute(preview, {confirmed:true})` requires that same live preview and lease.
-- `associations` lists local minimal original associations. `read` returns the
-  selected owner's existing journal; optional `poll:true` makes an explicit
-  current-authorized `GetTask` request for an already observed peer task ID.
-- `prepareCancel` and `execute` make a separate explicit cancellation request.
-  `abort` only abandons a preview/local transport; its result never asserts
-  remote cancellation.
-- `prepareResult` and `execute` separately review and sign a limited Result.
-  Completed protocol work does not automatically mean the user's problem was
-  solved. Failed/canceled Tasks cannot support a succeeded/partial Result.
-- `reconcileResult` reads the exact original accepted Case event receipt. It
-  does not reread withdrawn content or restore current content permission.
-- `prepareUse` and `execute` separately review the exact Pack/Configuration/
-  Attempt/Result references and audience. A discarded association preview keeps
-  its original operation and bytes; it does not silently widen the audience.
-- `reconcileUse` reads the original operation ID/hash receipt, including after a
-  lost ACK. Unknown/absent/conflict do not start work or resend a write. A fresh
-  explicit current preview is required before retrying an absent original use.
-
-All queued, local-store and network continuations check the captured
-subject/endpoint/binding/generation. An already accepted remote operation stays
-in its original journal when a late return is withheld after reconnection.
-Closing this composition invalidates its previews; the process owner separately
-stops the child process.
+The Go Native implementation owns Galaxy A2A and Worker associations,
+authorization, journals and original operation receipts. Agents use its existing
+`galaxy_worker_host_read`, `galaxy_worker_host_prepare`,
+`galaxy_worker_host_execute` and `galaxy_worker_host_abort_local` tools as needed.
+The trusted `workerPacks` configuration selects a peer and the actual
+Builder/manifest/source references; it does not accept executable commands from
+model input. A local abort does not cancel a peer task. Results and PackUse
+records retain their own operation receipts and are not inferred from a protocol
+task's completion. There is no parallel Node Galaxy host-flow implementation.
 
 ## AI-agent local operation
 
-Discover the existing repository, actual Node path, locked A2A package and exact
+Discover the existing repository, actual Node path, this reference's locked SDK and exact
 source files before launching. Do not install a global runner or accept an
 executable/cwd/endpoint from untrusted Pack metadata. Keep the listener loopback;
 real external transport, TLS and peer credentials require the owner's explicit

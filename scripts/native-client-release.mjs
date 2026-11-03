@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {isDeepStrictEqual} from 'node:util';
+import {create as createTar} from 'tar';
 import {signRelease} from '../packages/galaxy-contracts/src/release-artifact.mjs';
 import {verifyNativeLicenseNotices} from './native-license-notices.mjs';
 import {parseComponentRelease} from './release-identifiers.mjs';
@@ -43,20 +44,24 @@ function protocolReport(report){if(report.version!==1||report.profile!=='galaxy-
 export async function prepareNativeClientRelease({source,destination,tarExecutable='tar',sourceDirectory=root}){
  if(!isAbsolute(source)||!isAbsolute(destination)||!isAbsolute(sourceDirectory)||typeof tarExecutable!=='string'||!tarExecutable)fail('Absolute candidate/output/source required');
  const candidate=await inspectNativeClientCandidate({source,sourceDirectory}),files=await members(source);
- await mkdir(destination);const filename=`galaxy-native-go-${candidate.packageJson.version}.tgz`,archive=join(destination,filename),names=Object.keys(files);
- const list=join(destination,'archive-members.txt'),staging=join(destination,'.archive-check');
- await writeFile(list,names.join('\n')+'\n',{flag:'wx'});
+ await mkdir(destination);const filename=`galaxy-native-go-${candidate.packageJson.version}-${candidate.manifest.target.goos}-${candidate.manifest.target.goarch}.tgz`,archive=join(destination,filename),names=Object.keys(files);
+ const staging=join(destination,'.archive-check');
+ const executables=new Set([candidate.manifest.mcp.command,candidate.manifest.platformResources?.darwin?.command].filter(Boolean));
  try {
-  tar(tarExecutable,['-czf',archive,'-C',source,'-T',list]);
+  await createTar({cwd:source,file:archive,gzip:true,portable:true,onWriteEntry:entry=>{
+   const name=entry.path.replaceAll('\\','/').replace(/^\.\//,'');
+   const executable=executables.has(name)||(entry.stat.mode&0o111)!==0;
+   entry.stat.mode=(entry.stat.mode&~0o777)|(executable?0o755:0o644);
+  }},names);
   const entries=tar(tarExecutable,['-tf',archive]).toString('utf8').trim().split(/\r?\n/);if(!isDeepStrictEqual(entries,names))fail('Archive member list differs');
   if(tar(tarExecutable,['-tvf',archive]).toString('utf8').trim().split(/\r?\n/).some(line=>!line.startsWith('-')))fail('Archive contains non-regular members');
   await mkdir(staging);tar(tarExecutable,['-xf',archive,'-C',staging]);
   for(const[name,digest]of Object.entries(files))if(sha(await bytes(inside(staging,name)))!==digest)fail('Archive bytes differ: '+name);
- } finally {await rm(list,{force:true});await rm(staging,{recursive:true,force:true});}
+ } finally {await rm(staging,{recursive:true,force:true});}
  await inspectNativeClientCandidate({source,sourceDirectory});for(const[name,digest]of Object.entries(files))if(sha(await bytes(inside(source,name)))!==digest)fail('Candidate changed during packaging');
  const artifact=await bytes(archive),sourceSha256=sha(candidate.sourceBytes),artifactsSha256=sha(JSON.stringify(files));
  const report=protocolReport({version:1,profile:'galaxy-native-go/1',scope:'candidate-package-integrity',status:'integrity-verified',checkedAt:new Date().toISOString(),packageSha256:sha(artifact),sourceSha256,artifactsSha256,actualHostAcceptance:false,humanAcceptance:false,protocolAcceptance:'not-tested-by-packaging'});
- const packageMetadata={name:candidate.packageJson.name,version:candidate.packageJson.version,filename,sha256:sha(artifact),bytes:artifact.length,exports:Object.keys(candidate.packageJson.exports),dependencies:candidate.packageJson.dependencies,lockSha256:sha(candidate.lockBytes),sourceHashesSha256:sourceSha256};
+ const packageMetadata={name:candidate.packageJson.name,version:candidate.packageJson.version,target:candidate.manifest.target,filename,sha256:sha(artifact),bytes:artifact.length,exports:Object.keys(candidate.packageJson.exports),dependencies:candidate.packageJson.dependencies,lockSha256:sha(candidate.lockBytes),sourceHashesSha256:sourceSha256};
  const reportBytes=Buffer.from(json(report));for(const[name,value]of Object.entries({'protocol-report.json':reportBytes,'package-files.json':json(files),'package-metadata.json':json(packageMetadata),'source-hashes.json':candidate.sourceBytes,'package-lock.json':candidate.lockBytes}))await writeFile(join(destination,name),value,{flag:'wx'});
  return{destination,package:packageMetadata,protocolAcceptance:{profile:report.profile,scope:report.scope,reportSha256:sha(reportBytes),sourceSha256,artifactsSha256,actualHostAcceptance:false},publicationReady:false};
 }
@@ -64,7 +69,7 @@ export async function prepareNativeClientRelease({source,destination,tarExecutab
 export async function createNativeClientRelease({preparedDirectory,publisher,purpose='release-candidate',privateKey,kid,now=Math.floor(Date.now()/1000),lifetime=86400}){
  if(!isAbsolute(preparedDirectory))fail('Absolute prepared directory required');
  const pkg=await object(join(preparedDirectory,'package-metadata.json')),reportBytes=await bytes(join(preparedDirectory,'protocol-report.json')),report=protocolReport(JSON.parse(reportBytes));
- if(pkg.name!=='@galaxy/native-go-candidate'||!parseComponentRelease(pkg.version)||pkg.filename!==`galaxy-native-go-${pkg.version}.tgz`)fail('Go Native package mismatch');
+ if(pkg.name!=='@galaxy/native-go-candidate'||!parseComponentRelease(pkg.version)||(!['windows','linux','darwin'].includes(pkg.target?.goos)||!['amd64','arm64'].includes(pkg.target?.goarch))||pkg.filename!==`galaxy-native-go-${pkg.version}-${pkg.target.goos}-${pkg.target.goarch}.tgz`)fail('Go Native package mismatch');
  const artifact=await bytes(inside(preparedDirectory,pkg.filename)),files=await object(join(preparedDirectory,'package-files.json')),sources=await bytes(join(preparedDirectory,'source-hashes.json')),lockBytes=await bytes(join(preparedDirectory,'package-lock.json')),lock=JSON.parse(lockBytes);
  if(sha(artifact)!==pkg.sha256||artifact.length!==pkg.bytes||report.packageSha256!==pkg.sha256||sha(sources)!==pkg.sourceHashesSha256||report.sourceSha256!==sha(sources)||report.artifactsSha256!==sha(JSON.stringify(files))||pkg.lockSha256!==sha(lockBytes)||!isDeepStrictEqual(lock.packages?.['']?.dependencies,pkg.dependencies))fail('Prepared Go Native bytes differ');
  const manifest={version:1,kind:'galaxy-native-go-release',publisher,purpose,issuedAt:now,expiresAt:now+lifetime,package:pkg,protocolAcceptance:{profile:report.profile,scope:report.scope,reportSha256:sha(reportBytes),sourceSha256:report.sourceSha256,artifactsSha256:report.artifactsSha256,actualHostAcceptance:false}};

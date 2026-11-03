@@ -281,3 +281,84 @@ func TestLocalDeleteCancelsOnlyExactExistingQueueAndRollsBackOnFailure(t *testin
 		}
 	}
 }
+
+func TestWorkSummaryDerivesCoveredSourcesFromPendingPage(t *testing.T) {
+	ctx := context.Background()
+	s := materialStore(t)
+	c := connectMCP(t, s, "2025-11-25", true)
+	note := func(source string) map[string]any {
+		return materialCall(t, c, "galaxy_local_work_note", map[string]any{"host": "opencode", "sessionId": "original", "text": source, "sourceId": source}, false)
+	}
+	first := note("first")
+	workID := first["workId"].(string)
+	second := note("second")
+	page := materialCall(t, c, "galaxy_local_work_pending", map[string]any{"workId": workID, "limit": 1}, false)
+	position := page["summaryInput"].(map[string]any)
+	if position["throughSequence"] != first["observation"].(map[string]any)["sequence"] || page["hasMore"] != true {
+		t.Fatal("summary position did not stop at the first page")
+	}
+	third := note("third")
+	foreign := materialCall(t, c, "galaxy_local_work_note", map[string]any{"host": "opencode", "sessionId": "other", "text": "foreign", "sourceId": "foreign"}, false)
+	args := map[string]any{"workId": workID, "expectedRevision": position["expectedRevision"], "throughSequence": position["throughSequence"], "title": "First page", "summary": "First actual observation."}
+	empty := map[string]any{}
+	for k, v := range args {
+		empty[k] = v
+	}
+	empty["sourceObservationIds"] = []any{third["observation"].(map[string]any)["id"]}
+	materialCall(t, c, "galaxy_local_work_summary", empty, true)
+	empty["sourceObservationIds"] = []any{foreign["observation"].(map[string]any)["id"]}
+	materialCall(t, c, "galaxy_local_work_summary", empty, true)
+	empty["sourceObservationIds"] = []any{}
+	materialCall(t, c, "galaxy_local_work_summary", empty, false)
+	materialCall(t, c, "galaxy_local_work_summary", args, true)
+	got, err := s.WorkGet(ctx, WorkQuery{WorkID: workID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	view := got.(map[string]any)
+	summary := view["summaries"].([]any)[0].(map[string]any)
+	sources := summary["sourceObservationIds"].([]any)
+	if len(sources) != 1 || sources[0] != first["observation"].(map[string]any)["id"] {
+		t.Fatalf("derived sources do not match the selected page: %v", sources)
+	}
+	next := materialCall(t, c, "galaxy_local_work_pending", map[string]any{"workId": workID}, false)
+	observations := next["observations"].([]any)
+	if len(observations) != 2 || observations[0].(map[string]any)["id"] != second["observation"].(map[string]any)["id"] || observations[1].(map[string]any)["id"] != third["observation"].(map[string]any)["id"] {
+		t.Fatal("later observations did not remain pending")
+	}
+	pos := next["summaryInput"].(map[string]any)
+	firstSequence := int64(first["observation"].(map[string]any)["sequence"].(float64))
+	secondSequence := int64(second["observation"].(map[string]any)["sequence"].(float64))
+	pageGet, err := s.WorkGet(ctx, WorkQuery{WorkID: workID, AfterSequence: firstSequence, Limit: 1})
+	if err != nil || integer(pageGet.(map[string]any)["summaryInput"].(map[string]any)["throughSequence"]) != secondSequence {
+		t.Fatal("get did not provide the covered page position")
+	}
+	gapGet, err := s.WorkGet(ctx, WorkQuery{WorkID: workID, AfterSequence: secondSequence, Limit: 1})
+	if err != nil || gapGet.(map[string]any)["summaryInput"] != nil {
+		t.Fatal("get provided a summary position for a page with a gap")
+	}
+	explicit := map[string]any{"workId": workID, "expectedRevision": pos["expectedRevision"], "throughSequence": pos["throughSequence"], "sourceObservationIds": []any{observations[0].(map[string]any)["id"], first["observation"].(map[string]any)["id"]}, "title": "Next page", "summary": "Two observations."}
+	materialCall(t, c, "galaxy_local_work_summary", explicit, false)
+	got, err = s.WorkGet(ctx, WorkQuery{WorkID: workID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources = got.(map[string]any)["summaries"].([]any)[0].(map[string]any)["sourceObservationIds"].([]any)
+	if len(sources) != 3 || sources[0] != observations[0].(map[string]any)["id"] || sources[1] != observations[1].(map[string]any)["id"] || sources[2] != first["observation"].(map[string]any)["id"] {
+		t.Fatalf("covered and supplemental sources were not merged: %v", sources)
+	}
+	fourth := note("fourth")
+	materialCall(t, c, "galaxy_local_work_summary", map[string]any{"workId": workID, "expectedRevision": 2, "throughSequence": fourth["observation"].(map[string]any)["sequence"], "title": "Final page", "summary": "One observation."}, false)
+	got, err = s.WorkGet(ctx, WorkQuery{WorkID: workID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources = got.(map[string]any)["summaries"].([]any)[0].(map[string]any)["sourceObservationIds"].([]any)
+	if len(sources) != 1 || sources[0] != fourth["observation"].(map[string]any)["id"] {
+		t.Fatal("omitted source list did not derive the final observation")
+	}
+	done := materialCall(t, c, "galaxy_local_work_pending", map[string]any{"workId": workID}, false)
+	if done["summaryInput"] != nil {
+		t.Fatal("empty pending page offered summary position")
+	}
+}

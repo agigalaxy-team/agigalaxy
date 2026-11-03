@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,21 +27,8 @@ func TestRealPublicPortalAndControlledDeviceSubscriptions(t *testing.T) {
 	pool, dsn := testsupport.PostgreSQL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	root, _ := filepath.Abs("../../..")
 	dir := t.TempDir()
-	origin := ""
-	node := func(mode string) []byte {
-		t.Helper()
-		cmd := exec.Command("node", filepath.Join(root, "scripts/go/device-client-fixture.mjs"), mode)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GALAXY_GO_TEST_DATABASE_URL="+dsn, "GALAXY_GO_TEST_DEVICE_DIR="+dir, "GALAXY_GO_TEST_DEVICE_ORIGIN="+origin)
-		out, e := cmd.CombinedOutput()
-		if e != nil {
-			t.Fatalf("original device interop %s: %v %s", mode, e, out)
-		}
-		return out
-	}
-	deviceauthfixture.Prepare(t, pool, dir, []string{"binding", "history"})
+	prepared := deviceauthfixture.Prepare(t, pool, dir, []string{"binding", "history"})
 	api, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_api")
 	if e != nil {
 		t.Fatal(e)
@@ -55,15 +40,8 @@ func TestRealPublicPortalAndControlledDeviceSubscriptions(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	handshake := httptest.NewServer(deviceauth.Handler{Service: device})
-	defer handshake.Close()
-	origin = handshake.URL
-	node("client")
-	tokenBytes, e := os.ReadFile(filepath.Join(dir, "credential.txt"))
-	if e != nil {
-		t.Fatal(e)
-	}
-	deviceToken := string(tokenBytes)
+	prepared.Service = device
+	deviceToken := deviceauthfixture.Bind(t, prepared, dir, []string{"binding", "history"}).Credential
 	scope, portalToken, csrf := strings.Repeat("a", 64), strings.Repeat("p", 43), strings.Repeat("c", 43)
 	accountIssuer := "https://account.invalid/realms/community"
 	account, other := uuid.NewString(), uuid.NewString()

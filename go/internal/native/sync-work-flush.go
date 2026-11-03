@@ -5,6 +5,14 @@ import "context"
 // Flush continues only the existing saved work choice. No scheduler is started,
 // and an unresolved original operation stops that source rather than resending.
 func (u *WorkUpload) Flush(ctx context.Context, workID string) (any, error) {
+	release, e := u.runtime.acquirePrivateSync(ctx)
+	if e != nil {
+		return nil, e
+	}
+	defer release()
+	return u.flush(ctx, workID)
+}
+func (u *WorkUpload) flush(ctx context.Context, workID string) (any, error) {
 	if !optionalID(workID) {
 		return nil, connectionFailure("work_sync_input_invalid")
 	}

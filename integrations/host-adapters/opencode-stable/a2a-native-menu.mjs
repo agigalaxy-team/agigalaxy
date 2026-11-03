@@ -19,7 +19,7 @@ export function createNativeA2aMenu({call,select,prompt,info,language,isCurrent,
   if(!page.items?.length&&!page.nextCursor)return message(label('选择实际工作','Choose actual work'),label('当前没有本人可用的尝试。先继续原工作，再将选定内容交给已有服务。','There is no current owned Attempt. Continue the original work before sending selected content.'),back);
   menu(label('选择实际工作','Choose actual work'),[...(page.items??[]).map(w=>[plain(w.title),()=>done(w),plain(w.summary)]),...(page.nextCursor?[[label('其他工作','Other work'),()=>works(done,back,page.nextCursor)]]:[])],back);
  },back);}
- function start(peer){const back=()=>peerHome(peer);works(work=>void run(async()=>({view:unwrap(await call('galaxy_work_read',{caseId:work.caseId})),context:await readWorkContext?.()}),({view,context})=>{
+ function start(peer,back=()=>peerHome(peer)){works(work=>void run(async()=>({view:unwrap(await call('galaxy_work_read',{caseId:work.caseId})),context:await readWorkContext?.()}),({view,context})=>{
   const selected=attempt=>{const send=text=>prepare({peerId:peer.id,action:'send',caseId:work.caseId,attemptId:attempt.id,attemptVersion:attempt.version,...(attempt.taskId?{taskId:attempt.taskId}:{}),text},back),prepared=context?.a2a;
    if(context?.caseId===work.caseId&&prepared?.peerId===peer.id&&prepared.attemptId===attempt.id&&prepared.attemptVersion===attempt.version&&typeof prepared.text==='string'&&prepared.text.trim())return send(prepared.text);
    edit(label('这次需要所选服务处理的内容','Selected content for this service'),attempt.strategy??'',send,back);};
@@ -67,10 +67,14 @@ export function createNativeA2aMenu({call,select,prompt,info,language,isCurrent,
    [label('选择本次结果判断','Choose this result outcome'),()=>menu(label('这次对原工作的结果','Result for the original work'),[['inconclusive','暂不能得出结论','Inconclusive'],['partial','部分完成','Partial'],['succeeded','报告完成','Reported success'],['failed','报告未完成','Reported failure'],['conflicting','观察有冲突','Conflicting']].filter(([v])=>state==='completed'||!['succeeded','partial'].includes(v)).map(([v,cn,en])=>[label(cn,en),()=>{draft.reportedOutcome=v;render();}]),render),nativeStateLabel(draft.reportedOutcome)??draft.reportedOutcome],
    [label('查看保存内容','Review saved content'),()=>prepare({action:'result',peerId:a.peerId,associationId:a.associationId,...draft},back)],
   ],back);render();}
- function peerHome(peer){void run(()=>call('galaxy_a2a_work_read',{action:'list',peerId:peer.id}),data=>menu(plain(peer.name??peer.id),[
-  ...(data.associations??[]).map(a=>[plain(a.purpose),()=>detail(peer.id,a.associationId,()=>peerHome(peer)),a.sourceUnavailable?label('当前内容不可读','Current content unavailable'):nativeStateLabel(a.state)]),
-  [label('将当前内容交给这项服务','Send current content to this service'),()=>start(peer)],
- ],home),home);}
+ function peerHome(peer,after,previous=[],offset=0){const back=previous.length?()=>{const page=previous.at(-1);peerHome(peer,page.after,previous.slice(0,-1),page.offset);}:home;
+  void run(()=>call('galaxy_a2a_work_read',{action:'list',peerId:peer.id,...(after?{after}:{})}),data=>{const rows=data.associations??[],pageAt=index=>()=>peerHome(peer,after,previous,Math.floor(index/8)*8);
+   menu(plain(peer.name??peer.id),[
+    ...rows.map((a,index)=>[plain(a.purpose),()=>detail(peer.id,a.associationId,pageAt(index)),a.sourceUnavailable?label('当前内容不可读','Current content unavailable'):nativeStateLabel(a.state)]),
+    ...(data.nextAfter?[[label('更多工作','More work'),()=>peerHome(peer,data.nextAfter,[...previous,{after,offset:Math.floor(rows.length/8)*8}])]]:[]),
+    [label('将当前内容交给这项服务','Send current content to this service'),()=>start(peer,pageAt(rows.length+(data.nextAfter?1:0)))],
+   ],back,offset);
+  },back);}
  function home(){void run(()=>call('galaxy_a2a_peers',{}),page=>{const rows=Array.isArray(page)?page:page.items??[];
   if(!rows.length)return message(label('当前没有已接入的服务','No connected service'),label('继续原工作；需要外部服务时，由宿主明确选择已配置端点和授权。','Continue your work. The host must explicitly select a configured endpoint and its authority.'),onBack);
   menu(label('交给已有服务处理','Use an existing service'),rows.map(p=>[plain(p.name??p.id),()=>peerHome(p),plain(p.endpoint)]),onBack);

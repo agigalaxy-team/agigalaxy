@@ -2,8 +2,10 @@ package native
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
@@ -12,6 +14,7 @@ import (
 )
 
 const hostSessionMethod = "notifications/galaxy/host-session-complete"
+const hostDiagnosticMethod = "notifications/galaxy/host-diagnostic"
 
 type hostSessionNotice struct {
 	GalaxyID  string `json:"galaxyId"`
@@ -73,12 +76,16 @@ func (c *hostSessionConnection) Read(ctx context.Context) (jsonrpc.Message, erro
 		}
 		var notice hostSessionNotice
 		if len(request.Params) > 2048 || protocol.Decode(request.Params, &notice) != nil || !validID(notice.Host) || !validID(notice.SessionID) {
-			slog.Warn("host session notification rejected", "code", "native_host_request_invalid")
+			c.diagnostic("host session notification rejected", "native_host_request_invalid")
 			continue
 		}
 		scope, err := c.runtime.store.ChoiceScope(ctx)
 		if err != nil || scope.Owner == "" || scope.Owner != notice.GalaxyID {
-			slog.Warn("host session notification rejected", "code", "native_connection_selection_changed")
+			code := "native_connection_selection_changed"
+			if err != nil {
+				code = fault.Code(err)
+			}
+			c.diagnostic("host session notification rejected", code)
 			continue
 		}
 		notice.scope = scope
@@ -101,10 +108,25 @@ func (c *hostSessionConnection) process() {
 		case notice := <-c.notices:
 			ctx := uploadScopeContext(c.lifecycle, notice.scope)
 			if _, err := c.runtime.PrivateSessionComplete(ctx, notice.Host, notice.SessionID); err != nil && ctx.Err() == nil {
-				slog.Warn("host session upload continuation stopped", "code", fault.Code(err))
+				c.diagnostic("host session upload continuation stopped", fault.Code(err))
 			}
 		}
 	}
+}
+
+// diagnostic belongs only to the connection that submitted the host notice.
+// A notification has no request ID and never causes a business operation replay.
+func (c *hostSessionConnection) diagnostic(message, code string) {
+	slog.Warn(message, "code", code)
+	params, err := json.Marshal(struct {
+		Code string `json:"code"`
+	}{Code: code})
+	if err != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.lifecycle, 5*time.Second)
+	defer cancel()
+	_ = c.Connection.Write(ctx, &jsonrpc.Request{Method: hostDiagnosticMethod, Params: params})
 }
 
 func (c *hostSessionConnection) Close() error {

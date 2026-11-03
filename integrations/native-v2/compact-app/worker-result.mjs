@@ -12,20 +12,6 @@ export function workerPanelText(data) {
   return lines.join('\n\n');
 }
 
-// Ordinary MCP retains the exact authorized review. Supported Apps may carry
-// its private material only in component metadata, without changing authority.
-export function workerPanelResult(data, { componentOnly = false } = {}) {
-  if (data?.resultType === 'input_required' || Array.isArray(data?.content)) return data;
-  const preview = data?.preview;
-  const model = componentOnly && preview
-    ? { ...data, preview: { ...preview, exact: undefined, exactContentInComponent: true } }
-    : data;
-  return {
-    content: [{ type: 'text', text: workerPanelText(model) }], structuredContent: model,
-    ...(componentOnly && preview ? { _meta: { galaxyWorker: { preview } } } : {}),
-  };
-}
-
 export function workerComponentResult(result) {
   if (result?.resultType === 'input_required') return result;
   let data = result?.structuredContent ?? result;

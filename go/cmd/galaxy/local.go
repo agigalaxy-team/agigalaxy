@@ -11,8 +11,8 @@ import (
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/native"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/nativebridge"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func printValue(value any) error {
@@ -56,13 +56,9 @@ func localCommand(ctx context.Context, name string, args []string) error {
 	var value any
 	switch name {
 	case "integration-host":
-		return native.ServeHost(ctx, store, os.Stdin, os.Stdout)
+		return relayNative(ctx, nativebridge.Profile{DataDirectory: absolute, LocalOnly: true}, nativebridge.Host)
 	case "integration-mcp":
-		server, err := native.NewToolServer(store)
-		if err != nil {
-			return err
-		}
-		return server.Run(ctx, &mcp.StdioTransport{})
+		return relayNative(ctx, nativebridge.Profile{DataDirectory: absolute, LocalOnly: true}, nativebridge.MCP)
 	case "status":
 		value, e = store.LocalStatus(ctx)
 	case "export":
@@ -127,20 +123,14 @@ func menuCommand(ctx context.Context, args []string) error {
 	if e != nil || n < 1 || n > 5 || *language != "" && *language != "zh-CN" && *language != "en-US" {
 		return fault.New("native_arguments_invalid", 400)
 	}
-	c, e := native.ReadConfiguration(*configuration)
+	_, e = native.ReadConfiguration(*configuration)
 	if e != nil {
 		return e
 	}
-	store, e := native.NewStore(c.DataDirectory, c.Endpoint)
-	if e != nil {
+	if _, e = nativebridge.Ensure(ctx, nativebridge.Options{}); e != nil {
 		return e
 	}
-	runtime, e := native.NewRuntime(store, c, native.ConnectionOptions{})
-	if e != nil {
-		return e
-	}
-	defer runtime.Close()
-	value, e := runtime.Command(ctx, native.CommandInput{Command: *name, Language: *language, Stage: n})
+	value, e := nativebridge.Command(ctx, nativebridge.Profile{ConfigurationPath: *configuration}, native.CommandInput{Command: *name, Language: *language, Stage: n})
 	if e != nil {
 		return e
 	}
@@ -162,6 +152,11 @@ func usage() {
   galaxy host-configs <new output directory> --local-only [--data-dir <path>] [--hosts <comma-separated ids>]
   galaxy setup <website URL> [--host <host id>] [--data-dir <path>] [--organization]
   galaxy setup --local-only [--host <host id>] [--data-dir <path>] [--organization]
+  galaxy service start|status|stop|restart|run    Shared local runtime; no login autostart
+  galaxy install|update|repair [--host <id>] [--package-dir <release>] [--install-root <path>] [--data-dir <path>] [--config <file>|--local-only] [--dry-run]
+  galaxy uninstall --host <id> [--install-root <path>]  Remove host integration; keep owned data
+  galaxy install --mcp-config <file> --skill-dir <dir> --mcp-format json-mcpServers|json-servers|toml-mcp_servers [--local-only]
+  galaxy ingress [--config <file>|--data-dir <path>]    Persist one host observation from stdin
 
-This candidate is incomplete. Only an explicitly reviewed setup may change a host configuration.`)
+install configures the selected host for the current system user. Existing identity and local records are preserved.`)
 }

@@ -198,12 +198,8 @@ func registerNativeWorkerTools(server *mcp.Server, tools *toolRuntime, host *Nat
 				if action == "list" {
 					rows := uploadRows(value["associations"])
 					associations := []any{}
-					start := len(rows) - 32
-					if start < 0 {
-						start = 0
-					}
-					for i := len(rows) - 1; i >= start; i-- {
-						row := a2aClone(uploadObject(rows[i]))
+					for _, item := range rows {
+						row := a2aClone(uploadObject(item))
 						selected, e := host.Read(ctx, map[string]any{"action": "get", "associationId": row["associationId"]})
 						if e != nil {
 							if check := l.check(ctx); check != nil {
@@ -220,7 +216,7 @@ func registerNativeWorkerTools(server *mcp.Server, tools *toolRuntime, host *Nat
 						}
 						associations = append(associations, row)
 					}
-					return render(map[string]any{"associations": associations, "earlierAssociationsAvailable": len(rows) > 32})
+					return render(map[string]any{"associations": associations, "earlierAssociationsAvailable": value["earlierAssociationsAvailable"], "nextAfter": value["nextAfter"]})
 				}
 				if isOne(action, "reconcile-result", "reconcile-use") {
 					return render(map[string]any{"actionResult": map[string]any{"associationId": input["associationId"], "action": action, "result": value}})

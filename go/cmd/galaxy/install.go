@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -13,7 +15,6 @@ import (
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/native"
-	"github.com/google/uuid"
 )
 
 func candidateDirectory() (string, error) {
@@ -144,6 +145,12 @@ func setupCommand(ctx context.Context, args []string) error {
 	}
 	reader := bufio.NewReader(os.Stdin)
 	if input.Host == "" {
+		detected := native.DetectCurrentNativeHost(installationEnvironment())
+		if len(detected) == 1 {
+			input.Host = detected[0]
+		}
+	}
+	if input.Host == "" {
 		hosts := native.HostConfigurationOptions()
 		for index, host := range hosts {
 			fmt.Fprintf(os.Stderr, "%d. %s\n", index+1, host["label"])
@@ -174,7 +181,7 @@ func setupCommand(ctx context.Context, args []string) error {
 		return err
 	}
 	if input.Destination == "" {
-		input.Destination = filepath.Join(home, ".galaxy-connections", input.Host+"-"+uuid.NewString()[:8])
+		input.Destination = defaultClientRoot(home)
 	}
 	input.Destination, err = filepath.Abs(input.Destination)
 	if err != nil {
@@ -213,9 +220,39 @@ func setupCommand(ctx context.Context, args []string) error {
 	fmt.Fprint(os.Stderr, "确认按以上方案准备本机身份和宿主配置？[y/N] ")
 	line, readErr := reader.ReadString('\n')
 	confirmed := readErr == nil && (strings.EqualFold(strings.TrimSpace(line), "y") || strings.EqualFold(strings.TrimSpace(line), "yes"))
-	value, err := native.PrepareNativeInstallationReviewed(ctx, plan, input.SubjectType, confirmed)
+	if !confirmed {
+		return fault.New("setup_choice_required", 400)
+	}
+	configurationPath := ""
+	if !input.LocalOnly {
+		profile := sha256.Sum256([]byte(plan.Endpoint + "\n" + input.DataDirectory))
+		configurationPath = filepath.Join(input.Destination, "connections", fmt.Sprintf("service-%x.json", profile[:8]))
+		if _, err := os.Stat(configurationPath); os.IsNotExist(err) {
+			if err = os.MkdirAll(filepath.Dir(configurationPath), 0700); err != nil {
+				return err
+			}
+			if _, err = native.PrepareServiceConfiguration(ctx, native.ServiceConfigurationRequest{Website: plan.Website, Endpoint: plan.Endpoint, DataDirectory: input.DataDirectory, Output: configurationPath}, native.ServiceConfigurationOptions{}); err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+	}
+	environment := installationEnvironment()
+	if input.OpenCodeConfigDirectory != "" {
+		environment["OPENCODE_CONFIG_DIR"] = input.OpenCodeConfigDirectory
+	}
+	node, _ := exec.LookPath("node")
+	if node != "" {
+		node, err = filepath.Abs(node)
+		if err != nil {
+			return err
+		}
+	}
+	managed, err := native.PreviewManagedNativeInstallation(ctx, native.ManagedNativeInstallationInput{Host: input.Host, Home: home, Environment: environment, PackageDirectory: input.PackageDirectory, InstallRoot: input.Destination, DataDirectory: input.DataDirectory, ConfigPath: configurationPath, LocalOnly: input.LocalOnly, SubjectType: input.SubjectType, NodeExecutable: node, HostExecutable: input.OpenCodePath})
 	if err != nil {
 		return err
 	}
-	return printValue(value)
+	value, applyError := native.ApplyManagedNativeInstallation(ctx, managed)
+	return completeManagedInstallation(ctx, value, applyError)
 }

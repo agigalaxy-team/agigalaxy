@@ -32,7 +32,7 @@ func TestOriginalPublicDiscoveryAndFirstDeviceHandshake(t *testing.T) {
 			t.Fatalf("original JS %s: %v %s", mode, e, out)
 		}
 	}
-	deviceauthfixture.Prepare(t, owner, dir, []string{"binding", "history"})
+	prepared := deviceauthfixture.Prepare(t, owner, dir, []string{"binding", "history"})
 	pool, e := postgres.Open(ctx, dsn+"&options=-c%20role%3Dgalaxy_api")
 	if e != nil {
 		t.Fatal(e)
@@ -54,9 +54,9 @@ func TestOriginalPublicDiscoveryAndFirstDeviceHandshake(t *testing.T) {
 	defer server.Close()
 	origin = server.URL
 	node("service-metadata-interop.mjs", "official")
-	// The original connection client now follows successful public discovery;
-	// every binding/session request reaches this same Go handler chain.
-	node("device-client-fixture.mjs", "client")
+	// Use the Go device authority for the selected binding and session.
+	prepared.Service = devices
+	deviceauthfixture.Bind(t, prepared, dir, []string{"binding", "history"})
 	before, tag, e := service.manifest(ctx)
 	if e != nil {
 		t.Fatal(e)
