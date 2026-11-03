@@ -33,10 +33,10 @@ func secureDirectory(dir string) error {
 	}
 	return nil
 }
-func endpoint(dir string) string {
+func endpoint(dir string) (string, error) {
 	sid, _ := userSID()
 	sum := sha256.Sum256([]byte(sid + "|" + dir))
-	return `\\.\pipe\galaxy-native-` + hex.EncodeToString(sum[:16])
+	return `\\.\pipe\galaxy-native-` + hex.EncodeToString(sum[:16]), nil
 }
 func listen(ep string) (net.Listener, error) {
 	sid, e := userSID()

@@ -9,7 +9,7 @@ import { createAssistanceDraftMenu } from '../assistance-draft-menu.mjs';
 import { createContextDraftMenu } from '../context-draft-menu.mjs';
 import { describeConnectionState } from '../connection-state.mjs';
 import type { GalaxyMenuSession } from './session-context.ts';
-import { divider, localBoundary, formatModules } from './presentation.ts';
+import { divider, localBoundary, formatModules, humanizeOperationError } from './presentation.ts';
 import { createPurposeMenu } from '../purpose-menu.mjs';
 import { unwrap, plain } from '../purpose/presentation.mjs';
 import { nativeConnectionMessage } from '../../../native-v2/presentation/native-result.mjs';
@@ -126,7 +126,9 @@ export function createConnectionPages(session: GalaxyMenuSession) {
     } catch (error) {
       session.showInfo(
         chinese ? '连接配置无法读取' : 'Connection configuration unavailable',
-        String(error instanceof Error ? error.message : error),
+        humanizeOperationError(error, session.activeLanguage, chinese
+          ? '无法读取连接配置。'
+          : 'Unable to read the connection configuration.'),
         onBack,
       );
     }

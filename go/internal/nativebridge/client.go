@@ -308,9 +308,9 @@ func Handover(ctx context.Context) (Info, error) {
 		return ready(Ensure(ctx, Options{Executable: fallback}))
 	} else {
 		if fault.Code(e) == "native_service_action_invalid" {
-			return Info{}, fault.New("native_handover_legacy_unsupported", 409)
+			return current, fault.New("native_handover_legacy_unsupported", 409)
 		}
-		return Info{}, e
+		return current, e
 	}
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()

@@ -170,11 +170,15 @@ Codex 和 Claude 的事实 hook 使用 Node；程序可从 PATH 发现，或用 
 
 Windows 隔离环境已用可执行文件字节和 release ID 均不同的 A 0.1.1、B 0.1.2 候选实际检查：B 准备期间旧宿主 `repair` 不回退期望版本；待本人选择时保留 A；持锁的 MCP 和 Host 请求、大响应 stdout 背压完成后切换；原 MCP／Host stdio 继续使用，身份不变；`repair`／`uninstall` 保留其他 MCP 配置与身份。该结果只覆盖本次 Windows 隔离场景，不代表所有宿主、旧协议或其他系统均已实际验收。
 
+Linux amd64 已实际完成旧 `0.1.0` 到 `0.1.4` 的明确停止／启动：旧核心不支持交接时仍继续服务，准备新版不终止旧请求，切换后原 ID、工作资料及其他配置保持。此类失败的 CLI 结果区分最后观测与复查状态，不把准备完成报成切换完成。
+
+Unix 本机通信在地址长度允许时保留原缓存内 socket；超出系统限制时，使用按当前用户和规范缓存路径生成的稳定私有短地址，锁、期望版本及暂停记录仍在原缓存。不同宿主的临时目录不改变该地址。`0.1.5` 已在 Linux amd64 的长缓存和两个不同长临时目录下，经双 MCP 连接验证同一服务与 ID；macOS 对应实现已交叉构建，尚无实机结论。
+
 服务版入口 `galaxy native --config <公开配置绝对路径>` 提供当前已接入的服务和本机工具；本机入口 `galaxy integration-mcp --data-dir <目录>` 不构造服务 Runtime 或连接服务。对应的 `host`、`integration-host` 只供可信宿主使用，不作为模型 MCP 工具。公开配置含 `version:2`、HTTPS `endpoint`/`website`、绝对 `dataDirectory` 和可信公钥；通过 `--config` 或 `GALAXY_NATIVE_CONFIG` 选择，不写入 token、私钥或恢复码。`service-config inspect/prepare` 负责读取所选服务信息和准备公开配置；显式根 pin、信任目录及轮换见下文。`setup` 保留从所选官网读取公开服务配置并展示计划、经本人确认后安装的原入口，也支持 `setup --local-only`；实际安装共用同一执行器；`host-configs` 只向新目录生成片段，不代表已安装或宿主已加载。命令参数以 `galaxy --help` 为准。
 
 `scripts/build-native-v2.mjs` 构建平台二进制、面板、Skill 和宿主资源，`scripts/prepare-client-candidate.mjs` 在构建时解析并锁定薄宿主依赖、归集许可并准备归档；已有缓存可用 `--offline`。`--goos`/`--goarch` 可选择目标，跨目标候选不在当前机器执行安装检查。归档名包含发行版本、OS 和架构。`scripts/prepare-native-npm.mjs` 从已准备候选生成 `@galaxy/native` 薄入口和对应平台包目录，仅列入本次提供的目标。启动器无参数时执行 `install`，无法唯一识别宿主时在交互终端提示输入宿主 ID，非交互环境可使用 `install --host <宿主ID>`；其他参数直接交给 Native 程序。`scripts/prepare-native-container.mjs` 从 Linux 候选生成容器构建上下文。这些是未发布候选，包名不代表注册或发布权限。容器显式挂载专用资料目录和所需公开配置，用同一用户启动一个前台核心，再让各宿主通过 `docker exec -i` 连接同一容器；私有 IPC 在容器内。容器 `localhost` 不是桌面 `localhost`，不自动挂载整个用户目录、发布端口或部署数据库。容器准备器的第四个可选参数为基础镜像引用，也可由 `prepareNativeContainer({baseImage})` 传入；已核实的 `image@sha256:…` 可直接用于固定构建。默认值采用已经实际拉取并核对的 `node:22-bookworm-slim` 摘要，准确引用只在脚本中维护；显式覆盖时生成结果和说明仍区分固定摘要与可变标签。准备器不自动查询镜像，基础镜像更新与客户端发行分别处理。
 
-2026-11-04 本轮已开始准备 `0.1.4` 的六平台 Go Native 候选；同源 npm 包和 Linux 容器上下文需在各平台候选完成后另行装配。较早 `0.1.0` 包或历史文档属于其原有版本，不代表本轮候选，也不证明 `0.1.4` 已发布或通过各平台验收；实际装配及验收状态以 [WORK_STATUS](../../WORK_STATUS.md) 为准。
+2026-11-04 本轮已构建 `0.1.5` 的六平台 Go Native 候选，同源 npm 包及固定基础镜像的 Linux 容器上下文沿相同候选装配。较早 `0.1.0`／`0.1.4` 包属于其原有版本，不代表本轮最新候选；生成产物不等于已发布或各平台实机通过，实际装配及验收状态以 [WORK_STATUS](../../WORK_STATUS.md) 为准。
 
 旧签名发行 `galaxy-native-client-release` 的验签与启动说明仍适用于原包，不能据此推断 Go 候选已经验签、发布或获得宿主验收。构建和 NOTICE 见[源码与许可](source-and-licensing.md)。最近主会话对实际候选在隔离路径完成了自定义宿主 install → repair → uninstall，确认其他 MCP 配置和 ID 保留；这不证明所有真实宿主、Linux/macOS、系统提醒、签名或市场上架已验收。平台和未覆盖范围以 [WORK_STATUS](../../WORK_STATUS.md) 为准。
 

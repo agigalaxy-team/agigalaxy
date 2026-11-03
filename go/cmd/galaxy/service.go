@@ -32,6 +32,25 @@ func nativeServiceCommand(ctx context.Context, args []string) error {
 	case "restart":
 		info, err := nativebridge.Handover(ctx)
 		if err != nil {
+			if info.InstanceID != "" {
+				result := map[string]any{"lastObservedService": info, "handoverError": fault.Code(err)}
+				if current, statusErr := nativebridge.Status(ctx); statusErr == nil {
+					result["running"], result["service"] = true, current
+				} else if errors.Is(statusErr, nativebridge.ErrUnavailable) || errors.Is(statusErr, nativebridge.ErrPaused) {
+					result["running"] = false
+				} else {
+					result["statusError"] = fault.Code(statusErr)
+				}
+				switch fault.Code(err) {
+				case "native_handover_legacy_unsupported", "native_handover_legacy_connection":
+					result["nextAction"] = "Complete current work, then explicitly stop and start the service; existing shared connections will close."
+				case "native_handover_waiting_choice":
+					result["nextAction"] = "Complete the current choice, then retry service restart."
+				}
+				if printErr := printValue(result); printErr != nil {
+					return printErr
+				}
+			}
 			return err
 		}
 		return printValue(info)

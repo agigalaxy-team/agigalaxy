@@ -1,7 +1,7 @@
 import type { Action } from '../adapter-types.ts';
 import { createPurposeMenu } from '../purpose-menu.mjs';
 import type { GalaxyMenuSession } from './session-context.ts';
-import { divider, localBoundary, formatModules } from './presentation.ts';
+import { divider, localBoundary, formatModules, humanizeOperationError } from './presentation.ts';
 
 export function createSettingsPages(session: GalaxyMenuSession) {
   async function showSettingsModules(onReturn: Action) {
@@ -94,7 +94,9 @@ export function createSettingsPages(session: GalaxyMenuSession) {
               chinese
                 ? '重新初始化未完成'
                 : 'Reinitialization did not complete',
-              String(error instanceof Error ? error.message : error),
+              humanizeOperationError(error, session.activeLanguage, chinese
+                ? '清理未完成，请检查本机资料。'
+                : 'Cleanup did not complete. Check the local material.'),
               onReturn,
             );
           }

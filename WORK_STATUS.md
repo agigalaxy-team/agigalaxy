@@ -20,6 +20,8 @@
 
 含Token选择及路由修复的Linux API发布产物在仓外 `remaining-20261104/personal-api-ready/`，清单SHA256 `8e562ab0fdc6a84c5187674c824e6261ca549dfb96fa29a32ffb1c8087b15256`，依赖许可无缺项，未部署。Keycloak配置、PKCE登录及Hermes现有OAuth读取验收脚本已准备，均未借准备状态声称真实Token流程通过。双身份关联浏览器已关闭；本轮独立测试缓存内0.1.4共用服务已明确停止，原身份和业务资料保留，不影响用户宿主或网站服务。
 
+**本轮追加收尾（2026-11-04）：** Linux实机 `0.1.0→0.1.4` 通过，原MCP在新版准备及不支持交接报错后仍可读；明确停止／启动后原ID、工作资料及无关配置保持，`remote211/upgrade-result-222f2e5a.json`记录通过及服务结束。更长夹具首先暴露Unix socket地址超限，原失败 `upgrade-result-78c6fc36.json` 保留；已从IPC选址机制修复，而非仅缩短夹具。六平台最新候选为仓外 `remaining-20261104/release-candidate-0.1.5/`，同源npm六可选包和Linux容器上下文已装配；无正式发布。Linux `0.1.5` 的真实长XDG缓存、两个不同长TMPDIR、双MCP同PID/ID、关闭连接后服务保持及显式停止全部通过，`remote211/long-path-result-351304c0.json`同时确认服务和精确私有临时socket目录均结束/清理。新增CLI交接失败投影及OpenCode简洁错误文案，Token选择说明不假设所有宿主能展示409正文，不能展示的使用现有官网关联ID页面。线上双身份脚本已支持沿原报告与原操作接续；正式认证/API启用仍待原确认，不重复创建身份或绕过MCP。
+
 **实际接通：**
 - 同用户共用Go服务、私有IPC、多资料范围、MCP/Host薄连接、主动退出及恢复；单宿主关闭不关闭服务。统一install/update/repair/uninstall、当前宿主用户级接入，以及npm、原生包和适用容器的同源交付。事实观察子进程共用所需环境投影，不传入宿主模型凭据，不修改父Agent环境。
 - OpenCode、Codex、Claude、Hermes及DSH按其真实接口记录工作事实，当前Agent通过MCP读取、整理和保存摘要；精确选择后才采原会话材料，不默认上传。OpenCode录制先作有限投影，不复制未选长输出/附件；原信息修订由真实来源或Go事务承接，不伪造时间和版本。

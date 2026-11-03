@@ -29,8 +29,9 @@ export function createNativeProjectDiscoveryMenu({call,select,prompt,info,langua
  function ask(title,value,done,back){if(!alive())return;const v=begin();prompt({title,value:plain(value),placeholder:'',onConfirm:gate(v,done),onCancel:gate(v,back)});}
  async function run(work,done,back=home){if(!alive())return;const v=begin();info(label('正在读取','Reading'),label('正在取得当前允许的内容。','Reading currently authorized content.'),gate(v,back));
   try{const data=await work();if(alive(v))done(data);}catch(error){if(alive(v))failure(error,back);}}
- function failure(error,back){const stale=/source|opportunity|willingness|revision/.test(error.code??error.message),changed=/identity|binding|connection/.test(error.code??error.message);
-  notice(label('暂时无法继续','Unable to continue'),changed?label('当前身份或连接已变化。原联系保留，请从当前身份重新打开。','The identity or connection changed. The original contact is retained; reopen it with the current identity.')
+ function failure(error,back){const code=String(error?.code??error?.message??''),denied=error?.status===403||error?.statusCode===403||/(?:^|\D)403(?:\D|$)|forbidden|access_denied|insufficient_scope/i.test(code),stale=/source|opportunity|willingness|revision/.test(code),changed=/current_identity_changed|native_connection_selection_changed|contact_work_identity_changed|native_choice_binding_changed/.test(code);
+  notice(label('暂时无法继续','Unable to continue'),denied?label('服务拒绝了这次操作。请检查权限或联系服务管理员。','The service refused this operation. Check your permissions or contact the service administrator.')
+   :changed?label('当前身份或连接已变化。原联系保留，请从当前身份重新打开。','The identity or connection changed. The original contact is retained; reopen it with the current identity.')
    :stale?label('这份介绍或交流意愿已变化。可以返回重新查找；已写内容仍保留。','The introduction or contact wish changed. Search again; your text is retained.')
    :label('当前内容暂时无法读取。可以返回原工作，稍后再试。','This content is unavailable. Continue the original work and retry later.'),back);}
  async function identity(){const status=await native('galaxy_native_status');const tag=JSON.stringify([status.identity,status.endpoint,status.connection?.bindingId,status.connection?.generation]);

@@ -38,3 +38,22 @@ export function formatModules(
     })
     .join('\n');
 }
+
+// Only recognized conditions get specific guidance; unknown failures use the
+// calling page's plain-language fallback rather than exposing internal output.
+export function humanizeOperationError(error: unknown, language: string, fallback: string) {
+  const value = error && typeof error === 'object' ? error as { code?: unknown; status?: unknown; statusCode?: unknown; message?: unknown } : null;
+  const code = typeof value?.code === 'string' ? value.code : '';
+  const message = typeof value?.message === 'string' ? value.message : typeof error === 'string' ? error : '';
+  const detail = code + ' ' + message;
+  const chinese = language !== 'en-US';
+  if (/native_handover_legacy_unsupported|native_handover_legacy_connection/.test(detail))
+    return chinese
+      ? '旧版服务需要手动切换。完成当前工作后，退出并重新启动银河服务。'
+      : 'The older service requires a manual switch. Finish the current work, then stop and restart the Galaxy service.';
+  if (value?.status === 403 || value?.statusCode === 403 || /(?:^|\D)403(?:\D|$)|forbidden|access_denied|insufficient_scope/i.test(detail))
+    return chinese
+      ? '服务拒绝了这次操作。请检查权限或联系服务管理员。'
+      : 'The service refused this operation. Check your permissions or contact the service administrator.';
+  return fallback;
+}

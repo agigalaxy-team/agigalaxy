@@ -72,5 +72,9 @@ func paths() (string, string, string, error) {
 	if err = secureDirectory(dir); err != nil {
 		return "", "", "", err
 	}
-	return dir, endpoint(dir), filepath.Join(dir, "paused"), nil
+	ep, err := endpoint(dir)
+	if err != nil {
+		return "", "", "", err
+	}
+	return dir, ep, filepath.Join(dir, "paused"), nil
 }
