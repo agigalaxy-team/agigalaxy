@@ -21,6 +21,7 @@ type watchRPC struct {
 	mu, writeMu     sync.Mutex
 	command, cwd    string
 	args            []string
+	env             []string
 	cmd             *exec.Cmd
 	stdin           io.WriteCloser
 	exit            chan struct{}
@@ -68,6 +69,9 @@ func (r *watchRPC) start() error {
 	}
 	command := exec.Command(r.command, r.args...)
 	command.Dir = r.cwd
+	if r.env != nil {
+		command.Env = r.env
+	}
 	hideHostNotificationProcess(command)
 	command.Stderr = io.Discard
 	input, e := command.StdinPipe()

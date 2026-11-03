@@ -128,16 +128,27 @@ func managedHooks(host, path string, desired, old, older any) error {
 		eventOld := managedHookEvent(old, event)
 		eventOlder := managedHookEvent(older, event)
 		next := []any{}
+		kept := false
 		for _, group := range list {
-			if eventOld != nil && reflect.DeepEqual(group, eventOld) || eventOlder != nil && reflect.DeepEqual(group, eventOlder) {
+			if reflect.DeepEqual(group, eventDesired) {
+				if !kept {
+					next = append(next, group)
+					kept = true
+				}
 				continue
 			}
-			if reflect.DeepEqual(group, eventDesired) {
+			if eventOld != nil && reflect.DeepEqual(group, eventOld) || eventOlder != nil && reflect.DeepEqual(group, eventOlder) {
+				if !kept {
+					next = append(next, eventDesired)
+					kept = true
+				}
 				continue
 			}
 			next = append(next, group)
 		}
-		next = append(next, eventDesired)
+		if !kept {
+			next = append(next, eventDesired)
+		}
 		updated, err = hostSetConfiguration(updated, []string{"hooks", event}, next)
 		if err != nil {
 			return err

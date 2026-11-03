@@ -25,6 +25,10 @@ MCP结果再次收束：Worker/A2A和普通panel统一单条JSON Content，与�
 
 真实宿主进一步接通：Codex CLI 0.152.1 app-server和Claude Code 2.1.309各实际发现当前配置的390个服务工具（不等于配置之外的可选Worker/A2A工具），无模型调用。Hermes固定上游官方PluginManager、MCP discovery及registry真实调度本机status通过（36工具）；DSH固定源MCP插件＋官方Cordis/Tools/Executor也发现36工具并真实调用status，未创建模型会话；其首次清理因夹具Windows路径斜杠比较失败，已明确停止该隔离服务、修正夹具，原失败保留，不伪称应用失败。Hermes工具环境为Python3.12，部分系统site-packages；DSH其余官方npm依赖版本匹配但不声称字节对应固定commit。
 
+Codex 0.152.1已使用现有账户的实际可用默认模型完成status→工作列表→原工作读取三次真实MCP调用，取得本机夹具资料。用户全局配置的gpt-6.1-sol被该ChatGPT账户明确拒绝；仅本次探针改用官方model/list返回的默认gpt-5.6-sol，没有修改用户配置或团队模型。另发现正式安装写入Codex hook文件后，宿主默认仍为untrusted，正在接入官方逐项采用和自有条目卸载，不把文件存在算成自动录制可用。Claude沿现有登录/模型通路实测在首次工具前收到502 Upstream access forbidden，工具未运行，隔离服务已退出；原失败保留，不能据此归因于Go MCP，也不通过增加重试或修改用户模型规避。
+
+当前Codex实际安装已取得三项官方trusted；repair暴露宿主配置写接口把无关表写入旧注释区间的问题，已将repair/uninstall/recovery收束为同一份MCP表识别，定向回归通过；首次检查发现的多余import已移除，原失败保留。修复后实际安装全程待下一次集中构建补查，未把该阶段报告完成。真实exec即使预先查得三项trusted，仍未取得hook回执或新会话事实，不能把工具成功算成默认录制通过；空回执也不足以判断外壳是否启动，该宿主路径仍在定位，未改成扫描历史来掩盖缺口。
+
 剩余工作集中在对应宿主的完整模型/GUI及适用平台实机验收和正式发行：上述官方MCP调用与DB原件结果不代替完整Hermes/DSH模型会话。Linux/macOS桌面、容器实际运行和签名公证尚未验收；本轮不擅自上架发布。已确认不建设自动向原聊天投递的额外机制，不再把它列作待决。原始身份、私有资料和正式宿主配置不重建；证据、原失败及候选均在项目外 `D:/ChatGPT/work/galaxy-native-hosts-20261103/`。
 
 本轮成果仅在独立本地分支；尚未上传、正式发行或部署，未改变生产数据库、认证、模型及真实宿主配置。下方既有工作结果不代表本轮所有范围完成。

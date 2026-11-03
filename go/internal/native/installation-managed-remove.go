@@ -194,6 +194,14 @@ func UninstallManagedNativeHostAt(ctx context.Context, installRoot, host, config
 		return result, err
 	}
 	result["skillRetained"] = retainSkill
+	if host == "codex" && len(record.CodexHookTrust) > 0 {
+		remaining, cleanupErr := clearCodexHookTrust(ctx, record.HostExecutable, &record)
+		if cleanupErr != nil || len(remaining) > 0 {
+			result["hookTrustCleanup"] = "retained"
+		} else {
+			result["hookTrustCleanup"] = "removed"
+		}
+	}
 	for _, group := range []any{record.HookGroup, record.HookPrevious} {
 		if group != nil {
 			if err = removeManagedHooks(host, record.HookPath, group); err != nil {

@@ -153,11 +153,12 @@ func RemoveCodexNativeConfiguration(path, block string) error {
 		return err
 	}
 	original := string(raw)
-	if strings.Count(original, block) == 0 && !strings.Contains(original, codexGalaxyBegin) && !strings.Contains(original, codexGalaxyEnd) {
+	if !codexHasManagedMarker(original) {
 		return nil
 	}
-	if strings.Count(original, block) != 1 {
+	remaining, matched := removeRecordedCodexBlock(original, block)
+	if !matched {
 		return hostConfigurationFailure("setup_host_config_changed")
 	}
-	return hostReplaceSelected(path, strings.Replace(original, block, "", 1), &original)
+	return hostReplaceSelected(path, remaining, &original)
 }

@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 )
 
 type managedNativeJournal struct {
@@ -192,7 +191,7 @@ func managedNativeStateMatches(r *managedNativeRecord) (bool, error) {
 		return false, err
 	}
 	if managedRecordAdapter(r) == "codex" || managedRecordAdapter(r) == "custom-toml" {
-		if r.CodexBlock == "" || strings.Count(string(raw), r.CodexBlock) != 1 {
+		if _, matched := removeRecordedCodexBlock(string(raw), r.CodexBlock); !matched {
 			return false, nil
 		}
 	} else {
@@ -249,7 +248,7 @@ func managedNativeStateEmpty(r *managedNativeRecord) (bool, error) {
 		return false, err
 	}
 	if managedRecordAdapter(r) == "codex" || managedRecordAdapter(r) == "custom-toml" {
-		return !strings.Contains(string(raw), codexGalaxyBegin) && !codexGalaxySection.Match(raw), nil
+		return !codexHasManagedMarker(string(raw)) && !codexGalaxySection.Match(raw), nil
 	}
 	obj, err := hostConfigurationObject(string(raw))
 	if err != nil {

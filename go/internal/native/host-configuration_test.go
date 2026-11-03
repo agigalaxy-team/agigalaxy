@@ -294,3 +294,61 @@ func TestInstallationHoistedThinHostDependenciesAndOriginalScope(t *testing.T) {
 		t.Fatal(normal, e)
 	}
 }
+
+func TestCodexManagedTablesPreserveSubsequentUserTables(t *testing.T) {
+	pkg := installationFixturePackage(t)
+	path := filepath.Join(t.TempDir(), "config.toml")
+	input := HostConfigurationInput{PackageDirectory: pkg, LocalOnly: true, DataDirectory: filepath.Join(t.TempDir(), "data")}
+	block, err := UpdateCodexNativeConfiguration(path, input, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := "\n[unrelated.settings]\nvalue = \"keep\"\n\n[hooks.state.example]\ntrusted_hash = \"keep\"\n"
+	modified := strings.Replace(string(raw), codexGalaxyEnd, other+codexGalaxyEnd, 1)
+	if err := os.WriteFile(path, []byte(modified), 0600); err != nil {
+		t.Fatal(err)
+	}
+	record := &managedNativeRecord{Host: "codex", HostConfigPath: path, CodexBlock: block, ReleaseDirectory: pkg, SkillPath: filepath.Join(pkg, "skills", "galaxy")}
+	if matches, err := managedNativeStateMatches(record); err != nil || !matches {
+		t.Fatalf("recovery did not recognize the managed tables: %v, %v", matches, err)
+	}
+	newBlock, err := UpdateCodexNativeConfiguration(path, input, block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err = os.ReadFile(path)
+	if err != nil || !strings.Contains(string(raw), other) {
+		t.Fatalf("repair changed unrelated tables: %v", err)
+	}
+	if err := RemoveCodexNativeConfiguration(path, newBlock); err != nil {
+		t.Fatal(err)
+	}
+	raw, err = os.ReadFile(path)
+	if err != nil || !strings.Contains(string(raw), other) || strings.Contains(string(raw), "[mcp_servers.galaxy]") {
+		t.Fatalf("uninstall did not preserve unrelated tables: %v", err)
+	}
+
+	for _, change := range []struct{ name, text string }{
+		{"command", strings.Replace(block, "command = ", "command = \"user-change\" # ", 1)},
+		{"additional field", strings.Replace(block, codexGalaxyEnd, "enabled = false\n"+codexGalaxyEnd, 1)},
+	} {
+		t.Run(change.name, func(t *testing.T) {
+			if err := os.WriteFile(path, []byte(change.text), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := UpdateCodexNativeConfiguration(path, input, block); err == nil {
+				t.Fatal("repair accepted a changed Galaxy table")
+			}
+			if err := RemoveCodexNativeConfiguration(path, block); err == nil {
+				t.Fatal("uninstall accepted a changed Galaxy table")
+			}
+			if matches, err := managedNativeStateMatches(record); err != nil || matches {
+				t.Fatalf("recovery accepted a changed Galaxy table: %v, %v", matches, err)
+			}
+		})
+	}
+}

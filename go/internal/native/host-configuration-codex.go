@@ -80,7 +80,57 @@ func NativeUserHostPaths(host, home string, environment map[string]string) (conf
 const codexGalaxyBegin = "# BEGIN GALAXY MANAGED MCP\n"
 const codexGalaxyEnd = "# END GALAXY MANAGED MCP\n"
 
-var codexGalaxySection = regexp.MustCompile(`(?m)^\s*\[\s*mcp_servers\s*\.\s*(galaxy|"galaxy"|'galaxy')\s*(\.|\])`)
+var codexGalaxySection = regexp.MustCompile(`(?m)^\s*\[\s*(mcp_servers|"mcp_servers"|'mcp_servers')\s*\.\s*(galaxy|"galaxy"|'galaxy')\s*(\.|\])`)
+
+func codexHasManagedMarker(text string) bool {
+	return strings.Contains(text, strings.TrimSuffix(codexGalaxyBegin, "\n")) ||
+		strings.Contains(text, strings.TrimSuffix(codexGalaxyEnd, "\n"))
+}
+
+// removeRecordedCodexBlock identifies only the previously generated MCP tables.
+// Codex may move the end comment after tables it appends; those tables are not
+// part of the installation. The generated table bytes must still match exactly.
+func removeRecordedCodexBlock(text, block string) (string, bool) {
+	if !strings.HasPrefix(block, codexGalaxyBegin) || !strings.HasSuffix(block, codexGalaxyEnd) {
+		return text, false
+	}
+	begin, endMarker := codexGalaxyBegin, codexGalaxyEnd
+	if strings.Contains(text, strings.ReplaceAll(begin, "\n", "\r\n")) {
+		begin = strings.ReplaceAll(begin, "\n", "\r\n")
+		endMarker = strings.ReplaceAll(endMarker, "\n", "\r\n")
+		block = strings.ReplaceAll(block, "\n", "\r\n")
+	}
+	if strings.Count(text, begin) != 1 || strings.Count(text, endMarker) != 1 {
+		return text, false
+	}
+	body := strings.TrimSuffix(block, endMarker)
+	if strings.Count(text, body) != 1 {
+		return text, false
+	}
+	start := strings.Index(text, body)
+	end := strings.Index(text, endMarker)
+	if end < start+len(body) {
+		return text, false
+	}
+	// A key before the next table still belongs to the managed MCP table,
+	// even if the end comment sits before it. Treat it as a user change.
+	tail := strings.Replace(text[start+len(body):], endMarker, "", 1)
+	for _, line := range strings.Split(tail, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if !strings.HasPrefix(line, "[") {
+			return text, false
+		}
+		break
+	}
+	remaining := text[:start] + tail
+	if codexGalaxySection.MatchString(remaining) {
+		return text, false
+	}
+	return remaining, true
+}
 
 // UpdateCodexNativeConfiguration publishes only the managed TOML block. An
 // existing unrelated galaxy table is a conflict. previousBlock is the exact
@@ -118,17 +168,15 @@ func UpdateCodexNativeConfiguration(path string, input HostConfigurationInput, p
 		if !strings.HasPrefix(previousBlock, codexGalaxyBegin) || !strings.HasSuffix(previousBlock, codexGalaxyEnd) {
 			return "", hostConfigurationFailure("setup_host_config_changed")
 		}
-		count := strings.Count(text, previousBlock)
-		if count > 1 {
-			return "", hostConfigurationFailure("setup_host_config_changed")
-		}
-		if count == 1 {
-			text = strings.Replace(text, previousBlock, "", 1)
-		} else if strings.Contains(text, codexGalaxyBegin) || strings.Contains(text, codexGalaxyEnd) {
-			return "", hostConfigurationFailure("setup_host_config_changed")
+		if codexHasManagedMarker(text) {
+			var matched bool
+			text, matched = removeRecordedCodexBlock(text, previousBlock)
+			if !matched {
+				return "", hostConfigurationFailure("setup_host_config_changed")
+			}
 		}
 	}
-	if strings.Contains(text, codexGalaxyBegin) || strings.Contains(text, codexGalaxyEnd) || codexGalaxySection.MatchString(text) {
+	if codexHasManagedMarker(text) || codexGalaxySection.MatchString(text) {
 		return "", hostConfigurationFailure("setup_host_config_conflict")
 	}
 	args, environment := input.launch()

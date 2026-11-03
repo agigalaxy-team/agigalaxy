@@ -44,24 +44,25 @@ type ManagedNativeInstallationPlan struct {
 	recordOriginal       string
 }
 type managedNativeRecord struct {
-	Version           int    `json:"version"`
-	Host              string `json:"host"`
-	ConfigFormat      string `json:"configFormat,omitempty"`
-	DataDirectory     string `json:"dataDirectory"`
-	ConfigPath        string `json:"configPath,omitempty"`
-	Endpoint          string `json:"endpoint,omitempty"`
-	LocalOnly         bool   `json:"localOnly"`
-	HostConfigPath    string `json:"hostConfigPath"`
-	SkillPath         string `json:"skillPath,omitempty"`
-	ReleaseDirectory  string `json:"releaseDirectory"`
-	ManagedSpec       any    `json:"managedSpec,omitempty"`
-	ManagedPluginPath string `json:"managedPluginPath,omitempty"`
-	CodexBlock        string `json:"codexBlock,omitempty"`
-	HookPath          string `json:"hookPath,omitempty"`
-	HookGroup         any    `json:"hookGroup,omitempty"`
-	HookPrevious      any    `json:"hookPrevious,omitempty"`
-	NodeExecutable    string `json:"nodeExecutable,omitempty"`
-	HostExecutable    string `json:"hostExecutable,omitempty"`
+	Version           int                     `json:"version"`
+	Host              string                  `json:"host"`
+	ConfigFormat      string                  `json:"configFormat,omitempty"`
+	DataDirectory     string                  `json:"dataDirectory"`
+	ConfigPath        string                  `json:"configPath,omitempty"`
+	Endpoint          string                  `json:"endpoint,omitempty"`
+	LocalOnly         bool                    `json:"localOnly"`
+	HostConfigPath    string                  `json:"hostConfigPath"`
+	SkillPath         string                  `json:"skillPath,omitempty"`
+	ReleaseDirectory  string                  `json:"releaseDirectory"`
+	ManagedSpec       any                     `json:"managedSpec,omitempty"`
+	ManagedPluginPath string                  `json:"managedPluginPath,omitempty"`
+	CodexBlock        string                  `json:"codexBlock,omitempty"`
+	HookPath          string                  `json:"hookPath,omitempty"`
+	HookGroup         any                     `json:"hookGroup,omitempty"`
+	HookPrevious      any                     `json:"hookPrevious,omitempty"`
+	CodexHookTrust    []managedCodexHookTrust `json:"codexHookTrust,omitempty"`
+	NodeExecutable    string                  `json:"nodeExecutable,omitempty"`
+	HostExecutable    string                  `json:"hostExecutable,omitempty"`
 }
 
 // PreviewManagedNativeInstallation inspects only the chosen host and the
@@ -267,6 +268,7 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 		next.HookPath = plan.prior.HookPath
 		next.NodeExecutable = plan.prior.NodeExecutable
 		next.HostExecutable = plan.prior.HostExecutable
+		next.CodexHookTrust = plan.prior.CodexHookTrust
 	}
 	baseline, e := managedNativeBaseline(&next)
 	if e != nil {
@@ -377,7 +379,7 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 			next.HookPath = filepath.Join(input.Home, ".claude", "settings.json")
 		}
 		next.NodeExecutable = input.NodeExecutable
-		next.HostExecutable = ""
+		next.HostExecutable = input.HostExecutable
 		if input.NodeExecutable != "" {
 			var hookErr error
 			next.HookGroup, hookErr = managedHookGroup(input.Host, input.NodeExecutable, release.Directory, input.ConfigPath, input.DataDirectory)
@@ -394,6 +396,16 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 			next.HookGroup = old
 			next.HookPrevious = older
 			result["hookStatus"] = "node-unavailable"
+		}
+	}
+
+	if input.Host == "codex" && plan.prior != nil && len(plan.prior.CodexHookTrust) > 0 && (!hookReady || !reflect.DeepEqual(old, next.HookGroup)) {
+		remaining, cleanupErr := clearCodexHookTrust(ctx, input.HostExecutable, plan.prior)
+		next.CodexHookTrust = remaining
+		if cleanupErr != nil {
+			result["hookTrustCleanup"] = "retained"
+		} else {
+			result["hookTrustCleanup"] = "removed"
 		}
 	}
 
@@ -437,6 +449,42 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 		priorText := string(raw)
 		if e = hostReplaceSelected(plan.recordPath, string(final), &priorText); e != nil {
 			return result, e
+		}
+		if input.Host == "codex" {
+			var tracked []managedCodexHookTrust
+			status, trustErr := adoptCodexHooks(ctx, input.HostExecutable, next.HookPath, next.HookGroup, next.CodexHookTrust, &tracked)
+			result["hookStatus"] = status
+			if status != "trusted" {
+				result["hookTrustHelp"] = "Codex /hooks or Desktop Settings > Hooks"
+			}
+			if trustErr != nil {
+				result["hookError"] = "codex_hook_trust_unavailable"
+			}
+			if status == "trusted" || len(tracked) > 0 {
+				for _, oldTrust := range next.CodexHookTrust {
+					found := false
+					for _, current := range tracked {
+						if oldTrust.Key == current.Key {
+							found = true
+							break
+						}
+					}
+					if !found {
+						tracked = append(tracked, oldTrust)
+					}
+				}
+				next.CodexHookTrust = tracked
+				if updated, e := hostJSON(next); e == nil {
+					previous := string(final)
+					if e = hostReplaceSelected(plan.recordPath, string(updated), &previous); e == nil {
+						result["hookTrustRecordSaved"] = true
+					} else {
+						result["hookTrustRecordSaved"] = false
+					}
+				} else {
+					result["hookTrustRecordSaved"] = false
+				}
+			}
 		}
 	} else if input.Host == "codex" || input.Host == "claude-code" {
 		result["hooksConfigured"] = false
