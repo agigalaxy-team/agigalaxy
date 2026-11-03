@@ -1,8 +1,8 @@
 # 当前工作
 
-## 通用插件与本机共用服务（2026-11-03，本地交付收束）
+## 通用插件与本机共用服务（2026-11-04，本地交付收束）
 
-独立工作区 `05-build/worktrees/native-hosts`，分支 `work/native-hosts-20261103`；功能与工程说明已提交至 `062e188`，本节随后合入收束提交。现行方案见 [Native工程](docs/technical/native-client.md)。主线工作区、原身份和资料保持；没有上传、正式发行、部署或更改生产数据库、认证、模型及用户宿主配置。以下为本线当前结果，后续其他工作线记录保留各自范围。
+独立工作区 `05-build/worktrees/native-hosts`，分支 `work/native-hosts-20261103`；业务及宿主功能基线为 `062e188`，后续安装说明与容器交付已在本分支继续提交。现行方案见 [Native工程](docs/technical/native-client.md)。主线工作区、原身份和资料保持；没有上传、正式发行、部署或更改生产数据库、认证、模型及用户宿主配置。以下为本线当前结果，后续其他工作线记录保留各自范围。
 
 **实际接通：**
 - 同用户共用Go服务、私有IPC、多资料范围、MCP/Host薄连接、主动退出及恢复；单宿主关闭不关闭服务。统一install/update/repair/uninstall、当前宿主用户级接入，以及npm、原生包和适用容器的同源交付。事实观察子进程共用所需环境投影，不传入宿主模型凭据，不修改父Agent环境。
@@ -25,11 +25,11 @@
 - 用户指定Linux主机实机通过：Linux amd64包校验及解包、用户级install/repair、两个真实stdio MCP连接各发现36工具并读status；两连接关闭后共用服务仍存活，卸载保留原身份，明确停止服务成功。没有修改网站、数据库、系统启动项或现有宿主配置；该主机当前PATH无Node，原生核心路径不依赖它。
 
 **交付与未覆盖范围：**
-项目外 `D:/ChatGPT/work/galaxy-native-hosts-20261103/universal-runtime/delivery-ready-{windows,linux,darwin}-{amd64,arm64}/` 为六目标0.1.0候选；同源npm目录 `delivery-ready-npm/` 含六平台可选包，容器材料在 `delivery-ready-container-amd64/`。包内许可归集17组件；静态host-capabilities只说明源码接入形状，不重复维护实际验收状态。候选源码完整性与现有打包工具检查通过，未正式签名、公证或上架。
+项目外 `D:/ChatGPT/work/galaxy-native-hosts-20261103/universal-runtime/delivery-ready-{windows,linux,darwin}-{amd64,arm64}/` 为六目标0.1.0候选；同源npm目录 `delivery-ready-npm/` 含六平台可选包，固定基础镜像的容器材料在 `delivery-ready-container-pinned-amd64/`，此前未固定上下文仅留作仓外过程记录。包内许可归集17组件；静态host-capabilities只说明源码接入形状，不重复维护实际验收状态。候选源码完整性与现有打包工具检查通过，未正式签名、公证或上架。
 
-Windows和Linux amd64已有上述实际运行结果；macOS及ARM仅交叉构建，Linux/macOS真实桌面通知、macOS helper编译/签名/公证尚无实机结果。指定Linux主机普通用户无法访问Docker socket；已提出仅用sudo创建和清理临时容器的核对，未获答复前不运行容器或修改权限。六包与容器构建上下文不代替这些实机结果。容器准备器现支持显式基础镜像参数并返回实际引用及固定摘要状态；一次真实候选上下文准备通过。Docker官方Registry在本地及指定Linux主机读取均超时，尚未取得可核实的镜像摘要，正式发行前仍需固定；没有编造摘要或因此重构建客户端。
+Windows和Linux amd64已有上述实际运行结果；macOS及ARM仅交叉构建，Linux/macOS真实桌面通知、macOS helper编译/签名/公证尚无实机结果。用户已明确授权现有sudo仅作临时容器测试；指定Linux主机Docker 28.5.1实测通过：固定基础镜像的实际构建、同一容器双stdio MCP初始化/36工具发现/status、宿主连接关闭后同PID服务保持、容器重启后身份保持。本次容器、客户端镜像及新拉取的基础镜像已清理，挂载资料和回执保留，原7个容器均保留；未改用户权限、系统启动项或现有服务。通过Docker拉取和RepoDigests取得实际基础镜像摘要后，准备器默认值已固定，显式覆盖仍可用；最终上下文生成通过。早期直接Registry查询超时仍保留，未据此改写失败或重构建客户端。六目标包与该Linux amd64容器结果不扩大为其他平台实机通过。
 
-早期本机身份、schema、录制、代理socket、模型和探针失败均保留于仓库外；最新实际宿主证据位于同一外部工作目录的 `universal-runtime/`，Linux证据位于 `remote211/`。原旧包不冒充最新候选。旧Node连接、导出、删除、公网传输、自定义JS A2A、旧安装脚本、自动摘要循环及废弃测试已归档至整个项目外的 `withdrawn-node-business/`、`withdrawn-node-installation/`、`withdrawn-client-orchestration-20261103/`，不参与源码、构建或安装。保留JS只承担真实宿主/浏览器界面、npm引导、参考Worker第三方SDK及现用日志。
+早期本机身份、schema、录制、代理socket、模型和探针失败均保留于仓库外；最新实际宿主证据位于同一外部工作目录的 `universal-runtime/`，Linux及容器证据位于 `remote211/`（`container-result-9740e3d8.json`、`container-cleanup-9740e3d8.json`）。原旧包不冒充最新候选。旧Node连接、导出、删除、公网传输、自定义JS A2A、旧安装脚本、自动摘要循环及废弃测试已归档至整个项目外的 `withdrawn-node-business/`、`withdrawn-node-installation/`、`withdrawn-client-orchestration-20261103/`，不参与源码、构建或安装。保留JS只承担真实宿主/浏览器界面、npm引导、参考Worker第三方SDK及现用日志。
 
 ## 2026-11-03：工作台三岗位持续交办实测（进行中）
 

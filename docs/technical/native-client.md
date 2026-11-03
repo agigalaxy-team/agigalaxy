@@ -123,7 +123,7 @@ Vercel Skills目录表与MCPorter配置路径是适配线索，各宿主当前�
 
 | 能力 | 当前接线 | 实际范围与剩余路径 |
 |---|---|---|
-| 共用核心、资料范围与生命周期 | `nativebridge` 服务、私有 IPC、多 profile Runtime、薄连接、暂停与明确重启已实现 | Windows多连接/资料承接及Linux amd64安装、双MCP、卸载保留身份、明确停止已有实际结果；其他平台登录边界与容器生命周期分别记录 |
+| 共用核心、资料范围与生命周期 | `nativebridge` 服务、私有 IPC、多 profile Runtime、薄连接、暂停与明确重启已实现 | Windows多连接/资料承接及Linux amd64安装、双MCP、卸载保留身份、明确停止已有实际结果；其他平台登录边界分别记录；Linux amd64容器双MCP、连接退出及重启保留身份已有实际结果 |
 | 身份、设备、账户与恢复 | 原 Go 身份、首设备、连接、账户关联、撤销及恢复工具由共用核心承接 | 已有新 ID 与账户关联实际路径；恢复、其他设备及最终候选的平台范围沿各自结果记录 |
 | 完整 MCP、Skill 与模型参数 | 统一发布 schema 投影，执行前仍按原 schema 校验；工具不缩成固定目录 | 已有 OpenCode＋Gemini 对完整发现目录的实际调用；不据此宣称所有提供商和全部业务完成 |
 | 普通工作观察与环境 | OpenCode 事件、Codex／Claude hook、Hermes插件、DSH事件及私有 ingress已接线 | 只记宿主实际提供的消息、工具与环境；未采内容及未知实际模型保持未知，真实宿主运行范围分别核对 |
@@ -168,7 +168,7 @@ Codex 和 Claude 的事实 hook 使用 Node；程序可从 PATH 发现，或用 
 
 服务版入口 `galaxy native --config <公开配置绝对路径>` 提供当前已接入的服务和本机工具；本机入口 `galaxy integration-mcp --data-dir <目录>` 不构造服务 Runtime 或连接服务。对应的 `host`、`integration-host` 只供可信宿主使用，不作为模型 MCP 工具。公开配置含 `version:2`、HTTPS `endpoint`/`website`、绝对 `dataDirectory` 和可信公钥；通过 `--config` 或 `GALAXY_NATIVE_CONFIG` 选择，不写入 token、私钥或恢复码。`service-config inspect/prepare` 负责读取所选服务信息和准备公开配置；显式根 pin、信任目录及轮换见下文。`setup` 保留从所选官网读取公开服务配置并展示计划、经本人确认后安装的原入口，也支持 `setup --local-only`；实际安装共用同一执行器；`host-configs` 只向新目录生成片段，不代表已安装或宿主已加载。命令参数以 `galaxy --help` 为准。
 
-`scripts/build-native-v2.mjs` 构建平台二进制、面板、Skill 和宿主资源，`scripts/prepare-client-candidate.mjs` 在构建时解析并锁定薄宿主依赖、归集许可并准备归档；已有缓存可用 `--offline`。`--goos`/`--goarch` 可选择目标，跨目标候选不在当前机器执行安装检查。归档名包含发行版本、OS 和架构。`scripts/prepare-native-npm.mjs` 从已准备候选生成 `@galaxy/native` 薄入口和对应平台包目录，仅列入本次提供的目标。启动器无参数时执行 `install`，无法唯一识别宿主时在交互终端提示输入宿主 ID，非交互环境可使用 `install --host <宿主ID>`；其他参数直接交给 Native 程序。`scripts/prepare-native-container.mjs` 从 Linux 候选生成容器构建上下文。这些是未发布候选，包名不代表注册或发布权限。容器显式挂载专用资料目录和所需公开配置，用同一用户启动一个前台核心，再让各宿主通过 `docker exec -i` 连接同一容器；私有 IPC 在容器内。容器 `localhost` 不是桌面 `localhost`，不自动挂载整个用户目录、发布端口或部署数据库。容器准备器的第四个可选参数为基础镜像引用，也可由 `prepareNativeContainer({baseImage})` 传入；已核实的 `image@sha256:…` 可直接用于固定构建。未指定时保持 `node:22-bookworm-slim`，生成结果和说明区分固定摘要与可变标签；正式发行前仍需取得并采用实际镜像摘要，不在准备阶段自动查询或猜测。
+`scripts/build-native-v2.mjs` 构建平台二进制、面板、Skill 和宿主资源，`scripts/prepare-client-candidate.mjs` 在构建时解析并锁定薄宿主依赖、归集许可并准备归档；已有缓存可用 `--offline`。`--goos`/`--goarch` 可选择目标，跨目标候选不在当前机器执行安装检查。归档名包含发行版本、OS 和架构。`scripts/prepare-native-npm.mjs` 从已准备候选生成 `@galaxy/native` 薄入口和对应平台包目录，仅列入本次提供的目标。启动器无参数时执行 `install`，无法唯一识别宿主时在交互终端提示输入宿主 ID，非交互环境可使用 `install --host <宿主ID>`；其他参数直接交给 Native 程序。`scripts/prepare-native-container.mjs` 从 Linux 候选生成容器构建上下文。这些是未发布候选，包名不代表注册或发布权限。容器显式挂载专用资料目录和所需公开配置，用同一用户启动一个前台核心，再让各宿主通过 `docker exec -i` 连接同一容器；私有 IPC 在容器内。容器 `localhost` 不是桌面 `localhost`，不自动挂载整个用户目录、发布端口或部署数据库。容器准备器的第四个可选参数为基础镜像引用，也可由 `prepareNativeContainer({baseImage})` 传入；已核实的 `image@sha256:…` 可直接用于固定构建。默认值采用已经实际拉取并核对的 `node:22-bookworm-slim` 摘要，准确引用只在脚本中维护；显式覆盖时生成结果和说明仍区分固定摘要与可变标签。准备器不自动查询镜像，基础镜像更新与客户端发行分别处理。
 
 旧签名发行 `galaxy-native-client-release` 的验签与启动说明仍适用于原包，不能据此推断 Go 候选已经验签、发布或获得宿主验收。构建和 NOTICE 见[源码与许可](source-and-licensing.md)。最近主会话对实际候选在隔离路径完成了自定义宿主 install → repair → uninstall，确认其他 MCP 配置和 ID 保留；这不证明所有真实宿主、Linux/macOS、系统提醒、签名或市场上架已验收。平台和未覆盖范围以 [WORK_STATUS](../../WORK_STATUS.md) 为准。
 

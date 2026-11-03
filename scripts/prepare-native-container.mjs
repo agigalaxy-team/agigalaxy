@@ -5,7 +5,7 @@ import {inspectNativeClientCandidate} from './native-client-release.mjs';
 
 // The image uses an already prepared Linux release; it does not start a DB,
 // publish an image, configure a desktop host, or mount anything automatically.
-export async function prepareNativeContainer({candidate,destination,sourceDirectory,baseImage="node:22-bookworm-slim"}={}){
+export async function prepareNativeContainer({candidate,destination,sourceDirectory,baseImage="node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da"}={}){
  if(typeof baseImage!=='string'||!baseImage||/\s/u.test(baseImage))throw Error('Invalid base image reference');
  const baseImageDigestPinned=/@sha256:[0-9a-fA-F]{64}$/.test(baseImage);
  if(!isAbsolute(candidate)||!isAbsolute(destination)||!isAbsolute(sourceDirectory))throw Error('Absolute candidate/output/source paths required');
