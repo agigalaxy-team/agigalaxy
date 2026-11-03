@@ -73,7 +73,8 @@ func (s *Service) overviewDispatchesWithin(ctx context.Context, tx pgx.Tx, actor
 		if latest != nil {
 			last = Object{"id": latest["id"], "state": latest["state"], "updatedAt": iso(latest["updated_at"]), "completedAt": iso(latest["completed_at"])}
 		}
-		byDomain[str(d["domain"])] = append(byDomain[str(d["domain"])], Object{"id": d["id"], "title": d["title"], "enabled": d["enabled"], "trigger": obj(d["configuration"])["trigger"], "health": state, "readiness": ready, "nextDueAt": iso(d["next_due_at"]), "lastValidAt": iso(valid["completed_at"]), "latestTask": last})
+		active := d["enabled"] == true && !(obj(obj(d["configuration"])["trigger"])["kind"] == "once" && latest != nil && has(terminal, str(latest["state"])))
+		byDomain[str(d["domain"])] = append(byDomain[str(d["domain"])], Object{"id": d["id"], "title": d["title"], "enabled": d["enabled"], "active": active, "trigger": obj(d["configuration"])["trigger"], "health": state, "readiness": ready, "nextDueAt": iso(d["next_due_at"]), "lastValidAt": iso(valid["completed_at"]), "latestTask": last})
 	}
 	return byDomain, nil
 }
@@ -84,7 +85,7 @@ func mergeDispatchRuntime(account Object, dispatches []Object) {
 		account["dispatches"] = []Object{}
 	}
 	for _, d := range dispatches {
-		if d["enabled"] != true {
+		if d["active"] != true {
 			continue
 		}
 		wasEnabled := account["enabled"] == true

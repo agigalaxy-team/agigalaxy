@@ -22,7 +22,7 @@ export function AutonomyDispatches({accounts}: {accounts: AutonomyAccount[]}) {
       <thead><tr><th>交办任务</th><th>岗位</th><th>运行状态</th><th>计划</th><th>最近一轮</th><th>有效巡检</th><th>下次执行</th></tr></thead>
       <tbody>{items.map(({account, dispatch}) => <tr key={dispatch.id}>
         <th>{dispatch.title}</th><td>{autonomyDomains[account.domain]}</td>
-        <td><AutonomyState tone={!dispatch.enabled ? 'neutral' : ['healthy', 'running', 'ready'].includes(dispatch.health) ? 'active' : 'attention'}>{dispatch.enabled ? autonomyHealthNames[dispatch.health] ?? '状态未确认' : '已停用'}</AutonomyState></td>
+        <td><AutonomyState tone={!dispatch.enabled ? 'neutral' : ['healthy', 'running', 'ready'].includes(dispatch.health) ? 'active' : 'attention'}>{!dispatch.enabled ? '已停用' : dispatch.active===false&&dispatch.trigger.kind==='once' ? '本次已结束' : autonomyHealthNames[dispatch.health] ?? '状态未确认'}</AutonomyState></td>
         <td>{triggerLabel(dispatch.trigger)}</td>
         <td>{dispatch.latestTask ? <Link href={'/admin/operations/ai-runs?task=' + dispatch.latestTask.id} prefetch={false}>
           {autonomyStates[dispatch.latestTask.state] ?? '状态未确认'}<small>{autonomyDate(dispatch.latestTask.updatedAt)}</small>

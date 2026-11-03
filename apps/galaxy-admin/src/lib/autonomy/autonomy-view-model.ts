@@ -44,4 +44,4 @@ export function autonomyFailureLabel(task:Pick<AutonomyTask,'state'|'failure'>){
  return label+(failure?.reportedStatus?' · HTTP '+failure.reportedStatus:'');
 }
 
-export function autonomyAccountPlan(account:AutonomyAccount){const n=account.dispatches?.filter(d=>d.enabled).length??0;return n?(account.config.enabled?`例行值守＋${n}项交办`:`${n}项交办运行中`):autonomySchedule(account.config);}
+export function autonomyAccountPlan(account:AutonomyAccount){const n=account.dispatches?.filter(d=>d.active??d.enabled).length??0;return n?(account.config.enabled?`例行值守＋${n}项交办`:`${n}项交办运行中`):autonomySchedule(account.config);}
