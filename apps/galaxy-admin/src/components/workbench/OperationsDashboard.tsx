@@ -33,7 +33,7 @@ export function OperationsDashboard({initial,initialError}:{initial:OperationsSu
   const auto=page.available?value?.autonomy??null:null;
   const pending=workbenchPending(value);
   if(auto?.summary.waitingHuman&&auto.summary.waitingHuman>0)pending.push({id:'autonomy-human',group:'system',label:'自动流程等待决定',count:auto.summary.waitingHuman,unit:'项待决定',href:'/admin/operations/ai-runs?state=awaiting-human',icon:'strategy'});
-  const progress=(auto?.recentTasks??[]).filter(task=>['running','queued'].includes(task.state)).map(task=>({id:task.id,label:autonomyTaskTitle(task),createdAt:task.updatedAt,href:autonomyTaskHref(task),source:'自动运行'}));
+  const progress=(auto?.recentTasks??[]).slice(0,5).map(task=>({id:task.id,label:autonomyTaskTitle(task),createdAt:task.updatedAt,href:autonomyTaskHref(task),source:'自动运行'}));
   const analyticsAccess=!value?'unverified':authorization?.version&&authorization.permissions.includes('analytics.read')?'authorized':'denied';
   const publicAccess=!value?'unverified':value.availability.businessActivity==='not-authorized'||!authorization?.permissions.includes('content.read')?'denied':'authorized';
   const connection=page.loading&&!value?'loading':value?.ai?.state==='connected'?'connected':value?.ai?.state==='not-connected'?'not-connected':'unavailable';

@@ -104,6 +104,31 @@ func TestWorkbenchDispatchIndependentPlanAndOriginalReceipt(t *testing.T) {
 	if e != nil || read["enabled"] != true || read["latestTask"].(map[string]any)["state"] != "running" {
 		t.Fatalf("actual dispatch read: %#v %v", read, e)
 	}
+	// The same real assignment must be visible to the dashboard while routine
+	// duty remains disabled. No configuration change is needed to make it appear.
+	if _, e = owner.Exec(ctx, `INSERT INTO operations_autonomy_tasks_v1(id,endpoint,domain,source,source_key,title,mode,state,model_state,business_state,configuration,prompt_version,plan_version,session_id,due_at,created_at,updated_at,target_type,target_id) VALUES($1,$2,'overview','workbench',$1::uuid::text,'unavailable old source','ai','failed','failed','not-started','{}',1,1,$3,$4,$4,$4,'content-post',$5)`, uuid.NewString(), f.Endpoint, uuid.NewString(), now.Add(-time.Minute), uuid.NewString()); e != nil {
+		t.Fatal(e)
+	}
+	overview, e := s.Overview(ctx, f.Root, 7)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var runtimeAccount map[string]any
+	if overview["summary"].(map[string]any)["enabledAccounts"] != 1 || len(overview["timeline"].([]a.Object)) == 0 || overview["basis"].(map[string]any)["availability"] != "partial" {
+		t.Fatalf("one withheld historical source erased visible runtime: %#v", overview["summary"])
+	}
+	for _, account := range overview["accounts"].([]a.Object) {
+		if account["domain"] == "overview" {
+			runtimeAccount = account
+		}
+	}
+	if runtimeAccount == nil || runtimeAccount["enabled"] != true || runtimeAccount["config"].(map[string]any)["enabled"] != false || runtimeAccount["health"] != "running" {
+		t.Fatalf("independent assignment hidden behind routine enablement: %#v", runtimeAccount)
+	}
+	assignments := runtimeAccount["dispatches"].([]a.Object)
+	if len(assignments) != 1 || assignments[0]["id"] != op || assignments[0]["nextDueAt"] == nil || assignments[0]["latestTask"].(map[string]any)["id"] != taskID {
+		t.Fatalf("missing assignment schedule or round: %#v", assignments)
+	}
 	if _, e = s.ReadDispatch(ctx, sourceActor, "overview", a.Object{"dispatchId": op}); e != nil {
 		t.Fatal("private model receipt read", e)
 	}

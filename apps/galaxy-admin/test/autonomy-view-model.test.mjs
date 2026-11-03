@@ -72,3 +72,9 @@ test('new strategy execution starts without a widened scope and projects only su
  const source={...initial,actions:['content.hide'],grantIds:[id],privateBody:'excluded',trigger:{kind:'daily',at:null,eventTypes:[],privateBody:'excluded'}};
  const value=strategyExecution(source);assert.equal(value.trigger.at,null);assert.deepEqual(value.actions,['content.hide']);assert.equal(JSON.stringify(value).includes('excluded'),false);assert.equal(strategyExecution({...source,aiDomain:'foreign'}),null);
 });
+
+ test('independent assignments remain visible while routine duty is disabled',async()=>{
+ const {autonomyAccountState,autonomyAccountPlan}=await import('../src/lib/autonomy/autonomy-view-model.ts');
+ const account={enabled:true,health:'healthy',config:config(),dispatches:[{enabled:true}]};
+ assert.equal(account.config.enabled,false);assert.equal(autonomyAccountState(account),'正常值守');assert.equal(autonomyAccountPlan(account),'1项交办运行中');
+ });

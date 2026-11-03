@@ -15,7 +15,7 @@ export function autonomyNumber(value:number|null|undefined){return typeof value=
 export function autonomyPercent(value:number|null|undefined){return typeof value==='number'&&Number.isFinite(value)&&value>=0?new Intl.NumberFormat('zh-CN',{style:'percent',maximumFractionDigits:1}).format(value>1?value/100:value):'无样本';}
 export function autonomyDate(value:string|null|undefined,short=false){return value&&Number.isFinite(Date.parse(value))?short?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value)):shanghaiMinute(new Date(value)):'未记录';}
 export function autonomySchedule(config:Pick<AutonomyConfig,'schedule'>){return config.schedule.kind==='daily'?config.schedule.at?'每日 '+config.schedule.at:'每日 · 时刻待选':'每 '+config.schedule.minutes+' 分钟';}
-export function autonomyAccountState(account:AutonomyAccount){return !account.config.enabled?'待启用':autonomyHealthNames[account.health]??'健康未确认';}
+export function autonomyAccountState(account:AutonomyAccount){return !account.enabled?'待启用':autonomyHealthNames[account.health]??'健康未确认';}
 export function autonomyTaskHref(task:Pick<AutonomyTask,'id'>|string){return '/admin/operations/ai-runs?task='+encodeURIComponent(typeof task==='string'?task:task.id);}
 export function autonomyAccountHref(domain:AutonomyDomain,tab='overview'){return '/admin/operations/ai-work-accounts?'+new URLSearchParams({domain,tab});}
 export function autonomyTaskTitle(task:AutonomyTask){return task.title?.trim()||autonomyDomains[task.domain]+' · '+autonomySources[task.source];}
@@ -43,3 +43,5 @@ export function autonomyFailureLabel(task:Pick<AutonomyTask,'state'|'failure'>){
  const label=labels[failure?.category??'unknown']??labels.unknown;
  return label+(failure?.reportedStatus?' · HTTP '+failure.reportedStatus:'');
 }
+
+export function autonomyAccountPlan(account:AutonomyAccount){const n=account.dispatches?.filter(d=>d.enabled).length??0;return n?(account.config.enabled?`例行值守＋${n}项交办`:`${n}项交办运行中`):autonomySchedule(account.config);}

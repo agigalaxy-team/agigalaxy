@@ -72,6 +72,13 @@ func TestCurrentSchemaInteropAndHTTP(t *testing.T) {
 		t.Fatal(e)
 	}
 	// The current catalog must preserve the captured browser wire mapping.
+	// Autonomy is an additive producer/consumer contract after the Node capture.
+	expected := originalCatalog.(map[string]any)
+	for _, table := range []string{"operations_autonomy_tasks_v1", "operations_autonomy_configs_v1", "operations_autonomy_dispatches_v1"} {
+		expected["sources"].(map[string]any)[table] = "autonomy"
+	}
+	expected["permissions"].(map[string]any)["autonomy"] = "autonomy.read"
+	expected["admin"] = append(expected["admin"].([]any), "autonomy")
 	if !reflect.DeepEqual(normalize(t, catalog), originalCatalog) {
 		t.Fatal("Go catalog differs from captured topics")
 	}
