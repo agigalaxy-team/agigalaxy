@@ -1,65 +1,35 @@
 # 当前工作
 
-## 通用插件与本机共用服务（2026-11-03，进行中）
+## 通用插件与本机共用服务（2026-11-03，本地交付收束）
 
-独立工作区 `05-build/worktrees/native-hosts`，分支 `work/native-hosts-20261103`；现行方案见 [Native工程](docs/technical/native-client.md)。主线工作区与已有身份、资料保持原样。完整MCP＋Skill由当前Agent按真实任务组合，不新增固定Watch编排、子模型摘要循环或强制菜单。
+独立工作区 `05-build/worktrees/native-hosts`，分支 `work/native-hosts-20261103`；功能与工程说明已提交至 `062e188`，本节随后合入收束提交。现行方案见 [Native工程](docs/technical/native-client.md)。主线工作区、原身份和资料保持；没有上传、正式发行、部署或更改生产数据库、认证、模型及用户宿主配置。以下为本线当前结果，后续其他工作线记录保留各自范围。
 
-已接通：同用户共用Go服务、多资料范围、MCP与Host薄连接、明确退出和恢复；统一install/update/repair/uninstall、当前宿主用户级配置、release复用、npm引导及跨平台候选封包。原始资料仍按本人选择采集，当前Agent负责自然阶段的整理；不默认上传完整会话。
+**实际接通：**
+- 同用户共用Go服务、私有IPC、多资料范围、MCP/Host薄连接、主动退出及恢复；单宿主关闭不关闭服务。统一install/update/repair/uninstall、当前宿主用户级接入，以及npm、原生包和适用容器的同源交付。事实观察子进程共用所需环境投影，不传入宿主模型凭据，不修改父Agent环境。
+- OpenCode、Codex、Claude、Hermes及DSH按其真实接口记录工作事实，当前Agent通过MCP读取、整理和保存摘要；精确选择后才采原会话材料，不默认上传。OpenCode录制先作有限投影，不复制未选长输出/附件；原信息修订由真实来源或Go事务承接，不伪造时间和版本。
+- MCP保留完整能力，模型发布schema与原执行校验分离；普通panel和Worker/A2A的Content与StructuredContent同源，组件私有信息留Meta。Worker/A2A按实际关联分页，TUI/Apps可读取更多。原pending可重读当前获准材料，沿原位置显式ACK。
+- 网页只保留普通链接及 `galaxy_open/return/work_continue`，由Agent在原聊天通过MCP按需读取。专用网页回调、返回队列、claim/ack、投递轮询和固定摘要模型循环已退出，不再列为待选。`/Galaxy hub`接既有连接和查询；专业Worker运行环境与完整Hub运营初始化仍planned，本线不另建服务器业务实现。
 
-旧实现已退出当前源码与交付主链路：Node连接、导出、删除、公网传输、自定义JS A2A、旧安装配置脚本、自动摘要器和相应废弃测试/对端，归档在整个项目外 `D:/ChatGPT/work/galaxy-native-hosts-20261103/withdrawn-node-business/`、`withdrawn-node-installation/`、`withdrawn-client-orchestration-20261103/`。安装、依赖、组件清单、CI和检查入口已改接现行Go实现。参考Worker保留其真实第三方SDK；现用离线治理准备归Official脚本，`galaxy-client/src/node/`只保留现用日志工具，不是另一套Native核心。归档不参与源码分析、构建或安装。
+**身份及真实业务入口：**
+按用户要求删除前一测试ID，仅保留已通过官网注册及自建邮箱验证码验证的在线账户。经Go Native初始化和独立无头浏览器创建新ID、登记首设备、连接真实服务，再沿原OIDC、签名预览与本人确认完成关联；官网与Native均显示同一新ID，未直接写业务表。真实OpenCode＋既有后台Gemini已查询账户、社区分类和帖子，原会话接续成功。首次连接、原操作恢复、恢复/设备/账户签名及schema的受影响检查通过。凭据和实际身份记录留仓库外，不写入源码。
 
-本批必要实测结果：
-- 共用服务的双资料范围、关闭单宿主保持运行、重接、主动暂停、启动与同版重启通过；原ID保持。实际install→repair→第二宿主→uninstall及npm引导通过，无关MCP配置和资料保留。
-- OpenCode 1.18.31真实TUI及现有Gemini完整工具目录调用通过。最新两轮真实模型先正常沟通，再读取并整理实际履历，3项工具完成、持久化1份摘要、录制失败为0，原会话和未发送草稿保持。
-- 录制器已从可变事件对象改为当前SDK事实的有限投影；完整原件仅在精确选择后另取。6项真实Go录制检查通过，包含10 MiB附件和长工具输出，未选原件不传输。之前的来源修订冲突和模型超时等原失败保留于项目外。
-- 七处设备/生命周期Go夹具的真实隔离PostgreSQL场景通过；私有同步的宿主结束与MCP并发写入、取消等待及原回执丢失恢复通过，没有重复创建原操作。
-- Codex/Claude真实hook→Go原件导出、重复通知、完整尾行、工具调用/结果及锁释放通过。Hermes使用固定上游SessionDB、当前Python插件与真实Go完成4条选中原件及中断尾部导出，重复结束通知不重复采集；不等同于完整Hermes应用模型验收。DSH已接真实接口，尚缺完整宿主运行验收。
-- 用户已明确网页接续只需本地Agent可读MCP：专用网页回调、返回队列、claim/ack、OpenCode轮询和投递菜单均已移出源码归档。实际网页React组件在独立无头浏览器复制接续请求，再经真实Go MCP的work_continue/return读取当前资料通过；项目正文来自隔离HTTP夹具，不冒充真实在线项目或整站验收。
-- Windows候选运行和Linux/macOS交叉构建、归档执行位通过；其余平台桌面运行、macOS签名公证与容器实际运行未验收。受影响TypeScript检查通过，不扩大为全部平台完成。
+**集中必要检查结果：**
+- Windows共用服务、多资料范围、重接、暂停/启动、同版接续和原ID保持通过；七处设备/生命周期的隔离PostgreSQL场景通过。私有同步并发、取消等待和原ACK丢失恢复通过，没有重新创建操作。
+- OpenCode 1.18.31真实TUI＋既有Gemini两轮通过：普通沟通后读取和整理工作，保存1份摘要，录制失败0，原会话及草稿保持。6项真实Go录制检查含10 MiB附件及长输出；真实模型panel取得viewId并刷新同一视图通过。环境投影修改后仅补查两条受影响的真实Go持久路径，通过后未重复未改动的TUI/模型流程。
+- Codex 0.152.1真实模型完成3项MCP读取；实际UserPromptSubmit、3次PostToolUse、Stop正常退出，排除预置会话后有5条真实观察。安装→repair→uninstall通过：3项官方trusted、原key/hash保持、自有trust清理、无关设置及数据保留；宿主关闭hooks时仍能配置MCP，不擅自开启。实际宿主插入无关配置表引发的repair问题已从共用表所有权处理修复，4项受影响Go回归通过。该账户不支持全局指定模型，探针只使用官方model/list返回的可用默认模型，用户配置未改。
+- Claude Code 2.1.309使用现有账户和模型、Go安装器生成的原hook命令，真实完成MCP查询并产生6条观察，包含用户、工具和AI结束；数据与Native进程隔离。早期502失败保留，未增加模型重试或改接口。
+- DSH官方CLI 0.2.2-alpha.2及其真实SDK同会话两轮通过：14条事实、1份用户模型摘要，官方会话日志确认5次工具调用/结果；没有合成ingress或Native模型桥。固定源码参考与已安装npm版本分别记录，不声称包字节对应固定commit。
+- Hermes固定上游在隔离Python 3.14.10和官方锁定核心/MCP依赖下，官方CLI同会话两轮通过：8条观察、1份摘要。原探针只识别直接函数名，未识别上游lazy tool_call包装；只读核对原宿主DB及Go回执后确认实际工具成功，原失败报告保留，另存核对结果，未重新调用模型。测试Gateway和Native均结束。
+- Codex/Claude实际工具发现各为当前配置的390项，不含未配置的Worker/A2A；各宿主原件及重复通知/尾行/会话隔离有定向检查。MCP发现、当前模型调用与全部业务覆盖分别计算，不宣称全业务均经过真实模型。
+- 实际React接续组件经独立无头浏览器产生请求，再由真实Go MCP读取通过；其业务正文为隔离HTTP夹具，不冒称真实在线项目。Windows候选TUI、npm pack/离线引导和多宿主安装维护已有结果，未改动路径不重复检查。
+- 用户指定Linux主机实机通过：Linux amd64包校验及解包、用户级install/repair、两个真实stdio MCP连接各发现36工具并读status；两连接关闭后共用服务仍存活，卸载保留原身份，明确停止服务成功。没有修改网站、数据库、系统启动项或现有宿主配置；该主机当前PATH无Node，原生核心路径不依赖它。
 
-本批补齐了纯MCP的关注pending重复读取：当前Agent能读原窗口当前可读材料，撤回后不补旧正文，明确ACK原位置；定向真实连接夹具通过。Worker/A2A列表增加真实游标，TUI与Apps接“更多”，不再只截最近32项；Worker回归通过，A2A分页夹具首次缺少重编码后card信任hash导致失败，修正夹具后跨peer分页/范围核对通过，未降低产品信任校验。工具结果呈现提取实际正文，内部JSON不直接显示，呈现用例与TypeScript通过。
+**交付与未覆盖范围：**
+项目外 `D:/ChatGPT/work/galaxy-native-hosts-20261103/universal-runtime/delivery-ready-{windows,linux,darwin}-{amd64,arm64}/` 为六目标0.1.0候选；同源npm目录 `delivery-ready-npm/` 含六平台可选包，容器材料在 `delivery-ready-container-amd64/`。包内许可归集17组件；静态host-capabilities只说明源码接入形状，不重复维护实际验收状态。候选源码完整性与现有打包工具检查通过，未正式签名、公证或上架。
 
-最新整包候选在外部 `universal-runtime/delivery-mcp-1150-{windows,linux,darwin}/`（amd64），同一组生成 `delivery-npm-1150/` 和 `delivery-container-1150/`，未发布。1115同一安装/引导实现的Windows平台包与launcher已实际npm pack→离线安装，再经装入的launcher完成install/repair/第二宿主/uninstall；整版release复用、原ID和无关配置保留。实际最新Windows候选的OpenCode TUI安装、MCP、菜单→履历→原聊天、草稿与ID保持、关闭宿主服务继续及最终退出通过（opencode-tui-fixture-tILEv9）。DSH契约适配→Go完成4条事实/选中原件及重放去重/会话隔离，非完整DSH宿主。
+Windows和Linux amd64已有上述实际运行结果；macOS及ARM仅交叉构建，Linux/macOS真实桌面通知、macOS helper编译/签名/公证尚无实机结果。指定Linux主机普通用户无法访问Docker socket；已提出仅用sudo创建和清理临时容器的核对，未获答复前不运行容器或修改权限。六包与容器构建上下文不代替这些实机结果。容器基础镜像正式发行前仍需固定摘要。
 
-MCP结果再次收束：Worker/A2A和普通panel统一单条JSON Content，与原StructuredContent使用同一模型投影；精确后续引用可被只消费Content的宿主模型取得，组件私文仍只在原Meta。移除因此失去消费者的Go人类摘要副本及JS旧result包装，界面保留实际JS renderer。3项定向Go检查通过；factory夹具首次缺少源目录内UI产物，现可直接复用已生成候选UI，不为验收重复构建/复制源码。实际OpenCode＋现有Gemini单次提问完成panel→取得viewId→refresh同一视图，两次工具均成功；首轮继承HTTP代理时API socket关闭、未进入工具的失败保留，沿已成功隔离TUI的最小环境再次执行后通过，没有增加重试/超时或修改产品引擎。
-
-真实宿主进一步接通：Codex CLI 0.152.1 app-server和Claude Code 2.1.309各实际发现当前配置的390个服务工具（不等于配置之外的可选Worker/A2A工具），无模型调用。Hermes固定上游官方PluginManager、MCP discovery及registry真实调度本机status通过（36工具）；DSH固定源MCP插件＋官方Cordis/Tools/Executor也发现36工具并真实调用status，未创建模型会话；其首次清理因夹具Windows路径斜杠比较失败，已明确停止该隔离服务、修正夹具，原失败保留，不伪称应用失败。Hermes工具环境为Python3.12，部分系统site-packages；DSH其余官方npm依赖版本匹配但不声称字节对应固定commit。
-
-Codex 0.152.1已使用现有账户的实际可用默认模型完成status→工作列表→原工作读取三次真实MCP调用，取得本机夹具资料。用户全局配置的gpt-6.1-sol被该ChatGPT账户明确拒绝；仅本次探针改用官方model/list返回的默认gpt-5.6-sol，没有修改用户配置或团队模型。另发现正式安装写入Codex hook文件后，宿主默认仍为untrusted，正在接入官方逐项采用和自有条目卸载，不把文件存在算成自动录制可用。Claude沿现有登录/模型通路实测在首次工具前收到502 Upstream access forbidden，工具未运行，隔离服务已退出；原失败保留，不能据此归因于Go MCP，也不通过增加重试或修改用户模型规避。
-
-当前Codex实际安装已取得三项官方trusted；repair暴露宿主配置写接口把无关表写入旧注释区间的问题，已将repair/uninstall/recovery收束为同一份MCP表识别，定向回归通过；首次检查发现的多余import已移除，原失败保留。修复后实际安装全程待下一次集中构建补查，未把该阶段报告完成。真实exec即使预先查得三项trusted，仍未取得hook回执或新会话事实，不能把工具成功算成默认录制通过；空回执也不足以判断外壳是否启动，该宿主路径仍在定位，未改成扫描历史来掩盖缺口。
-
-剩余工作集中在对应宿主的完整模型/GUI及适用平台实机验收和正式发行：上述官方MCP调用与DB原件结果不代替完整Hermes/DSH模型会话。Linux/macOS桌面、容器实际运行和签名公证尚未验收；本轮不擅自上架发布。已确认不建设自动向原聊天投递的额外机制，不再把它列作待决。原始身份、私有资料和正式宿主配置不重建；证据、原失败及候选均在项目外 `D:/ChatGPT/work/galaxy-native-hosts-20261103/`。
-
-本轮成果仅在独立本地分支；尚未上传、正式发行或部署，未改变生产数据库、认证、模型及真实宿主配置。下方既有工作结果不代表本轮所有范围完成。
-
-## 2026-11-03：真实客户端创建ID、官网账户绑定与首次Agent调用（完成）
-
-按用户最新要求，前一测试ID及对应本机目录已删除，保留刚通过官网注册和自建Mailu验证码验证的在线账户。重新从Go Native MCP初始化入口，经独立无头浏览器确认创建新ID，正常登记首个控制设备并连接真实服务；随后沿原OIDC、签名预览与本机确认完成账户关联。官网账户“本机银河”及Native关联查询均显示同一新ID；没有手工写入选择、绑定或服务器业务表。测试凭据保存在仓库外受保护记录，源码与报告不含密码或模型密钥。
-
-修复首次连接缺失：复用设备接续的签名挑战、原提交与回执查询，初始选择仅在明确连接后建立；状态读取不登记设备。身份恢复与首次连接共用控制操作执行器。修正独立客户端/服务端时钟在期限上界的误拒绝，权限和服务实际过期检查保留。初始化与账户确认正文改为可读信息，完整操作保留于诊断下载。
-
-实际OpenCode 1.18.31＋现有后台Gemini接口已执行本机状态、社区分类与帖子查询。暴露并修复MCP联合schema在宿主转为Gemini函数声明时丢失参数的问题：发布描述补顶层字段，原服务端联合校验保持；同时明确账户query与登录status的不同用途。完整364工具目录的首次调用遇到连接关闭，当前实际联调限定为本次所需5项读取工具，不宣称全目录兼容。早期账户空参/错用status及模型误判关联状态的失败保留。最终原会话3轮模型步骤、4次实际读取（本机状态、账户query、社区两次分页）全部成功并给出正确汇总；另一次同会话接续只复述已读结果，无新增工具。OpenCode JSON事件输出遗漏部分并行工具消息，最终以同一宿主持久化part记录核实，不能将stdout缺失当成模型未执行。
-
-必要检查：首次新设备连接、丢失提交回执后重启原操作接续、原恢复/设备接续/账户签名/连接撤回/初始化6项通过；schema投影语义与MCP初始化两项通过。最新Windows候选`onboarding-delivery/release/galaxy-native-go-0.1.0.tgz`位于外部工作目录，SHA256 `14fca7977bf1ae1b738debacc5a542017eeaeb666a2ce700d8cd688813b0e832`，未正式签名、上传、合入主线或部署。其余宿主与多平台发行范围沿首批说明，未扩为服务器业务改造。
-
-## 2026-11-03：本机客户端与宿主插件独立工作线（首批本地完成，未合入／发布）
-
-按用户要求补齐根AGENTS核心开发原则：任务完成、防失真、机制修复、通用性、复用与简洁、实际体验和真实交付范围；保留已有阶段性集中检查要求。开发说明只引用同一规则入口，不新增规则副本或业务参数。仅本分支文档更新，尚未合入主线。
-
-本工作区为 `05-build/worktrees/native-hosts`，短期分支 `work/native-hosts-20261103`，从已提交基线 `800145ef44b85961e3b3c5a80f5f01b983f5e5b5` 建立。主线已有未提交的工作台／AgentOS改动保留在原工作区，不复制或修改。
-
-本线负责本机客户端、通用宿主接入、交互、安装和发行；复用 `go/cmd/galaxy`、`go/internal/native`、现有本机资料层、MCP、OpenCode薄适配和compact-app，不另建服务器业务实现。已读取现行规则、产品客户端、Native工程、CLI、宿主配置／安装、OpenCode进程桥接及候选发行源码。用户已授权推进，以下首批仅在独立工作区与隔离宿主完成，没有安装用户宿主或发布正式产物。
-
-已核实源码具有服务Native、无服务Integration、私有宿主持久通道、九种宿主配置输出及候选构建／打包入口。OpenCode有专用TUI、MCP及履历／原件桥接；其余宿主配置输出不能视为具备同等事件采集和界面能力。host-capabilities中的2026-09-13旧运行时观察不证明当前Go候选已通过；构建清单与发行报告仍明确hostAcceptance pending、publicationReady false。
-
-首批实现：共享子进程故障不再永久毒化宿主；原调用失败不重发，后续新请求可重新连接，MCP重新发现并把本人选择绑定原进程。去掉固定16轮选择限制，按完成／取消／关闭结束。接通`setup --local-only`和九宿主本机配置，OpenCode沿同一资料目录运行；服务版OpenCode配置从公开配置取得端点和目录。所有宿主setup保存独立包，不依赖原解包目录。构建依赖允许正常解析，可显式`--offline`，安装仍使用包内依赖。OpenCode诊断改用其公开SDK日志，不再向TUI终端写JSON。原CLI发现脚本已从旧galaxy.js接到当前Go候选。
-
-必要检查：受影响Go安装／配置用例通过；新增子进程故障与24次本人选择两项通过，随后受影响的真实Go桥接、首次菜单、迟到读取及日志／发现投影19项通过；候选归档的临时签名与篡改检查通过。实际Windows CLI已生成九宿主本机配置及服务版OpenCode同目录配置。Codex 0.166.0-alpha.5.1与Claude Code 2.1.309在隔离配置实际发现当前Go本机36个工具，Codex发现Galaxy Skill；无模型调用、无用户配置修改，临时CLI资料已清理。该CLI发现先于仅涉及日志的后续修改，不重复作为新包全项验收。
-
-真实OpenCode 1.18.31独立虚拟终端通过当前最终候选的本机安装→插件加载→打开本机履历→返回→未发送输入保留→插件停用清理，身份不变、进程正常退出。首个探针因等待条件过早失败；第二个探针遗漏渲染等待，失败保留；实际暴露的终端日志污染已修复。最终探针等待真实渲染后通过，不冒称物理桌面或模型整理已验收。证据及Windows amd64候选在`D:/ChatGPT/work/galaxy-native-hosts-20261103/`，最终包`delivery-candidate/release/galaxy-native-go-0.1.0.tgz`，SHA256 `6e1f8ccbf3e31cab940360b5a2e6ecb4259f6b6cb0b158378e674130f382570f`；未上传、正式签名或安装到用户环境。
-
-仍待推进：其他宿主的真实使用与接续、安装升级／卸载体验、网页受控设备接续、宿主实际模型整理，以及正式多平台发行。现有Go归档命名未区分目标平台，跨平台发布前需补齐；平台通知、macOS helper签名公证仍需对应机器结果。不能把配置输出、旧运行时观察或本批Windows路径扩大为全宿主／平台完成。
+早期本机身份、schema、录制、代理socket、模型和探针失败均保留于仓库外；最新实际宿主证据位于同一外部工作目录的 `universal-runtime/`，Linux证据位于 `remote211/`。原旧包不冒充最新候选。旧Node连接、导出、删除、公网传输、自定义JS A2A、旧安装脚本、自动摘要循环及废弃测试已归档至整个项目外的 `withdrawn-node-business/`、`withdrawn-node-installation/`、`withdrawn-client-orchestration-20261103/`，不参与源码、构建或安装。保留JS只承担真实宿主/浏览器界面、npm引导、参考Worker第三方SDK及现用日志。
 
 ## 2026-11-03：工作台三岗位持续交办实测（进行中）
 
