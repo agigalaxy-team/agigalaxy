@@ -27,7 +27,7 @@
 **交付与未覆盖范围：**
 项目外 `D:/ChatGPT/work/galaxy-native-hosts-20261103/universal-runtime/delivery-ready-{windows,linux,darwin}-{amd64,arm64}/` 为六目标0.1.0候选；同源npm目录 `delivery-ready-npm/` 含六平台可选包，容器材料在 `delivery-ready-container-amd64/`。包内许可归集17组件；静态host-capabilities只说明源码接入形状，不重复维护实际验收状态。候选源码完整性与现有打包工具检查通过，未正式签名、公证或上架。
 
-Windows和Linux amd64已有上述实际运行结果；macOS及ARM仅交叉构建，Linux/macOS真实桌面通知、macOS helper编译/签名/公证尚无实机结果。指定Linux主机普通用户无法访问Docker socket；已提出仅用sudo创建和清理临时容器的核对，未获答复前不运行容器或修改权限。六包与容器构建上下文不代替这些实机结果。容器基础镜像正式发行前仍需固定摘要。
+Windows和Linux amd64已有上述实际运行结果；macOS及ARM仅交叉构建，Linux/macOS真实桌面通知、macOS helper编译/签名/公证尚无实机结果。指定Linux主机普通用户无法访问Docker socket；已提出仅用sudo创建和清理临时容器的核对，未获答复前不运行容器或修改权限。六包与容器构建上下文不代替这些实机结果。容器准备器现支持显式基础镜像参数并返回实际引用及固定摘要状态；一次真实候选上下文准备通过。Docker官方Registry在本地及指定Linux主机读取均超时，尚未取得可核实的镜像摘要，正式发行前仍需固定；没有编造摘要或因此重构建客户端。
 
 早期本机身份、schema、录制、代理socket、模型和探针失败均保留于仓库外；最新实际宿主证据位于同一外部工作目录的 `universal-runtime/`，Linux证据位于 `remote211/`。原旧包不冒充最新候选。旧Node连接、导出、删除、公网传输、自定义JS A2A、旧安装脚本、自动摘要循环及废弃测试已归档至整个项目外的 `withdrawn-node-business/`、`withdrawn-node-installation/`、`withdrawn-client-orchestration-20261103/`，不参与源码、构建或安装。保留JS只承担真实宿主/浏览器界面、npm引导、参考Worker第三方SDK及现用日志。
 
