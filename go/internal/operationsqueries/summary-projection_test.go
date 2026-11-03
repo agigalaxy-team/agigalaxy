@@ -9,6 +9,19 @@ import (
 	"testing"
 )
 
+func TestCollectionEvidenceDoesNotClaimCompleteCoverage(t *testing.T) {
+	args := arguments{module: "maintenance", view: "logs", filters: Object{}}
+	value := Object{"items": []any{Object{"event": "worker-started"}}, "availability": Object{"state": "partial"}}
+	result, err := typedList(args, value, func(x Object) Object { return x }, nil)
+	if err != nil || !result.collectionEvidence || result.pagination["complete"] != false {
+		t.Fatalf("collection source and coverage must be independent: %#v, %v", result, err)
+	}
+	controlled, err := typedList(args, value, func(x Object) Object { return x }, fixedKind("feedback"))
+	if err != nil || controlled.collectionEvidence {
+		t.Fatalf("business objects must keep individual references: %#v, %v", controlled, err)
+	}
+}
+
 func TestOriginalFiveDomainSummaryProjectionDoesNotCarrySourceProse(t *testing.T) {
 	at := "2033-05-18T03:33:20.000Z"
 	id := "00000000-0000-4000-8000-000000000001"

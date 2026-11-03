@@ -18,6 +18,7 @@ func querySourceProof(result Object) Object {
 	}
 	selected := make([]any, 0, len(refs))
 	sourceIDs := map[string]bool{}
+	collection := result["evidenceScope"] == "collection"
 	for _, value := range refs {
 		source := obj(value)
 		read := obj(source["read"])
@@ -27,6 +28,9 @@ func querySourceProof(result Object) Object {
 		}
 		controlled, valid := source["controlledSource"].(bool)
 		if !valid || controlled && source["version"] == nil {
+			return proof
+		}
+		if collection && controlled {
 			return proof
 		}
 		ref := Object{}
@@ -46,9 +50,10 @@ func querySourceProof(result Object) Object {
 			return proof
 		}
 	}
-	// A route snapshot does not prove which objects from a returned page were
-	// delivered. If page rows lack their own exact references, fail closed.
-	if items, exists := obj(result["data"])["items"]; exists {
+	// Business objects retain individual references. Authorized operational
+	// collections (for example logs) are read as a collection, including partial
+	// pages; source coverage remains separate from access to returned material.
+	if items, exists := obj(result["data"])["items"]; exists && !collection {
 		rows, ok := items.([]any)
 		if !ok {
 			return proof
