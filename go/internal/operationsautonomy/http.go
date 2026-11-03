@@ -124,6 +124,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			out, e = s.Settings(r.Context(), actor)
 		}
+	case path == root+"/summary" && !write && r.URL.RawQuery == "":
+		out, e = s.WorkbenchSummary(r.Context(), actor)
 	case path == root+"/overview" && !write:
 		q, err := queryValues(r.URL.RawQuery)
 		days := 7

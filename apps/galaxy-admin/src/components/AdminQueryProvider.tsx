@@ -39,9 +39,8 @@ function IdentityQueries({children,scope}:{children:ReactNode;scope:{endpoint:st
  useEffect(()=>{
   if(!scope.identity||!scope.endpoint)return;
   const stopActivity=observeUserActivity();
-  const refreshSummary=()=>void client.invalidateQueries({queryKey:galaxyQueryKey(scope,'summary'),refetchType:'active'});
-  const reset=(modules:string[])=>window.dispatchEvent(new CustomEvent('galaxy:admin-reset',{detail:modules.includes('autonomy')?[...modules,'summary']:modules}));
-  const stream=createGalaxyEventClient({scope,queryClient:client,url:'/v1/operations/web-events',onReset:reset,onChange:event=>{agentOSChange(event);if(event.module==='autonomy')refreshSummary();},onResync:modules=>{if(modules.includes('autonomy'))refreshSummary();if(modules.includes('agentos'))window.dispatchEvent(new CustomEvent<AdminAgentOSResync>('galaxy:admin-agentos-resync',{detail:{reason:'replay-gap'}}));},initialCursor:cursor.current});stream.start();
+  const reset=(modules:string[])=>window.dispatchEvent(new CustomEvent('galaxy:admin-reset',{detail:modules}));
+  const stream=createGalaxyEventClient({scope,queryClient:client,url:'/v1/operations/web-events',onReset:reset,onChange:agentOSChange,onResync:modules=>{if(modules.includes('agentos'))window.dispatchEvent(new CustomEvent<AdminAgentOSResync>('galaxy:admin-agentos-resync',{detail:{reason:'replay-gap'}}));},initialCursor:cursor.current});stream.start();
   let csrf='',expiresAt=0,lastUsed=0,active=true;const controller=new AbortController();
   const check=async()=>{
    const version=userActivityVersion();if(csrf&&(version<=lastUsed||Date.now()-version>60000))return;

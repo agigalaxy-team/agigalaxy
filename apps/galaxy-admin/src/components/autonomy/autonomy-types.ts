@@ -35,3 +35,5 @@ export type AutonomyRuntimeSettings={revision:number;concurrency:number;healthSe
 export type AutonomyRuntimeRead=AutonomyLease&{settings:AutonomyRuntimeSettings;limits:{concurrencyMaximum:number}};
 export type AutonomyRuntimeSave=AutonomyLease&{operationId:string;settings:AutonomyRuntimeSettings;replayed:boolean};
 export type AutonomyOperation=AutonomyLease&({state:'not-recorded';operationId:string}|{state:'recorded';operationId:string;kind:string;result:AutonomyConfigSave|AutonomyControlSave|AutonomyEnableSave|AutonomyRuntimeSave});
+
+export type AutonomySummaryRead=Pick<AutonomyOverview,"checkedAt"|"readExpiresAt"|"accounts"|"summary"|"timeline"|"recentTasks"|"humanTasks"|"basis">;
