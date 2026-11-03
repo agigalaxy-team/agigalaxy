@@ -176,7 +176,7 @@ Codex 和 Claude 的事实 hook 使用 Node；程序可从 PATH 发现，或用 
 
 ## 宿主配置与能力
 
-生成器的配置形状不是跨宿主验收结论。运行前按包内 `HOSTS.md`、`host-capabilities.json` 和实际 `tools/list` 确认可用能力。
+包内 `HOSTS.md` 和 `host-capabilities.json` 说明接入形状与源码适配范围；当前工具目录以实际 `tools/list` 为准。真实宿主验收集中记录在 `WORK_STATUS.md` 及其外部证据，不在静态配置清单维护重复的运行或发布状态。
 
 当前受管安装使用下列用户级入口；`host-configs`生成的项目片段只是可选手动配置材料，不作为用户级安装结果。
 
