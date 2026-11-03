@@ -37,6 +37,7 @@ type definition struct {
 	Annotations *mcp.ToolAnnotations `json:"annotations"`
 	Scope       any                  `json:"scope"`
 	resolved    *jsonschema.Resolved
+	advertised  map[string]any
 	consume     Consumer
 }
 type Handler struct {
@@ -91,10 +92,32 @@ func NewHandler(services Services, authority *deviceauth.OAuthResourceAccess, ve
 			return nil, e
 		}
 		d.resolved = resolved
+		d.advertised, e = advertisedSchema(d.InputSchema)
+		if e != nil {
+			return nil, e
+		}
 		d.consume = consumer
 		h.tools = append(h.tools, d)
 	}
 	return h, nil
+}
+
+func advertisedSchema(raw json.RawMessage) (map[string]any, error) {
+	var schema map[string]any
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		return nil, err
+	}
+	if schema == nil {
+		return nil, configurationError()
+	}
+	if schema["type"] == nil && (schema["oneOf"] != nil || schema["anyOf"] != nil) {
+		schema["type"] = "object"
+	}
+	if schema["type"] != "object" {
+		return nil, configurationError()
+	}
+	mcpschema.Project(schema)
+	return schema, nil
 }
 func (h *Handler) Metadata() Object {
 	raw, _ := json.Marshal(h.metadata)
@@ -171,10 +194,7 @@ func mergeDefaults(actual, defaults Object) {
 func (h *Handler) server(authentication deviceauth.OAuthAuthentication, requestID *string) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "galaxy-personal", Version: "0.1.0"}, nil)
 	for _, d := range h.tools {
-		var schema map[string]any
-		_ = json.Unmarshal(d.InputSchema, &schema)
-		mcpschema.Project(schema)
-		s.AddTool(&mcp.Tool{Name: d.Name, Description: d.Description, InputSchema: schema, Annotations: d.Annotations}, func(ctx context.Context, r *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		s.AddTool(&mcp.Tool{Name: d.Name, Description: d.Description, InputSchema: d.advertised, Annotations: d.Annotations}, func(ctx context.Context, r *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			input, e := parseArguments(d, r.Params.Arguments)
 			if e != nil {
 				return result("Invalid tool arguments: "+e.Error(), true), nil

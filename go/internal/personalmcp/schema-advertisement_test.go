@@ -20,7 +20,11 @@ func TestPersonalToolAdvertisementKeepsOriginalValidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := definition{Name: "fixture", InputSchema: raw, resolved: resolved}
+	projectedSchema, err := advertisedSchema(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := definition{Name: "fixture", InputSchema: raw, resolved: resolved, advertised: projectedSchema}
 	h := &Handler{tools: []definition{d}}
 	server := h.server(deviceauth.OAuthAuthentication{}, nil)
 	ct, st := mcp.NewInMemoryTransports()
@@ -79,4 +83,20 @@ func TestPersonalToolAdvertisementKeepsOriginalValidation(t *testing.T) {
 			t.Fatalf("original validator accepted %s", value)
 		}
 	}
+}
+
+func TestPersonalCatalogRegistersWithSDK(t *testing.T) {
+	var catalog []definition
+	if err := json.Unmarshal(catalogJSON, &catalog); err != nil {
+		t.Fatal(err)
+	}
+	for i := range catalog {
+		schema, err := advertisedSchema(catalog[i].InputSchema)
+		if err != nil {
+			t.Fatalf("%s: %v", catalog[i].Name, err)
+		}
+		catalog[i].advertised = schema
+	}
+	h := &Handler{tools: catalog}
+	h.server(deviceauth.OAuthAuthentication{}, nil)
 }
