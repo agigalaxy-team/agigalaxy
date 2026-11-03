@@ -12,10 +12,17 @@ import (
 // Dispatch is a user-owned work request, independent of a position's routine
 // configuration. Goals are data, not system prompts or new authority.
 func parseDispatch(input Object) (Object, error) {
-	if !closed(input, []string{"kind", "targetDomain", "title", "goal", "trigger", "startNow"}, []string{"mode", "actions", "grantIds", "resourceIds", "strategyIds"}) || input["kind"] != "task-dispatch" || !has(domains, str(input["targetDomain"])) {
+	if !closed(input, []string{"kind", "targetDomain", "title", "goal", "trigger", "startNow"}, []string{"executionGoal", "mode", "actions", "grantIds", "resourceIds", "strategyIds"}) || input["kind"] != "task-dispatch" || !has(domains, str(input["targetDomain"])) {
 		return nil, invalid()
 	}
 	x := obj(clone(input))
+	if work, exists := x["executionGoal"]; exists {
+		v, ok := text(work, 1, 4000, true)
+		if !ok {
+			return nil, invalid()
+		}
+		x["executionGoal"] = v
+	}
 	for k, b := range map[string][2]int{"title": {1, 160}, "goal": {1, 4000}} {
 		v, ok := text(x[k], b[0], b[1], true)
 		if !ok {
@@ -89,6 +96,10 @@ func parseDispatch(input Object) (Object, error) {
 func dispatchConfiguration(base, x Object) Object {
 	cfg := obj(clone(obj(base["configuration"])))
 	cfg["goal"], cfg["mode"], cfg["purpose"] = x["goal"], x["mode"], "operations-"+str(x["targetDomain"])
+	delete(cfg, "executionGoal")
+	if x["executionGoal"] != nil {
+		cfg["executionGoal"] = x["executionGoal"]
+	}
 	// A new request never inherits unrelated actions or grants from routine duty.
 	cfg["plan"] = Object{"strategyIds": x["strategyIds"], "actions": x["actions"], "grantIds": x["grantIds"], "resourceIds": x["resourceIds"], "eventTypes": []any{}}
 	schedule := Object{"kind": "interval", "minutes": 1, "timezone": "Asia/Shanghai"}
@@ -105,11 +116,10 @@ func (s *Service) dispatchOwner(ctx context.Context, tx pgx.Tx, a Actor, source,
 	if s.Permissions == nil {
 		return Actor{}, fail("operations_autonomy_unavailable")
 	}
-	human, e := s.Permissions.TaskOwnerWithin(ctx, tx, a, source)
-	if e != nil {
-		return Actor{}, e
-	}
-	return s.actor(ctx, tx, human, "ai.use."+target, nil)
+	// Private model calls carry the permission service's stored-human proof;
+	// web confirmations carry the access gateway's cookie proof. Their issuing
+	// permission service verifies both; neither is reinterpreted as the other.
+	return s.Permissions.TaskOwnerWithin(ctx, tx, a, source, target)
 }
 
 func (s *Service) PrepareDispatch(ctx context.Context, a Actor, source string, input Object, operationID string) (Object, error) {
@@ -155,7 +165,11 @@ func (s *Service) PrepareDispatch(ctx context.Context, a Actor, source string, i
 		case "event":
 			frequency = "相关事件发生时"
 		}
-		return Object{"schemaVersion": 1, "kind": "task-dispatch", "domain": source, "request": x, "command": command, "requiredAction": "autonomy.control", "target": Object{"kind": "ai-work-account", "id": role.AccountID, "label": label}, "title": x["title"], "impact": []any{"交办岗位：" + label, "执行安排：" + frequency, "工作目标：" + str(x["goal"]), "首次执行：" + map[bool]string{true: "确认后开始", false: "等待触发"}[x["startNow"] == true]}, "basis": []any{"目标岗位现有角色与已选择的正式授权"}, "checkedAt": s.now().Unix(), "readExpiresAt": s.now().Unix() + 30, "decisionSource": "human-required"}, nil
+		out := Object{"schemaVersion": 1, "kind": "task-dispatch", "domain": source, "request": x, "command": command, "requiredAction": "autonomy.control", "target": Object{"kind": "ai-work-account", "id": role.AccountID, "label": label}, "title": x["title"], "impact": []any{"交办岗位：" + label, "执行安排：" + frequency, "工作目标：" + str(x["goal"]), "首次执行：" + map[bool]string{true: "确认后开始", false: "等待触发"}[x["startNow"] == true]}, "basis": []any{"目标岗位现有角色与已选择的正式授权"}, "checkedAt": s.now().Unix(), "readExpiresAt": s.now().Unix() + 30, "decisionSource": "human-required"}
+		if work := str(x["executionGoal"]); work != "" {
+			out["impact"] = append(list(out["impact"]), "每次执行："+work)
+		}
+		return out, nil
 	})
 }
 
@@ -171,12 +185,18 @@ func (s *Service) ConfirmDispatch(ctx context.Context, a Actor, source string, p
 		return nil, invalid()
 	}
 	runtime := s.runtime(ctx)
-	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
-		actor, e := s.actor(ctx, tx, a, "autonomy.control", authorize)
-		if e != nil {
-			return nil, e
+	if authorize != nil {
+		fresh, err := authorize(ctx)
+		if err != nil {
+			return nil, err
 		}
-		actor, e = s.dispatchOwner(ctx, tx, actor, source, str(x["targetDomain"]))
+		if fresh.ID != a.ID || fresh.Endpoint != s.Endpoint || fresh.AIProof != nil {
+			return nil, fault.New("business_admin_denied", 403)
+		}
+		a = fresh
+	}
+	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
+		actor, e := s.dispatchOwner(ctx, tx, a, source, str(x["targetDomain"]))
 		if e != nil {
 			return nil, e
 		}
@@ -229,6 +249,10 @@ func (s *Service) ConfirmDispatch(ctx context.Context, a Actor, source string, p
 			}
 		}
 		result := Object{"operationId": operationID, "state": "completed", "summary": "任务已交办，已进入服务端调度。", "receipt": Object{"dispatchId": operationID, "taskId": task["id"], "scheduled": true}, "effectExecuted": true, "dispatchId": operationID, "dispatch": Object{"id": operationID, "revision": 1}, "targetDomain": x["targetDomain"], "enabled": true, "taskId": task["id"]}
+		result["references"] = []any{Object{"kind": "task-assignment", "id": operationID}}
+		if task["id"] != nil {
+			result["references"] = append(result["references"].([]any), Object{"kind": "autonomy-task", "id": task["id"]})
+		}
 		if x["startNow"] != true {
 			result["summary"] = "任务已交办，等待计划触发。"
 		}
@@ -270,7 +294,7 @@ func (s *Service) ReadDispatch(ctx context.Context, a Actor, source string, args
 		if d == nil {
 			return nil, fail("operations_autonomy_task_not_found")
 		}
-		if _, e = s.actor(ctx, tx, owner, "ai.use."+str(d["domain"]), nil); e != nil {
+		if _, e = s.dispatchOwner(ctx, tx, owner, source, str(d["domain"])); e != nil {
 			return nil, e
 		}
 		// Task metadata is not a route to another position's business materials.

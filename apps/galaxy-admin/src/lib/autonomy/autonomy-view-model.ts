@@ -8,14 +8,14 @@ export const autonomyModes:Record<AutonomyMode,string>={code:'程序自动',ai:'
 export const autonomySources:Record<AutonomySource,string>={workbench:'工作台',routine:'例行值守',event:'业务事件',recovery:'恢复接续'};
 export const autonomyStates:Record<string,string>={pending:'等待处理',queued:'排队中',ready:'就绪',running:'处理中','waiting-human':'等待人工','awaiting-human':'等待人工',paused:'已暂停',stopped:'已停止',cancelled:'已停止',completed:'处理结束',failed:'运行失败',unknown:'结果待核对','no-action':'维持现状',blocked:'处理受阻',reconciling:'核对原结果'};
 export const autonomyBusinessStates:Record<string,string>={completed:'已取得业务结果',applied:'已生效',confirmed:'已确认',changed:'已更新',unchanged:'维持现状','no-action':'维持现状',pending:'尚未办理','not-started':'尚未办理','waiting-human':'等待人工','awaiting-human':'等待人工',failed:'办理失败',unknown:'结果待核对',none:'无业务动作','not-applicable':'无业务动作',recorded:'已记录',accepted:'已受理'};
-export const autonomyModelStates:Record<string,string>={dispatching:'正在发起模型',accepted:'模型已受理',pending:'等待模型',queued:'等待模型',running:'模型运行中',completed:'模型已答复',failed:'模型调用失败',unknown:'模型结果未确认','not-required':'无需模型','not-started':'尚未调用','not-configured':'模型未配置',unavailable:'模型暂不可用',PENDING:'等待模型',RUNNING:'模型运行中',COMPLETED:'模型已答复',ERROR:'模型调用失败',PAUSED:'模型已暂停',CANCELLED:'模型已停止'};
+export const autonomyModelStates:Record<string,string>={dispatching:'正在发起模型',accepted:'模型已受理',pending:'等待模型',queued:'等待模型',running:'模型运行中',completed:'模型已答复',failed:'模型运行中断',unknown:'模型结果未确认','not-required':'无需模型','not-started':'尚未调用','not-configured':'模型未配置',unavailable:'模型暂不可用',PENDING:'等待模型',RUNNING:'模型运行中',COMPLETED:'模型已答复',ERROR:'模型运行中断',PAUSED:'模型已暂停',CANCELLED:'模型已停止'};
 export const autonomyHealthNames:Record<string,string>={healthy:'正常值守',ready:'已就绪',disabled:'待启用',pending:'待启用','not-enabled':'待启用',running:'正在值守',late:'巡检逾期',overdue:'巡检逾期',attention:'需要处理',degraded:'需要处理',blocked:'未就绪',unavailable:'暂不可用',unknown:'健康未确认'};
 export const autonomyResultNames:Record<string,string>={completed:'完成',applied:'完成',unchanged:'维持现状','no-action':'维持现状','waiting-human':'等待人工','awaiting-human':'等待人工',failed:'失败',unknown:'结果未知',pending:'尚未完成'};
 export function autonomyNumber(value:number|null|undefined){return typeof value==='number'&&Number.isFinite(value)&&value>=0?value.toLocaleString('zh-CN'):'—';}
 export function autonomyPercent(value:number|null|undefined){return typeof value==='number'&&Number.isFinite(value)&&value>=0?new Intl.NumberFormat('zh-CN',{style:'percent',maximumFractionDigits:1}).format(value>1?value/100:value):'无样本';}
 export function autonomyDate(value:string|null|undefined,short=false){return value&&Number.isFinite(Date.parse(value))?short?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value)):shanghaiMinute(new Date(value)):'未记录';}
 export function autonomySchedule(config:Pick<AutonomyConfig,'schedule'>){return config.schedule.kind==='daily'?config.schedule.at?'每日 '+config.schedule.at:'每日 · 时刻待选':'每 '+config.schedule.minutes+' 分钟';}
-export function autonomyAccountState(account:AutonomyAccount){return !account.config.enabled?'待启用':autonomyHealthNames[account.health]??'健康未确认';}
+export function autonomyAccountState(account:AutonomyAccount){return !account.enabled?'待启用':autonomyHealthNames[account.health]??'健康未确认';}
 export function autonomyTaskHref(task:Pick<AutonomyTask,'id'>|string){return '/admin/operations/ai-runs?task='+encodeURIComponent(typeof task==='string'?task:task.id);}
 export function autonomyAccountHref(domain:AutonomyDomain,tab='overview'){return '/admin/operations/ai-work-accounts?'+new URLSearchParams({domain,tab});}
 export function autonomyTaskTitle(task:AutonomyTask){return task.title?.trim()||autonomyDomains[task.domain]+' · '+autonomySources[task.source];}
@@ -35,3 +35,13 @@ export function autonomyConfigMerge(draft:AutonomyDutyDraft,current:AutonomyConf
  return {configuration,conflicts,ready:conflicts.every(row=>!!choices[row.key])};
 }
 export const autonomyErrors:Record<string,string>={operations_autonomy_version_changed:'设置已有更新，你的修改已保留。',operations_autonomy_revision_changed:'设置已有更新，你的修改已保留。',operations_autonomy_not_ready:'所选岗位尚未就绪，请补齐列出的条件。',operations_autonomy_schedule_required:'请先为运维选择每日巡检时刻。',operations_autonomy_daily_time_required:'请先为运维选择每日巡检时刻。',operations_autonomy_task_changed:'任务已有变化，已读取当前状态。',operations_autonomy_task_control_denied:'当前任务不能执行这个操作。',operations_permission_denied:'当前权限不允许这项操作。',invalid_operations_autonomy_request:'请检查填写内容后再保存。'};
+
+export function autonomyFailureLabel(task:Pick<AutonomyTask,'state'|'failure'>){
+ if(task.state!=='failed')return null;
+ const failure=task.failure;
+ const labels:Record<string,string>={'rate-limit':'模型服务限流',timeout:failure?.stage==='execution'?'本轮执行超时':'模型请求超时',connection:'模型服务连接失败','context-limit':'模型上下文超出配置范围','service-unavailable':'模型服务返回异常','request-rejected':'模型请求被拒绝',unknown:'具体失败原因未记录'};
+ const label=labels[failure?.category??'unknown']??labels.unknown;
+ return label+(failure?.reportedStatus?' · HTTP '+failure.reportedStatus:'');
+}
+
+export function autonomyAccountPlan(account:AutonomyAccount){const n=account.dispatches?.filter(d=>d.active??d.enabled).length??0;return n?(account.config.enabled?`例行值守＋${n}项交办`:`${n}项交办运行中`):autonomySchedule(account.config);}

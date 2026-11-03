@@ -34,7 +34,7 @@ BOUNDARIES = [
     "模型、供应商、凭据、岗位提示词及管理人员权限由人工管理，AI只读取和使用岗位提示词。获准总控可在人工委派上限内维护其他AI专用角色，不可编辑共享角色、代码固定边界或给自己扩大上限。日常业务策略仍按对应能力办理。",
     "回答能否维护AI岗位、提示词或日常策略前，先用current_summary核对真实capability及当前计划，再用read_ai_delegation读取本任务获准委派和目标版本。无权、范围外和未接通分别说明，不能凭岗位名称或历史完全否认/承诺。普通日常策略只按当前已获准typed动作办理，不扩大授权或目标。",
     "可用assess_task记录任务进度和剩余工作；未知写结果只用reconcile_task_operations查询原号。",
-    "本次运行处理上下文invocation所指的当前触发；完成本次目标及必要动作后结束本轮。未来定时或事件触发由服务端调度，不在模型里等待下一次到期；本轮结束不表示取消整体交办。",
+    "assignment是长期意图；execution是当前执行目标；scheduler拥有未来触发。只评估execution是否完成，未来时间或事件交给调度，不把交办寿命当成本轮剩余工作。本轮结果不能声称整个长期交办已完成。",
     "保留原人工决定与任务方案。模型结束、工具受理和建议不能当作业务完成；只以原业务operation回执说明真实效果。未知结果仅查询原操作，不换编号重发或盲目重放。",
     "不自行批准具体文件清理、整站恢复、重要正式消息或改变已有人工处置。需要人工时保留原任务和具体原因，日常无变化不制造提醒。",
 ]
@@ -46,6 +46,7 @@ class DutyInput(BaseModel):
 
 
 class RemainingWork(BaseModel):
+    """Work that can be advanced in this execution, not a future activation."""
     model_config = ConfigDict(extra="forbid")
     kind: Literal["read", "action", "human"]
     description: str = Field(min_length=1, max_length=240)
@@ -61,7 +62,9 @@ class ReadResolution(BaseModel):
 
 class TaskAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    goalSatisfied: bool
+    scope: Literal["execution"] = "execution"
+    goalSatisfied: bool = Field(description="Whether the CURRENT execution objective is satisfied, never the lifetime of a recurring assignment.")
+    deferredWork: list[str] = Field(default_factory=list, description="Future scheduled/event-triggered work. Recorded separately; it does not keep this execution running.")
     remainingWork: list[RemainingWork] = Field(max_length=8)
     summary: str = Field(max_length=1000)
     readResolutions: list[ReadResolution] | None = Field(default=None, max_length=20, description="Optional recorded evidence coordinates; they are not a completion requirement.")
@@ -126,7 +129,12 @@ class _DutyReadGateway:
 
 def duty_tools(gateway, allowed, progress=None):
     def assess_task(run_context: RunContext, fc: FunctionCall, assessment: TaskAssessment) -> str:
-        """Assess the frozen goal; never treat an assessment as evidence of effects.
+        """Assess only execution.objective and current work, not assignment lifetime.
+
+        Put future activations in deferredWork. Only unfinished current steps go
+        in remainingWork. Summary describes this execution; scheduling and
+        elapsed assignment time come from the server, never from an assertion.
+        Never treat an assessment as evidence of effects.
 
         This optional progress update does not establish business effects.
         """
@@ -252,6 +260,8 @@ def duty_factory(*, settings, db, gateway, model_factory=None):
             selected = (with_current_authority(model_factory(), bound_gateway) if model_factory is not None
                 else domain_model(settings, task["domain"], bound_gateway))
             from .duty_completion import with_duty_completion
+            from .conversation_failures import with_model_failures
+            selected = with_model_failures(selected)
             selected = with_duty_completion(selected, bound_gateway, progress, round_seconds)
             selected = with_duty_pauses(selected, bound_gateway)
             selected._galaxy_usage_database = projected

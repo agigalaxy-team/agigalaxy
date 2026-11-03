@@ -99,6 +99,11 @@ func (s *Service) Overview(ctx context.Context, a Actor, days int) (Object, erro
 			}), "backlog": count(items, func(r Object) bool { return r["state"] == "queued" }), "waitingHuman": count(items, func(r Object) bool { return r["state"] == "waiting-human" })}
 		}
 		accounts := []Object{}
+		alive := health != nil && until.Sub(date(health["checked_at"])) <= time.Duration(s.defaultNumber("healthSeconds")+s.defaultNumber("startGraceSeconds"))*time.Second
+		dispatches, e := s.overviewDispatchesWithin(ctx, tx, actor, cfgs, rows, runtime, alive)
+		if e != nil {
+			return nil, e
+		}
 		names := map[string]string{"overview": "总控", "governance": "治理", "messaging": "消息", "discovery": "数据与发现", "maintenance": "运维"}
 		for _, cfg := range cfgs {
 			ready, e := s.readinessWithin(ctx, tx, cfg, runtime)
@@ -108,11 +113,6 @@ func (s *Service) Overview(ctx context.Context, a Actor, days int) (Object, erro
 			items := filter(rows, func(r Object) bool { return r["domain"] == cfg["domain"] && r["source"] != "workbench" })
 			m := measure(items)
 			withheldDomain := withheldDomains[str(cfg["domain"])]
-			if withheldDomain || len(current) == 1000 {
-				for k := range m {
-					m[k] = nil
-				}
-			}
 			alive := health != nil && until.Sub(date(health["checked_at"])) <= time.Duration(s.defaultNumber("healthSeconds")+s.defaultNumber("startGraceSeconds"))*time.Second
 			overdue := false
 			for _, r := range items {
@@ -151,6 +151,7 @@ func (s *Service) Overview(ctx context.Context, a Actor, days int) (Object, erro
 			for k, v := range m {
 				out[k] = v
 			}
+			mergeDispatchRuntime(out, dispatches[str(cfg["domain"])])
 			accounts = append(accounts, out)
 		}
 		ids := []string{}
@@ -175,7 +176,7 @@ func (s *Service) Overview(ctx context.Context, a Actor, days int) (Object, erro
 			return len(seen)
 		}
 		m := measure(automatic)
-		summary := Object{"enabledAccounts": count(accounts, func(r Object) bool { return r["enabled"] == true }), "healthyAccounts": count(accounts, func(r Object) bool { return r["health"] == "healthy" }), "active": count(rows, func(r Object) bool { return r["state"] == "running" }), "queued": count(rows, func(r Object) bool { return r["state"] == "queued" }), "waitingHuman": count(rows, func(r Object) bool { return r["state"] == "waiting-human" }), "failed": count(window, func(r Object) bool { return r["state"] == "failed" }), "unknown": count(rows, func(r Object) bool { return r["state"] == "unknown" || r["business_state"] == "unknown" }), "businessCompleted": uniqueCompleted(receipts, true), "allBusinessCompleted": uniqueCompleted(receipts, false), "onTimeRate": nil}
+		summary := Object{"enabledAccounts": count(accounts, func(r Object) bool { return r["enabled"] == true }), "healthyAccounts": count(accounts, func(r Object) bool { return has([]string{"healthy", "running"}, str(r["health"])) }), "active": count(rows, func(r Object) bool { return r["state"] == "running" }), "queued": count(rows, func(r Object) bool { return r["state"] == "queued" }), "waitingHuman": count(rows, func(r Object) bool { return r["state"] == "waiting-human" }), "failed": count(window, func(r Object) bool { return r["state"] == "failed" }), "unknown": count(rows, func(r Object) bool { return r["state"] == "unknown" || r["business_state"] == "unknown" }), "businessCompleted": uniqueCompleted(receipts, true), "allBusinessCompleted": uniqueCompleted(receipts, false), "onTimeRate": nil}
 		for k, v := range m {
 			summary[k] = v
 		}
@@ -274,27 +275,13 @@ func (s *Service) Overview(ctx context.Context, a Actor, days int) (Object, erro
 		if _, e = s.actor(ctx, tx, a, "autonomy.read", nil); e != nil {
 			return nil, e
 		}
-		if len(withheld) > 0 || len(current) == 1000 {
-			for k := range summary {
-				summary[k] = nil
-			}
-		}
-		if len(withheld) > 0 {
-			timeline = []Object{}
-		}
 		modes, results := []Object{}, []Object{}
 		for _, k := range []string{"code", "ai", "ai-human", "human-ai"} {
-			var n any
-			if len(withheld) == 0 {
-				n = count(automatic, func(r Object) bool { return r["mode"] == k })
-			}
+			n := count(automatic, func(r Object) bool { return r["mode"] == k })
 			modes = append(modes, Object{"key": k, "count": n})
 		}
 		for _, k := range []string{"not-started", "pending", "completed", "failed", "unknown", "no-action"} {
-			var n any
-			if len(withheld) == 0 {
-				n = count(automatic, func(r Object) bool { return r["business_state"] == k })
-			}
+			n := count(automatic, func(r Object) bool { return r["business_state"] == k })
 			results = append(results, Object{"key": k, "count": n})
 		}
 		recent, e := view(rows)
@@ -322,7 +309,7 @@ func (s *Service) Overview(ctx context.Context, a Actor, days int) (Object, erro
 		if len(withheld) > 0 {
 			unknownOut, trackedOut = nil, nil
 		}
-		return s.stamp(Object{"accounts": accounts, "summary": summary, "runtime": Object{"state": runtime["state"], "modelState": runtime["modelState"]}, "timeline": timeline, "modes": modes, "results": results, "usage": Object{"points": points, "totals": totals, "observedSubtotal": subtotal, "unknownTasks": unknownOut, "coverage": Object{"trackedTasks": trackedOut, "observedTasks": len(usageRows), "complete": unknownTasks == 0 && len(withheld) == 0 && len(current) < 1000, "history": "ledger-window-only"}}, "recentTasks": recent, "humanTasks": human, "exceptions": exceptions, "capabilities": Object{"canConfigure": has(actor.Permissions, "autonomy.configure"), "canEnable": has(actor.Permissions, "autonomy.configure"), "canControl": has(actor.Permissions, "autonomy.control")}, "basis": Object{"from": from.UTC().Format("2006-01-02T15:04:05.000Z"), "until": until.UTC().Format("2006-01-02T15:04:05.000Z"), "tasks": "persisted-intents-only", "expected": "persisted-routine-intents-in-created-window", "onTimeRate": "effective-routine-completed-within-frozen-due-grace-round-over-expected", "late": "persisted-routine-start-grace-exceeded-not-missed-schedule-slots", "recovery": "single-coalesced-catch-up-with-original-due-no-historical-slot-count", "businessCompleted": "automatic-task-with-actual-business-receipt-excluding-workbench-cards", "inspectionCompleted": "effective-tool-read-and-completed-round", "coverage": coverage, "availability": availability, "calls": "observed-native-metadata-only", "history": "not-backfilled"}}), nil
+		return s.stamp(Object{"accounts": accounts, "summary": summary, "runtime": Object{"state": runtime["state"], "modelState": runtime["modelState"]}, "timeline": timeline, "modes": modes, "results": results, "usage": Object{"points": points, "totals": totals, "observedSubtotal": subtotal, "unknownTasks": unknownOut, "coverage": Object{"trackedTasks": trackedOut, "observedTasks": len(usageRows), "complete": unknownTasks == 0 && len(withheld) == 0 && len(current) < 1000, "history": "ledger-window-only"}}, "recentTasks": recent, "humanTasks": human, "exceptions": exceptions, "capabilities": Object{"canConfigure": has(actor.Permissions, "autonomy.configure"), "canEnable": has(actor.Permissions, "autonomy.configure"), "canControl": has(actor.Permissions, "autonomy.control")}, "basis": Object{"from": from.UTC().Format("2006-01-02T15:04:05.000Z"), "until": until.UTC().Format("2006-01-02T15:04:05.000Z"), "tasks": "persisted-intents-only", "expected": "persisted-routine-intents-in-created-window", "onTimeRate": "effective-routine-completed-within-frozen-due-grace-round-over-expected", "late": "persisted-routine-start-grace-exceeded-not-missed-schedule-slots", "recovery": "single-coalesced-catch-up-with-original-due-no-historical-slot-count", "businessCompleted": "automatic-task-with-actual-business-receipt-excluding-workbench-cards", "inspectionCompleted": "effective-tool-read-and-completed-round", "coverage": coverage, "statisticsScope": "visible-tasks-in-window", "availability": availability, "calls": "observed-native-metadata-only", "history": "not-backfilled"}}), nil
 	})
 }
 func (s *Service) WorkbenchSummary(ctx context.Context, a Actor) (Object, error) {

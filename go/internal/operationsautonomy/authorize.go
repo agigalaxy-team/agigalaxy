@@ -107,14 +107,9 @@ func (s *Service) Authorize(ctx context.Context, input Object) (Object, error) {
 		}
 		task := Object{"completion": completion, "taskId": row["id"], "operationId": row["id"], "planId": row["config_id"], "planVersion": row["plan_version"], "promptVersion": row["prompt_version"], "delegationVersion": row["delegation_version"], "domain": row["domain"], "aiAccountId": row["ai_account_id"], "mode": row["mode"], "source": row["source"], "purpose": cfg["purpose"], "sessionId": row["session_id"], "roleVersion": roleVersion, "scopeVersion": row["plan_version"], "state": row["state"], "businessState": row["business_state"], "effectiveCheck": row["effective_check"], "roundSeconds": round, "continuation": continuation, "prompt": Object{"boundary": BoundaryPrompt, "role": cfg["prompt"], "context": Object{"title": row["title"], "source": row["source"], "sourceTargets": sources["sourceTargets"], "sourceCoverage": sources["sourceCoverage"], "sourceBasis": sources["basis"], "goal": cfg["goal"]}}, "plan": plan, "scope": Object{"actions": plan["actions"], "resourceIds": plan["resourceIds"]}, "modelBinding": Object{"domain": row["domain"], "source": "current-manual-model-settings"}, "tools": tools}
 		context := obj(obj(task["prompt"])["context"])
-		trigger := obj(cfg["schedule"])
-		if dispatched := obj(cfg["dispatch"]); dispatched != nil {
-			trigger = obj(dispatched["trigger"])
-			context["dispatchId"] = dispatched["id"]
-		} else if execution := obj(cfg["strategyExecution"]); execution != nil {
-			trigger = obj(execution["trigger"])
-		}
-		context["invocation"] = Object{"unit": "current-trigger", "dueAt": iso(row["due_at"]), "trigger": trigger, "futureTriggers": "server-scheduler"}
+		unit := executionContext(row, cfg)
+		context["assignment"], context["execution"], context["scheduler"] = unit["assignment"], unit["execution"], unit["scheduler"]
+		context["goal"] = obj(unit["execution"])["objective"]
 		if row["native_attempt_id"] != nil {
 			task["nativeAttemptId"] = row["native_attempt_id"]
 		}

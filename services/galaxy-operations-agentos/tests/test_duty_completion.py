@@ -49,3 +49,17 @@ class DutyDecisionTests(unittest.TestCase):
             result = decide(SimpleNamespace(user_id="autonomy:test", metadata={}))
             self.assertEqual((result.state, result.reason), (state, "original-state"))
 
+
+    def test_future_work_does_not_continue_current_execution(self):
+        assessment = {"scope": "execution", "goalSatisfied": True, "remainingWork": [],
+            "deferredWork": ["Recheck at the next event"], "summary": "Current work delivered"}
+        decide = self.decide({"disposition": "completed", "modelAssessment": assessment}, [assessment])
+        self.assertEqual(decide(SimpleNamespace(user_id="autonomy:test", metadata={})).state, "completed")
+
+    def test_current_multistep_work_remains_flexible(self):
+        assessment = {"scope": "execution", "goalSatisfied": False,
+            "remainingWork": [{"kind": "read", "description": "Compare another permitted source"}],
+            "deferredWork": ["Observe a later trigger"], "summary": "Need another source now"}
+        decide = self.decide({"disposition": "completed", "modelAssessment": assessment}, [assessment])
+        self.assertEqual(decide(SimpleNamespace(user_id="autonomy:test", metadata={})).remaining,
+            ("Compare another permitted source",))

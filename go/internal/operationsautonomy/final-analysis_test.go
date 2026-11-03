@@ -280,6 +280,15 @@ func TestTaskReportFinalizerRevalidatesOutsideTransaction(t *testing.T) {
 	}
 	check(false, "available")
 	check(true, "available")
+	beforeSummary := calls
+	directory, err := service.Tasks(ctx, actor, Object{"projection": "summary"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := directory["items"].([]Object)
+	if len(listed) != 1 || listed[0]["id"] != id || listed[0]["finalAnalysis"] != nil || calls != beforeSummary {
+		t.Fatal("summary directory fetched report bodies or lost its original task")
+	}
 	mode = "source-changed"
 	check(false, "withheld")
 	mode = "permission-revoked"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/jackc/pgx/v5"
 	"regexp"
@@ -16,9 +17,13 @@ var nativeRunPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 var modelStates = []string{"not-started", "dispatching", "accepted", "running", "completed", "failed", "cancelled", "unknown", "not-required"}
 
 func parseReport(input Object) (Object, error) {
-	if !closed(input, []string{"taskId", "modelState", "status"}, []string{"nativeRunId", "nativeAttemptId", "nativeContinuable", "code", "summary", "finalAnalysis", "manualPause", "manualResumeConsumed", "modelUsage"}) || !schemaUUID.MatchString(str(input["taskId"])) || !has(modelStates, str(input["modelState"])) || !has([]string{"running", "waiting-human", "completed", "failed", "unknown"}, str(input["status"])) {
+	if !closed(input, []string{"taskId", "modelState", "status"}, []string{"nativeRunId", "nativeAttemptId", "nativeContinuable", "code", "summary", "finalAnalysis", "manualPause", "manualResumeConsumed", "modelUsage", "failure"}) || !schemaUUID.MatchString(str(input["taskId"])) || !has(modelStates, str(input["modelState"])) || !has([]string{"running", "waiting-human", "completed", "failed", "unknown"}, str(input["status"])) {
 		return nil, invalid()
 	}
+	if raw, exists := input["failure"]; exists && (fault.RuntimeFailure(raw) == nil || input["status"] != "failed") {
+		return nil, invalid()
+	}
+
 	if v, ok := input["nativeRunId"]; ok && !nativeRunPattern.MatchString(str(v)) {
 		return nil, invalid()
 	}
@@ -98,6 +103,12 @@ func (s *Service) Report(ctx context.Context, input Object) (Object, error) {
 		if str(row["native_run_id"]) != "" && str(x["nativeRunId"]) != "" && row["native_run_id"] != x["nativeRunId"] {
 			return nil, fail("operations_autonomy_operation_conflict")
 		}
+		if failure := obj(x["failure"]); failure != nil && !has([]string{"completed", "stopped"}, str(row["state"])) {
+			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET result=jsonb_set(jsonb_set(COALESCE(NULLIF(result,'null'::jsonb),'{}'::jsonb),'{failure}',$3::jsonb),'{failureNativeRunId}',$4::jsonb) WHERE endpoint=$1 AND id=$2`, s.Endpoint, row["id"], jsonText(failure), jsonText(x["nativeRunId"])); e != nil {
+				return nil, e
+			}
+		}
+
 		if usage := obj(x["modelUsage"]); usage != nil {
 			if str(row["native_run_id"]) == "" && !has(terminal, str(row["state"])) {
 				if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET native_run_id=$3 WHERE endpoint=$1 AND id=$2 AND native_run_id IS NULL`, s.Endpoint, row["id"], x["nativeRunId"]); e != nil {

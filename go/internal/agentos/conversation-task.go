@@ -176,7 +176,11 @@ func (s *Conversations) conversationTaskActionHistory(ctx context.Context, row C
 		if value, ok := result["summary"].(string); ok {
 			receiptSummary = value
 		}
-		out = append(out, Object{"cardId": cardID, "operationId": operationID, "parentTurnId": turnID, "state": state, "effectExecuted": effect, "receipt": Object{"state": receiptState, "summary": receiptSummary}, "presentation": cardPresentation(proposal)})
+		entry := Object{"cardId": cardID, "operationId": operationID, "parentTurnId": turnID, "state": state, "effectExecuted": effect, "receipt": Object{"state": receiptState, "summary": receiptSummary}, "presentation": cardPresentation(proposal)}
+		if refs := resultReferences(result["references"]); len(refs) > 0 {
+			entry["references"] = refs
+		}
+		out = append(out, entry)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err

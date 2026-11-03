@@ -45,7 +45,9 @@ func typedList(args arguments, value Object, projector func(Object) Object, kind
 			complete = false
 		}
 	}
-	return queryResult{source: source, data: data, refs: refs, pagination: Object{"next": resume, "complete": complete}}, nil
+	// Logs and projected configuration history belong to their authorized
+	// collection. They do not invent object IDs or per-object access contracts.
+	return queryResult{source: source, data: data, refs: refs, collectionEvidence: kind == nil, pagination: Object{"next": resume, "complete": complete}}, nil
 }
 func fixedKind(kind string) func(Object) string { return func(Object) string { return kind } }
 

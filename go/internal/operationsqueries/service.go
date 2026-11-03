@@ -208,11 +208,12 @@ func (s *Service) reader(a Actor) operationspermissions.Authority {
 }
 
 type queryResult struct {
-	source, data Object
-	refs         []reference
-	pagination   Object
-	purpose      string
-	availability string
+	source, data       Object
+	refs               []reference
+	pagination         Object
+	purpose            string
+	availability       string
+	collectionEvidence bool
 }
 type reference struct {
 	kind, id     string
@@ -330,6 +331,9 @@ func (s *Service) Query(ctx context.Context, actor Actor, domain, tool string, i
 		pagination = Object{"next": nil, "complete": true}
 	}
 	value := Object{"tool": tool, "module": args.module, "view": nullable(args.view), "availability": "available", "data": result.data, "evidenceRefs": refs, "pagination": pagination, "checkedAt": at, "readExpiresAt": deadline, "purpose": purpose, "excludedFromProfile": !slices.Contains([]string{"analytics", "recommendations", "search"}, args.module)}
+	if result.collectionEvidence {
+		value["evidenceScope"] = "collection"
+	}
 	if contentPage {
 		pagination["requestedLimit"], pagination["appliedLimit"] = requestedLimit, args.filters["limit"]
 	}

@@ -39,7 +39,8 @@ def dispatch_tools(send):
             title: str, goal: str, trigger: TaskTrigger,
             start_now: bool = True, mode: Literal["ai", "ai-human"] = "ai-human",
             actions: list[str] | None = None, grant_ids: list[UUID] | None = None,
-            resource_ids: list[UUID] | None = None, strategy_ids: list[UUID] | None = None) -> str:
+            resource_ids: list[UUID] | None = None, strategy_ids: list[UUID] | None = None,
+            execution_goal: str | None = None) -> str:
         """Prepare a real task-assignment card for any supported operations goal.
 
         Use once for one background task, interval/daily for recurring work, or
@@ -52,12 +53,17 @@ def dispatch_tools(send):
         Omitted actions/grants make this a read/analysis task. For write actions,
         select actual existing grants, published strategies and targets as required
         by that business action; this request grants no rights.
+        goal preserves the overall assignment intent. execution_goal describes
+        the work to deliver for ONE activation, without waiting through future
+        triggers or declaring the whole assignment finished. trigger belongs to
+        the scheduler. This separation applies to any recurring/event work.
         Preserve the user's goal, timing and human conditions; no fixed task
         template or round count is required. An observation period does not
         imply canceling or disabling the assignment at its end.
         """
         return send(run_context, fc, "prepare-operation", {
             "kind": "task-dispatch", "targetDomain": target_domain,
+            **({"executionGoal": execution_goal} if execution_goal is not None else {}),
             "title": title, "goal": goal, "trigger": trigger.model_dump(mode="json"),
             "startNow": start_now, "mode": mode, "actions": actions or [],
             "grantIds": [str(v) for v in grant_ids or []],
@@ -68,7 +74,8 @@ def dispatch_tools(send):
             dispatch_id: UUID) -> str:
         """Read the actual assignment switch, next due time and latest task state.
 
-        Use its real ID from the confirmed card receipt. This is read-only and
+        Use the actual task-assignment reference from the confirmed card receipt.
+        This is read-only and
         never starts, resumes, retries or cancels a task. Completed model output
         alone is not proof that a business operation or future round completed.
         """

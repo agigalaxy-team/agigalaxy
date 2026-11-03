@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
@@ -151,6 +152,7 @@ func overviewRun(v Object) (Object, error) {
 		return nil, fail("operations_agentos_response_invalid", 503)
 	}
 	var role, versions, boundary, errorCode any
+	var failure Object
 	if n, ok := overviewInteger(v["rolePromptVersion"]); ok && n > 0 {
 		role = n
 	}
@@ -167,9 +169,10 @@ func overviewRun(v Object) (Object, error) {
 		boundary = v["boundaryVersion"]
 	}
 	if v["state"] == "ERROR" {
+		failure = fault.RuntimeFailure(v["failure"])
 		errorCode = overviewChoice(v["errorCode"], []string{"operations_agentos_run_failed", "operations_authorization_unavailable", "operations_agentos_authority_changed"})
 	}
-	return Object{"runId": v["runId"], "executionId": overviewUUID(v["executionId"]), "conversationId": overviewUUID(v["conversationId"]), "sessionId": overviewNativeID(v["sessionId"]), "componentId": overviewNativeID(v["componentId"]), "componentType": overviewChoice(v["componentType"], []string{"agent", "team", "workflow"}), "domain": overviewChoice(v["domain"], overviewDomains), "state": overviewChoice(v["state"], overviewStates), "errorCode": errorCode, "createdAt": overviewTime(v["createdAt"]), "updatedAt": overviewTime(v["updatedAt"]), "promptVersion": overviewChoice(v["promptVersion"], []string{"galaxy-operations-v1", "galaxy-prepared-review-v1", "galaxy-conversation-v1", "galaxy-conversation-v2", "galaxy-conversation-v3", "galaxy-p13-selected-content-v1"}), "rolePromptVersion": role, "boundaryVersion": boundary, "modelSettingsVersion": overviewModelVersion(v["modelSettingsVersion"]), "modelSettingsVersions": versions, "tokens": overviewTokens(v["tokens"]), "durationMs": overviewNumber(v["durationMs"]), "retryCount": nil, "retryState": "not-recorded", "metadataOnly": true, "executor": nil, "conversation": nil}, nil
+	return Object{"runId": v["runId"], "executionId": overviewUUID(v["executionId"]), "conversationId": overviewUUID(v["conversationId"]), "sessionId": overviewNativeID(v["sessionId"]), "componentId": overviewNativeID(v["componentId"]), "componentType": overviewChoice(v["componentType"], []string{"agent", "team", "workflow"}), "domain": overviewChoice(v["domain"], overviewDomains), "state": overviewChoice(v["state"], overviewStates), "errorCode": errorCode, "failure": failure, "createdAt": overviewTime(v["createdAt"]), "updatedAt": overviewTime(v["updatedAt"]), "promptVersion": overviewChoice(v["promptVersion"], []string{"galaxy-operations-v1", "galaxy-prepared-review-v1", "galaxy-conversation-v1", "galaxy-conversation-v2", "galaxy-conversation-v3", "galaxy-p13-selected-content-v1"}), "rolePromptVersion": role, "boundaryVersion": boundary, "modelSettingsVersion": overviewModelVersion(v["modelSettingsVersion"]), "modelSettingsVersions": versions, "tokens": overviewTokens(v["tokens"]), "durationMs": overviewNumber(v["durationMs"]), "retryCount": nil, "retryState": "not-recorded", "metadataOnly": true, "executor": nil, "conversation": nil}, nil
 }
 func overviewSpan(v Object) Object {
 	if overviewNativeID(v["spanId"]) == nil || overviewNativeID(v["traceId"]) == nil {

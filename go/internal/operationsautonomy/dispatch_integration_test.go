@@ -54,8 +54,14 @@ func TestWorkbenchDispatchIndependentPlanAndOriginalReceipt(t *testing.T) {
 	}
 	s.Pool = poolFor("galaxy_api")
 	request := a.Object{"kind": "task-dispatch", "targetDomain": "overview", "title": "Review unresolved feedback", "goal": "Read unresolved feedback and compare recurring needs; do not change feedback states.", "trigger": a.Object{"kind": "interval", "minutes": 37}, "startNow": true}
+	sourceActor, e := postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (a.Actor, error) {
+		return f.Permissions.StoredHumanAIWithin(ctx, tx, f.Root.ID, "overview", automation["accounts"].(map[string]any)["overview"].(string), "conversation", "workbench.read")
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
 	op := uuid.NewString()
-	proposal, e := s.PrepareDispatch(ctx, f.Root, "overview", request, op)
+	proposal, e := s.PrepareDispatch(ctx, sourceActor, "overview", request, op)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -97,6 +103,51 @@ func TestWorkbenchDispatchIndependentPlanAndOriginalReceipt(t *testing.T) {
 	read, e := s.ReadDispatch(ctx, f.Root, "overview", a.Object{"dispatchId": op})
 	if e != nil || read["enabled"] != true || read["latestTask"].(map[string]any)["state"] != "running" {
 		t.Fatalf("actual dispatch read: %#v %v", read, e)
+	}
+	// The same real assignment must be visible to the dashboard while routine
+	// duty remains disabled. No configuration change is needed to make it appear.
+	if _, e = owner.Exec(ctx, `INSERT INTO operations_autonomy_tasks_v1(id,endpoint,domain,source,source_key,title,mode,state,model_state,business_state,configuration,prompt_version,plan_version,session_id,due_at,created_at,updated_at,target_type,target_id) VALUES($1,$2,'overview','workbench',$1::uuid::text,'unavailable old source','ai','failed','failed','not-started','{}',1,1,$3,$4,$4,$4,'content-post',$5)`, uuid.NewString(), f.Endpoint, uuid.NewString(), now.Add(-time.Minute), uuid.NewString()); e != nil {
+		t.Fatal(e)
+	}
+	overview, e := s.Overview(ctx, f.Root, 7)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var runtimeAccount map[string]any
+	if overview["summary"].(map[string]any)["enabledAccounts"] != 1 || len(overview["timeline"].([]a.Object)) == 0 || overview["basis"].(map[string]any)["availability"] != "partial" {
+		t.Fatalf("one withheld historical source erased visible runtime: %#v", overview["summary"])
+	}
+	for _, account := range overview["accounts"].([]a.Object) {
+		if account["domain"] == "overview" {
+			runtimeAccount = account
+		}
+	}
+	if runtimeAccount == nil || runtimeAccount["enabled"] != true || runtimeAccount["config"].(map[string]any)["enabled"] != false || runtimeAccount["health"] != "running" {
+		t.Fatalf("independent assignment hidden behind routine enablement: %#v", runtimeAccount)
+	}
+	assignments := runtimeAccount["dispatches"].([]a.Object)
+	if len(assignments) != 1 || assignments[0]["id"] != op || assignments[0]["nextDueAt"] == nil || assignments[0]["latestTask"].(map[string]any)["id"] != taskID {
+		t.Fatalf("missing assignment schedule or round: %#v", assignments)
+	}
+	if _, e = s.ReadDispatch(ctx, sourceActor, "overview", a.Object{"dispatchId": op}); e != nil {
+		t.Fatal("private model receipt read", e)
+	}
+	// A failed invocation can have successful reads, but is not a successful
+	// inspection. The exact native failure must survive the original report.
+	if _, e = owner.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET dispatch_started_at=$3,native_run_id='dispatch-native',effective_check=true WHERE endpoint=$1 AND id=$2`, f.Endpoint, taskID, now); e != nil {
+		t.Fatal(e)
+	}
+	failure := a.Object{"stage": "model-request", "category": "service-unavailable", "reportedStatus": 502}
+	if _, e = s.Report(ctx, a.Object{"taskId": taskID, "nativeRunId": "dispatch-native", "modelState": "failed", "status": "failed", "code": "operations_autonomy_model_service_unavailable", "failure": failure}); e != nil {
+		t.Fatal(e)
+	}
+	view, e := s.GetTask(ctx, f.Root, taskID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	failed := view["task"].(map[string]any)
+	if failed["lastValidAt"] != nil || failed["state"] != "failed" || failed["failure"].(map[string]any)["category"] != "service-unavailable" {
+		t.Fatalf("failed inspection projected as success or lost reason: %#v", failed)
 	}
 	// Finishing a round does not stop the recurring assignment. One later due
 	// time produces one new task, even if scheduler wakeups repeat.

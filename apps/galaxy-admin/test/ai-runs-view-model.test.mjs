@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {aiDuration,aiRecordedNumber,aiRunDetailPath,aiRunDomainLabel,aiRunsHref,aiRunsLocation,aiRunsPath,aiRunStateLabel,aiRunTime,aiRunTrigger,aiSpanInterval,aiSpanRows,aiTimelineRange} from "../src/lib/autonomy/ai-runs-view-model.ts";
+import {aiDuration,aiRecordedNumber,aiRunDetailPath,aiRunDomainLabel,aiRunsHref,aiRunsLocation,aiRunsPath,autonomyRunsPath,aiRunStateLabel,aiRunTime,aiRunTrigger,aiSpanInterval,aiSpanRows,aiTimelineRange} from "../src/lib/autonomy/ai-runs-view-model.ts";
 
 const stamp='2026-10-23T01:00:00.000Z';
 function span(id,parent,start,end,trace='trace_1'){return {spanId:id,parentSpanId:parent,traceId:trace,name:id,state:'OK',startTime:new Date(Date.parse(stamp)+start).toISOString(),endTime:new Date(Date.parse(stamp)+end).toISOString(),durationMs:end-start,tokens:{input:null,output:null,total:null},input:{state:'not-recorded',value:null},output:{state:'not-recorded',value:null}};}
@@ -9,6 +9,7 @@ test('global native run queries use only supported metadata filters and keep non
  const location=aiRunsLocation({run:'run_native-1042',span:'a123',trace:'trace_1',page:'12',domain:'governance',state:'PAUSED',view:'io',query:'private text',operatorId:'foreign',limit:'500'});
  const url=new URL(aiRunsPath(location),'https://admin.invalid');
  assert.deepEqual([...url.searchParams.keys()].sort(),['domain','limit','page','state']);assert.equal(url.searchParams.get('limit'),'25');assert.equal(url.searchParams.get('page'),'12');assert.equal(location.run,'run_native-1042');
+ assert.equal(new URL(autonomyRunsPath(location),'https://admin.invalid').searchParams.get('projection'),'summary');
  assert.equal(aiRunDetailPath(location.run),'/v1/operations/agentos/runs/run_native-1042');
  assert.equal(aiRunDetailPath('../executions'),null);assert.equal(aiRunDetailPath('run?input=secret'),null);
  const invalid=aiRunsLocation({run:'https://else.invalid',page:'100001',domain:'private-chat-body',state:'SUCCESS',span:'old',trace:'old'});

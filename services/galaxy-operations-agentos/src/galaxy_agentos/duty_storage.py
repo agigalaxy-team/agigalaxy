@@ -13,6 +13,7 @@ from .duty_continuation import WRITE_TOOLS, call_reference
 from .gateway import AuthorityDenied, AuthorityUnavailable
 from .duty_attempt import attempt_id
 from .read_model import usage_snapshot
+from .conversation_failures import failure_data, failure_view
 
 
 MODEL_STATES = {"PENDING": "accepted", "RUNNING": "running", "COMPLETED": "completed",
@@ -48,6 +49,15 @@ def manual_resume_consumed(value):
     return {**marker, "resumeOperationId": operation}
 
 
+def execution_failure(content):
+    details = failure_view(content)
+    if details is not None:
+        return details
+    if isinstance(content, str) and content in {"agentos_task_timeout", "agentos_autonomy_round_timeout"}:
+        return {"stage": "execution", "category": "timeout", "reportedStatus": None}
+    return None
+
+
 def duty_report_fields(run):
     nested = run.get("run_data") if isinstance(run.get("run_data"), dict) else {}
     status_value = run.get("status") or nested.get("status")
@@ -56,12 +66,18 @@ def duty_report_fields(run):
     usage = usage_snapshot(nested if nested else run)
     failure = (metadata or {}).get("completionFailureCode")
     code = failure if isinstance(failure, str) and failure in {"operations_autonomy_completion_incomplete", "operations_autonomy_validation_ledger_unavailable"} else "operations_autonomy_model_failed"
+    details = failure_data((metadata or {}).get("runtimeFailure")) or execution_failure(nested.get("content") or run.get("content"))
+    if status == "ERROR":
+        if details is None:
+            details = {"stage": "execution", "category": "unknown", "reportedStatus": None}
+        if code == "operations_autonomy_model_failed":
+            code = ("operations_autonomy_model_" + details["category"].replace("-", "_")) if details["stage"] == "model-request" else "operations_autonomy_run_failed"
     return {"nativeRunId": run.get("run_id") or nested.get("run_id"),
         **({"nativeAttemptId": attempt} if (attempt := attempt_id((metadata or {}).get("nativeAttemptId"))) else {}),
         "modelState": MODEL_STATES.get(status, "unknown"),
         "status": "waiting-human" if status == "PAUSED" else "completed" if status == "COMPLETED"
             else "failed" if status in {"ERROR", "CANCELLED"} else "running" if status in {"PENDING", "RUNNING"} else "unknown",
-        **({"code": code} if status == "ERROR" else {}),
+        **({"code": code, "failure": details} if status == "ERROR" else {}),
         **({"modelUsage": usage} if any(value is not None for value in usage.values()) else {}),
         **({"manualPause": marker} if status == "PAUSED" and (marker := manual_pause_marker((metadata or {}).get("manualPause"))) else {}),
         **({"manualResumeConsumed": consumed} if status == "RUNNING" and (consumed := manual_resume_consumed((metadata or {}).get("manualResumeConsumed"))) else {})}
@@ -99,6 +115,10 @@ def duty_storage_fields(fields):
         if key in result:
             result[key] = None
     metadata = result.get("metadata")
+    raw = fields.get("metadata") if isinstance(fields.get("metadata"), dict) else {}
+    details = failure_data(raw.get("runtimeFailure")) or execution_failure(fields.get("content"))
+    if details is not None and not isinstance(metadata, dict):
+        metadata = {}
     if isinstance(metadata, dict):
         allowed = {"nativeAttemptId", "taskId", "operationId", "planId", "planVersion", "promptVersion", "boundaryVersion",
             "delegationVersion", "roleVersion", "domain", "aiAccountId", "source", "purpose", "modelSettingsVersion",
@@ -107,6 +127,8 @@ def duty_storage_fields(fields):
             and (key != "completionFailureCode" or isinstance(value, str) and value in {"operations_autonomy_completion_incomplete", "operations_autonomy_validation_ledger_unavailable"})
             and (value is None or type(value) in {str, int, bool}
                 or key == "activeDurationBefore" and type(value) is float and math.isfinite(value) and value >= 0)}
+        if details is not None:
+            result["metadata"]["runtimeFailure"] = details
         marker = manual_pause_marker(metadata.get("manualPause"))
         if marker is not None:
             result["metadata"]["manualPause"] = marker
@@ -179,7 +201,11 @@ def duty_database(db, gateway):
         # Native timeout/error producers can supply provider exception text in
         # this fallback field even when the normal run body was projected.
         if "content_if_absent" in kwargs:
-            kwargs["content_if_absent"] = None
+            # A status-only patch must not replace the stored binding metadata.
+            # Only an already closed internal error code can use this slot.
+            details = execution_failure(kwargs["content_if_absent"])
+            if details is None:
+                kwargs["content_if_absent"] = None
         result = db.update_run_in_session(*args, fields=duty_storage_fields(fields), **kwargs)
         if result is True or result == RunPersistOutcome.UPDATED:
             report(kwargs.get("run_id") or (args[1] if len(args) > 1 else None), fields,

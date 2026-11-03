@@ -595,7 +595,7 @@ class DutyContracts(unittest.TestCase):
         self.assertEqual(report["modelState"], "failed")
         self.assertEqual(report["code"], "operations_autonomy_completion_incomplete")
         row["run_data"]["metadata"]["completionFailureCode"] = "untrusted-value"
-        self.assertEqual(duty_report_fields(row)["code"], "operations_autonomy_model_failed")
+        self.assertEqual(duty_report_fields(row)["code"], "operations_autonomy_run_failed")
 
     def test_atomic_storage_preserves_native_fence_and_withholds_timeout_tool_and_prompt_bodies(self):
         gateway = CurrentTask()

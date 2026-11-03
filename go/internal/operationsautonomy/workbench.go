@@ -337,7 +337,8 @@ func (s *Service) BindWorkbenchTaskWithin(ctx context.Context, tx pgx.Tx, in Wor
 			return nil, e
 		}
 	}
-	return Object{"taskId": in.TaskID, "goal": cfg["goal"], "purpose": cfg["purpose"], "planVersion": row["plan_version"], "promptVersion": row["prompt_version"], "strategyIds": plan["strategyIds"], "targetType": row["target_type"], "targetId": row["target_id"], "resourceScope": scope, "resourceIds": plan["resourceIds"], "actions": plan["actions"]}, nil
+	unit := executionContext(row, cfg)
+	return Object{"taskId": in.TaskID, "goal": obj(unit["execution"])["objective"], "workContext": unit, "purpose": cfg["purpose"], "planVersion": row["plan_version"], "promptVersion": row["prompt_version"], "strategyIds": plan["strategyIds"], "targetType": row["target_type"], "targetId": row["target_id"], "resourceScope": scope, "resourceIds": plan["resourceIds"], "actions": plan["actions"]}, nil
 }
 func (s *Service) TaskContinuationWithin(ctx context.Context, tx pgx.Tx, id string) (Object, error) {
 	row, e := s.taskWithin(ctx, tx, id, "")
