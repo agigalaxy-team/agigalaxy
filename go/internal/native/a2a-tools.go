@@ -14,6 +14,7 @@ import (
 // Closing this returned hook stops retained local previews/transports; it never
 // reports remote task cancellation. No host is constructed by tools/list.
 func registerNativeA2aTools(server *mcp.Server, tools *toolRuntime, host *NativeA2a) func() {
+	tools.pending = append(tools.pending, host.pendingInteractions)
 	if host == nil {
 		return func() {}
 	}

@@ -19,6 +19,8 @@ func nativeAccountResult(value any, e error) (*mcp.CallToolResult, error) {
 }
 func registerNativeIdentityAccountTools(server *mcp.Server, tools *toolRuntime, runtime *Runtime) {
 	accounts := NewNativeIdentityAccounts(runtime)
+	tools.pending = append(tools.pending, accounts.pendingInteractions)
+	registerAccountBookmarkTools(server, runtime)
 	id := materialUUID()
 	action := func(value string) any { return map[string]any{"const": value} }
 	reads := map[string]any{"type": "object", "oneOf": []any{objectSchema(map[string]any{"action": action("providers")}, "action"), objectSchema(map[string]any{"action": action("begin"), "providerId": map[string]any{"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"}}, "action", "providerId"), objectSchema(map[string]any{"action": map[string]any{"type": "string", "enum": []string{"status", "cancel"}}, "id": id}, "action", "id"), objectSchema(map[string]any{"action": action("query"), "id": id, "after": id, "limit": integerSchema(1, 100, 20)}, "action")}}

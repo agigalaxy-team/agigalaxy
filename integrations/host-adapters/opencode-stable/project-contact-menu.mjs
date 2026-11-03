@@ -80,12 +80,10 @@ export function createNativeProjectDiscoveryMenu({call,select,prompt,info,langua
   [label('写联系内容','Write a contact message'),()=>compose(item,()=>opportunityActions(data,back))],
   [label('阅读工作经历','Read experience'),()=>experiences(item,null,()=>opportunityActions(data,back))],
   [label('再读项目介绍','Read introduction again'),()=>readOpportunity(item,back)],
-  [label('来源与适用差异','Sources and differences'),()=>notice(label('来源与适用差异','Sources and differences'),JSON.stringify({opportunityRef:item.opportunityRef,classification:item.classification,participant:item.participant,match:item.match,sources:item.sources},null,2),()=>readOpportunity(item,back))],
   [label('回到原工作','Return to original work'),onReturnWork]],back);}
  function experiences(item,after,back){void run(()=>detail(item,after),data=>{const page=data.experience,items=page.items??[];
   if(!items.length)return notice(label('当前可读经历','Currently readable experience'),label('这次未读到对方分享的工作经历。','No shared work experience was readable in this query.'),back);
   const render=()=>menu(label('工作经历','Work experience'),[...items.map(e=>[e.title??label('这项工作','This work'),()=>readExperience(item,e,after,render),e.summary]),
-   [label('经历来源详情','Experience source details'),()=>void run(()=>detail(item,after),fresh=>notice(label('经历来源详情','Experience source details'),JSON.stringify(fresh.experience,null,2),render),render)],
    ...((page.nextCursor??page.nextAfter)?[[label('更多经历','More experience'),()=>experiences(item,page.nextCursor??page.nextAfter,back)]]:[])],back);render();},back);}
  function readExperience(item,entry,after,back){void run(()=>detail(item,after),data=>{const fresh=data.experience.items.find(e=>e.key===entry.key);if(!fresh)return notice(label('这项经历暂不可读','This experience is unavailable'),label('原来源或可见范围已变化。','The source or current access changed.'),back);
   const outcome=value=>({succeeded:label('完成','Completed'),partial:label('部分完成','Partial'),failed:label('未完成','Failed'),inconclusive:label('暂不能得出结论','Inconclusive'),conflicting:label('观察有冲突','Conflicting')}[value]);
@@ -104,7 +102,7 @@ export function createNativeProjectDiscoveryMenu({call,select,prompt,info,langua
   const write=()=>ask(label('给这位同行写联系内容','Write to this person'),draft.note,value=>{draft.note=value.trim();if(!draft.note||draft.note.length>2000)return notice(label('联系内容','Contact message'),label('请写 2000 字以内的联系内容。','Write a message of up to 2000 characters.'),write);
    void run(()=>native('galaxy_contact_work_prepare',{action:'send',context:query.context,opportunityRef:item.opportunityRef,purpose:draft.purpose,note:draft.note,roomTitle:item.project.title}),p=>execute(p,back),back);
   },back);
-  if(item.match.purposes.length===1||draft.purpose==='conversation')return write();
+  if(item.match.purposes.length===1)return write();
   menu(label('这次联系想做什么','What is this contact for?'),item.match.purposes.map(id=>[purposes[id],()=>{draft.purpose=id;write();}]),back);
  }
  function pendingContacts(items){menu(label('尚待接续的联系','Unfinished contacts'),items.map(p=>[p.title,()=>execute(p,home)]),home);}
@@ -137,7 +135,6 @@ export function createNativeProjectDiscoveryMenu({call,select,prompt,info,langua
    ...(contact.state==='sent'&&contact.recipientId===status.identity?[[label('接受并继续聊天','Accept and continue chatting'),()=>respond('accept')],[label('谢绝这次交流','Decline this contact'),()=>respond('decline')]]:[]),
    ...(contact.state==='sent'&&contact.initiatorId===status.identity?[[label('撤回这次联系','Withdraw this contact'),()=>respond('withdraw')]]:[]),
    [label('再读联系内容','Read contact again'),()=>contactView(contactId,back)],
-   [label('来源详情','Source details'),()=>notice(label('联系来源','Contact source'),JSON.stringify(contact,null,2),()=>contactView(contactId,back))],
    [label('回到原工作','Return to original work'),onReturnWork]],back);watch(v);};
   const watch=v=>{if(contact.state!=='sent')return;timer=setTimeout(async()=>{if(!alive(v))return;try{const fresh=await native('galaxy_contact_v2_get',{contactId});if(!alive(v))return;if(fresh.state!==contact.state||fresh.revision!==contact.revision)return contactView(contactId,back);watch(v);}catch(error){if(alive(v))failure(error,back);}},4000);timer.unref?.();};
   const v=notice(sent?.roomTitle??label('这次联系','This contact'),text,actions);watch(v);

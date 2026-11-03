@@ -177,9 +177,35 @@ func TestUploadCloudGoServicesAndRecoveryLifecycle(t *testing.T) {
 	if _, e = work.Resume(ctx, text(uploadObject(prepared)["operationId"])); e != nil {
 		t.Fatal(e)
 	}
-	result, e = work.DeleteCloudReviewed(ctx, q, &scope)
-	if e != nil || uploadObject(result)["state"] != "deleted" || deletes.Load() != 2 {
-		t.Fatalf("restored source delete: %v %v", e, result)
+	// The server accepted this new deletion, but the process lost the local
+	// cleanup step after persisting its receipt. Background flush must finish
+	// that exact cleanup without repeating the remote deletion or uploading it.
+	_, e = rt.uploadCloudDelete(ctx, q, "work", &scope, false, "", func(map[string]any, any) error { return io.ErrUnexpectedEOF })
+	if e != io.ErrUnexpectedEOF || deletes.Load() != 2 {
+		t.Fatalf("delete cleanup interruption: %v count=%d", e, deletes.Load())
+	}
+	if pending, e := rt.uploadPendingDelete(ctx, q, "work", &scope); e != nil || !pending {
+		t.Fatalf("confirmed delete cleanup was not retained: %v %v", pending, e)
+	}
+	// An explicit restore before cleanup creates a new scope. Completing the
+	// earlier delete must not block or erase that newly selected source.
+	if _, e = work.ChooseReviewed(ctx, WorkUploadChoice{ChoiceID: uuid.NewString(), Enabled: true, TargetAccountID: meta.TargetID, WorkIDs: []string{meta.WorkID}, IncludeExisting: true, RestoreWorkIDs: []string{meta.WorkID}}, &scope); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = work.Flush(ctx, meta.WorkID); e != nil || deletes.Load() != 2 {
+		t.Fatalf("flush did not finish original delete cleanup: %v count=%d", e, deletes.Load())
+	}
+	if pending, e := rt.uploadPendingDelete(ctx, q, "work", &scope); e != nil || pending {
+		t.Fatalf("delete cleanup remained pending: %v %v", pending, e)
+	}
+	if e = work.queue(ctx, false, scope.Owner, &scope, func(db *sql.DB, _ string) error {
+		row, e := oneMap(ctx, db, "SELECT blocked FROM work_sync_scopes WHERE owner_id=? AND endpoint=? AND work_id=?", scope.Owner, rt.config.Endpoint, meta.WorkID)
+		if e == nil && (row == nil || integer(row["blocked"]) != 0) {
+			t.Fatal("old deletion blocked the newly restored scope")
+		}
+		return e
+	}); e != nil {
+		t.Fatal(e)
 	}
 	if _, e = work.ChooseReviewed(ctx, WorkUploadChoice{ChoiceID: uuid.NewString(), Enabled: true, TargetAccountID: meta.TargetID, WorkIDs: []string{meta.WorkID}, IncludeExisting: true, RestoreWorkIDs: []string{meta.WorkID}}, &scope); e != nil {
 		t.Fatal(e)
@@ -252,8 +278,11 @@ func TestUploadCloudGoServicesAndRecoveryLifecycle(t *testing.T) {
 	if result, e = archive.DeleteCloudReviewed(ctx, aq, &scope); e != nil || uploadObject(result)["state"] != "unknown" {
 		t.Fatalf("archive deletion lost ACK: %v %v", e, result)
 	}
-	if result, e = archive.DeleteCloudReviewed(ctx, aq, &scope); e != nil || uploadObject(result)["deleted"] != true || deletes.Load() != 1 {
-		t.Fatalf("archive deletion replayed: %v %v", e, result)
+	if _, e = rt.uploadCloudDelete(ctx, aq, "archive", &scope, true, "", func(map[string]any, any) error { return io.ErrUnexpectedEOF }); e != io.ErrUnexpectedEOF || deletes.Load() != 1 {
+		t.Fatalf("archive confirmed cleanup interruption: %v count=%d", e, deletes.Load())
+	}
+	if result, e = archive.Resume(ctx, id); e != nil || uploadObject(result)["state"] != "deleted" || deletes.Load() != 1 {
+		t.Fatalf("archive original deletion cleanup was not resumed: %v %v count=%d", e, result, deletes.Load())
 	}
 	transport.setHook(nil)
 	stale := scope

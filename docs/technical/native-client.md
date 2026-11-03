@@ -134,7 +134,7 @@ Vercel Skills目录表与MCPorter配置路径是适配线索，各宿主当前�
 | 求助、房间、发布及业务参与 | Go业务工具、Skill与可选面板保留真实读写 | 完整帮助／协作／返回及跨人实际写入不能由只读查询代替；沿原业务授权办理 |
 | 关注与已委托工作 | check／ack／status／stop及原grant、事件、位置与回执保留 | 普通MCP可重读原pending工作及固定窗口，材料变化沿当前权限呈现，Agent显式ACK原工作；专用只读驱动为可选兼容，服务存活不表示模型持续运行 |
 | A2A与Worker Pack | 已配置对端的选择、执行、进度、取消和回执链路已存在，目的入口按真实原关联分页；`/Galaxy hub`接已有服务连接和Hub查询入口 | 专业Worker运行环境与完整Hub运营初始化仍planned，不影响连接或读取现有Hub；参考Worker与协议检查不等于独立供给已运行 |
-| 用户级安装维护 | install／update／repair／uninstall、整版资源、原资料保留及平台归档命名已实现 | 多宿主有配置合并与隔离检查，真实宿主采用、更新切换及失败恢复分别核对；旧受管发行目录目前保留 |
+| 用户级安装维护 | install／update／repair／uninstall、整版资源、原资料保留及平台归档命名已实现 | Windows 隔离 A/B 跨版检查覆盖待确认选择、在办 MCP／Host、stdout 背压、同一 stdio 续接、旧宿主 repair 和资料保留；其他平台及旧协议迁移分别核对，旧受管发行目录目前保留 |
 | 系统提醒与多平台发行 | Windows／Linux通道及macOS helper源码、目标平台构建、npm和容器准备入口已实现 | Linux／macOS真实桌面、macOS编译签名公证及正式多平台发行仍待对应结果；新包与镜像尚未上架 |
 
 需求依据保留于[早期用户原话](../../originals/conversations/early-product-discussions.jsonl)、[原聊天与宿主要求](../../originals/conversations/CURRENT_USER_DECISIONS_2026-09-12.md)及[后续澄清](../../originals/conversations/CURRENT_USER_REQUIREMENTS_2026-10-09.md)。资料编号、旧planned标签或历史失败只说明其原范围，不取代当前源码和实际结果。
@@ -164,11 +164,17 @@ Codex 和 Claude 的事实 hook 使用 Node；程序可从 PATH 发现，或用 
 
 安装器先按目标 OS/架构和清单检查候选，内容与依赖一致时复用已有受管发行，否则把平台二进制、面板、Skill、宿主适配及其依赖复制到用户安装根下的新发行目录，再更新选定配置；宿主入口不依赖临时 `npx` 缓存。现有资料和用户自有配置保留；`uninstall` 移除所选受管宿主配置，并按宿主处理不再被其他受管记录引用的 Skill；OpenCode 的 Skill 随保留的旧发行目录保留。卸载不删除身份、履历、任务或其他资料。旧发行目录当前保留，不能仅凭 PID 或一个服务状态推断所有旧连接已退出。
 
-共用服务按需启动，`native`/`integration-mcp` 是 MCP 薄连接，`host`/`integration-host` 是宿主私有 JSONL 通道。关闭单个宿主连接不会关闭共用服务，也不设置 OS 开机自启。成功安装后记录期望的完整发行版本；正在运行的兼容版本可继续服务。`galaxy service status` 在运行时报告运行版本、已安装版本及是否 `restart-required`；`galaxy service restart` 是明确切换，会关闭现有连接，应在适当时机使用，不把在途未知业务写入自动重发。`galaxy service stop` 记录暂停意图，后台重连不会立即拉起；`galaxy service start` 明确恢复。停止或重启均不删除资料。
+共用服务按需启动，`native`/`integration-mcp` 是 MCP 薄连接，`host`/`integration-host` 是宿主私有 JSONL 通道。关闭单个宿主连接不会关闭共用服务，也不设置 OS 开机自启。首次安装在尚无期望版本时选择完整发行；普通 `install` 和 `repair` 保留已经选定的服务版本，修复较旧宿主不会把服务期望版本切回旧版。明确执行 `update` 才选择本次完整候选作为期望版本；正在运行的兼容旧核心继续服务，`galaxy service status` 报告运行版本、期望版本及 `restart-required`。需要切换时执行 `galaxy service restart`。
+
+支持交接协议的核心与薄连接在切换时暂停接纳新的业务消息，等待已接纳请求及其响应写入原宿主输出，再切换核心并让同一 stdio 连接重新建立协议；不自动重发业务操作。已有本人选择或其他进程内待处理交互时，切换报告等待并恢复旧连接，原选择仍可继续，处理后再执行切换。连接意外中断时，结果不能仅凭断链认定成功或失败，应查询原操作与回执。没有该控制协议的旧核心或旧连接不能声称可无损自动迁移，切换会报告不支持或旧连接限制，不以强制终止代替排空。`galaxy service stop` 记录暂停意图，后台重连不会立即拉起；`galaxy service start` 明确恢复。停止、重启和卸载均保留身份与资料。
+
+Windows 隔离环境已用可执行文件字节和 release ID 均不同的 A 0.1.1、B 0.1.2 候选实际检查：B 准备期间旧宿主 `repair` 不回退期望版本；待本人选择时保留 A；持锁的 MCP 和 Host 请求、大响应 stdout 背压完成后切换；原 MCP／Host stdio 继续使用，身份不变；`repair`／`uninstall` 保留其他 MCP 配置与身份。该结果只覆盖本次 Windows 隔离场景，不代表所有宿主、旧协议或其他系统均已实际验收。
 
 服务版入口 `galaxy native --config <公开配置绝对路径>` 提供当前已接入的服务和本机工具；本机入口 `galaxy integration-mcp --data-dir <目录>` 不构造服务 Runtime 或连接服务。对应的 `host`、`integration-host` 只供可信宿主使用，不作为模型 MCP 工具。公开配置含 `version:2`、HTTPS `endpoint`/`website`、绝对 `dataDirectory` 和可信公钥；通过 `--config` 或 `GALAXY_NATIVE_CONFIG` 选择，不写入 token、私钥或恢复码。`service-config inspect/prepare` 负责读取所选服务信息和准备公开配置；显式根 pin、信任目录及轮换见下文。`setup` 保留从所选官网读取公开服务配置并展示计划、经本人确认后安装的原入口，也支持 `setup --local-only`；实际安装共用同一执行器；`host-configs` 只向新目录生成片段，不代表已安装或宿主已加载。命令参数以 `galaxy --help` 为准。
 
 `scripts/build-native-v2.mjs` 构建平台二进制、面板、Skill 和宿主资源，`scripts/prepare-client-candidate.mjs` 在构建时解析并锁定薄宿主依赖、归集许可并准备归档；已有缓存可用 `--offline`。`--goos`/`--goarch` 可选择目标，跨目标候选不在当前机器执行安装检查。归档名包含发行版本、OS 和架构。`scripts/prepare-native-npm.mjs` 从已准备候选生成 `@galaxy/native` 薄入口和对应平台包目录，仅列入本次提供的目标。启动器无参数时执行 `install`，无法唯一识别宿主时在交互终端提示输入宿主 ID，非交互环境可使用 `install --host <宿主ID>`；其他参数直接交给 Native 程序。`scripts/prepare-native-container.mjs` 从 Linux 候选生成容器构建上下文。这些是未发布候选，包名不代表注册或发布权限。容器显式挂载专用资料目录和所需公开配置，用同一用户启动一个前台核心，再让各宿主通过 `docker exec -i` 连接同一容器；私有 IPC 在容器内。容器 `localhost` 不是桌面 `localhost`，不自动挂载整个用户目录、发布端口或部署数据库。容器准备器的第四个可选参数为基础镜像引用，也可由 `prepareNativeContainer({baseImage})` 传入；已核实的 `image@sha256:…` 可直接用于固定构建。默认值采用已经实际拉取并核对的 `node:22-bookworm-slim` 摘要，准确引用只在脚本中维护；显式覆盖时生成结果和说明仍区分固定摘要与可变标签。准备器不自动查询镜像，基础镜像更新与客户端发行分别处理。
+
+2026-11-04 本轮已开始准备 `0.1.4` 的六平台 Go Native 候选；同源 npm 包和 Linux 容器上下文需在各平台候选完成后另行装配。较早 `0.1.0` 包或历史文档属于其原有版本，不代表本轮候选，也不证明 `0.1.4` 已发布或通过各平台验收；实际装配及验收状态以 [WORK_STATUS](../../WORK_STATUS.md) 为准。
 
 旧签名发行 `galaxy-native-client-release` 的验签与启动说明仍适用于原包，不能据此推断 Go 候选已经验签、发布或获得宿主验收。构建和 NOTICE 见[源码与许可](source-and-licensing.md)。最近主会话对实际候选在隔离路径完成了自定义宿主 install → repair → uninstall，确认其他 MCP 配置和 ID 保留；这不证明所有真实宿主、Linux/macOS、系统提醒、签名或市场上架已验收。平台和未覆盖范围以 [WORK_STATUS](../../WORK_STATUS.md) 为准。
 

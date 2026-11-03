@@ -4,6 +4,8 @@ import { nativeChoiceUrl } from '../../../native-v2/compact-app/browser-choice.m
 import { plain, unwrap, fingerprint } from './presentation.mjs';
 
 export function createPurposeMessages(session) {
+  // Retain unresolved sends while this Galaxy session remains open.
+  const pendingSends = new Map();
   function messages(after) {
     if (!session.nativeTools)
       return session.message(
@@ -59,6 +61,7 @@ export function createPurposeMessages(session) {
         latest: true,
         limit: 40,
       }),
+      pending = await session.native('galaxy_chat_pending_sends', { roomId }),
       grants = await session.native('galaxy_chat_agent_grants', {
         roomId,
         limit: 100,
@@ -87,6 +90,7 @@ export function createPurposeMessages(session) {
     return {
       meta,
       history,
+      pending,
       grant,
       status,
       names: new Map(names.map((n) => [n.subjectId, n.displayName])),
@@ -156,6 +160,14 @@ export function createPurposeMessages(session) {
                     ],
                   ]
                 : []),
+              ...(latest.pending.items ?? []).map((saved) => [
+                session.label('核对尚未确认的消息', 'Check an unconfirmed message'),
+                () => {
+                  const local = pendingSends.get(saved.clientMessageId);
+                  if (local && local.owner === session.owner) return pendingSend(local);
+                  return pendingLocator(room, back, saved);
+                },
+              ]),
               [
                 session.label('打开完整对话', 'Open full conversation'),
                 () =>
@@ -206,6 +218,7 @@ export function createPurposeMessages(session) {
               d.meta.state,
               d.meta.transportAvailable,
               d.grant,
+              d.pending,
               d.history.messages,
               [...d.names],
             ]);
@@ -259,105 +272,108 @@ export function createPurposeMessages(session) {
     );
   }
 
+  function pendingLocator(room, back, saved) {
+    const roomId = room.id ?? room.roomId;
+    void session.run(
+      () => session.native('galaxy_chat_message_status', {
+        roomId, clientMessageId: saved.clientMessageId, requestHash: saved.requestHash,
+      }),
+      (result) => session.message(
+        session.label('原消息结果', 'Original message status'),
+        result.state === 'accepted'
+          ? session.label('服务已接收原消息。', 'The service accepted the original message.')
+          : result.state === 'absent' || result.state === 'not-found'
+            ? session.label('服务未找到原消息；此处没有保留原文，不能自动重发。', 'The service did not find the original message. Its text is not retained here, so it cannot be resent automatically.')
+            : session.label('原消息结果仍无法确定。没有重新发送。', 'The original message result remains unconfirmed. Nothing was resent.'),
+        () => roomView(room, back),
+      ),
+      () => roomView(room, back),
+    );
+  }
+
+  function pendingSend(item, notice = '') {
+    if (item.owner !== session.owner) return;
+    const check = () => void session.run(
+      () => session.native('galaxy_chat_message_status', {
+        roomId: item.roomId,
+        clientMessageId: item.payload.clientMessageId,
+        requestHash: item.requestHash,
+      }),
+      (result) => {
+        if (result.state === 'accepted') {
+          pendingSends.delete(item.payload.clientMessageId);
+          return roomView(item.room, item.back);
+        }
+        item.state = result.state === 'not-found' ? 'absent' : result.state;
+        pendingSend(item);
+      },
+      () => pendingSend(item, session.label('暂时无法核对原消息。', 'The original message could not be checked.')),
+    );
+    session.menu(
+      session.label('原消息尚待确认', 'Original message needs confirmation') +
+        (notice ? '\n' + notice : '') + '\n\n' + plain(item.payload.text),
+      [
+        [session.label('核对原消息', 'Check the original message'), check],
+        ...(item.state === 'absent'
+          ? [[session.label('重试同一条消息', 'Retry the same message'), () => sendOriginal(item)]]
+          : []),
+        [session.label('回到对话', 'Return to conversation'), () => roomView(item.room, item.back)],
+        [session.label('回到原工作', 'Return to original work'), session.onReturnWork],
+      ],
+      () => roomView(item.room, item.back),
+    );
+  }
+
+  function sendOriginal(item) {
+    if (item.owner !== session.owner) return;
+    item.state = 'unknown';
+    void session.run(async () => {
+      try {
+        return await session.native('galaxy_chat_send', { roomId: item.roomId, ...item.payload });
+      } catch {
+        return session.native('galaxy_chat_message_status', {
+          roomId: item.roomId,
+          clientMessageId: item.payload.clientMessageId,
+          requestHash: item.requestHash,
+        });
+      }
+    }, (result) => {
+      if (result.state === 'accepted' || (result.messageId && !result.state)) {
+        pendingSends.delete(item.payload.clientMessageId);
+        return roomView(item.room, item.back);
+      }
+      item.state = result.state === 'not-found' ? 'absent' : result.state;
+      pendingSend(item);
+    }, () => pendingSend(item, session.label('发送结果暂时无法核对。', 'The send result could not be checked.')));
+  }
+
+  async function startSend(room, grant, back, text, version) {
+    const roomId = room.id ?? room.roomId;
+    const payload = { clientMessageId: randomUUID(), text, replyTo: null, agentGrantId: grant.grantId };
+    const item = { room, roomId, back, payload, owner: session.owner, requestHash: await chatSendRequestHash(payload), state: 'unknown' };
+    if (!session.alive(version) || item.owner !== session.owner) return;
+    pendingSends.set(payload.clientMessageId, item);
+    sendOriginal(item);
+  }
+
   function reply(room, grant, back = () => messages(), draft = '') {
     session.stopMessages();
     const v = ++session.version;
     session.prompt({
       title: session.label('写给这段对话的消息', 'Write to this conversation'),
-      placeholder: '',
-      value: draft,
+      placeholder: '', value: draft,
       onCancel: () => roomView(room, back),
       onConfirm: (text) => {
         if (!session.alive(v)) return;
         if (!text.trim()) return roomView(room, back);
         if (!grant) return allowReply(room, text.trim(), back);
-        const roomId = room.id ?? room.roomId,
-          payload = {
-            clientMessageId: randomUUID(),
-            text: text.trim(),
-            replyTo: null,
-            agentGrantId: grant.grantId,
-          };
-        const send = () =>
-          void session.run(
-            async () => {
-              try {
-                return await session.native('galaxy_chat_send', {
-                  roomId,
-                  ...payload,
-                });
-              } catch {
-                const receipt = await session.native(
-                  'galaxy_chat_message_status',
-                  {
-                    roomId,
-                    clientMessageId: payload.clientMessageId,
-                    requestHash: await chatSendRequestHash(payload),
-                  },
-                );
-                return {
-                  ...receipt,
-                  state:
-                    receipt.state === 'not-found' ? 'absent' : receipt.state,
-                };
-              }
-            },
-            (result) => {
-              if (
-                result.state === 'accepted' ||
-                (result.messageId && !result.state)
-              )
-                return roomView(room, back);
-              // A confirmed absent receipt can offer the same original bytes. Unknown or
-              // conflict never creates a second message or silently changes its grant.
-              session.menu(
-                session.label('发送结果尚待确认', 'Sending needs confirmation'),
-                [
-                  [
-                    session.label('继续这条消息', 'Continue this message'),
-                    () =>
-                      void session.run(
-                        async () =>
-                          session.native('galaxy_chat_message_status', {
-                            roomId,
-                            clientMessageId: payload.clientMessageId,
-                            requestHash: await chatSendRequestHash(payload),
-                          }),
-                        (r) =>
-                          r.state === 'accepted'
-                            ? roomView(room, back)
-                            : session.message(
-                                'Galaxy',
-                                session.label(
-                                  '原消息尚未确认，可以在完整对话中继续。',
-                                  'The original message is not confirmed. Continue in the full conversation.',
-                                ),
-                                () => roomView(room, back),
-                              ),
-                      ),
-                  ],
-                  ...(result.state === 'absent'
-                    ? [
-                        [
-                          session.label(
-                            '重试同一条消息',
-                            'Retry the same message',
-                          ),
-                          send,
-                        ],
-                      ]
-                    : []),
-                  [
-                    session.label('回到原工作', 'Return to original work'),
-                    session.onReturnWork,
-                  ],
-                ],
-                () => roomView(room, back),
-              );
-            },
+        void startSend(room, grant, back, text.trim(), v).catch(() => {
+          if (session.alive(v)) session.message(
+            session.label('消息未能准备', 'Unable to prepare message'),
+            session.label('原文字仍保留，可以返回编辑。', 'Your text is retained; return to edit it.'),
             () => reply(room, grant, back, text),
           );
-        send();
+        });
       },
     });
   }
@@ -410,38 +426,8 @@ export function createPurposeMessages(session) {
         const fresh = await readRoom(room);
         if (!session.alive(v)) return;
         if (!fresh.grant) throw Error('reply_grant_unavailable');
-        // The written message already expressed this send. Use that exact text
-        // after the actual permission choice, without asking to compose it again.
-        const payload = {
-          roomId,
-          clientMessageId: randomUUID(),
-          text,
-          replyTo: null,
-          agentGrantId: fresh.grant.grantId,
-        };
-        let sent;
-        try {
-          sent = await session.native('galaxy_chat_send', payload);
-        } catch {
-          sent = await session.native('galaxy_chat_message_status', {
-            roomId,
-            clientMessageId: payload.clientMessageId,
-            requestHash: await chatSendRequestHash(payload),
-          });
-        }
-        if (session.alive(v)) {
-          if (sent.state === 'accepted' || (sent.messageId && !sent.state))
-            roomView(room, back);
-          else
-            session.message(
-              session.label('消息尚待确认', 'Message needs confirmation'),
-              session.label(
-                '原消息尚未确认，已保留这次定位。可以继续原对话。',
-                'The original message is not confirmed. Continue this conversation.',
-              ),
-              () => roomView(room, back),
-            );
-        }
+        // Use the exact written message and the same receipt handling as an existing grant.
+        await startSend(room, fresh.grant, back, text, v);
       } catch {
         if (session.alive(v))
           session.message(

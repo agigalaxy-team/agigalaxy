@@ -3,6 +3,7 @@ package native
 import (
 	"context"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"math"
 )
 
 func (h *NativePersonalSummaries) reconcile(ctx context.Context, l *personalSummaryLease, id, version string) (map[string]any, error) {
@@ -97,13 +98,171 @@ func (h *NativePersonalSummaries) reconcile(ctx context.Context, l *personalSumm
 	result["newUploads"] = 0
 	return result, nil
 }
+func summaryPreferenceMatches(remote, input map[string]any) bool {
+	return remote["endpoint"] == input["endpoint"] && remote["enabled"] == input["enabled"] && connectionEqual(remote["roomIds"], input["roomIds"]) && remote["includeExisting"] == input["includeExisting"]
+}
+
+func summaryPreferenceRevision(value any) (int64, bool) {
+	if n, ok := value.(float64); ok {
+		if math.IsNaN(n) || math.IsInf(n, 0) || n < 0 || n > 9007199254740991 || math.Trunc(n) != n {
+			return 0, false
+		}
+		return int64(n), true
+	}
+	if connectionSafeInteger(value) {
+		return psInt(value), true
+	}
+	return 0, false
+}
+
+func summaryPreferenceInput(endpoint string, revision any, preference map[string]any) map[string]any {
+	return map[string]any{"endpoint": endpoint, "expectedRevision": revision, "enabled": isOne(text(preference["state"]), "enabled", "enabled-pending-binding"), "roomIds": preference["roomIds"], "includeExisting": preference["includeExisting"]}
+}
+
+func (h *NativePersonalSummaries) dispatchPreferenceOperation(ctx context.Context, l *personalSummaryLease, operation map[string]any) (map[string]any, error) {
+	result, e := l.call(ctx, "preferences/save", psObject(operation["input"]))
+	if e != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if fault.Code(e) == "summary_preference_conflict" {
+			remote, readErr := l.call(ctx, "preferences/read", map[string]any{})
+			if readErr == nil {
+				return h.finishPreferenceOperation(ctx, l, operation, remote)
+			}
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+		}
+		return map[string]any{"state": "preference-unknown", "originalOperationRetained": true}, nil
+	}
+	return h.finishPreferenceOperation(ctx, l, operation, result)
+}
+
+// finishPreferenceOperation only adopts a current server value after its
+// revision has advanced beyond the original compare-and-set. It never invents
+// a receipt or changes an existing request's expected revision.
+func (h *NativePersonalSummaries) finishPreferenceOperation(ctx context.Context, l *personalSummaryLease, operation, remote map[string]any) (map[string]any, error) {
+	input := psObject(operation["input"])
+	expectedRevision, expectedOK := summaryPreferenceRevision(input["expectedRevision"])
+	remoteRevision, remoteOK := summaryPreferenceRevision(remote["revision"])
+	if input == nil || !expectedOK || !remoteOK || remote["endpoint"] != input["endpoint"] {
+		return nil, connectionFailure("summary_preference_receipt_mismatch")
+	}
+	if remoteRevision <= expectedRevision {
+		return map[string]any{"state": "preference-unknown", "originalOperationRetained": true}, nil
+	}
+	if !summaryPreferenceMatches(remote, input) {
+		// A newly reviewed choice may race the previous unknown CAS. Only the
+		// previous request's exact value at the next revision identifies that
+		// competition; an unrelated later change remains a conflict.
+		previous := psObject(operation["supersededInput"])
+		previousRevision, previousOK := summaryPreferenceRevision(previous["expectedRevision"])
+		if previous != nil && previousOK && remoteRevision == previousRevision+1 && summaryPreferenceMatches(remote, previous) {
+			_, e := l.update(ctx, func(s map[string]any) error {
+				if !psEqual(s["preferenceOperation"], operation) || !psEqual(s["preference"], operation["choice"]) {
+					return connectionFailure("summary_choice_changed")
+				}
+				delete(s, "preferenceOperation")
+				return nil
+			})
+			if e != nil {
+				return nil, e
+			}
+			return map[string]any{"state": "preference-current", "remoteRevision": remote["revision"]}, nil
+		}
+		_, e := l.update(ctx, func(s map[string]any) error {
+			if !psEqual(s["preferenceOperation"], operation) {
+				return connectionFailure("summary_choice_changed")
+			}
+			psObject(s["preferenceOperation"])["state"] = "conflict"
+			return nil
+		})
+		if e != nil {
+			return nil, e
+		}
+		return map[string]any{"state": "preference-conflict", "originalOperationRetained": true, "remoteRevision": remote["revision"]}, nil
+	}
+	_, e := l.update(ctx, func(s map[string]any) error {
+		if !psEqual(s["preferenceOperation"], operation) {
+			return connectionFailure("summary_choice_changed")
+		}
+		p := psObject(s["preference"])
+		if psEqual(p, operation["choice"]) {
+			p["cloudRevision"] = remote["revision"]
+			p["needsPreferenceSync"] = false
+			if remote["enabled"] == true {
+				p["state"] = "enabled"
+			}
+		}
+		delete(s, "preferenceOperation")
+		return nil
+	})
+	if e != nil {
+		return nil, e
+	}
+	return map[string]any{"state": "preference-current", "remoteRevision": remote["revision"]}, nil
+}
+
 func (h *NativePersonalSummaries) synchronize(ctx context.Context, l *personalSummaryLease, force bool) (map[string]any, error) {
 	s, e := l.read(ctx)
 	if e != nil {
 		return nil, e
 	}
 	p := psObject(s["preference"])
-	if l.connection == nil || l.connection.Endpoint != p["endpoint"] {
+	if l.connection == nil {
+		return map[string]any{"state": "local", "reason": "matching_binding_required"}, nil
+	}
+	if operation := psObject(s["preferenceOperation"]); operation != nil {
+		input := psObject(operation["input"])
+		if input == nil || input["endpoint"] != l.connection.Endpoint {
+			return map[string]any{"state": "preference-unknown", "reason": "matching_binding_required", "originalOperationRetained": true}, nil
+		}
+		if operation["state"] == "conflict" {
+			return map[string]any{"state": "preference-conflict", "originalOperationRetained": true}, nil
+		}
+		remote, e := l.call(ctx, "preferences/read", map[string]any{})
+		if e != nil {
+			return nil, e
+		}
+		revision, valid := summaryPreferenceRevision(remote["revision"])
+		expectedRevision, expectedValid := summaryPreferenceRevision(input["expectedRevision"])
+		if !valid || !expectedValid || revision < expectedRevision || remote["endpoint"] != input["endpoint"] {
+			return nil, connectionFailure("summary_preference_receipt_mismatch")
+		}
+		var resolved map[string]any
+		if revision == expectedRevision {
+			if !psEqual(p, operation["choice"]) {
+				if p["endpoint"] != l.connection.Endpoint || p["needsPreferenceSync"] != true {
+					return map[string]any{"state": "preference-unknown", "originalOperationRetained": true}, nil
+				}
+				next := map[string]any{"state": "unknown", "input": psClone(summaryPreferenceInput(l.connection.Endpoint, remote["revision"], p)), "choice": psClone(p), "supersededInput": psClone(input)}
+				_, e = l.update(ctx, func(t map[string]any) error {
+					if !psEqual(t["preferenceOperation"], operation) || !psEqual(t["preference"], p) {
+						return connectionFailure("summary_choice_changed")
+					}
+					t["preferenceOperation"] = next
+					return nil
+				})
+				if e != nil {
+					return nil, e
+				}
+				operation = next
+			}
+			resolved, e = h.dispatchPreferenceOperation(ctx, l, operation)
+		} else {
+			resolved, e = h.finishPreferenceOperation(ctx, l, operation, remote)
+		}
+		if e != nil || resolved["state"] != "preference-current" {
+			return resolved, e
+		}
+		s, e = l.read(ctx)
+		if e != nil {
+			return nil, e
+		}
+		p = psObject(s["preference"])
+	}
+	if l.connection.Endpoint != p["endpoint"] {
 		return map[string]any{"state": "local", "reason": "matching_binding_required"}, nil
 	}
 	if p["needsPreferenceSync"] == true {
@@ -119,22 +278,30 @@ func (h *NativePersonalSummaries) synchronize(ctx context.Context, l *personalSu
 		if !psEqual(live["preference"], expected) {
 			return nil, connectionFailure("summary_choice_changed")
 		}
-		pref, e := l.call(ctx, "preferences/save", map[string]any{"endpoint": l.connection.Endpoint, "expectedRevision": remote["revision"], "enabled": isOne(text(p["state"]), "enabled", "enabled-pending-binding"), "roomIds": p["roomIds"], "includeExisting": p["includeExisting"]})
-		if e != nil {
-			return nil, e
+		revision, valid := summaryPreferenceRevision(remote["revision"])
+		if !valid || revision >= 9007199254740991 {
+			return nil, connectionFailure("summary_preference_receipt_mismatch")
 		}
-		s, e = l.update(ctx, func(t map[string]any) error {
+		input := summaryPreferenceInput(l.connection.Endpoint, remote["revision"], p)
+		operation := map[string]any{"state": "unknown", "input": psClone(input), "choice": expected}
+		_, e = l.update(ctx, func(t map[string]any) error {
 			if !psEqual(t["preference"], expected) {
 				return connectionFailure("summary_choice_changed")
 			}
-			tp := psObject(t["preference"])
-			tp["cloudRevision"] = pref["revision"]
-			tp["needsPreferenceSync"] = false
-			if pref["enabled"] == true {
-				tp["state"] = "enabled"
+			if t["preferenceOperation"] != nil {
+				return connectionFailure("summary_choice_changed")
 			}
+			t["preferenceOperation"] = operation
 			return nil
 		})
+		if e != nil {
+			return nil, e
+		}
+		resolved, e := h.dispatchPreferenceOperation(ctx, l, operation)
+		if e != nil || resolved["state"] != "preference-current" {
+			return resolved, e
+		}
+		s, e = l.read(ctx)
 		if e != nil {
 			return nil, e
 		}

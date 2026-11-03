@@ -5,8 +5,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/gofrs/flock"
 )
 
 type DesiredRelease struct {
@@ -17,55 +20,75 @@ type DesiredRelease struct {
 // SetDesiredRelease records an already prepared complete release as the next
 // on-demand service executable; it does not stop the currently running core.
 func SetDesiredRelease(executable string) (DesiredRelease, error) {
+	d, _, err := SelectDesiredRelease(executable, true)
+	return d, err
+}
+
+// SelectDesiredRelease atomically selects the prepared release. When replace
+// is false an existing selection wins, preventing repair of another host from
+// silently rolling back a newer selection. The bool reports an actual write.
+func SelectDesiredRelease(executable string, replace bool) (DesiredRelease, bool, error) {
 	var d DesiredRelease
 	if !filepath.IsAbs(executable) {
-		return d, fault.New("native_release_path_invalid", 400)
+		return d, false, fault.New("native_release_path_invalid", 400)
 	}
 	executable = filepath.Clean(executable)
-	st, e := os.Stat(executable)
-	if e != nil {
-		return d, e
+	st, err := os.Stat(executable)
+	if err != nil {
+		return d, false, err
 	}
 	if !st.Mode().IsRegular() {
-		return d, fault.New("native_release_path_invalid", 400)
+		return d, false, fault.New("native_release_path_invalid", 400)
 	}
 	id := releaseID(executable)
 	if id == "" {
-		return d, fault.New("native_release_manifest_invalid", 400)
+		return d, false, fault.New("native_release_manifest_invalid", 400)
 	}
-	dir, _, _, e := paths()
-	if e != nil {
-		return d, e
+	dir, _, _, err := paths()
+	if err != nil {
+		return d, false, err
+	}
+	lock := flock.New(filepath.Join(dir, "desired-release.lock"))
+	if err = lock.Lock(); err != nil {
+		return d, false, err
+	}
+	defer lock.Unlock()
+	current, err := GetDesiredRelease()
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return d, false, err
+	}
+	if err == nil && (!replace || current.ReleaseID == id && sameReleaseExecutable(current.Executable, executable)) {
+		return current, false, nil
 	}
 	d = DesiredRelease{Executable: executable, ReleaseID: id}
-	data, e := json.Marshal(d)
-	if e != nil {
-		return d, e
+	data, err := json.Marshal(d)
+	if err != nil {
+		return d, false, err
 	}
 	data = append(data, '\n')
-	f, e := os.CreateTemp(dir, ".desired-*.tmp")
-	if e != nil {
-		return d, e
+	f, err := os.CreateTemp(dir, ".desired-*.tmp")
+	if err != nil {
+		return d, false, err
 	}
 	name := f.Name()
 	defer os.Remove(name)
-	if e = f.Chmod(0600); e == nil {
-		_, e = f.Write(data)
+	if err = f.Chmod(0600); err == nil {
+		_, err = f.Write(data)
 	}
-	if e == nil {
-		e = f.Sync()
+	if err == nil {
+		err = f.Sync()
 	}
 	closeErr := f.Close()
-	if e != nil {
-		return d, e
+	if err != nil {
+		return d, false, err
 	}
 	if closeErr != nil {
-		return d, closeErr
+		return d, false, closeErr
 	}
-	if e = os.Rename(name, filepath.Join(dir, "desired-release.json")); e != nil {
-		return d, e
+	if err = os.Rename(name, filepath.Join(dir, "desired-release.json")); err != nil {
+		return d, false, err
 	}
-	return d, nil
+	return d, true, nil
 }
 
 // GetDesiredRelease returns os.ErrNotExist when no managed release was set.
@@ -116,7 +139,7 @@ func decorateRelease(info Info) (Info, error) {
 	}
 	info.InstalledReleaseID = d.ReleaseID
 	info.InstalledExecutable = d.Executable
-	if info.ReleaseID != "" && info.ReleaseID == d.ReleaseID && filepath.Clean(info.Executable) == filepath.Clean(d.Executable) {
+	if info.ReleaseID != "" && info.ReleaseID == d.ReleaseID && sameReleaseExecutable(info.Executable, d.Executable) {
 		info.SwitchState = "current"
 	} else {
 		info.PendingReleaseID = d.ReleaseID
@@ -141,4 +164,12 @@ func releaseID(executable string) string {
 		return ""
 	}
 	return manifest.ReleaseID
+}
+
+func sameReleaseExecutable(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
 }

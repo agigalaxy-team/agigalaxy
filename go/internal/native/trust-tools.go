@@ -79,6 +79,7 @@ func nativeTrustVCPin(input map[string]any) (trustpackages.VCVerifyOptions, erro
 // unknown operations remain in the existing private local journal.
 func registerNativeTrustTools(server *mcp.Server, tools *toolRuntime, runtime *Runtime) func() {
 	host := NewNativeTrust(runtime)
+	tools.pending = append(tools.pending, host.pendingInteractions)
 	contracts := remoteSelectedContracts(nativeTrustContractsJSON)
 	names := []string{}
 	for name := range contracts {

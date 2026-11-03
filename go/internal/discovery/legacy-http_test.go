@@ -14,6 +14,28 @@ import (
 
 type legacyIdentity func(context.Context, string, string) (deviceauth.Actor, error)
 
+func TestSiteDiscoveryForwardsContactDiscoveryRoutes(t *testing.T) {
+	for _, path := range []string{"/v1/discovery/query", "/v1/discovery/preferences/read", "/v1/discovery/preferences/save"} {
+		t.Run(path, func(t *testing.T) {
+			var forwarded bool
+			h := Handler{Next: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				forwarded = r.URL.Path == path && r.Method == http.MethodPost
+				w.WriteHeader(http.StatusNoContent)
+			})}
+			result := httptest.NewRecorder()
+			h.ServeHTTP(result, httptest.NewRequest(http.MethodPost, path, nil))
+			if !forwarded || result.Code != http.StatusNoContent {
+				t.Fatalf("original contact discovery request not forwarded: forwarded=%v status=%d", forwarded, result.Code)
+			}
+		})
+	}
+	for _, path := range []string{"/v1/discovery/config", "/v1/discovery/events", "/v1/discovery/search", "/v1/discovery/recommendations"} {
+		if !(Handler{}).owns(path) {
+			t.Fatalf("site discovery route %s no longer belongs to site handler", path)
+		}
+	}
+}
+
 func (f legacyIdentity) Authenticate(ctx context.Context, token, scope string) (deviceauth.Actor, error) {
 	return f(ctx, token, scope)
 }

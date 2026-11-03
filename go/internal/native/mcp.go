@@ -28,11 +28,13 @@ type toolRuntime struct {
 	mu      sync.Mutex
 	choices map[string]*choiceRecord
 	browser *BrowserChoices
+	pending []func() (int, time.Time)
 }
 type ToolServer struct {
 	*mcp.Server
 	browser       *BrowserChoices
 	closeServices func()
+	tools         *toolRuntime
 }
 
 func (s *ToolServer) Close() {
@@ -291,7 +293,7 @@ func newToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArti
 	if runtime == nil {
 		registerIntegrationTools(s, rt)
 	}
-	return &ToolServer{Server: s, browser: rt.browser, closeServices: closeServices}, nil
+	return &ToolServer{Server: s, browser: rt.browser, closeServices: closeServices, tools: rt}, nil
 }
 func (r *toolRuntime) token(nonce string) string {
 	m := hmac.New(sha256.New, r.key)

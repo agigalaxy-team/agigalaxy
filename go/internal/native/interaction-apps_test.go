@@ -163,6 +163,14 @@ func TestInteractionAppsActualMCPResourceMetadataAndScopedPanel(t *testing.T) {
 	if e != nil || !invalid.IsError {
 		t.Fatal("unknown argument was accepted", e, invalid)
 	}
+	owner, e := store.Owner(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	reviewedPrivacy, e := cs.CallTool(ctx, &mcp.CallToolParams{Name: "galaxy_local_panel_upload_save", Arguments: map[string]any{"galaxyId": owner, "level": "local-only"}})
+	if e != nil || reviewedPrivacy.IsError {
+		t.Fatal("panel privacy choice with owner failed", e, reviewedPrivacy)
+	}
 	copy := *artifact
 	copy.HTML += "changed"
 	if e = RegisterInteractionResource(mcp.NewServer(&mcp.Implementation{Name: "synthetic", Version: "1"}, nil), &copy); e == nil {

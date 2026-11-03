@@ -346,6 +346,7 @@ func (h *NativeWebHandoff) Close() error {
 }
 func registerNativeWebHandoffTools(server *mcp.Server, tools *toolRuntime, runtime *Runtime) func() {
 	host := NewNativeWebHandoff(runtime)
+	tools.pending = append(tools.pending, host.pendingInteractions)
 	for _, name := range []string{"galaxy_identity_web_connect", "galaxy_identity_web_connect_status"} {
 		contract := psObject(psObject(webContracts()["contracts"])[name])
 		addNativeTool(server, &mcp.Tool{Name: name, InputSchema: contract["schema"], Description: text(contract["description"]), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: contract["readOnlyHint"] == true}}, "web_identity_operation_failed", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {

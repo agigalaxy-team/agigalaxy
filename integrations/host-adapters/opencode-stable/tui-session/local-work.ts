@@ -306,6 +306,7 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
             const operationPage = session.pageGeneration,
               stillReading = () =>
                 !session.closed && operationPage === session.pageGeneration;
+            let settingsSaved = false;
             try {
               await setWorkArchiveSelection(archive, {
                 galaxyId: work.galaxyId,
@@ -313,6 +314,7 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
                 sessionId: work.sessionId,
                 enabled: !selected,
               });
+              settingsSaved = true;
               if (!selected) {
                 const result = await recorder.backfillArchive({
                   galaxyId: work.galaxyId,
@@ -347,12 +349,16 @@ export function createLocalWorkPages(session: GalaxyMenuSession) {
             } catch {
               if (stillReading())
                 session.showInfo(
-                  chinese
-                    ? '保存设置暂未完成'
-                    : 'Unable to update saving settings',
-                  chinese
-                    ? '已有记录仍可阅读，请稍后重试。'
-                    : 'Existing records remain readable. Please try again later.',
+                  settingsSaved
+                    ? chinese ? '保存设置已更新' : 'Saving settings updated'
+                    : chinese ? '保存设置暂未完成' : 'Unable to update saving settings',
+                  settingsSaved
+                    ? chinese
+                      ? '设置已保存，但较早消息的回读或当前状态刷新未完成。已有记录保留，可稍后重新打开查看。'
+                      : 'The setting was saved, but earlier-message backfill or the current-state refresh did not finish. Existing records are retained; reopen later to check.'
+                    : chinese
+                      ? '已有记录仍可阅读，请稍后重试。'
+                      : 'Existing records remain readable. Please try again later.',
                   back,
                 );
             }

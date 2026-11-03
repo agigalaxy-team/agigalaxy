@@ -203,18 +203,23 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 		return printValue(plan)
 	}
 	result, applyError := native.ApplyManagedNativeInstallation(ctx, plan)
-	return completeManagedInstallation(ctx, result, applyError)
+	return completeManagedInstallation(ctx, result, applyError, action == "update")
 }
 
-func completeManagedInstallation(ctx context.Context, result map[string]any, applyError error) error {
+func completeManagedInstallation(ctx context.Context, result map[string]any, applyError error, replaceDesired bool) error {
 	if applyError == nil && result != nil {
 		if release, ok := result["release"].(*native.NativeRelease); ok && result["hostConfigured"] == true {
-			desired, err := nativebridge.SetDesiredRelease(release.Executable)
+			desired, changed, err := nativebridge.SelectDesiredRelease(release.Executable, replaceDesired)
 			if err != nil {
 				result["serviceReleaseSelected"] = false
 				applyError = err
 			} else {
-				result["serviceReleaseSelected"] = true
+				selected := filepath.Clean(desired.Executable) == filepath.Clean(release.Executable)
+				if runtime.GOOS == "windows" {
+					selected = strings.EqualFold(filepath.Clean(desired.Executable), filepath.Clean(release.Executable))
+				}
+				result["serviceReleaseSelected"] = selected
+				result["serviceReleaseChanged"] = changed
 				result["installedService"] = desired
 				if running, statusError := nativebridge.Status(ctx); statusError == nil {
 					result["service"] = running

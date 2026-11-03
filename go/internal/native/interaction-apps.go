@@ -407,12 +407,33 @@ func RegisterInteractionApps(server *mcp.Server, runtime *Runtime, artifact *Int
 				shown = preview
 			}
 		}
-		exact, e := protocol.Encode(shown)
+		var uploadScope *ChoiceScope
+		if uploadReviewSupported(name) {
+			current, e := uploadChoiceScope(ctx, runtime.store)
+			if e != nil {
+				return interactionPanelError(e), nil
+			}
+			uploadScope = &current
+		}
+		readable, handled, e := uploadReviewMessage(ctx, runtime, name, input, nil, uploadScope)
 		if e != nil {
 			return interactionPanelError(e), nil
 		}
-		message += "\n" + string(exact)
-		result, e := review(ctx, req, name, input, message, run)
+		if handled {
+			message = readable
+		} else {
+			exact, e := protocol.Encode(shown)
+			if e != nil {
+				return interactionPanelError(e), nil
+			}
+			message += "\n" + string(exact)
+		}
+		result, e := review(ctx, req, name, input, message, func(scope *ChoiceScope) (any, error) {
+			if uploadScope != nil && (scope == nil || *scope != *uploadScope) {
+				return nil, connectionFailure("native_connection_selection_changed")
+			}
+			return run(scope)
+		})
 		if e != nil {
 			return interactionPanelError(e), nil
 		}

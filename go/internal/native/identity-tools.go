@@ -19,6 +19,7 @@ func identityDeviceResult(value any, e error) (*mcp.CallToolResult, error) {
 }
 func registerIdentityControlTools(server *mcp.Server, tools *toolRuntime, runtime *Runtime) {
 	devices := NewNativeDeviceManagement(runtime)
+	tools.pending = append(tools.pending, devices.pendingInteractions)
 	reads := map[string]any{"type": "object", "oneOf": []any{objectSchema(map[string]any{"action": map[string]any{"type": "string", "enum": []string{"current", "list", "pending"}}}, "action"), objectSchema(map[string]any{"action": map[string]any{"const": "reconcile"}, "operationId": materialUUID()}, "action", "operationId")}}
 	addNativeTool(server, &mcp.Tool{Name: "galaxy_identity_device_native_read", InputSchema: reads, Description: "Read devices controlled by this local identity on this authority, or original pending/receipt metadata. Reconcile only the original operation; no signing, device approval, binding, retry, recovery or data restoration.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}}, "device_management_native_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input struct {

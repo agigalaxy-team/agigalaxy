@@ -15,6 +15,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/jstext"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/mcpschema"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/publicwrites"
 	"github.com/google/jsonschema-go/jsonschema"
@@ -24,6 +25,7 @@ import (
 
 // catalog.json is the maintained personal MCP wire contract. It has no runtime
 // dependency on the retired Node registration handler or its one-time exporter.
+//
 //go:embed catalog.json
 var catalogJSON []byte
 
@@ -65,7 +67,11 @@ func NewHandler(services Services, authority *deviceauth.OAuthResourceAccess, ve
 	}
 	h := &Handler{services: services, authority: authority, Resource: resource, MetadataPath: "/.well-known/oauth-protected-resource/mcp/personal", host: u.Host}
 	issuer := verifier.Metadata()["issuer"]
-	h.metadata = Object{"resource": resource, "authorization_servers": []any{issuer}, "scopes_supported": []string{"galaxy:binding"}, "resource_name": "Galaxy Personal"}
+	supportedScopes := []string{}
+	for _, allowed := range authority.AllowedScopes() {
+		supportedScopes = append(supportedScopes, "galaxy:"+allowed)
+	}
+	h.metadata = Object{"resource": resource, "authorization_servers": []any{issuer}, "scopes_supported": supportedScopes, "resource_name": "Galaxy Personal"}
 	var catalog []definition
 	if json.Unmarshal(catalogJSON, &catalog) != nil {
 		return nil, configurationError()
@@ -165,8 +171,9 @@ func mergeDefaults(actual, defaults Object) {
 func (h *Handler) server(authentication deviceauth.OAuthAuthentication, requestID *string) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "galaxy-personal", Version: "0.1.0"}, nil)
 	for _, d := range h.tools {
-		var schema any
+		var schema map[string]any
 		_ = json.Unmarshal(d.InputSchema, &schema)
+		mcpschema.Project(schema)
 		s.AddTool(&mcp.Tool{Name: d.Name, Description: d.Description, InputSchema: schema, Annotations: d.Annotations}, func(ctx context.Context, r *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			input, e := parseArguments(d, r.Params.Arguments)
 			if e != nil {
@@ -237,9 +244,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	requestID := uuid.NewString()
-	authentication, e := h.authority.Authenticate(r.Context(), bearer[1], &requestID)
+	authentication, e := h.authority.Authenticate(r.Context(), bearer[1], &requestID, r.Header.Values("X-Galaxy-Subject-ID")...)
 	if e != nil {
-		h.reject(w, fault.Status(e), fault.Code(e), []string{"galaxy:binding"}, fault.Code(e) == "invalid_token")
+		var selection *deviceauth.OAuthIdentitySelectionRequired
+		if errors.As(e, &selection) {
+			subjects := make([]Object, 0, len(selection.SubjectIDs))
+			for _, id := range selection.SubjectIDs {
+				subjects = append(subjects, Object{"subjectId": id})
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(Object{"error": "identity_selection_required", "subjects": subjects})
+			return
+		}
+		code := fault.Code(e)
+		h.reject(w, fault.Status(e), code, []string{"galaxy:binding"}, code == "invalid_token" || code == "insufficient_scope")
 		return
 	}
 	if !included(authentication.AuthInfo.Scopes, "galaxy:binding") {

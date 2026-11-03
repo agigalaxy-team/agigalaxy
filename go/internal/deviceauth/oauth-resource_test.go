@@ -202,6 +202,43 @@ func TestOAuthResourceOriginalBindingAssociationAndRevocationPG(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	// A linked account can control multiple identities; neither the database
+	// insertion order nor token scope may choose or combine them implicitly.
+	other := prepareControlFixture(t, admin, t.TempDir(), true)
+	otherActor, _ := bindControlFixture(t, fixture, other, []string{"binding", "history"})
+	otherLink := uuid.NewString()
+	_, e = admin.Exec(ctx, `INSERT INTO external_identity_links(id,subject_id,binding_id,endpoint,provider_id,issuer,external_subject,client_id,payload_text,payload_hash,signature) VALUES($1,$2,$3,$4,'original',$5,'external','linked-client',$6,$7,$8)`, otherLink, other.Genesis.ID, otherActor.BindingID, "https://device.example.invalid", a.server.URL, payload, identity.Digest([]byte(payload)), linkSignature)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = authority.Authenticate(ctx, "resource-token", nil); fault.Code(e) != "identity_selection_required" || fault.Status(e) != 409 {
+		t.Fatalf("ambiguous identity: %v", e)
+	}
+	var choices *OAuthIdentitySelectionRequired
+	if !errors.As(e, &choices) || len(choices.SubjectIDs) != 2 || !contains(choices.SubjectIDs, m.Genesis.ID) || !contains(choices.SubjectIDs, other.Genesis.ID) {
+		t.Fatalf("eligible subject choices: %v", e)
+	}
+	for _, subject := range []string{m.Genesis.ID, other.Genesis.ID} {
+		selected, err := authority.Authenticate(ctx, "resource-token", nil, subject)
+		if err != nil || selected.Actor.SubjectID != subject {
+			t.Fatalf("selected identity %s: %v", subject, err)
+		}
+	}
+	if _, e = authority.Authenticate(ctx, "resource-token", nil, "invalid"); fault.Code(e) != "invalid_identity_selection" {
+		t.Fatalf("invalid selector: %v", e)
+	}
+	if _, e = authority.Authenticate(ctx, "resource-token", nil, m.Genesis.ID, other.Genesis.ID); fault.Code(e) != "invalid_identity_selection" {
+		t.Fatalf("duplicate selector: %v", e)
+	}
+	if _, e = admin.Exec(ctx, `UPDATE external_identity_links SET revoked_at=now() WHERE id=$1`, otherLink); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = authority.Authenticate(ctx, "resource-token", nil, other.Genesis.ID); fault.Code(e) != "identity_selection_unavailable" || fault.Status(e) != 403 {
+		t.Fatalf("unlinked identity accepted: %v", e)
+	}
+	if unique, err := authority.Authenticate(ctx, "resource-token", nil); err != nil || unique.Actor.SubjectID != m.Genesis.ID {
+		t.Fatalf("unique identity: %v", err)
+	}
 	if result.Actor.CredentialHash != "" || len(result.Actor.Scopes) != 2 || result.Actor.Authentication.Profile != "oauth-resource" || result.AuthInfo.ExpiresAt != 2000000120 {
 		t.Fatal("OAuth confused with device bearer or incorrect intersection")
 	}
@@ -264,7 +301,7 @@ func TestOAuthResourceOriginalBindingAssociationAndRevocationPG(t *testing.T) {
 	if e = authorize(result.Actor, "history"); fault.Status(e) != 401 {
 		t.Fatal("revoked link accepted in transaction")
 	}
-	if _, e = authority.Authenticate(ctx, "resource-token", nil); fault.Code(e) != "invalid_token" {
+	if _, e = authority.Authenticate(ctx, "resource-token", nil); fault.Code(e) != "identity_selection_unavailable" || fault.Status(e) != 403 {
 		t.Fatal("revoked association authenticated")
 	}
 	_, _ = admin.Exec(ctx, `UPDATE external_identity_links SET revoked_at=NULL WHERE id=$1`, linkID)

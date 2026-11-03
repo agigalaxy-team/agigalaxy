@@ -54,13 +54,24 @@ func (t *hostSessionTransport) Connect(ctx context.Context) (mcp.Connection, err
 
 type hostSessionConnection struct {
 	mcp.Connection
-	runtime    *Runtime
-	lifecycle  context.Context
-	cancel     context.CancelFunc
-	notices    chan hostSessionNotice
-	done       chan struct{}
-	closeOnce  sync.Once
-	closeError error
+	runtime      *Runtime
+	lifecycle    context.Context
+	cancel       context.CancelFunc
+	notices      chan hostSessionNotice
+	done         chan struct{}
+	closeOnce    sync.Once
+	closeError   error
+	noticeMu     sync.Mutex
+	noticeClosed bool
+}
+
+// PendingHostNotifications counts accepted host notices until their queued or
+// executing continuation ends. It is scoped to this Runtime, across sessions.
+func (r *Runtime) PendingHostNotifications() int {
+	if r == nil {
+		return 0
+	}
+	return int(r.hostNotices.Load())
 }
 
 func (c *hostSessionConnection) Read(ctx context.Context) (jsonrpc.Message, error) {
@@ -79,8 +90,10 @@ func (c *hostSessionConnection) Read(ctx context.Context) (jsonrpc.Message, erro
 			c.diagnostic("host session notification rejected", "native_host_request_invalid")
 			continue
 		}
+		c.runtime.hostNotices.Add(1)
 		scope, err := c.runtime.store.ChoiceScope(ctx)
 		if err != nil || scope.Owner == "" || scope.Owner != notice.GalaxyID {
+			c.runtime.hostNotices.Add(-1)
 			code := "native_connection_selection_changed"
 			if err != nil {
 				code = fault.Code(err)
@@ -89,11 +102,22 @@ func (c *hostSessionConnection) Read(ctx context.Context) (jsonrpc.Message, erro
 			continue
 		}
 		notice.scope = scope
+		c.noticeMu.Lock()
+		if c.noticeClosed {
+			c.runtime.hostNotices.Add(-1)
+			c.noticeMu.Unlock()
+			return nil, c.lifecycle.Err()
+		}
 		select {
 		case c.notices <- notice:
+			c.noticeMu.Unlock()
 		case <-ctx.Done():
+			c.runtime.hostNotices.Add(-1)
+			c.noticeMu.Unlock()
 			return nil, ctx.Err()
 		case <-c.lifecycle.Done():
+			c.runtime.hostNotices.Add(-1)
+			c.noticeMu.Unlock()
 			return nil, c.lifecycle.Err()
 		}
 	}
@@ -101,6 +125,19 @@ func (c *hostSessionConnection) Read(ctx context.Context) (jsonrpc.Message, erro
 
 func (c *hostSessionConnection) process() {
 	defer close(c.done)
+	defer func() {
+		c.noticeMu.Lock()
+		c.noticeClosed = true
+		for {
+			select {
+			case <-c.notices:
+				c.runtime.hostNotices.Add(-1)
+			default:
+				c.noticeMu.Unlock()
+				return
+			}
+		}
+	}()
 	for {
 		select {
 		case <-c.lifecycle.Done():
@@ -110,6 +147,7 @@ func (c *hostSessionConnection) process() {
 			if _, err := c.runtime.PrivateSessionComplete(ctx, notice.Host, notice.SessionID); err != nil && ctx.Err() == nil {
 				c.diagnostic("host session upload continuation stopped", fault.Code(err))
 			}
+			c.runtime.hostNotices.Add(-1)
 		}
 	}
 }

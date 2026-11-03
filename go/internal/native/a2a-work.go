@@ -349,6 +349,7 @@ func (h *NativeA2aWork) retained(l *nativeIdentityLease, op *a2aWorkOperation) m
 }
 func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *NativeA2a, settings ...WorkerToolOptions) func() {
 	h := NewNativeA2aWork(host)
+	tools.pending = append(tools.pending, h.pendingInteractions)
 	var options WorkerToolOptions
 	if len(settings) > 0 {
 		options = settings[0]

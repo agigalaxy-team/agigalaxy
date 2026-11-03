@@ -38,17 +38,19 @@ type Info struct {
 	Lifecycle           map[string]any `json:"lifecycle"`
 }
 type request struct {
-	Version int                 `json:"version"`
-	Action  string              `json:"action"`
-	Profile Profile             `json:"profile,omitempty"`
-	Channel Channel             `json:"channel,omitempty"`
-	Input   native.CommandInput `json:"input,omitempty"`
+	Version             int                 `json:"version"`
+	Action              string              `json:"action"`
+	Profile             Profile             `json:"profile,omitempty"`
+	Channel             Channel             `json:"channel,omitempty"`
+	Input               native.CommandInput `json:"input,omitempty"`
+	RelayControlVersion int                 `json:"relayControlVersion,omitempty"`
 }
 type response struct {
-	Info   *Info           `json:"info,omitempty"`
-	Error  string          `json:"error,omitempty"`
-	Status int             `json:"status,omitempty"`
-	Result json.RawMessage `json:"result,omitempty"`
+	Info                *Info           `json:"info,omitempty"`
+	Error               string          `json:"error,omitempty"`
+	Status              int             `json:"status,omitempty"`
+	Result              json.RawMessage `json:"result,omitempty"`
+	RelayControlVersion int             `json:"relayControlVersion,omitempty"`
 }
 type Options struct {
 	Executable    string

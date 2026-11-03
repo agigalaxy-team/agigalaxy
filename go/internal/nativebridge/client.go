@@ -175,21 +175,44 @@ func Connect(ctx context.Context, profile Profile, channel Channel) (io.ReadWrit
 
 // Relay keeps both directions byte-for-byte, including server-initiated MCP calls.
 func Relay(ctx context.Context, p Profile, ch Channel, input io.Reader, output io.Writer) error {
-	c, err := Connect(ctx, p, ch)
+	request := request{Version: ProtocolVersion, Action: "connect", Profile: p, Channel: ch, RelayControlVersion: 1}
+	raw, reader, response, err := exchange(ctx, request)
+	if fault.Code(err) == "native_service_draining" {
+		// No host bytes were consumed or sent. Wait for the handover to finish
+		// or resume, then open the first stream without replaying an operation.
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+		for err != nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-ticker.C:
+			}
+			if isUnavailable(err) {
+				if _, e := Ensure(ctx, Options{}); e != nil && !errors.Is(e, ErrUnavailable) {
+					return e
+				}
+			}
+			raw, reader, response, err = exchange(ctx, request)
+			if err != nil && !isUnavailable(err) && fault.Code(err) != "native_service_draining" {
+				return err
+			}
+		}
+	}
 	if err != nil {
 		return err
 	}
+	if response.RelayControlVersion == 1 {
+		return relayControlled(ctx, p, ch, input, output, raw, reader, response.Info)
+	}
+	c := &bufferedConn{Conn: raw, reader: reader}
 	defer c.Close()
 	stop := context.AfterFunc(ctx, func() { c.Close() })
 	defer stop()
 	inputDone := make(chan error, 1)
 	go func() {
 		_, e := io.Copy(c, input)
-		if w, ok := c.(interface{ CloseWrite() error }); ok {
-			_ = w.CloseWrite()
-		} else {
-			_ = c.Close()
-		}
+		_ = c.CloseWrite()
 		inputDone <- e
 	}()
 	_, err = io.Copy(output, c)
@@ -242,7 +265,7 @@ func Stop(ctx context.Context) error {
 // Handover explicitly restarts the core, using a prepared release when set.
 // Existing sessions close and retain their original operation IDs.
 func Handover(ctx context.Context) (Info, error) {
-	_, desiredErr := GetDesiredRelease()
+	desired, desiredErr := GetDesiredRelease()
 	if desiredErr != nil && !errors.Is(desiredErr, os.ErrNotExist) {
 		return Info{}, desiredErr
 	}
@@ -251,9 +274,18 @@ func Handover(ctx context.Context) (Info, error) {
 			return Info{}, e
 		}
 	}
+	ready := func(info Info, err error) (Info, error) {
+		if err != nil || desiredErr != nil {
+			return info, err
+		}
+		if info.ReleaseID != desired.ReleaseID || !sameReleaseExecutable(info.Executable, desired.Executable) {
+			return info, fault.New("native_handover_target_changed", 409)
+		}
+		return info, nil
+	}
 	current, e := Status(ctx)
 	if errors.Is(e, ErrPaused) || errors.Is(e, ErrUnavailable) {
-		return Ensure(ctx, Options{ExplicitStart: true})
+		return ready(Ensure(ctx, Options{ExplicitStart: true}))
 	}
 	if e != nil {
 		return Info{}, e
@@ -269,12 +301,15 @@ func Handover(ctx context.Context) (Info, error) {
 			return Info{}, fault.New("native_restart_executable_unavailable", 409)
 		}
 	}
-	c, _, old, e := exchange(ctx, request{Version: ProtocolVersion, Action: "handover"})
+	c, _, old, e := exchange(ctx, request{Version: ProtocolVersion, Action: "handover-drain"})
 	if e == nil {
 		_ = c.Close()
 	} else if isUnavailable(e) {
-		return Ensure(ctx, Options{Executable: fallback})
+		return ready(Ensure(ctx, Options{Executable: fallback}))
 	} else {
+		if fault.Code(e) == "native_service_action_invalid" {
+			return Info{}, fault.New("native_handover_legacy_unsupported", 409)
+		}
 		return Info{}, e
 	}
 	ticker := time.NewTicker(50 * time.Millisecond)
@@ -284,7 +319,7 @@ func Handover(ctx context.Context) (Info, error) {
 	for {
 		info, statusErr := Status(ctx)
 		if statusErr == nil && old.Info != nil && info.InstanceID != old.Info.InstanceID {
-			return info, nil
+			return ready(info, nil)
 		}
 		if errors.Is(statusErr, ErrUnavailable) {
 			break
@@ -303,5 +338,5 @@ func Handover(ctx context.Context) (Info, error) {
 		case <-ticker.C:
 		}
 	}
-	return Ensure(ctx, Options{Executable: fallback})
+	return ready(Ensure(ctx, Options{Executable: fallback}))
 }

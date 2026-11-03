@@ -2,7 +2,6 @@ package native
 
 import (
 	"context"
-	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -18,14 +17,13 @@ func registerUploadTools(server *mcp.Server, rt *toolRuntime, runtime *Runtime) 
 				return toolError(connectionFailure(invalid))
 			}
 			if review {
-				var previewScope *ChoiceScope
-				message := fmt.Sprintf("本人选择：%s\n当前设备和身份的原保存范围；endpoint=%s\n准确输入：%s\n新选择仅影响这些资料、档位和目标；不会删除宿主原件，也不会更改公开查询。", description, runtime.config.Endpoint, string(req.Params.Arguments))
+				current, e := uploadChoiceScope(ctx, runtime.store)
+				if e != nil {
+					return toolError(e)
+				}
+				previewScope := &current
+				var cloudStatus map[string]any
 				if name == "galaxy_work_cloud_delete" || name == "galaxy_archive_cloud_delete" {
-					current, e := uploadChoiceScope(ctx, runtime.store)
-					if e != nil {
-						return toolError(e)
-					}
-					previewScope = &current
 					var q UploadCloudQuery
 					if e = protocol.Decode(req.Params.Arguments, &q); e != nil {
 						return toolError(e)
@@ -34,18 +32,14 @@ func registerUploadTools(server *mcp.Server, rt *toolRuntime, runtime *Runtime) 
 					if name == "galaxy_work_cloud_delete" {
 						kind = "work"
 					}
-					value, e := runtime.uploadCloudCall(ctx, q, kind, "status", previewScope)
+					cloudStatus, e = runtime.uploadCloudCall(ctx, q, kind, "status", previewScope)
 					if e != nil {
 						return toolError(e)
 					}
-					raw, e := protocol.Encode(value)
-					if e != nil {
-						return toolError(e)
-					}
-					message += fmt.Sprintf("\n删除范围：当前身份 %s、准确账户 %s、此云端副本。\n实际云端状态：%s\n本机原件、宿主原件和其他账户副本不受影响；此来源范围将停止自动再上传。", current.Owner, q.TargetAccountID, raw)
 				}
-				if name == "galaxy_local_settings_save" && input["autoCleanAfterDays"] != nil {
-					message += fmt.Sprintf("\n保存时将依已有规则清理超过 %v 天的本机捕获原件；云端副本与宿主原件单独保留。", input["autoCleanAfterDays"])
+				message, _, e := uploadReviewMessage(ctx, runtime, name, input, cloudStatus, previewScope)
+				if e != nil {
+					return toolError(e)
 				}
 				return rt.review(ctx, req, input, message, func(scope *ChoiceScope) (any, error) {
 					if previewScope != nil && *previewScope != *scope {

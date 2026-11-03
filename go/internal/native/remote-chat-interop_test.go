@@ -98,6 +98,16 @@ func TestRemoteChatGoServiceOriginalGrantAndUnknownMessage(t *testing.T) {
 		t.Fatal("lost ACK reported success")
 	}
 	transport.setHook(nil)
+	// A fresh client must recover the original locator from the private store.
+	client = NewNativeChat(runtime)
+	pending, e := client.Call(ctx, "galaxy_chat_pending_sends", map[string]any{"roomId": room}, nil)
+	if e != nil || len(uploadRows(pending["items"])) != 1 {
+		t.Fatal("missing original pending send", pending, e)
+	}
+	locator := uploadObject(uploadRows(pending["items"])[0])
+	if locator["clientMessageId"] != message || locator["state"] != "unknown" || locator["text"] != nil {
+		t.Fatal("invalid retained send locator", locator)
+	}
 	normalized, e := remoteChatNormalize("galaxy_chat_send", send)
 	if e != nil {
 		t.Fatal(e)
@@ -110,6 +120,21 @@ func TestRemoteChatGoServiceOriginalGrantAndUnknownMessage(t *testing.T) {
 	receipt, e := client.Call(ctx, "galaxy_chat_message_status", map[string]any{"roomId": room, "clientMessageId": message, "requestHash": identity.Digest(canonical)}, nil)
 	if e != nil || receipt["state"] != "accepted" || archive.sends.Load() != 1 {
 		t.Fatal(receipt, e, archive.sends.Load())
+	}
+	if locator["requestHash"] != identity.Digest(canonical) {
+		t.Fatal("journal hash differs from original request", locator)
+	}
+	pending, e = client.Call(ctx, "galaxy_chat_pending_sends", map[string]any{"roomId": room}, nil)
+	if e != nil || len(uploadRows(pending["items"])) != 0 {
+		t.Fatal("acknowledged send remains pending", pending, e)
+	}
+	if _, e = client.Call(ctx, "galaxy_chat_send", send, nil); e != nil || archive.sends.Load() != 1 {
+		t.Fatal("acknowledged send was replayed", e, archive.sends.Load())
+	}
+	changedSend := identityClone(send)
+	changedSend["text"] = "different text under the original ID"
+	if _, e = client.Call(ctx, "galaxy_chat_send", changedSend, nil); e == nil {
+		t.Fatal("changed payload reused original message ID")
 	}
 	if _, e = client.Call(ctx, "galaxy_chat_agent_revoke", map[string]any{"roomId": room, "grantId": grant}, nil); e != nil {
 		t.Fatal(e)

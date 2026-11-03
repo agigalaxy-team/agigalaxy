@@ -10,6 +10,8 @@ OpenCode stable 的 /galaxy 提供社区、帮助、消息、本地履历、设�
 
 本机原件须本人明确选择准确宿主和会话。Codex/Claude 的候选 hook 在选中后读取宿主提供的精确 transcript 路径，DeepSeek Harness 可采集选中会话实际收到的消息事件；均以实际可取得的记录和脱敏结果为范围，不代表完整重建。原件上传另行选择，当前源码接线不代表候选包或真实宿主已验收。
 
+房间消息由现有 MCP 处理；发送前 Native 保存当前身份、服务和房间下的原 `clientMessageId`/请求摘要。宿主或 Agent 可用 `galaxy_chat_pending_sends` 找到未决定位，并用 `galaxy_chat_message_status` 核对原回执，已确认的定位从未决列表移除。此记录不保存消息正文、附件或重发授权，宿主关闭后不能凭它恢复草稿或自动发送。MCP 调用、宿主前台和 Agent 按实际需要组合，不要求固定菜单或任务循环。
+
 宿主可向 createGalaxyAdapter 或 createConfiguredGalaxyAdapter 提供 nativeTools.call 和可选 readWorkContext，使用当前获准的前台 Native 工具桥。当前身份、设备、连接或许可变化后，旧内容和预览需要失效；取消与返回保留独立输入，不静默重新派发。
 
 ## 范围与兼容

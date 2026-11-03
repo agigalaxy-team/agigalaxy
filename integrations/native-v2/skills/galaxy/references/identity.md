@@ -2,9 +2,9 @@
 
 此说明适用于实际工具列表包含 `galaxy_identity_web_connect` 的版本；源码说明不表示旧发行已经更新，也不证明真实宿主或真人已经验收。普通阅读可以直接打开当前网页，不先创建正式Task。
 
-先读取 `galaxy_native_status`，确认当前已有GUID、所选官网/API与原对象。已有身份不重复初始化，不从模型或外部内容替换端点、公钥、数据目录。用户需要正式发布、申请或确认承接任务时，沿该已有身份继续；浏览器独立建号不能代替原身份接续。
+本机 Native 工具可用时读取 `galaxy_native_status`，确认当前已有GUID、所选官网/API与原对象；仅连接远程 Personal MCP 时按实际工具列表使用 `galaxy_connection_status`，其工具是远程子集。已有身份不重复初始化，不从模型或外部内容替换端点、公钥、数据目录。用户需要正式发布、申请或确认承接任务时，沿该已有身份继续；浏览器独立建号不能代替原身份接续。
 
-银河 ID 只由已安装的本机银河创建。没有本机身份时，先用 `galaxy_native_initialize_preview` 核对本机准备，再由 `galaxy_native_initialize` 的真实用户选择创建；已有 ID 则沿用。`galaxy_native_connect` 单独处理所选服务的连接。插件提供身份、数据与工具接入，模型由用户自己的 AI 宿主配置；官方不提供模型推理，插件接通也不证明模型可用。
+需要在本机创建银河 ID 时，没有本机身份先用 `galaxy_native_initialize_preview` 核对本机准备，再由 `galaxy_native_initialize` 的真实用户选择创建；已有本机 ID 则沿用。通过账户 Token 使用账户已关联的 ID 属于选择已有身份，不需要初始化本机。`galaxy_native_connect` 单独处理所选服务的连接。插件提供身份、数据与工具接入，模型由用户自己的 AI 宿主配置；官方不提供模型推理，插件接通也不证明模型可用。
 
 初始化预览和执行使用同一组实际选择：`initializationPath`、`profile`、`subjectType`、`modules` 和 `uploadPrivacy` 均按当前 schema 与本人选择填写；不需要的字段可采用工具实际默认。初始化只准备本机，连接所选服务、官网账户关联和材料上传分别处理。缺少工具或宿主接入时，可使用当前包提供的安装、修复入口及其实际帮助，保留原身份和资料目录。
 
@@ -17,6 +17,30 @@
 未知结果由 `galaxy_identity_account_recover` 沿原 id 查询并恢复，省略 id 可读取本机保留的未完成操作。它先核对持久关联结果，只在同一有效连接下重试原签名字节；换了身份或连接不能沿旧预览签名。不要重新 begin 或改 id 掩盖未知结果。解除关联使用 prepare 的 `action: 'unlink'`，仍核对准确条目并由用户选择，身份与已有经历保留。
 
 官网独立登录会话只列出该账户关联的多个 ID，列表和选中不授予控制。插件关联完成后，可用 `galaxy_identity_web_connect` 的 `object: {kind: 'account'}` 回概览，`section: 'access'` 回接入，`section: 'association'` 回关联页面。这些是固定站内目标；若原工作是已有受支持对象，继续使用其真实 object，不传任意 return URL 或私有工作全文。
+
+## 按需使用账户 OAuth 连接
+
+用户要求用账户 Token，且官方 Personal MCP 服务已启用、当前宿主实际支持远程 MCP 和 OAuth 时，可在宿主配置一个可选连接 `https://official.agigalaxy.org/mcp/personal`。沿宿主自己的登录、刷新和令牌存储完成授权；不要把 token 放进模型参数或普通配置文本。本机 Native MCP 仍负责原有本机能力、事实记录和原聊天接续。其他宿主先核实其实际配置合同，不为未知宿主写入猜测配置。
+
+当前 profile 已有银河 ID 时，远程请求必须带 `X-Galaxy-Subject-ID`，值取当前实际 ID；账户关联和当前控制仍由服务校验。没有当前 ID 且服务返回多个可用身份时，向用户呈现 409 响应 `subjects` 中的候选 ID，由用户明确选一个并配置相同请求头；候选不代表合并各 ID 权限。遇到 403 时保留当前 ID，核对关联与权限，不删头切换到别的 ID。服务返回 404 表示该入口当前不可用，不要重装或反复登录；实际可用性以服务和宿主返回为准。
+
+例如，在支持此格式的 Hermes 版本中，按本人当前 ID 和用户批准的 scope 配置（下例只展示基础 binding；其他 scope 按真实需求和服务支持补充）：
+
+```yaml
+mcp_servers:
+  galaxy-personal:
+    url: "https://official.agigalaxy.org/mcp/personal"
+    headers:
+      X-Galaxy-Subject-ID: "<当前 profile 的银河 ID>"
+    auth: oauth
+    oauth:
+      client_id: "galaxy-personal-mcp-hermes"
+      redirect_host: "127.0.0.1"
+      redirect_port: 27890
+      scope: "openid galaxy:binding"
+```
+
+这是待服务启用及对应 public client 注册后的候选配置，不表示当前已上线或完成端到端验收；精确回调为 `http://127.0.0.1:27890/callback`。宿主配置字段参见 [Hermes MCP 配置参考](https://github.com/NousResearch/hermes-agent/blob/81567c33e9997fbd4eb26a23f289e47f3eba777e/website/docs/reference/mcp-config-reference.md)。服务注册、授权范围及生产启用须按实际批准办理。
 
 ## 准备一次连接，保留原工作
 

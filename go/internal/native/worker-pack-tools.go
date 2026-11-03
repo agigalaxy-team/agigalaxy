@@ -131,6 +131,7 @@ func (h *NativeWorkerHost) prunePreviews() {
 	}
 }
 func registerNativeWorkerTools(server *mcp.Server, tools *toolRuntime, host *NativeWorkerHost, options ...WorkerToolOptions) func() {
+	tools.pending = append(tools.pending, host.pendingInteractions, host.a2a.pendingInteractions)
 	if host == nil {
 		return func() {}
 	}

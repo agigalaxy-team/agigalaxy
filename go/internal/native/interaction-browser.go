@@ -69,8 +69,9 @@ func interactionKey(input BrowserChoiceInput) (string, error) {
 }
 func (b *BrowserChoices) pruneLocked() {
 	for path, entry := range b.recoveryEntries {
-		if !entry.expires.After(b.now()) {
+		if !entry.expires.After(b.now()) && entry.mu.TryLock() {
 			delete(b.recoveryEntries, path)
+			entry.mu.Unlock()
 		}
 	}
 	for path, entry := range b.entries {

@@ -10,6 +10,7 @@ import (
 
 func registerNativeIdentityGroupTools(server *mcp.Server, tools *toolRuntime, runtime *Runtime) func() {
 	host := NewNativeIdentityGroupOperations(runtime)
+	tools.pending = append(tools.pending, host.pendingInteractions)
 	var contracts map[string]any
 	_ = protocol.Decode([]byte(nativeIdentityGroupContractsJSON), &contracts)
 	names := []string{}

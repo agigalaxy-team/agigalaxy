@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"sync/atomic"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 )
@@ -30,6 +31,7 @@ type Runtime struct {
 	nativeHelp        *NativeHelp
 	navigation        *NativeNavigation
 	deviceHandoff     *NativeDeviceHandoff
+	hostNotices       atomic.Int64
 }
 
 func NewRuntime(store *Store, configuration Configuration, options ConnectionOptions) (*Runtime, error) {

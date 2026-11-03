@@ -39,6 +39,9 @@ type service struct {
 	artifactDir string
 	lifecycle   context.Context
 	ingress     map[string]bool
+	relays      map[*relayDrainState]struct{}
+	legacy      int
+	draining    bool
 }
 
 func canonical(path string) (string, error) {
@@ -224,7 +227,14 @@ func (s *service) handle(ctx context.Context, c net.Conn) {
 	case "status":
 		_ = json.NewEncoder(c).Encode(response{Info: &s.info})
 		return
-	case "handover":
+	case "handover", "handover-drain":
+		drainCtx, cancelDrain := context.WithCancel(ctx)
+		defer cancelDrain()
+		go func() { var b [1]byte; _, _ = c.Read(b[:]); cancelDrain() }()
+		if e := s.drain(drainCtx); e != nil {
+			_ = json.NewEncoder(c).Encode(response{Error: fault.Code(e), Status: fault.Status(e)})
+			return
+		}
 		_ = json.NewEncoder(c).Encode(response{Info: &s.info})
 		s.cancel()
 		return
@@ -241,6 +251,11 @@ func (s *service) handle(ctx context.Context, c net.Conn) {
 		s.cancel()
 		return
 	case "command":
+		if !s.addLegacy() {
+			_ = json.NewEncoder(c).Encode(response{Error: "native_service_draining", Status: 409})
+			return
+		}
+		defer s.removeLegacy()
 		if req.Profile.LocalOnly {
 			_ = json.NewEncoder(c).Encode(response{Error: "native_runtime_required", Status: 400})
 			return
@@ -271,15 +286,43 @@ func (s *service) handle(ctx context.Context, c net.Conn) {
 		_ = json.NewEncoder(c).Encode(response{Error: "native_service_channel_invalid", Status: 400})
 		return
 	}
+	var relay *relayDrainState
+	if req.RelayControlVersion == 1 {
+		relay = newRelayDrainState(&relayPacketWriter{w: c})
+		if !s.addRelay(relay) {
+			_ = json.NewEncoder(c).Encode(response{Error: "native_service_draining", Status: 409})
+			return
+		}
+		defer s.removeRelay(relay)
+	} else {
+		if !s.addLegacy() {
+			_ = json.NewEncoder(c).Encode(response{Error: "native_service_draining", Status: 409})
+			return
+		}
+		defer s.removeLegacy()
+	}
 	state, err := s.profile(req.Profile, req.Channel)
 	if err != nil {
 		_ = json.NewEncoder(c).Encode(response{Error: fault.Code(err), Status: fault.Status(err)})
 		return
 	}
-	if err = json.NewEncoder(c).Encode(response{Info: &s.info}); err != nil {
+	answer := response{Info: &s.info}
+	var stream io.Reader = &frameReader{reader: reader}
+	var output io.Writer = c
+	if relay != nil {
+		answer.RelayControlVersion = 1
+		stream = controlledInput(ctx, reader, relay, req.Channel == Host)
+		output = relayOutput{relay}
+	}
+	if err = json.NewEncoder(c).Encode(answer); err != nil {
 		return
 	}
-	stream := &frameReader{reader: reader}
+	if relay != nil {
+		relay.mu.Lock()
+		relay.ready = true
+		relay.signal()
+		relay.mu.Unlock()
+	}
 	if req.Channel == Host {
 		hostCtx, cancelHost := context.WithCancel(ctx)
 		defer cancelHost()
@@ -296,14 +339,21 @@ func (s *service) handle(ctx context.Context, c net.Conn) {
 					}
 				}
 				if e != nil {
-					if !stream.ended {
+					graceful := false
+					if framed, ok := stream.(*frameReader); ok {
+						graceful = framed.ended
+					}
+					if framed, ok := stream.(*controlledInputReader); ok {
+						graceful = framed.ended.Load()
+					}
+					if !graceful {
 						cancelHost()
 					}
 					return
 				}
 			}
 		}()
-		_ = native.ServeHost(hostCtx, state.store, input, c)
+		_ = native.ServeHost(hostCtx, state.store, input, output)
 		return
 	}
 	var server *native.ToolServer
@@ -312,7 +362,10 @@ func (s *service) handle(ctx context.Context, c net.Conn) {
 	} else {
 		server = state.full
 	}
-	transport := mcp.Transport(&mcp.IOTransport{Reader: io.NopCloser(stream), Writer: nopWriteCloser{c}})
+	transport := mcp.Transport(&mcp.IOTransport{Reader: io.NopCloser(stream), Writer: nopWriteCloser{output}})
+	if relay != nil {
+		transport = &trackedTransport{Transport: transport, state: relay, hostNotices: !req.Profile.LocalOnly}
+	}
 	if !req.Profile.LocalOnly {
 		transport = native.HostSessionTransport(state.runtime, transport)
 	}

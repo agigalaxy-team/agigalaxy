@@ -18,6 +18,7 @@ func NewNativeChat(runtime *Runtime) *NativeChat { return &NativeChat{runtime} }
 func remoteChatContracts() map[string]any {
 	var value map[string]any
 	_ = protocol.Decode([]byte(remoteChatContractsJSON), &value)
+	value["galaxy_chat_pending_sends"] = map[string]any{"schema": objectSchema(map[string]any{"roomId": map[string]any{"type": "string", "format": "uuid"}}, "roomId"), "description": "List unresolved original message locators for this identity, service and room. This reads local state and never sends or returns message bodies.", "write": false}
 	return value
 }
 func remoteChatInvalid() error { return fault.New("native_chat_input_invalid", 400) }
@@ -242,6 +243,10 @@ func (c *NativeChat) Call(ctx context.Context, name string, input any, expected 
 		return nil, fault.New("native_choice_binding_changed", 409)
 	}
 	scope := lease.scope
+	roomID := text(value["roomId"])
+	if name == "galaxy_chat_pending_sends" {
+		return chatJournalPending(operation, lease, roomID)
+	}
 	path, body, e := remoteChatPath(name, value)
 	if e != nil {
 		return nil, e
@@ -275,6 +280,36 @@ func (c *NativeChat) Call(ctx context.Context, name string, input any, expected 
 			return result, nil
 		}
 		body["bindingId"] = lease.connection.bindingID
+	}
+	if name == "galaxy_chat_send" {
+		_, err := chatJournalPrepare(operation, lease, roomID, body)
+		if err != nil {
+			return nil, err
+		}
+		result, err := call(path, body)
+		if err != nil {
+			return nil, err
+		}
+		hash, err := chatSendHash(body)
+		if err != nil {
+			return nil, err
+		}
+		if err = chatJournalObserve(operation, lease, roomID, text(body["clientMessageId"]), hash, result); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+	if name == "galaxy_chat_message_status" {
+		result, err := call(path, body)
+		if err != nil {
+			return nil, err
+		}
+		if hash := text(body["requestHash"]); hash != "" {
+			if err = chatJournalObserve(operation, lease, roomID, text(body["clientMessageId"]), hash, result); err != nil {
+				return nil, err
+			}
+		}
+		return result, nil
 	}
 	return call(path, body)
 }

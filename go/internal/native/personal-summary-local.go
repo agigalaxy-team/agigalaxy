@@ -70,9 +70,14 @@ func (h *NativePersonalSummaries) choose(ctx context.Context, l *personalSummary
 	if scope == nil || *scope != l.scope {
 		return nil, connectionFailure("summary_choice_required")
 	}
+	h.syncMu.Lock()
+	defer h.syncMu.Unlock()
 	enabled, _ := x["enabled"].(bool)
 	return l.update(ctx, func(s map[string]any) error {
 		prior := psObject(s["preference"])
+		if operation := psObject(s["preferenceOperation"]); operation != nil && operation["state"] == "conflict" {
+			delete(s, "preferenceOperation")
+		}
 		state := "enabled-pending-binding"
 		if !enabled {
 			state = "disabled"
@@ -272,7 +277,11 @@ func (h *NativePersonalSummaries) status(ctx context.Context, l *personalSummary
 			pending = append(pending, map[string]any{"summaryId": q["summaryId"], "versionId": q["versionId"], "endpoint": q["endpoint"], "state": q["state"], "receiptOnly": q["receiptOnly"] == true})
 		}
 	}
-	return map[string]any{"subjectId": l.scope.Owner, "preference": psClone(p), "promptNeeded": p["state"] == "unset", "connected": l.connection != nil, "syncTargetMatches": l.connection != nil && l.connection.Endpoint == p["endpoint"], "queued": len(uploadRows(s["queue"])), "pendingOperations": pending, "summaryCount": len(psObject(s["summaries"])), "modelRunning": false}, nil
+	var preferenceOperation any
+	if op := psObject(s["preferenceOperation"]); op != nil {
+		preferenceOperation = map[string]any{"state": op["state"], "endpoint": psObject(op["input"])["endpoint"], "expectedRevision": psObject(op["input"])["expectedRevision"]}
+	}
+	return map[string]any{"subjectId": l.scope.Owner, "preference": psClone(p), "preferenceOperation": preferenceOperation, "promptNeeded": p["state"] == "unset", "connected": l.connection != nil, "syncTargetMatches": l.connection != nil && l.connection.Endpoint == p["endpoint"], "queued": len(uploadRows(s["queue"])), "pendingOperations": pending, "summaryCount": len(psObject(s["summaries"])), "modelRunning": false}, nil
 }
 func (h *NativePersonalSummaries) list(ctx context.Context, l *personalSummaryLease) (any, error) {
 	s, e := l.read(ctx)

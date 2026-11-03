@@ -31,7 +31,7 @@ func (r *Runtime) uploadPendingDelete(ctx context.Context, q UploadCloudQuery, k
 		if record != nil && (record["owner"] != scope.Owner || !connectionEqual(record["input"], q)) {
 			return connectionFailure("cloud_delete_original_operation_changed")
 		}
-		pending = record["state"] == "unknown"
+		pending = record["state"] == "unknown" || record["state"] == "confirmed" && record["cleanupPending"] == true
 		return nil
 	})
 	return pending, e
@@ -114,7 +114,7 @@ func (a *ArchiveUpload) CleanupCloud(ctx context.Context, q UploadCloudQuery) (a
 // The original delete endpoint has no separate operation ID. Keep its exact
 // owner/account/source attempt before dispatch; an unknown result is status-only.
 // Local queue cleanup is a separate commit after the verified remote result.
-func (r *Runtime) uploadCloudDelete(ctx context.Context, q UploadCloudQuery, kind string, scope *ChoiceScope, reconcileOnly bool, cleanup func() error) (any, error) {
+func (r *Runtime) uploadCloudDelete(ctx context.Context, q UploadCloudQuery, kind string, scope *ChoiceScope, reconcileOnly bool, localScopeID string, cleanup func(map[string]any, any) error) (any, error) {
 	if e := uploadCloudValidate(q, kind, "delete"); e != nil {
 		return nil, e
 	}
@@ -132,12 +132,15 @@ func (r *Runtime) uploadCloudDelete(ctx context.Context, q UploadCloudQuery, kin
 			return e
 		}
 		if prior != nil {
+			if prior["owner"] != scope.Owner || !connectionEqual(prior["input"], q) {
+				return connectionFailure("cloud_delete_original_operation_changed")
+			}
 			return nil
 		}
 		if reconcileOnly {
 			return connectionFailure("cloud_delete_original_operation_unavailable")
 		}
-		prior = map[string]any{"state": "unknown", "input": q, "owner": scope.Owner, "createdAt": localNow()}
+		prior = map[string]any{"state": "unknown", "input": q, "owner": scope.Owner, "createdAt": localNow(), "localScopeId": localScopeID}
 		if e := uploadNativeRecordWithin(dir, key, prior); e != nil {
 			return e
 		}
@@ -147,7 +150,7 @@ func (r *Runtime) uploadCloudDelete(ctx context.Context, q UploadCloudQuery, kin
 	if e != nil {
 		return nil, e
 	}
-	if reconcileOnly && prior["state"] == "confirmed" {
+	if reconcileOnly && prior["state"] == "confirmed" && prior["cleanupPending"] != true {
 		return map[string]any{"state": "superseded"}, nil
 	}
 	unknown := func(cause error) (any, error) {
@@ -157,7 +160,7 @@ func (r *Runtime) uploadCloudDelete(ctx context.Context, q UploadCloudQuery, kin
 	// An explicitly restored work can occupy the same work ID again. A new
 	// reviewed deletion may target it only after the previous attempt is proven
 	// complete. An unresolved attempt never takes this dispatch branch.
-	if prior["state"] == "confirmed" {
+	if prior["state"] == "confirmed" && prior["cleanupPending"] != true {
 		current, e := r.uploadCloudCall(ctx, q, kind, "status", scope)
 		if e != nil {
 			return unknown(e)
@@ -181,7 +184,7 @@ func (r *Runtime) uploadCloudDelete(ctx context.Context, q UploadCloudQuery, kin
 				if !connectionEqual(latest, prior) {
 					return connectionFailure("cloud_delete_original_operation_changed")
 				}
-				next := map[string]any{"state": "unknown", "input": q, "owner": scope.Owner, "createdAt": localNow()}
+				next := map[string]any{"state": "unknown", "input": q, "owner": scope.Owner, "createdAt": localNow(), "localScopeId": localScopeID}
 				if e := uploadNativeRecordWithin(dir, key, next); e != nil {
 					return e
 				}
@@ -231,16 +234,44 @@ func (r *Runtime) uploadCloudDelete(ctx context.Context, q UploadCloudQuery, kin
 			return unknown(connectionFailure("archive_sync_receipt_mismatch"))
 		}
 	}
+	confirmed := map[string]any{"state": "confirmed", "input": q, "owner": scope.Owner, "receipt": receipt, "cleanupPending": true}
+	if value, ok := prior["localScopeId"]; ok {
+		confirmed["localScopeId"] = value
+	}
 	e = r.store.With(ctx, true, func(dir string) error {
 		if e := r.store.verifyChoiceWithin(dir, scope); e != nil {
 			return e
 		}
-		return uploadNativeRecordWithin(dir, key, map[string]any{"state": "confirmed", "input": q, "owner": scope.Owner, "receipt": receipt})
+		var latest map[string]any
+		if _, e := readJSON(connectionRecordPath(dir, key), &latest); e != nil {
+			return e
+		}
+		if !connectionEqual(latest, prior) {
+			return connectionFailure("cloud_delete_original_operation_changed")
+		}
+		return uploadNativeRecordWithin(dir, key, confirmed)
 	})
 	if e != nil {
 		return nil, e
 	}
-	if e = cleanup(); e != nil {
+	if e = cleanup(receipt, confirmed["localScopeId"]); e != nil {
+		return nil, e
+	}
+	e = r.store.With(ctx, true, func(dir string) error {
+		if e := r.store.verifyChoiceWithin(dir, scope); e != nil {
+			return e
+		}
+		var latest map[string]any
+		if _, e := readJSON(connectionRecordPath(dir, key), &latest); e != nil {
+			return e
+		}
+		if !connectionEqual(latest, confirmed) {
+			return connectionFailure("cloud_delete_original_operation_changed")
+		}
+		confirmed["cleanupPending"] = false
+		return uploadNativeRecordWithin(dir, key, confirmed)
+	})
+	if e != nil {
 		return nil, e
 	}
 	return receipt, nil
@@ -249,7 +280,37 @@ func (u *WorkUpload) DeleteCloudReviewed(ctx context.Context, q UploadCloudQuery
 	return u.deleteCloud(ctx, q, scope, false)
 }
 func (u *WorkUpload) deleteCloud(ctx context.Context, q UploadCloudQuery, scope *ChoiceScope, reconcileOnly bool) (any, error) {
-	return u.runtime.uploadCloudDelete(ctx, q, "work", scope, reconcileOnly, func() error {
+	if scope == nil {
+		return nil, connectionFailure("native_connection_choice_required")
+	}
+	localScopeID := ""
+	if e := u.queue(ctx, false, scope.Owner, scope, func(db *sql.DB, owner string) error {
+		if db == nil {
+			return nil
+		}
+		choice, e := workUploadChoice(ctx, db, owner, u.runtime.config.Endpoint)
+		if e != nil || choice["targetAccountId"] != q.TargetAccountID {
+			return e
+		}
+		row, e := oneMap(ctx, db, "SELECT scope_id FROM work_sync_scopes WHERE owner_id=? AND endpoint=? AND work_id=?", owner, u.runtime.config.Endpoint, q.WorkID)
+		if row != nil {
+			localScopeID = text(row["scope_id"])
+		}
+		return e
+	}); e != nil {
+		return nil, e
+	}
+	return u.runtime.uploadCloudDelete(ctx, q, "work", scope, reconcileOnly, localScopeID, func(receipt map[string]any, captured any) error {
+		deletedScope := text(receipt["scopeId"])
+		if deletedScope == "" {
+			if captured == nil {
+				return connectionFailure("cloud_delete_scope_unresolved")
+			}
+			deletedScope = text(captured)
+		}
+		if deletedScope == "" {
+			return nil
+		}
 		return u.queue(ctx, true, scope.Owner, scope, func(db *sql.DB, owner string) error {
 			if db == nil {
 				return nil
@@ -259,11 +320,11 @@ func (u *WorkUpload) deleteCloud(ctx context.Context, q UploadCloudQuery, scope 
 				return e
 			}
 			if choice["targetAccountId"] == q.TargetAccountID {
-				if _, e = db.ExecContext(ctx, "UPDATE work_sync_scopes SET blocked=1 WHERE owner_id=? AND endpoint=? AND work_id=?", owner, u.runtime.config.Endpoint, q.WorkID); e != nil {
+				if _, e = db.ExecContext(ctx, "UPDATE work_sync_scopes SET blocked=1 WHERE owner_id=? AND endpoint=? AND work_id=? AND scope_id=?", owner, u.runtime.config.Endpoint, q.WorkID, deletedScope); e != nil {
 					return e
 				}
 			}
-			_, e = db.ExecContext(ctx, "UPDATE work_sync_jobs SET state='deleted',data_json='null' WHERE owner_id=? AND endpoint=? AND work_id=? AND target_id=?", owner, u.runtime.config.Endpoint, q.WorkID, q.TargetAccountID)
+			_, e = db.ExecContext(ctx, "UPDATE work_sync_jobs SET state='deleted',data_json='null' WHERE owner_id=? AND endpoint=? AND work_id=? AND target_id=? AND scope_id=?", owner, u.runtime.config.Endpoint, q.WorkID, q.TargetAccountID, deletedScope)
 			return e
 		})
 	})
@@ -272,7 +333,7 @@ func (a *ArchiveUpload) DeleteCloudReviewed(ctx context.Context, q UploadCloudQu
 	return a.deleteCloud(ctx, q, scope, false)
 }
 func (a *ArchiveUpload) deleteCloud(ctx context.Context, q UploadCloudQuery, scope *ChoiceScope, reconcileOnly bool) (any, error) {
-	return a.runtime.uploadCloudDelete(ctx, q, "archive", scope, reconcileOnly, func() error {
+	return a.runtime.uploadCloudDelete(ctx, q, "archive", scope, reconcileOnly, "", func(_ map[string]any, _ any) error {
 		return a.access(ctx, true, false, scope.Owner, scope, func(db *sql.DB, owner string) error {
 			if db == nil {
 				return nil

@@ -34,7 +34,7 @@ type Handler struct {
 }
 
 func (h Handler) owns(path string) bool {
-	return strings.HasPrefix(path, "/v1/discovery/") || path == "/v1/operations/discovery/analytics" || path == "/v1/operations/search-quality" || strings.HasPrefix(path, "/v1/operations/search-quality/") || path == "/v1/operations/recommendation" || strings.HasPrefix(path, "/v1/operations/recommendation/")
+	return path == "/v1/discovery/config" || path == "/v1/discovery/events" || path == "/v1/discovery/search" || path == "/v1/discovery/recommendations" || path == "/v1/operations/discovery/analytics" || path == "/v1/operations/search-quality" || strings.HasPrefix(path, "/v1/operations/search-quality/") || path == "/v1/operations/recommendation" || strings.HasPrefix(path, "/v1/operations/recommendation/")
 }
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !h.owns(r.URL.EscapedPath()) {

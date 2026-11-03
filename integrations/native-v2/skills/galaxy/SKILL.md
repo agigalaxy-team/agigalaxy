@@ -37,7 +37,7 @@ MCP 尚不可用时，Skill 配合当前 Agent 选择随包 `galaxy install`、`
 
 `galaxy_local_upload_privacy_get/set` 管理四档允许上传类型，默认第2档只含结构化履历概况；第3档才包含所选具体说明与过程摘要。完整会话另行选择，凭据始终排除。本人本地读取、宿主自己的模型调用及向银河上传分别处理。
 
-`galaxy_local_archive_configure/list/export/delete/cleanup` 管理实际采集的原会话，默认不保存完整会话；`galaxy_local_work_export/delete` 管理履历。私有云同步分别使用 `galaxy_work_sync_*`、`galaxy_archive_sync_*`，沿已选账户、目标与资料范围持续接续；新增范围按实际选择办理。本机、原件与云副本分别保存和删除，重置身份不清空它们。
+`galaxy_local_archive_configure/list/export/delete/cleanup` 管理实际采集的原会话，默认不保存完整会话；`galaxy_local_work_export/delete` 管理履历。私有云同步分别使用 `galaxy_work_sync_*`、`galaxy_archive_sync_*`，沿已选账户、目标与资料范围持续接续；新增范围按实际选择办理。本机、原件与云副本分别保存和删除，重置身份不清空它们。上传档位、工作或原会话范围、目标账户及云副本删除的本人选择会以可读名称与影响呈现；无法取得名称时用准确标识帮助区分。按当前选择核对实际范围，不要求用户阅读工具参数 JSON；具体工具仍按原参数和当前身份执行。
 
 ## 网页与原聊天接续
 

@@ -88,6 +88,11 @@ func installNativeRelease(ctx context.Context, source, root, dataDirectory, pref
 	if err := installationCaptureDependencies(source, target); err != nil {
 		return nil, err
 	}
+	// Validate the installed bytes before any host can point at this release.
+	// The source may have changed while the tree was being copied.
+	if err := installationValidateReleaseArtifacts(ctx, target, m.Artifacts); err != nil {
+		return nil, err
+	}
 	executable, err := hostCandidate(target)
 	if err != nil {
 		return nil, err
