@@ -10,3 +10,12 @@ test('original AI receipt proxy permits only the exact read-only UUID route',()=
  for(const bad of [path+'?x=1',path+'/extra',path.replace(operation,'not-a-uuid'),path.replace(task,'not-a-uuid')])assert.equal(policy(bad).allowed,false,bad);
  for(const method of ['POST','PUT','DELETE'])assert.equal(policy(path,method).allowed,false,method);
 });
+
+test('confirmed task assignment can be read through the same authenticated proxy',()=>{
+ for(const domain of ['overview','governance','messaging','discovery','maintenance']){
+  const dispatch=`/v1/operations/autonomy/dispatches/${domain}/${operation}`;
+  assert.equal(policy(dispatch).allowed,true);
+  assert.equal(policy(dispatch+'?x=1').allowed,false);
+  assert.equal(policy(dispatch,'POST').allowed,false);
+ }
+});
