@@ -287,7 +287,7 @@ func (s *Service) createDispatchTaskWithin(ctx context.Context, tx pgx.Tx, base,
 	cfg := obj(clone(base))
 	cfg["configuration"] = dispatchConfiguration(base, x)
 	cfg["enabled"] = true
-	obj(cfg["configuration"])["dispatch"] = Object{"id": assignment["id"], "revision": assignment["revision"], "operatorId": assignment["operator_id"]}
+	obj(cfg["configuration"])["dispatch"] = Object{"id": assignment["id"], "revision": assignment["revision"], "operatorId": assignment["operator_id"], "trigger": x["trigger"]}
 	title := str(assignment["title"])
 	key := "dispatch:" + str(assignment["id"]) + ":" + str(assignment["next_due_at"])
 	in := TaskInput{Source: "routine", Key: key, Title: &title}
