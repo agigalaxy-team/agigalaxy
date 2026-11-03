@@ -136,7 +136,18 @@ func (r *Runtime) commandSurface(ctx context.Context, name string, input Command
 	// These original Native overrides use the current selected identity, including
 	// an adopted identity. They never fall back to another local identity's work.
 	if name == "worker" {
-		return map[string]any{"command": name, "route": "galaxy-worker-identity", "state": "identity-setup-available", "message": "通过独立 Worker 目录创建 Agent 主体，保留普通客户端身份与履历；本操作不启动 Worker 或模型。", "nextTools": []string{"galaxy_local_worker_identity_create"}, "runtimeStarted": false, "localOnly": true}, nil
+		message := "通过独立 Worker 目录创建 Agent 主体，保留普通客户端身份与履历；本操作不启动 Worker 或模型。"
+		if input.Language == "en-US" {
+			message = "Create an Agent identity in a separate Worker directory while retaining the ordinary client identity and history. This does not start a Worker or model."
+		}
+		return map[string]any{"command": name, "route": "galaxy-worker-identity", "state": "identity-setup-available", "message": message, "nextTools": []string{"galaxy_local_worker_identity_create"}, "runtimeStarted": false, "localOnly": true}, nil
+	}
+	if name == "hub" {
+		message := "可连接所选银河服务，并按权限查询和参与 Hub。独立 Hub 的运营初始化仍在规划中。"
+		if input.Language == "en-US" {
+			message = "Connect to the selected Galaxy service and query or participate in a Hub according to your permissions. Initialization for operating an independent Hub is still planned."
+		}
+		return map[string]any{"command": name, "route": "galaxy-hub-client", "state": "client-tools-available", "message": message, "nextTools": []string{"galaxy_native_status", "galaxy_native_connect", "galaxy_hub_status", "galaxy_hub_query", "galaxy_hub_read"}, "localOnly": true}, nil
 	}
 	if name == "history" || name == "work" {
 		history, e := r.store.WorkList(ctx, WorkQuery{GalaxyID: scope.Owner})

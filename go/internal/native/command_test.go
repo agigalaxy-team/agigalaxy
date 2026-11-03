@@ -65,6 +65,9 @@ func TestCommandOriginalLocalPresentationAndReadBoundaries(t *testing.T) {
 		t.Fatal(e)
 	}
 	for i, name := range []string{"open", "case", "hub", "setup"} {
+		if name == "hub" {
+			continue // Hub now exposes the existing client tools, tested below.
+		}
 		original := uploadObject(uploadRows(fixture["initialized"])[i])
 		got, e := r.Command(ctx, CommandInput{Command: name, Language: "en-US"})
 		if e != nil {
@@ -100,6 +103,62 @@ func TestCommandOriginalLocalPresentationAndReadBoundaries(t *testing.T) {
 	compareLegacyCommandSnapshot(t, "export", exported)
 	assertInitializationIdentity(t, store.Directory, uploadObject(uploadObject(exported)["identity"]))
 
+}
+
+func TestCommandHubAndWorkerLanguage(t *testing.T) {
+	ctx := context.Background()
+	store, err := NewStore(t.TempDir(), "https://command.invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := commandRuntime(t, store)
+	for _, tc := range []struct{ command, language, message string }{
+		{"worker", "zh-CN", "通过独立 Worker 目录创建 Agent 主体，保留普通客户端身份与履历；本操作不启动 Worker 或模型。"},
+		{"worker", "en-US", "Create an Agent identity in a separate Worker directory while retaining the ordinary client identity and history. This does not start a Worker or model."},
+		{"hub", "zh-CN", "可连接所选银河服务，并按权限查询和参与 Hub。独立 Hub 的运营初始化仍在规划中。"},
+		{"hub", "en-US", "Connect to the selected Galaxy service and query or participate in a Hub according to your permissions. Initialization for operating an independent Hub is still planned."},
+	} {
+		value, err := r.Command(ctx, CommandInput{Command: tc.command, Language: tc.language})
+		if err != nil || uploadObject(value)["message"] != tc.message {
+			t.Fatalf("%s %s: got %v, error %v", tc.command, tc.language, value, err)
+		}
+	}
+}
+
+func TestCommandHubClientAvailableWithoutInitialization(t *testing.T) {
+	ctx := context.Background()
+	store, err := NewStore(t.TempDir(), "https://command.invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := commandRuntime(t, store)
+	check := func() {
+		t.Helper()
+		value, err := r.Command(ctx, CommandInput{Command: "hub"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		result := uploadObject(value)
+		if result["state"] != "client-tools-available" || result["route"] != "galaxy-hub-client" || result["localOnly"] != true {
+			t.Fatalf("unexpected hub client entry: %v", result)
+		}
+		want := []string{"galaxy_native_status", "galaxy_native_connect", "galaxy_hub_status", "galaxy_hub_query", "galaxy_hub_read"}
+		if !reflect.DeepEqual(result["nextTools"], want) {
+			t.Fatalf("unexpected hub client tools: %v", result["nextTools"])
+		}
+	}
+	check()
+	if owner, err := store.Owner(ctx); err != nil || owner != "" {
+		t.Fatalf("hub entry changed identity: %q, %v", owner, err)
+	}
+	scope, err := store.ChoiceScope(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.Initialize(ctx, InitializationInput{Profile: "minimal"}, true, &scope); err != nil {
+		t.Fatal(err)
+	}
+	check()
 }
 
 // Original JS projections, with per-run identity and timestamps checked and substituted.

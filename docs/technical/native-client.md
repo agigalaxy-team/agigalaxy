@@ -131,7 +131,7 @@ Vercel Skills目录表与MCPorter配置路径是适配线索，各宿主当前�
 | 网页与原聊天 | 原对象navigation、当前身份及来源复核、官网接续链接与MCP读取已接线 | 当前Agent按需调用`galaxy_open/return/work_continue`，在原聊天继续处理 |
 | 求助、房间、发布及业务参与 | Go业务工具、Skill与可选面板保留真实读写 | 完整帮助／协作／返回及跨人实际写入不能由只读查询代替；沿原业务授权办理 |
 | 关注与已委托工作 | check／ack／status／stop及原grant、事件、位置与回执保留 | 普通MCP可重读原pending工作及固定窗口，材料变化沿当前权限呈现，Agent显式ACK原工作；专用只读驱动为可选兼容，服务存活不表示模型持续运行 |
-| A2A与Worker Pack | 已配置对端的选择、执行、进度、取消和回执链路已存在，目的入口按真实原关联分页 | 专业Worker／Hub初始化仍planned；参考Worker与协议检查不等于独立供给已运行 |
+| A2A与Worker Pack | 已配置对端的选择、执行、进度、取消和回执链路已存在，目的入口按真实原关联分页；`/Galaxy hub`接已有服务连接和Hub查询入口 | 专业Worker运行环境与完整Hub运营初始化仍planned，不影响连接或读取现有Hub；参考Worker与协议检查不等于独立供给已运行 |
 | 用户级安装维护 | install／update／repair／uninstall、整版资源、原资料保留及平台归档命名已实现 | 多宿主有配置合并与隔离检查，真实宿主采用、更新切换及失败恢复分别核对；旧受管发行目录目前保留 |
 | 系统提醒与多平台发行 | Windows／Linux通道及macOS helper源码、目标平台构建、npm和容器准备入口已实现 | Linux／macOS真实桌面、macOS编译签名公证及正式多平台发行仍待对应结果；新包与镜像尚未上架 |
 
