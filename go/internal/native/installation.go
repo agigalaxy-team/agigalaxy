@@ -10,8 +10,12 @@ import (
 	"strings"
 )
 
-type NativeInstallationInput struct{ Website, Host, DataDirectory, Destination, PackageDirectory, OpenCodePath, OpenCodeConfigDirectory, DefaultOpenCodeConfigDirectory, SubjectType string }
+type NativeInstallationInput struct {
+	Website, Host, DataDirectory, Destination, PackageDirectory, OpenCodePath, OpenCodeConfigDirectory, DefaultOpenCodeConfigDirectory, SubjectType string
+	LocalOnly                                                                                                                                       bool
+}
 type NativeInstallationPlan struct {
+	LocalOnly               bool                   `json:"localOnly"`
 	Website                 string                 `json:"website"`
 	Endpoint                string                 `json:"endpoint"`
 	Operator                *string                `json:"operator"`
@@ -129,13 +133,20 @@ func PreviewNativeInstallation(ctx context.Context, input NativeInstallationInpu
 			return nil, e
 		}
 	}
-	website, e := InstallationWebsiteOrigin(input.Website)
-	if e != nil {
-		return nil, e
-	}
-	service, e := InspectServiceConfiguration(ctx, ServiceConfigurationRequest{Website: website}, options)
-	if e != nil {
-		return nil, e
+	service := &ServiceConfigurationInspection{PublicFingerprints: []PublicKeyFingerprint{}}
+	if input.LocalOnly {
+		if input.Website != "" {
+			return nil, hostConfigurationFailure("setup_configuration_conflict")
+		}
+	} else {
+		website, e := InstallationWebsiteOrigin(input.Website)
+		if e != nil {
+			return nil, e
+		}
+		service, e = InspectServiceConfiguration(ctx, ServiceConfigurationRequest{Website: website}, options)
+		if e != nil {
+			return nil, e
+		}
 	}
 	store, e := NewStore(input.DataDirectory, service.Endpoint)
 	if e != nil {
@@ -146,7 +157,7 @@ func PreviewNativeInstallation(ctx context.Context, input NativeInstallationInpu
 		return nil, e
 	}
 	normal := hostDirectory != nil && input.DefaultOpenCodeConfigDirectory != "" && filepath.Clean(*hostDirectory) == filepath.Clean(input.DefaultOpenCodeConfigDirectory)
-	return &NativeInstallationPlan{Website: service.Website, Endpoint: service.Endpoint, Operator: service.Operator, Host: label, DataDirectory: input.DataDirectory, Destination: input.Destination, PublicFingerprints: service.PublicFingerprints, HostConfigDirectory: hostDirectory, NormalStartupConfigured: normal, SubjectType: input.SubjectType, input: input, service: service, scope: scope}, nil
+	return &NativeInstallationPlan{LocalOnly: input.LocalOnly, Website: service.Website, Endpoint: service.Endpoint, Operator: service.Operator, Host: label, DataDirectory: input.DataDirectory, Destination: input.Destination, PublicFingerprints: service.PublicFingerprints, HostConfigDirectory: hostDirectory, NormalStartupConfigured: normal, SubjectType: input.SubjectType, input: input, service: service, scope: scope}, nil
 }
 func hostDirectoryCheck(path string) error {
 	e := hostDirectory(path)
@@ -194,22 +205,26 @@ func PrepareNativeInstallationReviewed(ctx context.Context, plan *NativeInstalla
 	if e = os.Mkdir(input.Destination, 0700); e != nil {
 		return nil, e
 	}
-	configPath := filepath.Join(input.Destination, "galaxy-public-config.json")
-	raw, e := hostJSON(Configuration{Version: 2, Endpoint: service.Endpoint, Website: service.Website, DataDirectory: input.DataDirectory, TrustedKeys: service.TrustedKeys})
-	if e != nil {
-		return nil, e
-	}
-	if e = hostWriteNew(configPath, raw); e != nil {
-		return nil, e
-	}
-	installedPackage := input.PackageDirectory
-	if input.Host == "opencode" {
-		installedPackage, e = installationCopyPackage(input.PackageDirectory, input.OpenCodeConfigDirectory)
+	configPath := ""
+	if !input.LocalOnly {
+		configPath = filepath.Join(input.Destination, "galaxy-public-config.json")
+		raw, e := hostJSON(Configuration{Version: 2, Endpoint: service.Endpoint, Website: service.Website, DataDirectory: input.DataDirectory, TrustedKeys: service.TrustedKeys})
 		if e != nil {
 			return nil, e
 		}
+		if e = hostWriteNew(configPath, raw); e != nil {
+			return nil, e
+		}
 	}
-	generatedInput := HostConfigurationInput{PackageDirectory: installedPackage, ConfigPath: configPath, Destination: filepath.Join(input.Destination, "host-configs"), Hosts: []string{input.Host}, DataDirectory: input.DataDirectory, Endpoint: service.Endpoint}
+	packageDirectory := input.Destination
+	if input.Host == "opencode" {
+		packageDirectory = input.OpenCodeConfigDirectory
+	}
+	installedPackage, e := installationCopyPackage(input.PackageDirectory, packageDirectory)
+	if e != nil {
+		return nil, e
+	}
+	generatedInput := HostConfigurationInput{LocalOnly: input.LocalOnly, PackageDirectory: installedPackage, ConfigPath: configPath, Destination: filepath.Join(input.Destination, "host-configs"), Hosts: []string{input.Host}, DataDirectory: input.DataDirectory, Endpoint: service.Endpoint}
 	generated, e := GenerateHostConfigurations(ctx, generatedInput)
 	if e != nil {
 		return nil, e
@@ -259,7 +274,8 @@ func PrepareNativeInstallationReviewed(ctx context.Context, plan *NativeInstalla
 	if input.Host == "opencode" {
 		result["openCodeInstalled"] = executable != ""
 	}
-	raw, e = hostJSON(result)
+	result["localOnly"] = input.LocalOnly
+	raw, e := hostJSON(result)
 	if e != nil {
 		return nil, e
 	}

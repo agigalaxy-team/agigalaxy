@@ -159,7 +159,9 @@ func usage() {
   galaxy service-config inspect --website <HTTPS origin> [--endpoint <HTTPS origin>]
   galaxy service-config prepare --website <HTTPS origin> --endpoint <HTTPS origin> --data-dir <absolute path> --output <new absolute file> [--root-pins-file <absolute JSON> --trust-directory <absolute path>] [--network-type official|hub]
   galaxy host-configs <absolute config> <new output directory> [--package-dir <candidate>] [--hosts <comma-separated ids>]
+  galaxy host-configs <new output directory> --local-only [--data-dir <path>] [--hosts <comma-separated ids>]
   galaxy setup <website URL> [--host <host id>] [--data-dir <path>] [--organization]
+  galaxy setup --local-only [--host <host id>] [--data-dir <path>] [--organization]
 
 This candidate is incomplete. Only an explicitly reviewed setup may change a host configuration.`)
 }

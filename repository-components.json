@@ -223,6 +223,12 @@
           "{node}",
           "scripts/check-go.mjs",
           "native-client"
+        ],
+        [
+          "{node}",
+          "--test",
+          "integrations/host-adapters/opencode-stable/bridge/child-lifecycle.test.mjs",
+          "integrations/host-adapters/opencode-stable/bridge/host-diagnostics.test.mjs"
         ]
       ],
       "buildLimit": "Local Go Native and thin host candidate; does not replace installed commands or establish platform acceptance.",

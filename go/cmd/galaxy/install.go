@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -24,14 +25,24 @@ func candidateDirectory() (string, error) {
 }
 
 func hostConfigurationsCommand(ctx context.Context, args []string) error {
-	if len(args) < 2 {
+	localOnly := slices.Contains(args, "--local-only")
+	if len(args) < 1 || !localOnly && len(args) < 2 {
 		return fault.New("native_arguments_invalid", 400)
 	}
-	input := native.HostConfigurationInput{ConfigPath: args[0], Destination: args[1]}
+	input := native.HostConfigurationInput{}
+	remaining := args[1:]
+	if localOnly {
+		input.Destination = args[0]
+	} else {
+		input.ConfigPath, input.Destination = args[0], args[1]
+		remaining = args[2:]
+	}
 	flags := arguments("host-configs")
+	flags.BoolVar(&input.LocalOnly, "local-only", false, "")
+	flags.StringVar(&input.DataDirectory, "data-dir", "", "")
 	flags.StringVar(&input.PackageDirectory, "package-dir", "", "")
 	hosts := flags.String("hosts", "", "")
-	if flags.Parse(args[2:]) != nil || flags.NArg() != 0 {
+	if flags.Parse(remaining) != nil || flags.NArg() != 0 {
 		return fault.New("native_arguments_invalid", 400)
 	}
 	flags.Visit(func(f *flag.Flag) {
@@ -49,6 +60,35 @@ func hostConfigurationsCommand(ctx context.Context, args []string) error {
 			return err
 		}
 	}
+	if input.LocalOnly {
+		if input.DataDirectory == "" {
+			input.DataDirectory = os.Getenv("GALAXY_DATA_DIR")
+		}
+		if input.DataDirectory == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+			input.DataDirectory = filepath.Join(home, ".galaxy")
+		}
+		input.DataDirectory, err = filepath.Abs(input.DataDirectory)
+		if err != nil {
+			return err
+		}
+	} else {
+		// OpenCode's TUI and its MCP server must use the SAME selected store.
+		// The public configuration is the owner of that location and endpoint.
+		if input.DataDirectory != "" {
+			return fault.New("native_arguments_invalid", 400)
+		}
+		if slices.Contains(input.Hosts, "opencode") {
+			configuration, err := native.ReadConfiguration(input.ConfigPath)
+			if err != nil {
+				return err
+			}
+			input.DataDirectory, input.Endpoint = configuration.DataDirectory, configuration.Endpoint
+		}
+	}
 	value, err := native.GenerateHostConfigurations(ctx, input)
 	if err != nil {
 		return err
@@ -62,6 +102,10 @@ func setupCommand(ctx context.Context, args []string) error {
 	input := native.NativeInstallationInput{SubjectType: "person"}
 	for i := 0; i < len(args); i++ {
 		argument := args[i]
+		if argument == "--local-only" {
+			input.LocalOnly = true
+			continue
+		}
 		if argument == "--organization" {
 			input.SubjectType = "organization"
 			continue
@@ -95,7 +139,7 @@ func setupCommand(ctx context.Context, args []string) error {
 		}
 		input.Website = argument
 	}
-	if input.Website == "" {
+	if input.Website == "" && !input.LocalOnly || input.Website != "" && input.LocalOnly {
 		return fault.New("native_arguments_invalid", 400)
 	}
 	reader := bufio.NewReader(os.Stdin)

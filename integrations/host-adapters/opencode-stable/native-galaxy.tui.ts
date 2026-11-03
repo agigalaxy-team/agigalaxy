@@ -3,7 +3,7 @@ import {createNativeRuntimeBridge} from './native-runtime-bridge.mjs';
 import {createHostLocalClient} from './bridge/host-local-client.mjs';
 import {createHostInputHandler} from './bridge/host-input.mjs';
 import type {StableHostApi} from './adapter-types.ts';
-import {nativeDiagnostics} from './bridge/native-diagnostics.mjs';
+import {hostDiagnostics} from './bridge/native-diagnostics.mjs';
 export {prepareOpenCodeLocalWork} from './bridge/host-local-client.mjs';
 
 type Options={configPath?:string;dataDirectory?:string;endpoint?:string;backend?:'go';executable?:string;onInputRequest?:(params:unknown,options:unknown)=>Promise<{action:'accept'|'decline'|'cancel';content?:Record<string,unknown>}>;openLink?:(url:string)=>Promise<unknown>;openBrowser?:(url:string)=>Promise<unknown>};
@@ -13,7 +13,6 @@ type Options={configPath?:string;dataDirectory?:string;endpoint?:string;backend?
 // OpenCode continues to own its providers, conversation and unsent prompt.
 export function createNativeGalaxyPlugin({configPath,dataDirectory:installedDirectory,backend='go',executable, onInputRequest,openLink,openBrowser}:Options={}){
   if(backend!=='go')throw Error('native_bridge_backend_invalid');
-  const diagnostics=nativeDiagnostics('host-client');
   return createGalaxyPlugin(async()=>{
   // The public service configuration locates the same user-owned local store.
   // Reading it does not start Native, authenticate or run a model.
@@ -33,6 +32,7 @@ export function createNativeGalaxyPlugin({configPath,dataDirectory:installedDire
    ...adapter,
    tui:async(api:StableHostApi)=>{
     hostApi=api;
+    const diagnostics=hostDiagnostics(api);
     const stop=()=>{shutdown().catch((error:unknown)=>diagnostics.emit({event:'host_bridge',stage:'shutdown',outcome:'failed',host:'opencode',error}));};
     unregister=api.lifecycle?.onDispose(stop);
     if(api.lifecycle?.signal.aborted){stop();unregister?.();return;}

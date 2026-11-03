@@ -37,14 +37,18 @@ function rpc(child){
   pending.set(key,{resolve,timer});child.stdin.write(JSON.stringify({jsonrpc:'2.0',id:key,method,params})+'\n');});
  return{request,notify:(method,params={})=>child.stdin.write(JSON.stringify({jsonrpc:'2.0',method,params})+'\n')};
 }
-export async function probeInstalledHosts({candidate,codexEntry,claudeExecutable,reportFile}){
+export async function probeInstalledHosts({candidate,codexEntry,claudeExecutable,reportFile,localOnly=true}){
  for(const p of[candidate,codexEntry,claudeExecutable,reportFile])if(!isAbsolute(p))throw new Error('Explicit absolute candidate, installed CLI and new report paths required');
  const directory=await mkdtemp(join(tmpdir(),'galaxy-installed-host-probe-'));let codex;
  const target=resolve(directory);
  if(!target.startsWith(resolve(tmpdir())+sep)||!target.split(sep).at(-1).startsWith('galaxy-installed-host-probe-'))throw new Error('Host probe cleanup target changed');
  const codexRun=codexEntry.endsWith('.exe')?{file:codexEntry,args:[]}:{file:process.execPath,args:[codexEntry]};
- const report={version:1,candidate,startedAt:new Date().toISOString(),syntheticConfiguration:true,userLoginRead:false,userModelCalls:0,globalConfigurationChanged:false,desktopUiVerified:false,hosts:[]};
+ const report={version:1,candidate,startedAt:new Date().toISOString(),localOnly,syntheticConfiguration:true,userLoginRead:false,userModelCalls:0,globalConfigurationChanged:false,desktopUiVerified:false,hosts:[]};
  try{
+  const manifest=JSON.parse(await readFile(join(candidate,'native-v2.json'),'utf8'));
+  if(manifest.kind!=='galaxy-native-go-local-candidate'||manifest.backend!=='go'||!['galaxy','galaxy.exe'].includes(manifest.mcp?.command))throw Error('Current Go Native candidate required');
+  report.candidateKind=manifest.kind;report.target=manifest.target;
+  const nativeEntry=join(candidate,manifest.mcp.command),nativeArgs=localOnly?['integration-mcp','--data-dir',join(directory,'data')]:['native'];
   const env=environment(directory);for(const path of[directory,env.HOME,env.APPDATA,env.LOCALAPPDATA,env.XDG_CONFIG_HOME,env.XDG_DATA_HOME,env.XDG_STATE_HOME,env.XDG_CACHE_HOME,env.CODEX_HOME,env.CLAUDE_CONFIG_DIR])await mkdir(path,{recursive:true});
   const cwd=join(directory,'workspace');await mkdir(cwd);await cp(join(candidate,'skills/galaxy'),join(cwd,'.agents/skills/galaxy'),{recursive:true});
   const now=Math.floor(Date.now()/1000),pair=generateKeyPairSync('ed25519'),configPath=join(directory,'synthetic-public-config.json');
@@ -54,9 +58,9 @@ export async function probeInstalledHosts({candidate,codexEntry,claudeExecutable
   // host originates initialize/tools/list. Record method names and result counts,
   // never tool arguments, text, keys or credentials.
   const proxy=join(directory,'forward.mjs');
-  await writeFile(proxy,`import {spawn} from 'node:child_process';import {appendFileSync} from 'node:fs';const[entry,log]=process.argv.slice(2),child=spawn(process.execPath,[entry],{stdio:['pipe','pipe','pipe'],windowsHide:true,env:process.env}),requests=new Map();let input='',output='';function record(v){appendFileSync(log,JSON.stringify(v)+'\\n');}process.stdin.on('data',chunk=>{child.stdin.write(chunk);input+=chunk;for(;;){const p=input.indexOf('\\n');if(p<0)break;const line=input.slice(0,p);input=input.slice(p+1);try{const m=JSON.parse(line);if(m.method){record({direction:'host-to-server',method:m.method});requests.set(m.id,m.method);}}catch{}}});child.stdout.on('data',chunk=>{process.stdout.write(chunk);output+=chunk;for(;;){const p=output.indexOf('\\n');if(p<0)break;const line=output.slice(0,p);output=output.slice(p+1);try{const m=JSON.parse(line),method=requests.get(m.id);if(method)record({direction:'server-to-host',method,error:m.error?.code??null,...(Array.isArray(m.result?.tools)?{toolCount:m.result.tools.length}:{}),...(m.result?.serverInfo?{serverName:m.result.serverInfo.name}: {})});}catch{}}});process.stdin.on('end',()=>child.stdin.end());child.stderr.on('data',c=>process.stderr.write(c));child.on('exit',code=>process.exit(code??1));process.on('SIGTERM',()=>{child.kill();process.exit(0)});`);
-  const codexTrace=join(directory,'codex-trace.jsonl'),args=[proxy,join(candidate,'galaxy.js'),codexTrace];
-  const toml='[analytics]\nenabled = false\n[mcp_servers.galaxy]\ncommand = '+JSON.stringify(process.execPath)+'\nargs = '+JSON.stringify(args)+'\nstartup_timeout_sec = 20\n[mcp_servers.galaxy.env]\nGALAXY_NATIVE_CONFIG = '+JSON.stringify(configPath)+'\n';
+  await writeFile(proxy,`import {spawn} from 'node:child_process';import {appendFileSync} from 'node:fs';const[entry,args,log]=process.argv.slice(2),child=spawn(entry,JSON.parse(args),{stdio:['pipe','pipe','pipe'],windowsHide:true,env:process.env}),requests=new Map();let input='',output='';function record(v){appendFileSync(log,JSON.stringify(v)+'\\n');}process.stdin.on('data',chunk=>{child.stdin.write(chunk);input+=chunk;for(;;){const p=input.indexOf('\\n');if(p<0)break;const line=input.slice(0,p);input=input.slice(p+1);try{const m=JSON.parse(line);if(m.method){record({direction:'host-to-server',method:m.method});requests.set(m.id,m.method);}}catch{}}});child.stdout.on('data',chunk=>{process.stdout.write(chunk);output+=chunk;for(;;){const p=output.indexOf('\\n');if(p<0)break;const line=output.slice(0,p);output=output.slice(p+1);try{const m=JSON.parse(line),method=requests.get(m.id);if(method)record({direction:'server-to-host',method,error:m.error?.code??null,...(Array.isArray(m.result?.tools)?{toolCount:m.result.tools.length}:{}),...(m.result?.serverInfo?{serverName:m.result.serverInfo.name}: {})});}catch{}}});process.stdin.on('end',()=>child.stdin.end());child.stderr.on('data',c=>process.stderr.write(c));child.on('error',()=>{process.stderr.write('Native process could not start\\n');process.exit(1);});child.on('exit',code=>process.exit(code??1));process.on('SIGTERM',()=>{child.kill();process.exit(0)});`);
+  const codexTrace=join(directory,'codex-trace.jsonl'),args=[proxy,nativeEntry,JSON.stringify(nativeArgs),codexTrace];
+  const toml='[analytics]\nenabled = false\n[mcp_servers.galaxy]\ncommand = '+JSON.stringify(process.execPath)+'\nargs = '+JSON.stringify(args)+'\nstartup_timeout_sec = 20\n'+(localOnly?'':'[mcp_servers.galaxy.env]\nGALAXY_NATIVE_CONFIG = '+JSON.stringify(configPath)+'\n');
   await writeFile(join(env.CODEX_HOME,'config.toml'),toml);
   const version=execFileSync(codexRun.file,[...codexRun.args,'--version'],{env,cwd,windowsHide:true,encoding:'utf8',timeout:15000}).trim();
   codex=spawn(codexRun.file,[...codexRun.args,'app-server','--stdio'],{cwd,env,windowsHide:true,stdio:['pipe','pipe','pipe']});let errors='';codex.stderr.on('data',c=>{errors+=c;});
@@ -68,9 +72,9 @@ export async function probeInstalledHosts({candidate,codexEntry,claudeExecutable
   report.hosts.push({host:'Codex CLI app-server',version,rpcError:status.error?.code??null,serverPresent:!!server,
    toolCount:server?.tools?Object.keys(server.tools).length:0,events,...galaxySkillDiscovery(skills,cwd),modelTurnStarted:false});
   await stop(codex);codex=null;
-  const claudeTrace=join(directory,'claude-trace.jsonl'),mcpArgs=[proxy,join(candidate,'galaxy.js'),claudeTrace],claudeVersion=execFileSync(claudeExecutable,['--version'],{env,cwd,windowsHide:true,encoding:'utf8',timeout:15000}).trim();
+  const claudeTrace=join(directory,'claude-trace.jsonl'),mcpArgs=[proxy,nativeEntry,JSON.stringify(nativeArgs),claudeTrace],claudeVersion=execFileSync(claudeExecutable,['--version'],{env,cwd,windowsHide:true,encoding:'utf8',timeout:15000}).trim();
   // Explicit installed CLI writes only this empty temporary profile.
-  execFileSync(claudeExecutable,['mcp','add','galaxy','--scope','user','--transport','stdio','--env','GALAXY_NATIVE_CONFIG='+configPath,'--',process.execPath,...mcpArgs],
+  execFileSync(claudeExecutable,['mcp','add','galaxy','--scope','user','--transport','stdio',...(localOnly?[]:['--env','GALAXY_NATIVE_CONFIG='+configPath]),'--',process.execPath,...mcpArgs],
    {env,cwd,windowsHide:true,encoding:'utf8',timeout:20000,stdio:['ignore','pipe','pipe']});
   let result='',healthError=null;
   try{result=execFileSync(claudeExecutable,['mcp','get','galaxy'],{env,cwd,windowsHide:true,encoding:'utf8',timeout:30000,stdio:['ignore','pipe','pipe']});}

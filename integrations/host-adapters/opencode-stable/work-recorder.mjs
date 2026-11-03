@@ -1,6 +1,6 @@
 import {createHostLocalClient} from './bridge/host-local-client.mjs';
 import {createOpenCodeWorkSummarizer} from './work-summarizer.mjs';
-import {nativeDiagnostics} from './bridge/native-diagnostics.mjs';
+import {hostDiagnostics} from './bridge/native-diagnostics.mjs';
 
 const asTime = value => Number.isFinite(value) && value >= 0 ? new Date(value).toISOString() : undefined;
 const modelName = model => model && typeof model.providerID === 'string' && typeof (model.modelID ?? model.id) === 'string'
@@ -21,7 +21,7 @@ const content = text => ({excerpt: short(text), originalLength: typeof text === 
 export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive, onSessionComplete, pollMs = 2000} = {}) {
   const persistence=history?null:createHostLocalClient({localOnly:true,dataDirectory});
   history??=persistence.history;archive??=persistence?.archive;
-  const diagnostics=nativeDiagnostics('host-client');
+  const diagnostics=hostDiagnostics(api);
   diagnostics.emit({event:'host_recording',stage:'recording',outcome:'started',host:'opencode'});
   let accepting = true, closing, chain = Promise.resolve(), active = null, errorCode = null, selectedModel, actualModel;
   let environmentKey = '', lastSession = '', lastOwner = '';

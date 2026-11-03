@@ -20,6 +20,7 @@ export interface StableHostApi {
   // Public OpenCode TUI SDK. Appending keeps the host's unsent input and does
   // not submit it or select/start a model.
   client?: { tui: { appendPrompt(input: { text: string }): Promise<{ data?: boolean; error?: unknown }> };
+    app?: {log(input: {service: string; level: 'debug'|'info'|'warn'|'error'; message: string; extra: Record<string, unknown>}, options?: {signal?: AbortSignal}): Promise<{error?: unknown}>};
     session?: {create(input: Record<string, unknown>, options?: {signal?: AbortSignal}): Promise<unknown>;
       prompt(input: Record<string, unknown>, options?: {signal?: AbortSignal}): Promise<unknown>;
       messages?(input: {sessionID: string}, options?: {signal?: AbortSignal}): Promise<unknown>;

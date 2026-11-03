@@ -78,12 +78,16 @@ type OpenCodeConfigurationPlan struct {
 // PreviewOpenCodeConfiguration reads only the explicitly provided directory.
 // No ambient HOME/profile discovery, process start or file creation occurs.
 func PreviewOpenCodeConfiguration(ctx context.Context, directory string, input HostConfigurationInput) (*OpenCodeConfigurationPlan, error) {
-	for _, path := range []string{directory, input.PackageDirectory, input.ConfigPath, input.DataDirectory} {
+	paths := []string{directory, input.PackageDirectory, input.DataDirectory}
+	if !input.LocalOnly {
+		paths = append(paths, input.ConfigPath)
+	}
+	for _, path := range paths {
 		if !filepath.IsAbs(path) {
 			return nil, hostConfigurationFailure("setup_path_invalid")
 		}
 	}
-	if !serviceConfigurationOrigin(input.Endpoint) {
+	if input.LocalOnly && (input.ConfigPath != "" || input.Endpoint != "") || !input.LocalOnly && !serviceConfigurationOrigin(input.Endpoint) {
 		return nil, hostConfigurationFailure("setup_path_invalid")
 	}
 	if _, e := hostCandidate(input.PackageDirectory); e != nil {
@@ -159,7 +163,9 @@ func PreviewOpenCodeConfiguration(ctx context.Context, directory string, input H
 					}
 				}
 				next = append(next, plan.SkillsPath)
-				file.text, e = hostSetConfiguration(file.text, []string{"mcp", "galaxy"}, map[string]any{"type": "local", "command": []string{entry, "native"}, "environment": map[string]string{"GALAXY_NATIVE_CONFIG": input.ConfigPath}, "enabled": true})
+				args, environment := input.launch()
+				command := append([]string{entry}, args...)
+				file.text, e = hostSetConfiguration(file.text, []string{"mcp", "galaxy"}, map[string]any{"type": "local", "command": command, "environment": environment, "enabled": true})
 				if e == nil {
 					file.text, e = hostSetConfiguration(file.text, []string{"skills", "paths"}, next)
 				}

@@ -11,6 +11,8 @@ galaxy native --config <现有公开配置绝对路径>
 galaxy integration-mcp --data-dir <本机资料目录>
 ```
 
+安装与宿主配置也可直接选择已有的本机模式：`galaxy setup --local-only --host <宿主ID> --data-dir <目录>`；只生成配置时用 `galaxy host-configs <新输出目录> --local-only --data-dir <目录> --hosts <宿主ID列表>`。这条路径不读取网站配置或连接服务，配置中的命令为 `integration-mcp`，以后接入服务时再选择服务配置。OpenCode薄插件显式保持同一目录和本机模式，不继承环境中另一个服务配置。普通服务模式的OpenCode生成器从所选公开配置取得资料目录与端点，避免TUI和MCP指向不同位置。
+
 `native` 读取服务配置，提供已接入的服务工具、连接与本人选择、宿主接续及本机能力。`integration-mcp` 不要求服务配置，只提供原本机 Integration 工具：初始化、Case Draft／Disclosure／Consent／Local Proof Draft、本机历史与原有本机资料管理等；不构造服务 Runtime、不连接服务或调用模型。它沿用 `--data-dir`、`GALAXY_DATA_DIR` 及默认用户 `.galaxy` 目录的选择次序。本机草稿不是云端 Evidence 或已验证履历；Consent 与 Proof 保留各自的原提交和状态。
 
 Go 候选中的 `setup`、`service-config`、`host-configs` 子命令分别承接原安装、公开配置准备与宿主配置生成。参数以 `galaxy --help` 和 [Go 核心说明](../../go/README.md)为准，不使用旧 Node 业务安装器来处理 Go 候选。`setup` 从所选官网 `galaxy-web-config.json` 读取真实 API 和 Ed25519 公钥；失败保留原资料，不猜另一服务。OpenCode 一次确认列出实际配置/资料位置、记录方式，保存独立运行包并合并银河 TUI/MCP/Skill，保留其他插件、项目和模型设置。已有身份/类型沿用；无身份时同次选择准备个人或明确组织身份。安装不注册账户、关联服务或开始上传。只有自定义目录未被正常启动加载时才使用包内原宿主启动薄适配。
@@ -23,7 +25,7 @@ Go 候选宿主配置的 MCP command 指向包内平台二进制，args 为 `nat
 
 旧签名发行种类 `galaxy-native-client-release` 以 JWS/Ed25519 绑定包和报告准确字节，签名最长30天；其维护、验签和启动说明仍用于对应旧包，不表示 Go 候选沿用旧内核。被替代内核从现行源码退出，历史签名包及必要原始证据留在项目外；宿主 TUI、SDK 桥接和 UI 继续使用各自平台代码。信任不能从包内自行推导。`protocolAcceptance=local-stdio-http-fixtures`、`actualHostAcceptance=false` 的报告只覆盖该范围；验签不等于安装、发布或真实宿主验收。构建及 NOTICE 见[源码与许可](source-and-licensing.md)。
 
-`scripts/build-native-v2.mjs`在新候选目录构建平台 Go 二进制、薄宿主 JS、compact UI 与现有宿主资源，并记录实际文件摘要；不要求源码预存 UI dist。宿主依赖在构建／搬移运行包时闭合，不在安装中联网补包。候选准备核对包完整性和临时宿主配置；实际 CLI 发现、隔离 TUI 与物理桌面分别记录。目标平台、构建成功或包完整性均不表示真实宿主和系统提醒已经验收，也不表示上线或用户已安装。
+`scripts/build-native-v2.mjs`在新候选目录构建平台 Go 二进制、薄宿主 JS、compact UI 与现有宿主资源，并记录实际文件摘要；不要求源码预存 UI dist。`prepare-client-candidate.mjs`在构建时解析并锁定宿主依赖，已有缓存可显式用`--offline`；安装时使用包内依赖，不联网补包。所有宿主的setup都保存独立运行包，配置不依赖临时解包或源码位置。候选准备核对包完整性和临时宿主配置；实际 CLI 发现、隔离 TUI 与物理桌面分别记录。目标平台、构建成功或包完整性均不表示真实宿主和系统提醒已经验收，也不表示上线或用户已安装。
 
 身份恢复的本机页面模板属于 Go 源码并编入 `galaxy`；候选构建按 `./cmd/galaxy` 的实际 Go 依赖收集源码及嵌入资源摘要，不需要额外复制恢复页面。该接线不代表新候选已经构建或完成宿主、平台验收。
 
@@ -43,6 +45,8 @@ Go 候选宿主配置的 MCP command 指向包内平台二进制，args 为 `nat
 | DeepSeek Harness | 组合 `mcp-plugin.fragment.json`、项目 `.dsh/skills/galaxy`；复用原 registry/filesystem/consumer，浮窗和后台能力分别实现 |
 
 OpenCode 的事件适配保存本地事实、有限片段和环境，自有模型增量整理；事实不等模型/网络，失败有限重试。`client.tui.appendPrompt({text})` 可追加正文和来源到原未发送输入，不提交模型；原会话返回沿宿主导航。其他宿主无事件接口时只读取已有资料或保存明确自述，不宣称相同自动采集。MCP Apps 使用 compact-app，小面板合同检查不替代真宿主呈现；无 Apps 保留普通 MCP，同义操作继续可用。
+
+宿主MCP与私有持久通道共用子进程生命周期：进程意外退出后，只允许后续新请求重新连接，不自动重发中断的操作；MCP重建连接时重新发现协议，原本人选择只接续其原进程。本人选择随完成、取消或关闭结束，不设固定选择轮数。OpenCode插件的诊断走宿主[公开日志SDK](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/sdk/js/src/v2/gen/sdk.gen.ts)，不向TUI的stdout/stderr打印JSON；缺少日志能力不阻断工作，也不回退污染终端。
 
 Claude `watchHost` 只接受 `kind:claude-code` 与真实绝对 command/cwd，不接受附加参数、认证变量或已验证布尔值。`galaxy_watch_host_capabilities` 只查询版本/help，不建模型会话。缺有效配置证据时 `readerProfileDocumented` 可为真，`readerConfigurationConfirmed/effectiveManagedPolicyConfirmed/backgroundReaderSupported` 仍为假；activate 返回 foreground-fallback（如 `host_reader_configuration_unconfirmed`），不启动模型。原因是 managed settings 优先级及动态来源不能仅靠旗标/缺本机文件排除。前台 `galaxy_watch_check`/`ack` 更新 Agent 游标；reconcile 的 unknown 不等于原模型已停止。
 

@@ -2,7 +2,7 @@ import {AsyncLocalStorage} from 'node:async_hooks';
 import {randomUUID} from 'node:crypto';
 import {consoleRuntimeLogger,createRuntimeLogger,runtimeLogConfiguration} from '../../../../packages/galaxy-client/src/node/runtime-logger.mjs';
 
-const context=new AsyncLocalStorage(),registeredTools=new Set(),defaults=new Map();
+const context=new AsyncLocalStorage(),registeredTools=new Set(),defaults=new Map(),hostReporters=new WeakMap();
 const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const events=new Set(['native_runtime','native_tool','native_http','native_private_sync','native_transport','native_watch',
   'host_bridge','host_process','host_rpc','host_recording','host_archive','host_summary','client_log_rate_limited']);
@@ -123,6 +123,24 @@ export function nativeDiagnostics(component='native'){
   if(!defaults.has(component))defaults.set(component,createNativeDiagnosticReporter(consoleRuntimeLogger(component,{destination:process.stderr,eventFormatter:nativeDiagnosticFields,maxBufferedBytes:262144,
     release:process.env.GALAXY_NATIVE_RELEASE,environment:process.env.GALAXY_ENVIRONMENT??'local'})));
   return defaults.get(component);
+}
+
+// The TUI owns stdout AND stderr. Use its public SDK log endpoint rather than
+// drawing JSON over the user's current work. Older hosts without this endpoint
+// remain usable; diagnostic availability is reported separately.
+export function hostDiagnostics(api){
+  if(hostReporters.has(api))return hostReporters.get(api);
+  const endpoint=api.client?.app;
+  let failures=0;
+  const write=(fields,level='info')=>{
+    if(typeof endpoint?.log!=='function'){failures++;return;}
+    const extra=nativeDiagnosticFields(fields);
+    try{Promise.resolve(endpoint.log({service:'galaxy',level,message:extra.event,extra},{signal:AbortSignal.timeout(1500)})).then(result=>{if(result?.error)failures++;},()=>{failures++;});}
+    catch{failures++;}
+  };
+  const reporter=createNativeDiagnosticReporter({write,error:fields=>write(fields,'error'),
+    status:()=>({mode:'host',ready:typeof endpoint?.log==='function',writeFailures:failures}),close:()=>Promise.resolve()});
+  hostReporters.set(api,reporter);return reporter;
 }
 export async function createNativeDiagnostics({component='native',env=process.env}={}){
   try{

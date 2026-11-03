@@ -1,4 +1,4 @@
-import {nativeDiagnostics} from './bridge/native-diagnostics.mjs';
+import {hostDiagnostics} from './bridge/native-diagnostics.mjs';
 
 const outputSchema = {type: 'object', additionalProperties: false, required: ['title', 'summary', 'outcome'], properties: {
   title: {type: 'string', minLength: 1, maxLength: 180}, summary: {type: 'string', minLength: 1, maxLength: 12000},
@@ -7,7 +7,7 @@ const outputSchema = {type: 'object', additionalProperties: false, required: ['t
 /** Bounded calls through the public SDK's session.create/prompt APIs execute the
  * user's provider. The original foreground session stays untouched. */
 export function createOpenCodeWorkSummarizer(api, history, {delayMs = 800, retryDelaysMs = [5000,15000,45000], now = Date.now} = {}) {
-  const diagnostics=nativeDiagnostics('host-client');
+  const diagnostics=hostDiagnostics(api);
   let closed = false;
   const waiting = new Map(), running = new Map(), children = new Set(), executing = new Set(), tasks = new Set();
   const failures = new Map(), latestRequests = new Map(), changedDuringRun = new Set();

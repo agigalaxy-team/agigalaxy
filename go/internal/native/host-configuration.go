@@ -17,6 +17,7 @@ import (
 )
 
 type HostConfigurationInput struct {
+	LocalOnly        bool     `json:"localOnly,omitempty"`
 	PackageDirectory string   `json:"packageDirectory"`
 	ConfigPath       string   `json:"configPath"`
 	Destination      string   `json:"destination"`
@@ -156,6 +157,13 @@ func hostOpenCodePlugin(input HostConfigurationInput) string {
 }
 func hostExecutable(directory string) string { entry, _ := hostCandidate(directory); return entry }
 
+func (input HostConfigurationInput) launch() ([]string, map[string]string) {
+	if input.LocalOnly {
+		return []string{"integration-mcp", "--data-dir", input.DataDirectory}, map[string]string{}
+	}
+	return []string{"native"}, map[string]string{"GALAXY_NATIVE_CONFIG": input.ConfigPath}
+}
+
 func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInput) (map[string]any, error) {
 	if input.Hosts == nil {
 		for _, option := range HostConfigurationOptions() {
@@ -164,7 +172,16 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 			}
 		}
 	}
-	for _, path := range []string{input.PackageDirectory, input.ConfigPath, input.Destination} {
+	paths := []string{input.PackageDirectory, input.Destination}
+	if input.LocalOnly {
+		if input.ConfigPath != "" || input.Endpoint != "" {
+			return nil, hostConfigurationFailure("setup_configuration_conflict")
+		}
+		paths = append(paths, input.DataDirectory)
+	} else {
+		paths = append(paths, input.ConfigPath)
+	}
+	for _, path := range paths {
 		if !filepath.IsAbs(path) {
 			return nil, hostConfigurationFailure("setup_path_invalid")
 		}
@@ -173,8 +190,10 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 	if e != nil {
 		return nil, e
 	}
-	if e = hostFile(input.ConfigPath); e != nil {
-		return nil, e
+	if !input.LocalOnly {
+		if e = hostFile(input.ConfigPath); e != nil {
+			return nil, e
+		}
 	}
 	if len(input.Hosts) == 0 {
 		return nil, hostConfigurationFailure("setup_host_invalid")
@@ -198,7 +217,7 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 		}
 	}
 	if selected["opencode"] {
-		if !filepath.IsAbs(input.DataDirectory) || !serviceConfigurationOrigin(input.Endpoint) {
+		if !filepath.IsAbs(input.DataDirectory) || !input.LocalOnly && !serviceConfigurationOrigin(input.Endpoint) {
 			return nil, hostConfigurationFailure("setup_path_invalid")
 		}
 		if e = hostFile(filepath.Join(input.PackageDirectory, "opencode.js")); e != nil {
@@ -241,7 +260,8 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 		}
 		return hostCopyTree(filepath.Join(input.PackageDirectory, "skills", "galaxy"), target)
 	}
-	spec := map[string]any{"type": "stdio", "command": entry, "args": []string{"native"}, "env": map[string]string{"GALAXY_NATIVE_CONFIG": input.ConfigPath}}
+	commandArgs, environment := input.launch()
+	spec := map[string]any{"type": "stdio", "command": entry, "args": commandArgs, "env": environment}
 	mcp := map[string]any{"mcpServers": map[string]any{"galaxy": spec}}
 	// Each format remains the original host format; only the actual core command
 	// changes from Node/galaxy.js to the selected candidate's Go native command.
@@ -251,7 +271,7 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 	}
 	addSkill := func(name string) { operations = append(operations, func() error { return skill(name) }) }
 	if selected["opencode"] {
-		add("opencode/opencode.json", map[string]any{"$schema": "https://opencode.ai/config.json", "mcp": map[string]any{"galaxy": map[string]any{"type": "local", "command": []string{entry, "native"}, "environment": spec["env"], "enabled": true}}, "skills": map[string]any{"paths": []string{filepath.Join(input.Destination, "opencode", ".agents", "skills")}}})
+		add("opencode/opencode.json", map[string]any{"$schema": "https://opencode.ai/config.json", "mcp": map[string]any{"galaxy": map[string]any{"type": "local", "command": append([]string{entry}, commandArgs...), "environment": spec["env"], "enabled": true}}, "skills": map[string]any{"paths": []string{filepath.Join(input.Destination, "opencode", ".agents", "skills")}}})
 		add("opencode/galaxy.tui.mjs", hostOpenCodePlugin(input))
 		add("opencode/tui.json", map[string]any{"$schema": "https://opencode.ai/tui.json", "plugin": []string{hostFileURL(filepath.Join(input.Destination, "opencode", "galaxy.tui.mjs"))}})
 		addSkill("opencode/.agents/skills/galaxy")
@@ -266,7 +286,11 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 		addSkill("copilot-vscode/.github/skills/galaxy")
 	}
 	if selected["codex"] {
-		add("codex/config.fragment.toml", "[mcp_servers.galaxy]\ncommand = "+hostJSONString(entry)+"\nargs = [\"native\"]\n\n[mcp_servers.galaxy.env]\nGALAXY_NATIVE_CONFIG = "+hostJSONString(input.ConfigPath)+"\n")
+		config := "[mcp_servers.galaxy]\ncommand = " + hostJSONString(entry) + "\nargs = " + hostJSONString(commandArgs) + "\n"
+		if !input.LocalOnly {
+			config += "\n[mcp_servers.galaxy.env]\nGALAXY_NATIVE_CONFIG = " + hostJSONString(input.ConfigPath) + "\n"
+		}
+		add("codex/config.fragment.toml", config)
 		addSkill("codex/.agents/skills/galaxy")
 		operations = append(operations, func() error {
 			target := filepath.Join(input.Destination, "codex", "galaxy-native-v2")
@@ -292,11 +316,15 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 		addSkill("trae-work/.trae/skills/galaxy")
 	}
 	if selected["hermes"] {
-		add("hermes/config.fragment.yaml", "mcp_servers:\n  galaxy:\n    command: "+hostJSONString(entry)+"\n    args: [\"native\"]\n    env:\n      GALAXY_NATIVE_CONFIG: "+hostJSONString(input.ConfigPath)+"\n")
+		config := "mcp_servers:\n  galaxy:\n    command: " + hostJSONString(entry) + "\n    args: " + hostJSONString(commandArgs) + "\n"
+		if !input.LocalOnly {
+			config += "    env:\n      GALAXY_NATIVE_CONFIG: " + hostJSONString(input.ConfigPath) + "\n"
+		}
+		add("hermes/config.fragment.yaml", config)
 		addSkill("hermes/skills/galaxy")
 	}
 	if selected["deepseek-harness"] {
-		add("deepseek-harness/mcp-plugin.fragment.json", map[string]any{"id": "mcp-galaxy", "name": "@deepseek-ai/dsh-mcp-client", "config": map[string]any{"serverName": "galaxy", "transport": "stdio", "command": entry, "args": []string{"native"}, "env": spec["env"]}})
+		add("deepseek-harness/mcp-plugin.fragment.json", map[string]any{"id": "mcp-galaxy", "name": "@deepseek-ai/dsh-mcp-client", "config": map[string]any{"serverName": "galaxy", "transport": "stdio", "command": entry, "args": commandArgs, "env": spec["env"]}})
 		addSkill("deepseek-harness/.dsh/skills/galaxy")
 	}
 	for _, run := range operations {
@@ -319,6 +347,7 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 		return nil, e
 	}
 	result := map[string]any{"schemaVersion": 1, "packageDirectory": input.PackageDirectory, "publicConfigPath": input.ConfigPath, "generatedAt": time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), "hosts": input.Hosts, "hostCount": len(input.Hosts), "hostRuntimeTested": false, "marketplacePublished": false, "actualSettingsModified": false, "traeCommandRequiresHostPathResolution": false, "outputs": outputs}
+	result["localOnly"] = input.LocalOnly
 	if e = save("generated-configs.json", result); e != nil {
 		return nil, e
 	}
