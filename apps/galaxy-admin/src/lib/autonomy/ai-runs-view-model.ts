@@ -1,3 +1,4 @@
+import {autonomyFailureLabel} from './autonomy-view-model';
 import {shanghaiMinute} from '../shanghai-time.mjs';
 import type {AiRecordedTime,AiRunDomain,AiRunEvent,AiRunLocation,AiRunMetadata,AiRunSpan,AiRunState,AiSpanRow} from "../../components/ai-runs/ai-runs-types";
 
@@ -56,6 +57,7 @@ export function aiSpanLabel(span:AiRunSpan){
 }
 export function aiRunError(run:AiRunMetadata){
  if(run.state!=='ERROR')return null;
+ if(run.failure)return autonomyFailureLabel({state:'failed',failure:run.failure});
  const labels:Record<string,string>={operations_authorization_unavailable:'运行授权服务暂时不可用，本次运行未完成。',operations_agentos_authority_changed:'本次运行的授权已变化，运行已停止。'};
  return run.errorCode&&Object.hasOwn(labels,run.errorCode)?labels[run.errorCode]:'本次运行失败。错误详情未记录。';
 }

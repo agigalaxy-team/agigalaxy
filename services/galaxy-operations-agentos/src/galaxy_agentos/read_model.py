@@ -60,6 +60,8 @@ def metadata(row):
             error_code = "operations_authorization_unavailable"
         elif error_code and event.get("error_type") == "AuthorityDenied":
             error_code = "operations_agentos_authority_changed"
+    from .conversation_failures import failure_data
+    failure = failure_data(context.get("runtimeFailure")) if row.get("status") == "ERROR" else None
     duty_prompt = context.get("promptVersion") if task_id else None
     if not (type(duty_prompt) is int and duty_prompt > 0 or isinstance(duty_prompt, str)
             and re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", duty_prompt)):
@@ -89,7 +91,7 @@ def metadata(row):
             and context.get("boundaryVersion") == "galaxy-conversation-boundary-v3" else None,
         "sessionId": row.get("session_id"), "componentId": component_id,
         "componentType": row.get("run_type"), "domain": domain,
-        "state": row.get("status"), "errorCode": error_code, "createdAt": row.get("created_at"), "updatedAt": row.get("updated_at"),
+        "state": row.get("status"), "errorCode": error_code, "failure": failure, "createdAt": row.get("created_at"), "updatedAt": row.get("updated_at"),
         "promptVersion": duty_prompt if task_id else P13_WORKFLOW if row.get("run_type") == "workflow" and component_id == P13_WORKFLOW
             else context.get("promptVersion") if context.get("promptVersion") in {"galaxy-operations-v1", "galaxy-prepared-review-v1", "galaxy-conversation-v1", "galaxy-conversation-v2"} else None,
         "tokens": {"input": usage["inputTokens"], "output": usage["outputTokens"], "total": usage["totalTokens"]},

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/jackc/pgx/v5"
 	"regexp"
@@ -19,14 +20,8 @@ func parseReport(input Object) (Object, error) {
 	if !closed(input, []string{"taskId", "modelState", "status"}, []string{"nativeRunId", "nativeAttemptId", "nativeContinuable", "code", "summary", "finalAnalysis", "manualPause", "manualResumeConsumed", "modelUsage", "failure"}) || !schemaUUID.MatchString(str(input["taskId"])) || !has(modelStates, str(input["modelState"])) || !has([]string{"running", "waiting-human", "completed", "failed", "unknown"}, str(input["status"])) {
 		return nil, invalid()
 	}
-	if raw, exists := input["failure"]; exists {
-		f := obj(raw)
-		if !closed(f, []string{"stage", "category", "reportedStatus"}, nil) ||
-			!has([]string{"model-request", "execution"}, str(f["stage"])) ||
-			!has([]string{"rate-limit", "timeout", "connection", "context-limit", "service-unavailable", "request-rejected", "unknown"}, str(f["category"])) ||
-			f["reportedStatus"] != nil && !integer(f["reportedStatus"], 400, 599) || input["status"] != "failed" {
-			return nil, invalid()
-		}
+	if raw, exists := input["failure"]; exists && (fault.RuntimeFailure(raw) == nil || input["status"] != "failed") {
+		return nil, invalid()
 	}
 
 	if v, ok := input["nativeRunId"]; ok && !nativeRunPattern.MatchString(str(v)) {
