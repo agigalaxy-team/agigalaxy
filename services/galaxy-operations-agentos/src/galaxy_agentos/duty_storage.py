@@ -201,10 +201,11 @@ def duty_database(db, gateway):
         # Native timeout/error producers can supply provider exception text in
         # this fallback field even when the normal run body was projected.
         if "content_if_absent" in kwargs:
+            # A status-only patch must not replace the stored binding metadata.
+            # Only an already closed internal error code can use this slot.
             details = execution_failure(kwargs["content_if_absent"])
-            if details is not None:
-                fields = {**fields, "metadata": {**(fields.get("metadata") or {}), "runtimeFailure": details}}
-            kwargs["content_if_absent"] = None
+            if details is None:
+                kwargs["content_if_absent"] = None
         result = db.update_run_in_session(*args, fields=duty_storage_fields(fields), **kwargs)
         if result is True or result == RunPersistOutcome.UPDATED:
             report(kwargs.get("run_id") or (args[1] if len(args) > 1 else None), fields,

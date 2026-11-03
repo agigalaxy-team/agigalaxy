@@ -36,3 +36,21 @@ class DutyFailureProjectionTests(unittest.TestCase):
         self.assertEqual(report["failure"]["stage"], "execution")
         self.assertEqual(report["failure"]["category"], "unknown")
         self.assertEqual(report["code"], "operations_autonomy_run_failed")
+
+
+    def test_status_only_timeout_keeps_original_binding_metadata(self):
+        from galaxy_agentos.duty_storage import duty_database
+        from agno.run.status_persist import RunPersistOutcome
+        class Db:
+            id = "closed-error-patch"
+            patch = None
+            def update_run_in_session(self, *args, fields, **kwargs):
+                self.patch = (fields, kwargs)
+                return RunPersistOutcome.STALE_ATTEMPT
+        db = Db()
+        bound = duty_database(db, object())
+        bound.update_run_in_session('session', 'run', fields={"status":"ERROR"},
+            content_if_absent="agentos_autonomy_round_timeout")
+        fields, kwargs = db.patch
+        self.assertNotIn("metadata", fields)
+        self.assertEqual(kwargs["content_if_absent"], "agentos_autonomy_round_timeout")
