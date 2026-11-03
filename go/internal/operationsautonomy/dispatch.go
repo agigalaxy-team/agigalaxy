@@ -229,6 +229,10 @@ func (s *Service) ConfirmDispatch(ctx context.Context, a Actor, source string, p
 			}
 		}
 		result := Object{"operationId": operationID, "state": "completed", "summary": "任务已交办，已进入服务端调度。", "receipt": Object{"dispatchId": operationID, "taskId": task["id"], "scheduled": true}, "effectExecuted": true, "dispatchId": operationID, "dispatch": Object{"id": operationID, "revision": 1}, "targetDomain": x["targetDomain"], "enabled": true, "taskId": task["id"]}
+		result["references"] = []any{Object{"kind": "task-assignment", "id": operationID}}
+		if task["id"] != nil {
+			result["references"] = append(result["references"].([]any), Object{"kind": "autonomy-task", "id": task["id"]})
+		}
 		if x["startNow"] != true {
 			result["summary"] = "任务已交办，等待计划触发。"
 		}

@@ -68,7 +68,8 @@ def dispatch_tools(send):
             dispatch_id: UUID) -> str:
         """Read the actual assignment switch, next due time and latest task state.
 
-        Use its real ID from the confirmed card receipt. This is read-only and
+        Use the actual task-assignment reference from the confirmed card receipt.
+        This is read-only and
         never starts, resumes, retries or cancels a task. Completed model output
         alone is not proof that a business operation or future round completed.
         """

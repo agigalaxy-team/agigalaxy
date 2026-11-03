@@ -61,7 +61,7 @@ def conversation_agents(*, settings, db, gateway, domains, active_domains, model
         if isinstance(current.get("taskContext"), dict): state[TASK_CONTEXT] = current["taskContext"]
         receipt = current.get("receiptFeedback")
         if isinstance(receipt, dict):
-            state[RECEIPT_FEEDBACK] = {key: receipt[key] for key in ("cardId", "operationId", "parentTurnId", "state", "effectExecuted", "presentation", "receipt") if key in receipt}
+            state[RECEIPT_FEEDBACK] = {key: receipt[key] for key in ("cardId", "operationId", "parentTurnId", "state", "effectExecuted", "presentation", "receipt", "references") if key in receipt}
         else:
             state.pop(RECEIPT_FEEDBACK, None)
 

@@ -12,3 +12,11 @@ func TestTaskDispatchGoalIsTextRatherThanInternalCommand(t *testing.T) {
 		t.Fatal("dispatch details missing")
 	}
 }
+
+func TestReceiptReferencesPreserveGenericObjectIdentityOnly(t *testing.T) {
+	id := "11111111-1111-4111-8111-111111111111"
+	refs := resultReferences([]any{Object{"kind": "future-business-object", "id": id}, Object{"kind": "task-assignment", "id": id, "command": "not-a-reference"}, Object{"kind": "bad", "id": "https://example.invalid"}})
+	if len(refs) != 1 || refs[0]["kind"] != "future-business-object" || refs[0]["id"] != id {
+		t.Fatalf("receipt references %#v", refs)
+	}
+}

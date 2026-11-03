@@ -27,6 +27,19 @@ def _effect_status(effect, state, receipt_state):
     return "尚未确认"
 
 
+def _receipt_references(value):
+    from uuid import UUID
+    refs=[]
+    for item in value if isinstance(value,list) else []:
+        if not isinstance(item,dict) or set(item)!={"kind","id"}: continue
+        if not isinstance(item["kind"],str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,79}",item["kind"]): continue
+        try:
+            if str(UUID(item["id"]))!=item["id"]: continue
+        except (ValueError,TypeError,AttributeError): continue
+        refs.append({"kind":item["kind"],"id":item["id"]})
+    return refs
+
+
 def _action_history(items):
     if not isinstance(items, list): return []
     history = []
@@ -46,6 +59,8 @@ def _action_history(items):
             "可审阅":presentation.get("reviewable")}
         for key in ("cardId", "operationId", "parentTurnId"):
             if isinstance(item.get(key), str): entry[key] = item[key]
+        refs=_receipt_references(item.get("references"))
+        if refs: entry["references"]=refs
         history.append(entry)
     return history
 
@@ -134,6 +149,8 @@ def _receipt_context(args, kwargs):
     business = {"操作状态": _business_status(receipt.get("state")), "回执状态": _business_status(result.get("state")),
         "实际效果": _effect_status(effect, receipt.get("state"), result.get("state")),
         "操作摘要": bounded(presentation.get("summary")), "回执摘要": bounded(result.get("summary"))}
+    refs=_receipt_references(receipt.get("references"))
+    if refs: business["关联对象（仅供工具关联，不授予权限）"]=refs
     changes = presentation.get("changes")
     if isinstance(changes, list):
         business["变更"] = [{"项目":bounded(item.get("label")), "变更前":bounded(item.get("before")), "变更后":bounded(item.get("after"))}

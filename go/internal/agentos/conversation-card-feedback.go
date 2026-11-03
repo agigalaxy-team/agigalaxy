@@ -140,5 +140,9 @@ func (s *Conversations) receiptFeedback(ctx context.Context, row Conversation, c
 	if value, ok := card.Result["effectExecuted"].(bool); ok {
 		executed = value
 	}
-	return Object{"cardId": card.ID, "operationId": card.OperationID, "parentTurnId": card.TurnID, "state": card.State, "effectExecuted": executed, "presentation": cardPresentation(card.Proposal), "receipt": Object{"state": card.Result["state"], "summary": card.Result["summary"]}}, nil
+	result := Object{"cardId": card.ID, "operationId": card.OperationID, "parentTurnId": card.TurnID, "state": card.State, "effectExecuted": executed, "presentation": cardPresentation(card.Proposal), "receipt": Object{"state": card.Result["state"], "summary": card.Result["summary"]}}
+	if refs := resultReferences(card.Result["references"]); len(refs) > 0 {
+		result["references"] = refs
+	}
+	return result, nil
 }
