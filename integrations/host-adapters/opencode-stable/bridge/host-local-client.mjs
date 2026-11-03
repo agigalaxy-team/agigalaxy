@@ -1,4 +1,5 @@
 import {createChildRPC} from './child-rpc.mjs';
+import {nativeObservationEnvironment} from '../../shared/native-environment.mjs';
 
 // Private inherited-stdio persistence, never a model tool. No service choice
 // means the original local-only store, not an implicit official connection.
@@ -7,7 +8,7 @@ export function createHostLocalClient({configPath=process.env.GALAXY_NATIVE_CONF
  let rpc,closed=false,closing;
  const transport=()=>{
   if(closed)throw Object.assign(Error('native_bridge_closed'),{code:'native_bridge_closed'});
-  const env=localOnly?{...process.env}:undefined;if(env)for(const key of Object.keys(env))if(key.toUpperCase()==='GALAXY_NATIVE_CONFIG')delete env[key];
+  const env=nativeObservationEnvironment();if(localOnly)for(const key of Object.keys(env))if(key.toUpperCase()==='GALAXY_NATIVE_CONFIG')delete env[key];
   return rpc??=createChildRPC({executable,configPath:localOnly?undefined:configPath,dataDirectory:localOnly?dataDirectory:undefined,env,requestTimeoutMs,command:localOnly?'integration-host':'host',maxMessageBytes:9*1024*1024});
  };
  const call=method=>async(params={})=>transport().request(method,params);
