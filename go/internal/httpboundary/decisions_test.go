@@ -27,6 +27,15 @@ type originalDecision struct {
 	Status                                                          int
 }
 
+func TestTaskDirectorySummaryQueryBoundary(t *testing.T) {
+	if !AllowedQuery("GET", "/v1/operations/autonomy/tasks", "domain=maintenance&source=routine&limit=100&projection=summary&page=1", "") {
+		t.Fatal("the HTTP boundary rejected the directory's summary contract")
+	}
+	if AllowedQuery("GET", "/v1/operations/autonomy/tasks", "projection=summary&projection=summary", "") || AllowedQuery("GET", "/v1/operations/agentos/runs", "projection=summary", "") {
+		t.Fatal("directory query widened duplicate or native-run contracts")
+	}
+}
+
 func TestOriginalHTTPBoundaryDecisions(t *testing.T) {
 	endpoint := "https://api.example.invalid"
 	origins := []string{"https://web.example.invalid", "https://admin.example.invalid"}

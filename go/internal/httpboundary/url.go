@@ -223,7 +223,7 @@ func AllowedQuery(method, path, raw, preflightMethod string) bool {
 		{"/v1/operations/messaging/plans", 8192, []string{"after", "limit", "state"}},
 		{"/v1/operations/messaging/runs", 8192, []string{"after", "limit", "planId"}},
 		{"/v1/announcements", 8192, []string{"after", "limit"}},
-		{"/v1/operations/autonomy/tasks", 2048, []string{"page", "limit", "domain", "source", "state", "mode", "targetType", "targetId"}},
+		{"/v1/operations/autonomy/tasks", 2048, []string{"page", "limit", "domain", "source", "state", "mode", "targetType", "targetId", "projection"}},
 		{"/v1/operations/autonomy/overview", 2048, []string{"days"}},
 		{"/v1/operations/agentos/runs", 2048, []string{"page", "limit", "domain", "state"}},
 		{"/v1/operations/strategies/records", 2048, []string{"after", "limit", "strategyId"}},
