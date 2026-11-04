@@ -64,12 +64,16 @@ func (s *Store) archiveChoiceMessage(ctx context.Context, x ArchiveInput) (strin
 }
 
 func (r *toolRuntime) review(ctx context.Context, req *mcp.CallToolRequest, input any, message string, run func(*ChoiceScope) (any, error)) (*mcp.CallToolResult, error) {
+	return r.reviewOn(ctx, req, input, message, false, run)
+}
+
+func (r *toolRuntime) reviewOn(ctx context.Context, req *mcp.CallToolRequest, input any, message string, browserOnly bool, run func(*ChoiceScope) (any, error)) (*mcp.CallToolResult, error) {
 	scope, e := r.store.ChoiceScope(ctx)
 	if e != nil {
 		return toolError(e)
 	}
 	owner := scope.Owner
-	if owner == "" && !isOne(req.Params.Name, "galaxy_native_initialize", "galaxy_device_offer", "galaxy_device_accept","galaxy_local_worker_identity_create") {
+	if owner == "" && !isOne(req.Params.Name, "galaxy_native_initialize", "galaxy_device_offer", "galaxy_device_accept", "galaxy_local_worker_identity_create") {
 		return toolError(fault.New("local_identity_required", 409))
 	}
 	rawInput, e := protocol.Encode(input)
@@ -98,10 +102,16 @@ func (r *toolRuntime) review(ctx context.Context, req *mcp.CallToolRequest, inpu
 	caps := req.ClientCapabilities()
 	// Empty legacy elicitation capabilities imply form support per MCP. A
 	// URL-only or absent capability does not acquire form support by version.
-	if caps == nil || caps.Elicitation == nil || caps.Elicitation.Form == nil && caps.Elicitation.URL != nil {
+	if browserOnly || caps == nil || caps.Elicitation == nil || caps.Elicitation.Form == nil && caps.Elicitation.URL != nil {
 		v, e := r.browser.Review(ctx, BrowserChoiceInput{Name: req.Params.Name, Input: input, Message: message, Scope: scope}, run)
 		if e != nil {
 			return toolError(e)
+		}
+		if browserOnly {
+			if review, ok := v.(map[string]any); ok && review["state"] == "user-choice-needs-browser" {
+				review["reason"] = "browser-confirmation"
+				review["message"] = "请在运行银河客户端的电脑上打开此链接并确认，然后回到原会话继续连接。"
+			}
 		}
 		return toolResult(v)
 	}

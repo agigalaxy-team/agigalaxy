@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
+
+	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestFirstConnectRegistersLocalIdentityAndReconcilesOriginal(t *testing.T) {
@@ -63,7 +67,12 @@ func TestFirstConnectRegistersLocalIdentityAndReconcilesOriginal(t *testing.T) {
 				return response, nil
 			})
 			defer transport.setHook(nil)
-			snapshot, e := r.ConnectReviewed(ctx, plan, &scope)
+			var snapshot *ConnectionSnapshot
+			if lostReceipt {
+				snapshot, e = r.ConnectReviewed(ctx, plan, &scope)
+			} else {
+				snapshot = connectFirstIdentityInBrowser(t, ctx, r, transport)
+			}
 			if lostReceipt {
 				if e == nil {
 					t.Fatal("lost receipt claimed success")
@@ -92,4 +101,58 @@ func TestFirstConnectRegistersLocalIdentityAndReconcilesOriginal(t *testing.T) {
 			}
 		})
 	}
+}
+
+func connectFirstIdentityInBrowser(t *testing.T, ctx context.Context, runtime *Runtime, transport *connectionTestTransport) *ConnectionSnapshot {
+	t.Helper()
+	server, err := NewRuntimeToolServer(runtime.store, runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	clientTransport, serverTransport := mcp.NewInMemoryTransports()
+	serverSession, err := server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	hostForms := 0
+	client := mcp.NewClient(&mcp.Implementation{Name: "host-with-hidden-form", Version: "1"}, &mcp.ClientOptions{
+		ElicitationHandler: func(context.Context, *mcp.ElicitRequest) (*mcp.ElicitResult, error) {
+			hostForms++
+			return &mcp.ElicitResult{Action: "decline"}, nil
+		},
+	})
+	session, err := client.Connect(ctx, clientTransport, &mcp.ClientSessionOptions{ProtocolVersion: "2025-11-25"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	call := func() map[string]any {
+		t.Helper()
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "galaxy_native_connect", Arguments: map[string]any{}})
+		if err != nil || result == nil || result.IsError || len(result.Content) == 0 {
+			t.Fatalf("connect tool: %+v, %v", result, err)
+		}
+		var payload map[string]any
+		if err = protocol.Decode([]byte(result.Content[0].(*mcp.TextContent).Text), &payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+	before := transport.count()
+	pending := call()
+	link, err := url.Parse(text(pending["url"]))
+	if err != nil || link == nil || link.Hostname() != "127.0.0.1" || pending["state"] != "user-choice-needs-browser" || pending["reason"] != "browser-confirmation" || pending["sideEffect"] != false {
+		t.Fatal("connection did not return a local review", pending, err)
+	}
+	script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const page=await browser.newPage();await page.goto(process.argv[1]);await page.getByRole('button',{name:'允许本次操作',exact:true}).click();if(!(await page.textContent('body')).includes('已允许'))throw Error('Connection confirmation did not complete');console.log(JSON.stringify({confirmed:true}));}finally{await browser.close();}`
+	if initializationNode(t, script, link.String())["confirmed"] != true || hostForms != 0 || transport.count() != before {
+		t.Fatal("connection ran or used a host form before continuing the original tool")
+	}
+	connected := call()
+	if text(connected["bindingId"]) == "" || hostForms != 0 {
+		t.Fatal("confirmed connection did not complete", connected)
+	}
+	return &ConnectionSnapshot{BindingID: text(connected["bindingId"]), SubjectID: text(connected["subjectId"])}
 }
