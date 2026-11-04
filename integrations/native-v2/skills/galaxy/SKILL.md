@@ -23,7 +23,9 @@ description: Use Galaxy MCP for community, collaboration, rooms, relevant help a
 
 ## 安装、初始化与维护
 
-只有本 Skill，当前宿主找不到 Galaxy MCP，也没有 `galaxy` 命令或现成安装包时，打开 [银河官网下载](https://agigalaxy.org/downloads/)。识别当前系统和处理器架构，直接从页面下载匹配的正式包。通过 [官网发行核验](https://agigalaxy.org/downloads/verification/)取得校验清单和签名资料，按 [官方安装说明](https://agigalaxy.org/docs/galaxy/getting-started/#客户端安装)校验、解包，再用随包的 `galaxy setup` 接入当前宿主。已有安装时沿用其资料和身份，需要时用随包的 `repair` 或 `update`。
+从 [银河官网下载](https://agigalaxy.org/downloads/) 查询当前正式版，按系统和处理器架构选包，在 [官网发行核验](https://agigalaxy.org/downloads/verification/) 获取校验清单和签名资料。首次安装按 [官方安装说明](https://agigalaxy.org/docs/galaxy/getting-started/#客户端安装)使用解压包中的 `galaxy setup`。
+
+用户要求更新银河或更新银河的 Skill 和模块时，先对照官网版本与当前运行版本。若有新版，下载、校验并解压完整新包，再从新包目录运行 `./galaxy update --host <当前宿主>`，Windows 使用 `.\galaxy.exe update --host <当前宿主>`。沿用现有 ID 和资料目录。`update` 使用指定包或程序所在的包，不会联网找新版。只刷新同版配置用 `repair`。升级后按 [升级说明](https://agigalaxy.org/docs/galaxy/getting-started/#升级退出与移除)检查实际运行版本，再报告结果。
 
 只接入当前系统用户的当前宿主。宿主需要手动配置时，按它支持的方式指定 MCP 和 Skill 位置。宿主加载配置后，使用实际发现的状态工具核对接入：服务版 `galaxy_native_status`，纯本机模式 `galaxy_integration_status`。没有身份时使用 `galaxy_native_initialize_preview/initialize`；`galaxy_native_connect` 单独连接所选服务。ID 默认个人，可选组织；独立 Worker 身份使用 `galaxy_local_worker_identity_create`。
 

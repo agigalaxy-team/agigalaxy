@@ -16,7 +16,7 @@
 node verify-native-client-download.mjs . PACKAGE.tgz
 ```
 
-把平台包解压到新目录，在其中运行 `./galaxy setup https://agigalaxy.org`。Windows PowerShell 使用 `./galaxy.exe setup https://agigalaxy.org`。宿主无法自动识别时，可加 `--host opencode`、`--host codex` 或其他实际宿主 ID。仅在本机使用时，运行 `./galaxy setup --local-only`。已有安装升级时使用发行包中的 `galaxy update` 选择新版，之后按服务状态安排切换。
+首次安装时，把平台包解压到新目录，在其中运行 `./galaxy setup https://agigalaxy.org`。Windows PowerShell 使用 `.\galaxy.exe setup https://agigalaxy.org`。宿主无法自动识别时，可加 `--host opencode`、`--host codex` 或其他实际宿主 ID。仅在本机使用时，运行 `./galaxy setup --local-only`。已有安装见[升级步骤](#升级退出与移除)。
 
 已有 Node.js 的用户也可从[官网其他安装包](https://agigalaxy.org/downloads/verification/#additional-packages)下载 npm 安装包。进入准备放置启动器的目录，用 `npm install --offline --ignore-scripts <匹配的平台 npm 包.tgz> <启动器 npm 包.tgz>` 安装，再通过 `npx --offline galaxy setup https://agigalaxy.org` 接入。容器构建材料和使用说明随 Linux amd64 容器上下文提供。
 
@@ -50,7 +50,11 @@ Skill 配合当前 Agent 根据环境选择和修复，不为普通桌面额外�
 
 ## 升级、退出与移除
 
-升级沿用资料目录及银河配置，整版准备与运行服务切换分别完成；在办操作按维护入口提供的状态接续。共用服务按需启动，关闭单个 Agent 只结束其连接，用户可以主动退出并再次启动；不设置开机自启，容器生命周期由所选环境管理。
+1. 从[官网下载页](https://agigalaxy.org/downloads/)下载当前正式版的完整平台包，核验后解压到新目录。`galaxy update` 使用本地提供的包，本身不下载新版。
+2. 在**新包目录**运行 `./galaxy update --host codex`，Windows PowerShell 运行 `.\galaxy.exe update --host codex`。其他宿主替换为实际宿主 ID。沿用已有资料目录及银河配置；结果中的 `release.releaseId` 应与下载版本一致。
+3. 如果服务仍在跑旧版，处理完在办确认后用新包中的 `galaxy service restart` 切换。若旧服务提示不支持交接，完成在办工作后按提示执行 `galaxy service stop` 和 `galaxy service start`，再按宿主需要重载连接。用 `galaxy service status` 检查 `service.releaseId`，确认新版已在运行。
+
+共用服务按需启动，关闭单个 Agent 只结束其连接，用户可以主动退出并再次启动；不设置开机自启，容器生命周期由所选环境管理。
 
 移除宿主连接、停止服务、停止同步、删除资料和撤销设备分别处理。反馈提供版本、宿主和最小复现即可，见[帮助与反馈](site-files/SUPPORT.md)。
 
