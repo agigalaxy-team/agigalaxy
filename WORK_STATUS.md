@@ -2,7 +2,7 @@
 
 ## 通用插件与本机共用服务（2026-11-04，本轮闭环通过）
 
-独立工作区 `05-build/worktrees/native-hosts`，分支 `work/native-hosts-20261103`；业务及宿主功能基线为 `062e188`，后续安装说明与容器交付已在本分支继续提交。现行方案见 [Native工程](docs/technical/native-client.md)。Native 0.1.5 为本地发行候选。经用户确认，生产启用专用 Personal MCP 认证并仅切换 API 单元。原身份与主线工作区保持。以下为本线当前结果，后续其他工作线记录保留各自范围。
+Native 客户端分支已整合到 GitHub `main`，[0.1.5 已正式发布](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.5)，标签指向 `a51046e`。发行页提供六平台安装包、发行签名、npm 离线包及 Linux amd64 容器构建材料。[发布提交的 CI](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41746572807) 通过，未改动组件沿用[前一轮通过结果](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41745695337)。公开校验清单可下载且与本地一致。Windows 和 Linux amd64 沿用实机结果，macOS 与 ARM64 为交叉构建，未实机验收，macOS 未做 Apple 签名或公证。
 
 **当前一轮：** 用户要求继续真实云同步、官网同源MCP/账户Token、线上业务及跨版升级；仍用原5个子会话协同。已将本地main `c1e4b8a`整合到本分支（merge `9b71e6c`），保留双方状态。新增云删除确认后清理接续/原scope限定、摘要原CAS恢复、账户书签、聊天未决定位持久、共用schema投影、原交互/通知计数与协商排空交接；本批源码已本地提交 `97a05a2`（66文件，3546新增/622删除），本地保留提交。
 
@@ -20,7 +20,7 @@
 
 含Token选择及路由修复的Linux API发布产物在仓外 `remaining-20261104/personal-api-ready/`，清单SHA256 `8e562ab0fdc6a84c5187674c824e6261ca549dfb96fa29a32ffb1c8087b15256`，依赖许可无缺项，为首次启用产物。现网随后以 API 单组件修正版本继续运行，见本节上线结果。双身份关联浏览器已关闭；本轮独立测试缓存内0.1.4共用服务已明确停止，原身份和业务资料保留，不影响用户宿主或网站服务。
 
-**本轮追加收尾（2026-11-04）：** Linux实机 `0.1.0→0.1.4` 通过，原MCP在新版准备及不支持交接报错后仍可读；明确停止／启动后原ID、工作资料及无关配置保持，`remote211/upgrade-result-222f2e5a.json`记录通过及服务结束。更长夹具首先暴露Unix socket地址超限，原失败 `upgrade-result-78c6fc36.json` 保留；已从IPC选址机制修复，而非仅缩短夹具。六平台最新候选为仓外 `remaining-20261104/release-candidate-0.1.5/`，同源npm六可选包和Linux容器上下文已装配；无正式发布。Linux `0.1.5` 的真实长XDG缓存、两个不同长TMPDIR、双MCP同PID/ID、关闭连接后服务保持及显式停止全部通过，`remote211/long-path-result-351304c0.json`同时确认服务和精确私有临时socket目录均结束/清理。新增CLI交接失败投影及OpenCode简洁错误文案，Token选择说明不假设所有宿主能展示409正文，不能展示的使用现有官网关联ID页面。线上双身份脚本已支持沿原报告与原操作接续；线上实测已沿原报告完成。
+**本轮追加收尾（2026-11-04）：** Linux实机 `0.1.0→0.1.4` 通过，原MCP在新版准备及不支持交接报错后仍可读；明确停止／启动后原ID、工作资料及无关配置保持，`remote211/upgrade-result-222f2e5a.json`记录通过及服务结束。更长夹具首先暴露Unix socket地址超限，原失败 `upgrade-result-78c6fc36.json` 保留；已从IPC选址机制修复，而非仅缩短夹具。正式版沿用仓外 `remaining-20261104/release-candidate-0.1.5/` 的六平台包原字节。Linux `0.1.5` 的真实长XDG缓存、两个不同长TMPDIR、双MCP同PID/ID、关闭连接后服务保持及显式停止全部通过，`remote211/long-path-result-351304c0.json`同时确认服务和精确私有临时socket目录均结束/清理。新增CLI交接失败投影及OpenCode简洁错误文案，Token选择说明不假设所有宿主能展示409正文，不能展示的使用现有官网关联ID页面。线上双身份脚本已支持沿原报告与原操作接续；线上实测已沿原报告完成。
 
 **生产启用及联调（2026-11-04）：** 经确认登记 Hermes PKCE 客户端和仅用于 Token 核验的独立客户端，服务端凭据由 API 通过 root 所有、0600 环境文件读取。Hermes SDK 实际申请标准 `offline_access`，初次被拒后将既有 Keycloak scope 作为该专用登录客户端的可选项，业务权限仍取当前 ID、Token、绑定与资源许可的交集。首次就绪检查覆盖元数据，真实已授权初始化随后暴露五个联合输入工具缺少 Go MCP SDK 所需顶层 object；已在装载时构建合法工具声明，原联合规则继续校验执行参数，目录注册和原校验回归通过。现行 API 发行 `native-personal-20261104c`，清单 SHA256 `0e912ed4122a689c8f7ed5399b99de222f80406c55074745ebf6aa7140229815`。无数据库迁移。
 
