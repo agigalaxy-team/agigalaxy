@@ -166,7 +166,11 @@ func TestInitializationPreviewMatchesOriginalCatalogAndSelection(t *testing.T) {
 	}
 	want := fixture["catalog"]
 	same(t, want, InitializationCatalog())
-	for _, input := range []InitializationInput{{Profile: "missing"}, {Modules: []string{"remote-sync"}}, {SubjectType: "agent"}, {InitializationPath: "personal-galaxy", Profile: "minimal"}} {
+	syncPlan, err := PreviewInitialization(InitializationInput{Modules: []string{"remote-sync"}})
+	if err != nil || syncPlan["localOnly"] != true || syncPlan["remoteEffects"] != "none" {
+		t.Fatalf("remote sync selection must only configure local capabilities: %v (%v)", syncPlan, err)
+	}
+	for _, input := range []InitializationInput{{Profile: "missing"}, {Modules: []string{"openclaw-adapter"}}, {SubjectType: "agent"}, {InitializationPath: "personal-galaxy", Profile: "minimal"}} {
 		if _, e := PreviewInitialization(input); e == nil {
 			t.Fatal("invalid selection accepted")
 		}

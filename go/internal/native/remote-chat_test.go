@@ -179,8 +179,11 @@ func TestRemoteChatOriginalInputDefaultsRefinementsAndStrictTools(t *testing.T) 
 	}
 	defer cs.Close()
 	tools, e := cs.ListTools(context.Background(), nil)
-	if e != nil || len(tools.Tools) != 22 {
-		t.Fatal("incomplete chat tools", e)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if len(tools.Tools) != 23 {
+		t.Fatalf("expected 23 chat tools, got %d", len(tools.Tools))
 	}
 	materialCall(t, cs, "galaxy_chat_send", map[string]any{"roomId": id, "agentGrantId": id, "clientMessageId": id, "text": "okay", "confirmed": true}, true)
 	if _, e = os.Stat(filepath.Join(store.Directory, "native-v2")); !os.IsNotExist(e) {
