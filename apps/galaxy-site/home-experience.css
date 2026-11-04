@@ -27,6 +27,9 @@
 .gh-hero-copy {padding-bottom:18px}
 .gh-hero-copy>p {margin-top:20px;font-size:clamp(16px,1.18vw,21px);letter-spacing:.01em}
 .gh-actions {display:flex;gap:18px;flex-wrap:wrap;margin-top:36px}
+.gh-agent-guide {display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 10px;margin-top:15px;color:var(--muted);font-size:14px;line-height:1.65}
+.gh-agent-guide a {color:var(--gh-pink);font:600 13px ui-monospace,monospace;text-decoration:underline;text-underline-offset:3px}
+.gh-agent-guide a:hover {color:#a43e69}
 .gh-button {display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:11px 29px;border:1px solid #efbfd3;border-radius:999px;background:#fff;font-size:15px;font-weight:600;line-height:1.5;transition:background 160ms ease,border-color 160ms ease}
 .gh-primary {background:var(--gh-pink);border-color:var(--gh-pink);color:#fff}
 .gh-button:hover {background:#fff7fb;border-color:#c97b9c;color:var(--ink)}

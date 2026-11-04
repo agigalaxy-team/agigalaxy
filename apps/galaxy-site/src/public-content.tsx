@@ -33,6 +33,14 @@ const withoutCurrent=(nodes:Tree[]):Tree[]=>nodes.map(node=>{if(typeof node==='s
 const treeText=(nodes:Tree[]):string=>nodes.map(node=>typeof node==='string'?node:treeText(node.children)).join('');
 const text=(value:unknown)=>typeof value==='string'?value:'';
 type Link={label:string;href:string;description?:string};
+export const agentGuide = {url: '/agent.md', title: '银河 Agent 初始化与使用说明'};
+
+function HomeAgentGuide(){
+ return <div className="gh-agent-guide">
+  <a href={agentGuide.url} rel="help" type="text/markdown">AGENT.MD</a>
+  <span>面向 AI Agent 的官方指南，介绍银河的可用能力和接入方式。</span>
+ </div>;
+}
 function Links({links,home=false}:{links:Link[];home?:boolean}){return home?<div className="gh-actions">{links.map((link,index)=><a key={link.href+index} className={'gh-button'+(index===0?' gh-primary':'')} href={link.href}>{link.label}</a>)}</div>:<ul className="cms-links">{links.map((link,index)=><li key={link.href+index}><a href={link.href}>{link.label}</a>{link.description&&<p>{link.description}</p>}</li>)}</ul>;}
 function Blocks({blocks,media,release}:{blocks:SiteBlock[];media:SiteMedia[];release:Record<string,unknown>}){
  return blocks.map((block,index)=>{
@@ -61,9 +69,10 @@ export async function PublicPage({pathname}:{pathname:string}){
  if(path==='/'){
   const home=await data<{version:number;title:string;description:string;header:Tree[];body:Tree[];footer:Tree[]}>(['assets','home-content.json']);
   const slots:Record<string,React.ReactNode>={};
-  if(page){const hero=page.blocks.find(block=>block.blockType==='hero');slots['home-hero']=<div className="gh-hero-copy"><h1>{text(hero?.heading)||page.title}</h1><p>{text(hero?.text)||page.description}</p><Links home links={hero?.links as Link[]??[{label:'探索银河',href:'/app/'},{label:'接入我的 AI',href:'/downloads/'}]}/></div>;slots['page-extra']=<div className="cms-home-content"><Blocks blocks={page.blocks.filter(block=>block!==hero)} media={media} release={release}/></div>;}
+  if(page){const hero=page.blocks.find(block=>block.blockType==='hero');slots['home-hero']=<div className="gh-hero-copy"><h1>{text(hero?.heading)||page.title}</h1><p>{text(hero?.text)||page.description}</p><Links home links={hero?.links as Link[]??[{label:'探索银河',href:'/app/'},{label:'接入我的 AI',href:'/downloads/'}]}/><HomeAgentGuide/></div>;slots['page-extra']=<div className="cms-home-content"><Blocks blocks={page.blocks.filter(block=>block!==hero)} media={media} release={release}/></div>;}
   if(settings)slots['footer-links']=settings.footerLinks.map(link=><a key={link.href} href={link.href}>{link.label}</a>);
-  return <><a className="skip" href="#main">跳到内容</a>{tree(home.header)}<main id="main" className="home-shell" tabIndex={-1}>{tree(home.body,slots)}</main>{tree(home.footer,slots)}<HomeInteraction/><PublicContentUpdates publicationId={content.publicationId}/></>;
+  return <><a className="skip" href="#main">跳到内容</a>{tree(home.header)}<main id="main" className="home-shell" tabIndex={-1}>{tree(home.body,slots,node=>node.attrs.class==='gh-actions'
+   ? <>{tree([node],slots)}<HomeAgentGuide/></> : undefined)}</main>{tree(home.footer,slots)}<HomeInteraction/><PublicContentUpdates publicationId={content.publicationId}/></>;
  }
  let source:PublicData|null=null;
  try{source=await data<PublicData>(['assets','public-pages',...path.split('/').filter(Boolean),'index.json']);}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
