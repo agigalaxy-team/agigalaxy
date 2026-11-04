@@ -30,11 +30,10 @@ def _publication_observation(metadata):
 
 def release_status_body(metadata, content_slot):
     """Render only the authored status body from recorded release metadata."""
-    native = metadata.get('nativeClientDownload', {})
-    package = native.get('package', {})
+    current = metadata.get('currentNativeClient', {})
     site_version = escape(str(metadata.get('releaseId', metadata.get('version', '未提供'))))
     api_version = escape(str(metadata.get('backendRelease', '未提供')))
-    client_version = escape(str(package.get('version', '未提供')))
+    client_version = escape(str(current.get('version', '未提供')))
 
     def section(title, content, href, label):
         return ('<section class="reading-section"><h2>' + title + '</h2><div>'

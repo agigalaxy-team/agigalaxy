@@ -119,7 +119,7 @@ Vercel Skills目录表与MCPorter配置路径是适配线索，各宿主当前�
 
 ## 功能实现核对（2026-11-03）
 
-以下按当前源码区分接线与尚未覆盖的路径，实际运行结果集中在 [WORK_STATUS](../../WORK_STATUS.md)。本线统一推进 Go Native；开工基线及较早签名包的检查保留原版本归属，不构成并行开发线，也不替代当前候选验收。
+以下按当前源码区分接线与尚未覆盖的路径，实际运行结果集中在 [WORK_STATUS](../../WORK_STATUS.md)。本线统一推进 Go Native；开工基线及较早签名包的检查保留原版本归属，不构成并行开发线，也不替代现行版验收。
 
 | 能力 | 当前接线 | 实际范围与剩余路径 |
 |---|---|---|
@@ -135,7 +135,7 @@ Vercel Skills目录表与MCPorter配置路径是适配线索，各宿主当前�
 | 关注与已委托工作 | check／ack／status／stop及原grant、事件、位置与回执保留 | 普通MCP可重读原pending工作及固定窗口，材料变化沿当前权限呈现，Agent显式ACK原工作；专用只读驱动为可选兼容，服务存活不表示模型持续运行 |
 | A2A与Worker Pack | 已配置对端的选择、执行、进度、取消和回执链路已存在，目的入口按真实原关联分页；`/Galaxy hub`接已有服务连接和Hub查询入口 | 专业Worker运行环境与完整Hub运营初始化仍planned，不影响连接或读取现有Hub；参考Worker与协议检查不等于独立供给已运行 |
 | 用户级安装维护 | install／update／repair／uninstall、整版资源、原资料保留及平台归档命名已实现 | Windows 隔离 A/B 跨版检查覆盖待确认选择、在办 MCP／Host、stdout 背压、同一 stdio 续接、旧宿主 repair 和资料保留；其他平台及旧协议迁移分别核对，旧受管发行目录目前保留 |
-| 系统提醒与多平台发行 | Windows／Linux通道及macOS helper源码、目标平台构建、npm和容器准备入口已实现 | Linux／macOS真实桌面、macOS编译签名公证及正式多平台发行仍待对应结果；新包与镜像尚未上架 |
+| 系统提醒与多平台发行 | Windows／Linux通道及macOS helper源码、目标平台构建、npm和容器准备入口已实现 | Go 0.1.5 已发布六平台包及 Linux amd64 容器构建材料。Linux／macOS 真实桌面通知与 macOS helper 编译、签名和公证仍待实机结果 |
 
 需求依据保留于[早期用户原话](../../originals/conversations/early-product-discussions.jsonl)、[原聊天与宿主要求](../../originals/conversations/CURRENT_USER_DECISIONS_2026-09-12.md)及[后续澄清](../../originals/conversations/CURRENT_USER_REQUIREMENTS_2026-10-09.md)。资料编号、旧planned标签或历史失败只说明其原范围，不取代当前源码和实际结果。
 
@@ -176,9 +176,9 @@ Unix 本机通信在地址长度允许时保留原缓存内 socket；超出系�
 
 服务版入口 `galaxy native --config <公开配置绝对路径>` 提供当前已接入的服务和本机工具；本机入口 `galaxy integration-mcp --data-dir <目录>` 不构造服务 Runtime 或连接服务。对应的 `host`、`integration-host` 只供可信宿主使用，不作为模型 MCP 工具。公开配置含 `version:2`、HTTPS `endpoint`/`website`、绝对 `dataDirectory` 和可信公钥；通过 `--config` 或 `GALAXY_NATIVE_CONFIG` 选择，不写入 token、私钥或恢复码。`service-config inspect/prepare` 负责读取所选服务信息和准备公开配置；显式根 pin、信任目录及轮换见下文。`setup` 保留从所选官网读取公开服务配置并展示计划、经本人确认后安装的原入口，也支持 `setup --local-only`；实际安装共用同一执行器；`host-configs` 只向新目录生成片段，不代表已安装或宿主已加载。命令参数以 `galaxy --help` 为准。
 
-`scripts/build-native-v2.mjs` 构建平台二进制、面板、Skill 和宿主资源，`scripts/prepare-client-candidate.mjs` 在构建时解析并锁定薄宿主依赖、归集许可并准备归档；已有缓存可用 `--offline`。`--goos`/`--goarch` 可选择目标，跨目标候选不在当前机器执行安装检查。归档名包含发行版本、OS 和架构。`scripts/prepare-native-npm.mjs` 从已准备候选生成 `@galaxy/native` 薄入口和对应平台包目录，仅列入本次提供的目标。启动器无参数时执行 `install`，无法唯一识别宿主时在交互终端提示输入宿主 ID，非交互环境可使用 `install --host <宿主ID>`；其他参数直接交给 Native 程序。`scripts/prepare-native-container.mjs` 从 Linux 候选生成容器构建上下文。这些是未发布候选，包名不代表注册或发布权限。容器显式挂载专用资料目录和所需公开配置，用同一用户启动一个前台核心，再让各宿主通过 `docker exec -i` 连接同一容器；私有 IPC 在容器内。容器 `localhost` 不是桌面 `localhost`，不自动挂载整个用户目录、发布端口或部署数据库。容器准备器的第四个可选参数为基础镜像引用，也可由 `prepareNativeContainer({baseImage})` 传入；已核实的 `image@sha256:…` 可直接用于固定构建。默认值采用已经实际拉取并核对的 `node:22-bookworm-slim` 摘要，准确引用只在脚本中维护；显式覆盖时生成结果和说明仍区分固定摘要与可变标签。准备器不自动查询镜像，基础镜像更新与客户端发行分别处理。
+`scripts/build-native-v2.mjs` 构建平台二进制、面板、Skill 和宿主资源，`scripts/prepare-client-candidate.mjs` 在构建时解析并锁定薄宿主依赖、归集许可并准备归档；已有缓存可用 `--offline`。`--goos`/`--goarch` 可选择目标，跨目标候选不在当前机器执行安装检查。归档名包含发行版本、OS 和架构。`scripts/prepare-native-npm.mjs` 从已准备候选生成 `@galaxy/native` 薄入口和对应平台包目录，仅列入本次提供的目标。启动器无参数时执行 `install`，无法唯一识别宿主时在交互终端提示输入宿主 ID，非交互环境可使用 `install --host <宿主ID>`；其他参数直接交给 Native 程序。`scripts/prepare-native-container.mjs` 从 Linux 候选生成容器构建上下文。正式发行的 npm 包可从发行页下载并离线安装；容器上下文用于本地构建。容器显式挂载专用资料目录和所需公开配置，用同一用户启动一个前台核心，再让各宿主通过 `docker exec -i` 连接同一容器；私有 IPC 在容器内。容器 `localhost` 不是桌面 `localhost`，不自动挂载整个用户目录、发布端口或部署数据库。容器准备器的第四个可选参数为基础镜像引用，也可由 `prepareNativeContainer({baseImage})` 传入；已核实的 `image@sha256:…` 可直接用于固定构建。默认值采用已经实际拉取并核对的 `node:22-bookworm-slim` 摘要，准确引用只在脚本中维护；显式覆盖时生成结果和说明仍区分固定摘要与可变标签。准备器不自动查询镜像，基础镜像更新与客户端发行分别处理。
 
-2026-11-04 本轮已构建 `0.1.5` 的六平台 Go Native 候选，同源 npm 包及固定基础镜像的 Linux 容器上下文沿相同候选装配。较早 `0.1.0`／`0.1.4` 包属于其原有版本，不代表本轮最新候选；生成产物不等于已发布或各平台实机通过，实际装配及验收状态以 [WORK_STATUS](../../WORK_STATUS.md) 为准。
+[Go Native 0.1.5](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.5) 正式发行包含六平台包、同源 npm 包及固定基础镜像的 Linux 容器上下文。较早 `0.1.0`／`0.1.4` 的实测仅对应原版本，实际验收范围见 [WORK_STATUS](../../WORK_STATUS.md)。
 
 旧签名发行 `galaxy-native-client-release` 的验签与启动说明仍适用于原包，不能据此推断 Go 候选已经验签、发布或获得宿主验收。构建和 NOTICE 见[源码与许可](source-and-licensing.md)。最近主会话对实际候选在隔离路径完成了自定义宿主 install → repair → uninstall，确认其他 MCP 配置和 ID 保留；这不证明所有真实宿主、Linux/macOS、系统提醒、签名或市场上架已验收。平台和未覆盖范围以 [WORK_STATUS](../../WORK_STATUS.md) 为准。
 
@@ -207,9 +207,9 @@ OpenCode事件仅提示读取当前宿主视图；录制器先提取有限事实
 
 宿主MCP与私有持久通道分别通过薄连接访问共用服务；单个连接结束不关闭服务。连接中断后可以为后续请求重连，不自动重发结果未知的业务操作；本人选择、原操作和回执沿其实际作用域接续，不设固定选择轮数。OpenCode插件的诊断走宿主[公开日志SDK](https://github.com/anomalyco/opencode/blob/v1.18.31/packages/sdk/js/src/v2/gen/sdk.gen.ts)，不向TUI的stdout/stderr打印JSON；缺少日志能力不阻断工作，也不回退污染终端。
 
-既有 Claude `watchHost` 是专用只读驱动的可选兼容路径，不是当前Agent使用房间工具的前提，也不表示默认后台Watch已接通。历史基线中 `galaxy_watch_host_capabilities` 只查询版本/help，缺有效配置证据时 activate 返回 foreground-fallback；该历史结果不能代替当前候选验收。普通 `galaxy_watch_check`/`ack` 处理对应关注材料及 Agent 游标；reconcile 的 unknown 不等于原模型已停止。
+既有 Claude `watchHost` 是专用只读驱动的可选兼容路径，不是当前Agent使用房间工具的前提，也不表示默认后台Watch已接通。历史基线中 `galaxy_watch_host_capabilities` 只查询版本/help，缺有效配置证据时 activate 返回 foreground-fallback；该历史结果不能代替现行版验收。普通 `galaxy_watch_check`/`ack` 处理对应关注材料及 Agent 游标；reconcile 的 unknown 不等于原模型已停止。
 
-既有证据包括隔离 OpenCode 的实际 TUI 操作及 Codex/Claude CLI 工具发现；它们使用合成数据或有限发现范围，且须保留其记录的版本／运行内核，不能自动归于当前 Go 候选，也不能扩成所有宿主、桌面 UI、真实模型与后台循环都已验收。
+既有证据包括隔离 OpenCode 的实际 TUI 操作及 Codex/Claude CLI 工具发现；它们使用合成数据或有限发现范围，且须保留其记录的版本／运行内核，不能自动归于现行 Go 发行，也不能扩成所有宿主、桌面 UI、真实模型与后台循环都已验收。
 
 根管理的服务信任是显式选择：`service-config prepare` 的 `--root-pins-file` 与 `--trust-directory` 须成对提供绝对路径，`--network-type` 可选 `official` 或 `hub`。根 pin 文件为 `kid → {publicKeyPem,notBefore,notAfter,revoked}` 的公开 JSON，根信任不会从服务响应自行建立。先在服务信息中明确读取，Go 验证 Manifest 和 keyring、持久化公开信任序列后才采用；回滚、冲突、撤销复活及过期均拒绝。更新采用后使旧内存连接失效，沿原身份重新连接；根 keyring 过期不能继续使用旧会话。静态 `trustedKeys` 配置继续沿原方式工作。
 
@@ -248,7 +248,7 @@ OpenCode事件仅提示读取当前宿主视图；录制器先提取有限事实
 
 设备工具 `galaxy_identity_device_native_read` 的 current/list/pending/reconcile 只核对，prepare_revoke 登记未签挑战并给进程内 previewId，confirm 再经真实选择。控制版本/期限/连接变化重核；撤销只作用所选服务、拒绝目标旧连接，不删除数据或声称全网撤销。最后管理设备须已登记恢复依据才可自撤，登记不证明本人仍持有码。stop_retry 只停止本机继续提交，已签未知操作保留，不等于服务取消。
 
-Native 身份恢复码的当前源码入口是 `galaxy_identity_recovery`：`set` 为当前身份准备新码，`recover` 打开原码输入页，`resume` 以原 `operationId` 接续未完成操作。工具只返回临时本机页面定位，恢复码仅由本人在该页输入或查看，不放入工具参数、工具结果或公开配置。恢复在所选服务的同一 GUID 上执行控制操作，会撤销该服务原设备与绑定、选择新设备并轮换下一代恢复码；本人须在本机保存并确认新码，重新连接另行选择。它不自动恢复历史私有内容或本机资料。页面十分钟有效，关闭或过期不代表服务操作取消；结果未知先查询原回执，只有服务仍记录为待提交时，才可由本人确认重试原签名字节。此流程本机定向联测已通过，不能据源码接线声称最终候选或真实宿主与平台验收通过。
+Native 身份恢复码的当前源码入口是 `galaxy_identity_recovery`：`set` 为当前身份准备新码，`recover` 打开原码输入页，`resume` 以原 `operationId` 接续未完成操作。工具只返回临时本机页面定位，恢复码仅由本人在该页输入或查看，不放入工具参数、工具结果或公开配置。恢复在所选服务的同一 GUID 上执行控制操作，会撤销该服务原设备与绑定、选择新设备并轮换下一代恢复码；本人须在本机保存并确认新码，重新连接另行选择。它不自动恢复历史私有内容或本机资料。页面十分钟有效，关闭或过期不代表服务操作取消；结果未知先查询原回执，只有服务仍记录为待提交时，才可由本人确认重试原签名字节。此流程本机定向联测已通过，不能据源码接线推断所有宿主与平台验收通过。
 
 关注需当前房间 Agent grant、用途和结束时间；当前Agent可按任务使用 check/ack/stop，nextCheckAt 是读取时机提示，不代表已启动专用后台作业。绑定变更停止旧关注，不复制权限；本机保存定位并重读来源，人类已读与 Agent 游标分开。无事件不调用模型；停用 grant 不等于宿主原模型进程已停止。
 

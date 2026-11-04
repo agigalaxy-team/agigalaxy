@@ -141,7 +141,7 @@ class PublicNavigationTests(unittest.TestCase):
     def test_public_compiler_emits_content_not_current_html(self):
         with TemporaryDirectory() as temporary:
             output = Path(temporary)
-            metadata = {'backendRelease':'0.0.1','publicApiObservedAt':'fixture','nativeClientDownload':{'downloadBase':'/downloads/native-client/0.0.1/','package':{'version':'0.0.1','filename':'fixture.zip','bytes':128,'sha256':'a'*64}}}
+            metadata = {'backendRelease':'0.0.1','publicApiObservedAt':'fixture','currentNativeClient':{'version':'0.1.5','releaseUrl':'https://example.test/releases/native-v0.1.5','assetBase':'https://example.test/download/native-v0.1.5/','installationUrl':'https://example.test/install-go'},'nativeClientDownload':{'downloadBase':'/downloads/native-client/0.0.1/','package':{'version':'0.0.1','filename':'fixture.zip','bytes':128,'sha256':'a'*64}}}
             (output/'release.json').write_text(json.dumps(metadata),encoding='utf-8')
             with patch.object(chrome,'OUT',output),patch.object(chrome,'PREVIEW',True):
                 render_product_pages({'page':chrome.page,'write':chrome.write,'OUT':output,'PREVIEW':True,'RUNTIME_DATA':True})
@@ -151,7 +151,13 @@ class PublicNavigationTests(unittest.TestCase):
             download=json.loads((output/'assets/public-pages/downloads/index.json').read_text(encoding='utf-8'))
             verification=json.loads((output/'assets/public-pages/downloads/verification/index.json').read_text(encoding='utf-8'))
             self.assertIn('/downloads/verification/',json.dumps(download))
+            self.assertIn('galaxy-native-go-0.1.5-windows-amd64.tgz',json.dumps(download))
+            self.assertIn('https://example.test/install-go',json.dumps(download))
+            self.assertNotIn('fixture.zip',json.dumps(download))
+            docs=json.loads((output/'assets/public-pages/docs/index.json').read_text(encoding='utf-8'))
+            self.assertIn('https://example.test/install-go',json.dumps(docs))
             self.assertIn('SHA-256',json.dumps(verification))
+            self.assertIn('native-v0.1.5/SHA256SUMS',json.dumps(verification))
             self.assertIn('a'*64,json.dumps(verification))
             self.assertIn('/downloads/native-client/0.0.1/release.jws',json.dumps(verification))
             source=json.loads((output/'assets/public-pages/open-source/index.json').read_text(encoding='utf-8'))

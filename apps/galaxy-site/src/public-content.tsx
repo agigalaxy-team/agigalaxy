@@ -46,10 +46,9 @@ function Blocks({blocks,media,release}:{blocks:SiteBlock[];media:SiteMedia[];rel
    return <figure key={index} className="cms-block cms-image"><img src={'/media/cms/'+encodeURIComponent(item.id)+'/'+encodeURIComponent(item.filename)} alt={item.alt} width={item.width??undefined} height={item.height??undefined} loading="lazy" decoding="async"/>{(!!block.caption||!!item.credit)&&<figcaption>{!!block.caption&&<p>{text(block.caption)}</p>}{!!item.credit&&<p className="cms-media-credit">{item.credit}</p>}</figcaption>}</figure>;
   }
   if(block.blockType==='releaseLinks'){
-   const native=release.nativeClientDownload as {installBundle?:{filename:string;version:string};package?:{filename:string;version:string};downloadBase?:string}|undefined;
-   const selected=native?.installBundle??native?.package;
-   if(!selected||!native?.downloadBase||!/^[\w.-]+$/.test(selected.filename))throw Error('Stable client download metadata is unavailable');
-   return <section key={index} className="cms-block cms-release-links">{title}<p>银河客户端 {selected.version}</p><Links links={[{label:text(block.label),href:native.downloadBase+encodeURIComponent(selected.filename)},{label:'安装说明',href:'/downloads/'},{label:'发行资料',href:'/downloads/verification/'}]}/></section>;
+   const current=release.currentNativeClient as {version:string;installationUrl:string}|undefined;
+   if(!current?.version||!current.installationUrl)throw Error('Current client release metadata is unavailable');
+   return <section key={index} className="cms-block cms-release-links">{title}<p>银河 Go 客户端 {current.version}</p><Links links={[{label:text(block.label),href:'/downloads/#client-package'},{label:'安装说明',href:current.installationUrl},{label:'发行资料',href:'/downloads/verification/'}]}/></section>;
   }
   throw Error('Unsupported published block');
  });

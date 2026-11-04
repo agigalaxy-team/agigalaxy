@@ -216,7 +216,7 @@ def main():
     chrome.write('public-assets.json', json.dumps({'version':1,'files':files}, ensure_ascii=False, separators=(',', ':')) + '\n')
     print(json.dumps({'output': str(output), 'preview': preview,
                       'siteRelease': metadata['version'], 'apiRelease': metadata['backendRelease'],
-                      'clientVersion': metadata['nativeClientDownload']['package']['version'],
+                      'clientVersion': metadata['currentNativeClient']['version'],
                       'publicArchiveFilesCopied': len(catalog['files']),
                       'archiveDigestChecks': not bool(preserved_source)}))
 
