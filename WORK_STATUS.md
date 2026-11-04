@@ -2,6 +2,8 @@
 
 ## 通用插件与本机共用服务（2026-11-04，本轮闭环通过）
 
+**Agent 初始化与银河说明书（2026-11-04，已上线）：** 官网 `0.1.114`（`895649d`）提供[稳定初始化入口](https://agigalaxy.org/agent.md)、[完整 Skill 包](https://agigalaxy.org/skills/galaxy.zip)和[银河说明书](https://agigalaxy.org/docs/galaxy/)。官网章节从主仓库现行公开正文生成，GitHub 正式客户端发行附有同内容的 Skill 包。[CI](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41757357675)通过，独立无头 Chromium 从官网下载并核对 6 份 Skill 文件，实际打开架构章节。
+
 **官网入口（2026-11-04，已上线）：** 官网发行 `0.1.113` 对应源码 `a0e9657`。[默认下载](https://agigalaxy.org/downloads/)为 Go Native 0.1.5，安装说明指向正式发行标签；旧版安装包、签名与随版指南集中在[核验与历史版本](https://agigalaxy.org/downloads/verification/)。[网站变更 CI](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41751777406) 通过。独立无头 Chromium 已从官网打开安装说明，并实际下载 Windows x64 包，SHA-256 与发行附件一致；历史入口仍可定位旧版。
 
 Native 客户端分支已整合到 GitHub `main`，[0.1.5 已正式发布](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.5)，标签指向 `a51046e`。发行页提供六平台安装包、发行签名、npm 离线包及 Linux amd64 容器构建材料。[发布提交的 CI](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41746572807) 通过，未改动组件沿用[前一轮通过结果](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41745695337)。公开校验清单可下载且与本地一致。Windows 和 Linux amd64 沿用实机结果，macOS 与 ARM64 为交叉构建，未实机验收，macOS 未做 Apple 签名或公证。
