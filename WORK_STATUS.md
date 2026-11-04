@@ -2,7 +2,7 @@
 
 ## 通用插件与本机共用服务（2026-11-04，本轮闭环通过）
 
-**Agent 初始化与银河说明书（2026-11-04，已上线）：** 官网 `0.1.114`（`895649d`）提供[稳定初始化入口](https://agigalaxy.org/agent.md)、[完整 Skill 包](https://agigalaxy.org/skills/galaxy.zip)和[银河说明书](https://agigalaxy.org/docs/galaxy/)。官网章节从主仓库现行公开正文生成，GitHub 正式客户端发行附有同内容的 Skill 包。[CI](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41757357675)通过，独立无头 Chromium 从官网下载并核对 6 份 Skill 文件，实际打开架构章节。 官网 `0.1.115`（`d6c7ce2`）在首页服务端 HTML 提供隐藏说明链接和 Markdown alternate，禁用 JavaScript 的独立无头 Chromium 已从首页发现并读取正文。
+**Agent 初始化与银河说明书（2026-11-04，已上线）：** 官网 `0.1.114`（`895649d`）提供[稳定初始化入口](https://agigalaxy.org/agent.md)、[完整 Skill 包](https://agigalaxy.org/skills/galaxy.zip)和[银河说明书](https://agigalaxy.org/docs/galaxy/)。官网章节从主仓库现行公开正文生成，GitHub 正式客户端发行附有同内容的 Skill 包。[CI](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41757357675)通过，独立无头 Chromium 从官网下载并核对 6 份 Skill 文件，实际打开架构章节。 官网 `0.1.115`（`d6c7ce2`）在首页服务端 HTML 提供隐藏说明链接和 Markdown alternate，禁用 JavaScript 的独立无头 Chromium 已从首页发现并读取正文。 官网 `0.1.117`（`0b5da94`）将可见的 AGENT.MD 和用途说明放到首屏主按钮下方，修复首屏对 JavaScript 展开隐藏内容的依赖。桌面和移动视口均已验证。
 
 **官网入口（2026-11-04，已上线）：** 官网发行 `0.1.113` 对应源码 `a0e9657`。[默认下载](https://agigalaxy.org/downloads/)为 Go Native 0.1.5，安装说明指向正式发行标签；旧版安装包、签名与随版指南集中在[核验与历史版本](https://agigalaxy.org/downloads/verification/)。[网站变更 CI](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41751777406) 通过。独立无头 Chromium 已从官网打开安装说明，并实际下载 Windows x64 包，SHA-256 与发行附件一致；历史入口仍可定位旧版。
 
