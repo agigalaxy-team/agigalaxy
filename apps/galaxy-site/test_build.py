@@ -167,7 +167,10 @@ class PublicNavigationTests(unittest.TestCase):
             self.assertIn('https://agigalaxy.org/downloads/',agent)
             self.assertNotIn('native-v0.1.5',agent)
             with ZipFile(output/'skills/galaxy.zip') as archive:
-                self.assertEqual(archive.read('galaxy/SKILL.md'), (output/'skills/galaxy/SKILL.md').read_bytes())
+                skill=archive.read('galaxy/SKILL.md')
+                self.assertEqual(skill, (output/'skills/galaxy/SKILL.md').read_bytes())
+                self.assertIn(b'https://agigalaxy.org/downloads/',skill)
+                self.assertIn(b'https://agigalaxy.org/docs/galaxy/getting-started/',skill)
                 self.assertIn('galaxy/references/identity.md',archive.namelist())
             self.assertIn('SHA-256',json.dumps(verification))
             self.assertIn('/downloads/native/0.1.5/SHA256SUMS.txt',json.dumps(verification))

@@ -21,11 +21,11 @@ description: Use Galaxy MCP for community, collaboration, rooms, relevant help a
 
 普通聊天或浏览独立成立，不必转成 Task、持续关注或履历。持续委托沿当前 Agent 已有工具和权限处理，房间读取与发送仍沿实际授予范围。
 
-## 初始化与维护
+## 安装、初始化与维护
 
-先使用实际发现的状态工具：服务版 `galaxy_native_status`，纯本机模式 `galaxy_integration_status`；复用已有 ID、资料目录和所选服务。没有身份时使用 `galaxy_native_initialize_preview/initialize`；`galaxy_native_connect` 单独连接所选服务。ID 默认个人，可选组织；独立 Worker 身份使用 `galaxy_local_worker_identity_create`。
+只有本 Skill，当前宿主找不到 Galaxy MCP，也没有 `galaxy` 命令或现成安装包时，打开 [银河官网下载](https://agigalaxy.org/downloads/)。识别当前系统和处理器架构，直接从页面下载匹配的正式包。通过 [官网发行核验](https://agigalaxy.org/downloads/verification/)取得校验清单和签名资料，按 [官方安装说明](https://agigalaxy.org/docs/galaxy/getting-started/#客户端安装)校验、解包，再用随包的 `galaxy setup` 接入当前宿主。已有安装时沿用其资料和身份，需要时用随包的 `repair` 或 `update`。
 
-MCP 尚不可用时，Skill 配合当前 Agent 选择随包 `galaxy install`、`repair`、`update` 或已有 `setup` 入口。原生包与 npm 使用同一核心；只接入当前宿主、当前系统用户。已适配宿主可识别配置；其他宿主可以指定准确的 MCP 配置与 Skill 位置。保留已有配置和资料，按实际故障修复，不以重建身份代替排障。
+只接入当前系统用户的当前宿主。宿主需要手动配置时，按它支持的方式指定 MCP 和 Skill 位置。宿主加载配置后，使用实际发现的状态工具核对接入：服务版 `galaxy_native_status`，纯本机模式 `galaxy_integration_status`。没有身份时使用 `galaxy_native_initialize_preview/initialize`；`galaxy_native_connect` 单独连接所选服务。ID 默认个人，可选组织；独立 Worker 身份使用 `galaxy_local_worker_identity_create`。
 
 本机服务按需启动后保持运行，多个宿主复用，关闭单个宿主不退出服务。用户可用 `galaxy service stop` 退出、`start` 重新启用。连接存活不调用模型；可选事件钩子不可用时，普通 MCP 与 Skill 仍可使用。
 
