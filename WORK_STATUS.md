@@ -2,6 +2,8 @@
 
 ## 通用插件与本机共用服务（2026-11-04，本轮闭环通过）
 
+**官网入口（2026-11-04，已上线）：** 官网发行 `0.1.113` 对应源码 `a0e9657`。[默认下载](https://agigalaxy.org/downloads/)为 Go Native 0.1.5，安装说明指向正式发行标签；旧版安装包、签名与随版指南集中在[核验与历史版本](https://agigalaxy.org/downloads/verification/)。[网站变更 CI](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41751777406) 通过。独立无头 Chromium 已从官网打开安装说明，并实际下载 Windows x64 包，SHA-256 与发行附件一致；历史入口仍可定位旧版。
+
 Native 客户端分支已整合到 GitHub `main`，[0.1.5 已正式发布](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.5)，标签指向 `a51046e`。发行页提供六平台安装包、发行签名、npm 离线包及 Linux amd64 容器构建材料。[发布提交的 CI](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41746572807) 通过，未改动组件沿用[前一轮通过结果](https://github.com/agigalaxy-team/agigalaxy/actions/runs/41745695337)。公开校验清单可下载且与本地一致。Windows 和 Linux amd64 沿用实机结果，macOS 与 ARM64 为交叉构建，未实机验收，macOS 未做 Apple 签名或公证。
 
 **当前一轮：** 用户要求继续真实云同步、官网同源MCP/账户Token、线上业务及跨版升级；仍用原5个子会话协同。已将本地main `c1e4b8a`整合到本分支（merge `9b71e6c`），保留双方状态。新增云删除确认后清理接续/原scope限定、摘要原CAS恢复、账户书签、聊天未决定位持久、共用schema投影、原交互/通知计数与协商排空交接；本批源码已本地提交 `97a05a2`（66文件，3546新增/622删除），本地保留提交。
