@@ -35,6 +35,7 @@ const schema = z.discriminatedUnion('kind', [z.object({ ...common, kind: z.liter
     sourceSha256: hash, artifactsSha256: hash, scope: z.literal('local-stdio-http-fixtures'),
     actualHostAcceptance: z.literal(false) }).strict(),
 }).strict(), z.object({ ...common, kind: z.literal('galaxy-native-go-release'),
+  purpose: z.enum(['local-validation', 'release-candidate', 'release']),
   package: nativeGoPackageSchema,
   protocolAcceptance: z.object({ profile: z.literal('galaxy-native-go/1'), reportSha256: hash,
     sourceSha256: hash, artifactsSha256: hash, scope: z.literal('candidate-package-integrity'),

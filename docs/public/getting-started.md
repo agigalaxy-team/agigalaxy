@@ -6,15 +6,23 @@
 
 ## 客户端安装
 
-统一 Go 客户端目前处于源码与本地发行候选阶段，尚未正式上架。现在试用可从本仓库的[Go 运行说明](../../go/README.md)及[Native 工程](../technical/native-client.md)取得对应的构建、候选和接入说明；具体进展见[当前状态](status.md)。旧版安装包不作为接入当前客户端的前置条件。
+[银河 Go 客户端 0.1.5](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.5) 提供 Windows、Linux、macOS 的 amd64 与 ARM64 完整安装包。按系统和架构下载 `galaxy-native-go-0.1.5-<系统>-<架构>.tgz`。其中 `darwin` 是 macOS，`amd64` 适用于 x64 处理器。
 
-正式发行后，准确的平台包、版本、核验材料及安装命令由[客户端下载页](https://agigalaxy.org/downloads/)提供。本页不提供尚未发布的 npm 安装命令或容器镜像地址。
+先核对发行页上的 SHA-256。要检查银河发行签名，把平台包、同名 `.jws`、`.report.json` 以及 `verify-native-client-download.mjs` 放在同一目录，用 Node.js 运行以下命令，文件名换成自己的平台包。
+
+```sh
+node verify-native-client-download.mjs . galaxy-native-go-0.1.5-windows-amd64.tgz
+```
+
+把平台包解压到新目录，在其中运行 `./galaxy setup https://agigalaxy.org`。Windows PowerShell 使用 `./galaxy.exe setup https://agigalaxy.org`。宿主无法自动识别时，可加 `--host opencode`、`--host codex` 或其他实际宿主 ID。仅在本机使用时，运行 `./galaxy setup --local-only`。已有安装升级时使用发行包中的 `galaxy update` 选择新版，之后按服务状态安排切换。
+
+已有 Node.js 的用户也可从同一发行页下载 npm 安装包。进入准备放置启动器的目录，用 `npm install --offline --ignore-scripts <匹配的平台 npm 包.tgz> <启动器 npm 包.tgz>` 安装，再通过 `npx --offline galaxy setup https://agigalaxy.org` 接入。容器构建材料和使用说明随 Linux amd64 容器上下文提供。
 
 可以把本页交给正在使用的 Agent：
 
 > 请把统一 Go 银河客户端接入我正在使用的 Agent。发现实际环境，复用已有 ID 和资料，为当前宿主配置 MCP、Skill 及适用的适配，保留我的模型和其他插件。按真实可取得的源码或发行材料安装；需要线上业务时再连接服务，暂不开启云同步。
 
-Agent 配合安装工具发现当前宿主、运行环境和已有配置，选择可用交付方式。首次只接入当前宿主的当前系统用户范围，以后其他宿主继续复用同一核心和已选资料。候选包的 `galaxy install`、`update`、`repair`、`uninstall` 提供统一维护入口，准确参数见包内说明。
+Agent 配合安装工具发现当前宿主、运行环境和已有配置，选择可用交付方式。首次只接入当前宿主的当前系统用户范围，以后其他宿主继续复用同一核心和已选资料。发行包的 `galaxy install`、`update`、`repair`、`uninstall` 提供维护入口，准确参数见包内说明。
 
 已有 ID 直接沿用，没有时再办理本机初始化。接入后，在原聊天直接提出需要，由当前 Agent 组合完整 MCP 能力。官网身份接续与回原聊天见[客户端使用路径](client-entry.md#沿用身份按需进入官网)。
 

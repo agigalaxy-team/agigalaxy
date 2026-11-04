@@ -8,7 +8,7 @@
 
 现行客户端使用同一个 Go Native 核心，提供完整 MCP 能力与 Skill 用法；当前 Agent 使用自己的模型决定任务如何组合、继续和完成。npm 引导、原生整版包和适用容器是同一核心的交付方式，JavaScript／TypeScript 保留安装引导、宿主 SDK 与界面职责。
 
-当前处于源码与本地发行候选阶段，新 Go 包、npm 包及容器镜像尚未正式上架。源码试用与接入见[开始使用](getting-started.md)，实际开发进展见[WORK_STATUS](../../WORK_STATUS.md)。
+Go 客户端 0.1.5 提供六个平台的完整包、npm 本地安装包及 Linux amd64 容器构建材料。Windows amd64 和 Linux amd64 已进行实机检查。macOS 和 ARM64 包来自交叉构建，实机验收待补。下载和接入见[开始使用](getting-started.md)，开发进展见[WORK_STATUS](../../WORK_STATUS.md)。
 
 共用服务、当前用户宿主接入、身份与资料承接、安装维护、事实记录和原会话材料正在按实际宿主接通；官网接续通过同一MCP由Agent按需读取。已有 Windows／OpenCode 的集中检查和真实模型调用结果对应各自候选与场景，其余宿主和平台分别核对。使用路径及能力差异见[客户端入口](client-entry.md)。
 

@@ -8,8 +8,11 @@ import { verifyRelease } from "../packages/galaxy-contracts/src/release-artifact
 const publisher = 'https://agigalaxy.org', kid = 'galaxy-release-20260911';
 const thumbprint = 'mpeo6qMIGNl-uw1MPlQH3SKqmrMuZqdNjAP0YgsQ2U4';
 try {
-  if (process.argv.length !== 3) throw new Error('Expected downloaded release directory');
+  if (![3, 4].includes(process.argv.length)) throw new Error('Expected downloaded release directory and optional Go archive name');
   const directory = resolve(process.argv[2]);
+  const goArchive = process.argv[3];
+  if (goArchive && !/^galaxy-native-go-\d+\.\d+\.\d+-(?:windows|linux|darwin)-(?:amd64|arm64)\.tgz$/.test(goArchive))
+    throw new Error('Unexpected Go package filename');
   const response = await fetch(publisher + '/releases/keys.json', {
     redirect: 'error', cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(15000),
   });
@@ -26,22 +29,26 @@ try {
   if (keys.length !== 1 || periods.length !== 1 || keys[0].alg !== 'EdDSA'
     || await calculateJwkThumbprint(keys[0], 'sha256') !== thumbprint) throw new Error('Publisher pin changed');
   const key = await importJWK(keys[0], 'EdDSA');
-  const packageMetadata=JSON.parse((await local(directory,'package-metadata.json',65536)).toString('utf8'));
-  const artifactFilename=nativeArtifactFilename(packageMetadata);
-  const result = await verifyRelease((await local(directory, 'release.jws', 65536)).toString('utf8').trim(), {
-    publisher, expectedPackage: '@galaxy/native-client',
+  const packageMetadata = goArchive ? null : JSON.parse((await local(directory,'package-metadata.json',65536)).toString('utf8'));
+  const artifactFilename = goArchive ?? nativeArtifactFilename(packageMetadata);
+  const signatureFilename = goArchive ? goArchive + '.jws' : 'release.jws';
+  const reportFilename = goArchive ? goArchive + '.report.json' : 'protocol-report.json';
+  const result = await verifyRelease((await local(directory, signatureFilename, 65536)).toString('utf8').trim(), {
+    publisher, expectedPackage: goArchive ? '@galaxy/native-go-candidate' : '@galaxy/native-client',
     artifact: await local(directory, artifactFilename, 64 * 1024 * 1024),
-    report: await local(directory, 'protocol-report.json', 256 * 1024),
+    report: await local(directory, reportFilename, 256 * 1024),
     trustedKeys: new Map([[kid, { publicKey: key, notBefore: periods[0].notBefore,
       notAfter: periods[0].notAfter, revoked: periods[0].revoked !== false }]]),
   });
-  if (result.manifest.purpose !== 'release-candidate' || result.manifest.kind !== 'galaxy-native-client-release'
-    ||result.manifest.package.version!==packageMetadata.version||result.manifest.package.filename!==artifactFilename)
+  if (result.manifest.purpose !== (goArchive ? 'release' : 'release-candidate')
+    || result.manifest.kind !== (goArchive ? 'galaxy-native-go-release' : 'galaxy-native-client-release')
+    || (packageMetadata && result.manifest.package.version !== packageMetadata.version)
+    || result.manifest.package.filename !== artifactFilename)
     throw new Error('Unexpected release channel');
   console.log(JSON.stringify({ verified: true, publisher, package: result.manifest.package.name,
     version: result.manifest.package.version, sha256: result.manifest.package.sha256,
-    currentPublisherKeyStatusFetched: true, channel: 'development-candidate',
-    actualHostAcceptance: false, stableRelease: false, installed: false, connected: false }));
+    currentPublisherKeyStatusFetched: true, channel: goArchive ? 'release' : 'development-candidate',
+    actualHostAcceptance: false, stableRelease: Boolean(goArchive), installed: false, connected: false }));
 } catch {
   process.stderr.write('Download verification failed. Check exact files, publisher status, clock and signature expiry. Nothing was installed or connected.\n');
   process.exitCode = 1;
