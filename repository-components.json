@@ -250,6 +250,7 @@
       ],
       "files": [
         "scripts/build-native-client-verifier.mjs",
+        "scripts/galaxy-update-legacy.mjs",
         "scripts/build-native-v2.mjs",
         "scripts/native-client-installed-host-probe.mjs",
         "scripts/native-client-release.mjs",
@@ -393,6 +394,7 @@
       "files": [
         "scripts/test/browser-demo.test.mjs",
         "scripts/build-product.mjs",
+        "scripts/galaxy-update-legacy.mjs",
         "scripts/web-runtime.mjs",
         "scripts/website-artifact.mjs",
         "scripts/test/website-artifact.test.mjs"
