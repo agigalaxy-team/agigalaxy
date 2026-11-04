@@ -27,7 +27,9 @@ export async function servePublicResource(segments:string[]){
   if(!selected||!publicTypes.has(selected.contentType))return deny();
   const file=await safePublicFile(root,segments,256*1024*1024);
   if(/^downloads\/native\/\d+\.\d+\.\d+\/[\w.-]+\.tgz$/.test(path)){
-   return new Response(Readable.toWeb(createReadStream(file.path)),{headers:{...headers,'Cache-Control':'public, max-age=31536000, immutable','Content-Type':selected.contentType,'Content-Length':String(file.size),'Content-Disposition':`attachment; filename="${segments[3]}"`}});
+   // Node and DOM declare different types for the same Web Streams implementation.
+   const body=Readable.toWeb(createReadStream(file.path)) as unknown as ReadableStream<Uint8Array>;
+   return new Response(body,{headers:{...headers,'Cache-Control':'public, max-age=31536000, immutable','Content-Type':selected.contentType,'Content-Length':String(file.size),'Content-Disposition':`attachment; filename="${segments[3]}"`}});
   }
   return new Response(await readFile(file.path),{headers:{...headers,'Content-Type':selected.contentType,'Content-Length':String(file.size)}});
  }catch{return deny();}
