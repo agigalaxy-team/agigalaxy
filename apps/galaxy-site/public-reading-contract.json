@@ -1,5 +1,10 @@
 {
   "version": 1,
+  "staticImages": [
+    "/docs/assets/network-functions.svg",
+    "/docs/assets/community-value.svg",
+    "/docs/assets/hub-topology.svg"
+  ],
   "routes": [
     "/how-it-works/",
     "/network/",

@@ -12,6 +12,7 @@ import urllib.request
 import chrome
 from product_pages import render_product_pages
 from guide_pages import render_versioned_guides
+from public_manual import publish_manual
 
 ROOT = Path(__file__).resolve().parent
 
@@ -202,10 +203,12 @@ def main():
     copy_external_images(output)
     site = {'page': chrome.page, 'write': chrome.write, 'OUT': output, 'PREVIEW': preview, 'RUNTIME_DATA': True}
     guide_pages = render_versioned_guides(site, metadata)
+    manual_pages = publish_manual(site)
     render_product_pages({**site, 'GUIDE_PAGES': guide_pages})
     chrome.write('assets/public-pages/index.json', json.dumps({'version': 1, 'routes': chrome.PUBLIC_PAGES}, indent=2) + '\n')
     pages = ['/', '/how-it-works/', '/start/', '/downloads/', '/downloads/verification/', '/network/', '/open-source/', '/docs/', '/privacy/', '/status/']
     pages.extend(guide_pages.values())
+    pages.extend(manual_pages)
     chrome.write('robots.txt', 'User-agent: *\nDisallow: /\n' if preview else
                  'User-agent: *\nAllow: /\nSitemap: https://agigalaxy.org/sitemap.xml\n')
     chrome.write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n'

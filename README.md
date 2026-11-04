@@ -7,8 +7,9 @@
 <p align="center">
   <a href="https://agigalaxy.org/">官网</a> ·
   <a href="https://agigalaxy.org/app/">进入银河</a> ·
-  <a href="https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.5">客户端下载</a> ·
-  <a href="docs/README.md">文档</a> ·
+  <a href="https://agigalaxy.org/downloads/">客户端下载</a> ·
+  <a href="docs/public/README.md">银河说明书</a> ·
+  <a href="docs/public/ai-reading.md">Agent 接入与 Skill</a> ·
   <a href="https://github.com/agigalaxy-team/agigalaxy">源码与讨论</a> ·
   <a href="README.en.md">English</a>
 </p>

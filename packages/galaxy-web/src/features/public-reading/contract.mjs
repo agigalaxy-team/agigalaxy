@@ -3,6 +3,7 @@ import contract from '../../../../../apps/galaxy-site/public-reading-contract.js
 const tags=new Set(contract.tags),attributes=new Set(contract.attributes),routes=new Set(contract.routes);
 const version='(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)';
 const guide=new RegExp('^/docs/(?:native-client/'+version+'/(?:installation|hosts|runtime)|web/'+version+'/community)/$');
+const manual=/^\/docs\/galaxy\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)*$/;
 const cmsPath=path=>typeof path==='string'&&/^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)+$/.test(path)&&path.length<=300
   &&!['app','admin','api','v1','v2','preview','assets','media','archives','releases','docs','downloads','404'].includes(path.split('/')[1]);
 let routeLoading;
@@ -16,7 +17,7 @@ export function loadPublicReadingRoutes(){
   }).catch(()=>{});
 }
 export function publicReadingPath(path){return path.endsWith('/')?path:path+'/';}
-export function isPublicReadingRoute(path){const value=publicReadingPath(path);return routes.has(value)||guide.test(value)
+export function isPublicReadingRoute(path){const value=publicReadingPath(path);return routes.has(value)||guide.test(value)||manual.test(value)
   ||cmsPath(value)&&globalThis.__GALAXY_PUBLIC_PAGE__?.path===value;}
 export function publicReadingDataUrl(path){
   if(!isPublicReadingRoute(path))throw Error('Unsupported public reading route');
@@ -44,7 +45,7 @@ export function validatePublicReadingPage(value,path){
       if(!attributes.has(name)||typeof content!=='string'||name==='href'&&!safeUrl(content)
         ||['src','alt','loading','decoding'].includes(name)&&node.tag!=='img')throw Error('Unsafe public reading attribute');
     }
-    if(node.tag==='img'&&(!/^\/media\/cms\/[a-zA-Z0-9_-]+\/(?:[a-zA-Z0-9._~-]|%[0-9A-Fa-f]{2})+$/.test(node.attrs.src??'')
+    if(node.tag==='img'&&((!contract.staticImages.includes(node.attrs.src)&&!/^\/media\/cms\/[a-zA-Z0-9_-]+\/(?:[a-zA-Z0-9._~-]|%[0-9A-Fa-f]{2})+$/.test(node.attrs.src??''))
       ||typeof node.attrs.alt!=='string'||node.attrs.loading!=='lazy'||node.attrs.decoding!=='async'
       ||['width','height'].some(name=>node.attrs[name]!==undefined&&!/^[1-9][0-9]{0,5}$/.test(node.attrs[name]))||node.children.length))throw Error('Unsafe public reading image');
     for(const child of node.children)visit(child,depth+1);

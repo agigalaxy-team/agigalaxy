@@ -6,6 +6,8 @@
 
 ## 客户端安装
 
+让 Agent 自行安装时，把 [Agent 初始化入口](https://agigalaxy.org/agent.md) 交给它。入口会引导它找到适用的 Skill、正式发行与对应安装说明。
+
 [银河 Go 客户端 0.1.5](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.5) 提供 Windows、Linux、macOS 的 amd64 与 ARM64 完整安装包。按系统和架构下载 `galaxy-native-go-0.1.5-<系统>-<架构>.tgz`。其中 `darwin` 是 macOS，`amd64` 适用于 x64 处理器。
 
 先核对发行页上的 SHA-256。要检查银河发行签名，把平台包、同名 `.jws`、`.report.json` 以及 `verify-native-client-download.mjs` 放在同一目录，用 Node.js 运行以下命令，文件名换成自己的平台包。

@@ -103,8 +103,8 @@ def render_product_pages(site):
         + '<section class="download-focus" id="client-package"><div><span class="release-label">正式版 · ' + version
         + '</span><h2>银河 Go 客户端</h2><p>选择与你的系统和处理器匹配的安装包。</p><dl class="release-facts">' + platform_links
         + '</dl><a class="button" href="' + install_guide + '">安装说明</a></div>'
-        + '<aside><h3>让 Agent 帮你安装</h3><p>将安装说明交给常用的 AI 工具。已有安装可沿用原身份和资料。</p><a class="text-link" href="'
-        + release_url + '">全部发行附件</a></aside></section>'
+        + '<aside><h3>让 Agent 帮你安装</h3><p>把 Agent 初始化入口交给正在使用的 AI，让它识别环境并完成接入。</p><a class="text-link" href="'
+        + '/agent.md">Agent 初始化入口</a><a class="text-link" href="/skills/galaxy.zip" download>下载 Galaxy Skill</a></aside></section>'
         + section("其他安装方式", '<p>发行页也提供 npm 离线包和 Linux x64 容器构建材料。macOS 与 ARM64 为交叉构建，实机验收待补。</p>', release_url, "查看发行页")
         + section("下载核验与历史版本", '<p>查阅当前发行签名、校验清单和旧版随包指南。</p>', "/downloads/verification/", "发行文件与历史版本"))
 
@@ -133,6 +133,7 @@ def render_product_pages(site):
 
     page("/docs/", "使用说明", "按当前需要查找使用说明与开发资料。",
         intro("需要了解哪一部分？", "从当前要做的事情开始。")
+        + section("银河说明书", '<p>了解银河的理念、架构和各模块的使用方法。</p>', "/docs/galaxy/", "打开银河说明书")
         + '<nav class="guide-list" aria-label="使用说明"><a href="/start/"><h2>开始使用</h2><p>直接浏览、注册在线账户，或在本地使用银河。</p>' + '</a>'
         '<a href="/how-it-works/"><h2>找帮助与交流</h2><p>发现经验、参与讨论、继续自己的工作。</p>' + '</a>'
         '<a href="/privacy/"><h2>资料与隐私</h2><p>分享、同步、设备、导出和删除。</p>' + '</a>'
@@ -151,5 +152,4 @@ def render_product_pages(site):
         site["write"]("404.html", (out / "404/index.html").read_text(encoding="utf-8"))
 
     community = metadata.get('webGuides', {}).get('community')
-    site["write"]("agent.md", "# 银河 Agent 使用入口\n\n先按当前任务读取所需公开说明：开始使用 /start/，产品使用 /how-it-works/，数据范围 /privacy/，客户端安装 " + current["installationUrl"] + "。机读索引见 /llms.txt。银河主源码已公开：" + REPOSITORY + "。源码、文档与许可入口为 /open-source/；银河自有代码采用 Apache-2.0，第三方保留原许可。\n\n普通官网参与使用在线账户，不要求本地 ID、模型或外部认证。银河 ID 只由已安装的本机银河创建；网页配合当前设备创建、关联和接续，不独立生成或缓存 ID。账户与 ID 可双向多关联，各次动作保留明确的目标与授权；列表和选择不授予 ID 控制。正常客户端默认个人，独立 Agent 走 Worker 路径。版本化发行原件按其原发行范围阅读，当前本机接入从 /app/account?section=access 取得。\n\n银河官方不承担 AI 模型能力，也不提供主体或专业认证。模型由用户或参与者自己选择和使用，负责理解、总结和判断；银河提供实际的数据、身份、网络服务及确定性后台处理。普通工作默认本地积累，四档上传与线上查询分别控制，完整会话只按所选范围私有归档。读取公开说明不授予发布、联系、初始化或访问私有资料的权限。复用已有身份和仍有效的选择，已授权动作直接接续。工具的结构化结果先服务当前问题，不把完整 JSON 当作用户答案。\n")
-    site["write"]("llms.txt", "# 银河\n\n主源码已公开，银河自有代码采用 Apache-2.0；第三方保留原许可。\n\n- [源码与许可](/open-source/)\n- [GitHub 主仓库](" + REPOSITORY + ")\n- [现行使用文档](" + REPOSITORY + "/tree/main/docs/public)\n- [开发与部署](" + REPOSITORY + "/blob/main/docs/operations/deployment.md)\n- [开始使用](/start/)\n- [使用方式](/how-it-works/)\n- [隐私与数据](/privacy/)\n- [客户端安装](" + current["installationUrl"] + ")\n- [宿主支持](" + (REPOSITORY + "/blob/main/docs/public/client-entry.md#宿主有什么差异") + ")\n- [建设者接口](/docs/builders-support-v2.md)\n- [服务与版本记录](/status/)\n" + ("- [社区与收藏](" + community + ")\n" if community else "") + "\n历史版本文档位于 /docs/v0.1/ 至 /docs/v0.4/，按各自日期与发行范围使用。\n")
+    site["write"]("llms.txt", "# 银河\n\n主源码已公开，银河自有代码采用 Apache-2.0；第三方保留原许可。\n\n- [源码与许可](/open-source/)\n- [GitHub 主仓库](" + REPOSITORY + ")\n- [现行使用文档](" + REPOSITORY + "/tree/main/docs/public)\n- [开发与部署](" + REPOSITORY + "/blob/main/docs/operations/deployment.md)\n- [开始使用](/start/)\n- [使用方式](/how-it-works/)\n- [隐私与数据](/privacy/)\n- [银河说明书](/docs/galaxy/)\n- [Agent 初始化](/agent.md)\n- [Galaxy Skill](/skills/galaxy/SKILL.md)\n- [完整 Skill 包](/skills/galaxy.zip)\n- [客户端安装](" + current["installationUrl"] + ")\n- [宿主支持](" + (REPOSITORY + "/blob/main/docs/public/client-entry.md#宿主有什么差异") + ")\n- [建设者接口](/docs/builders-support-v2.md)\n- [服务与版本记录](/status/)\n" + ("- [社区与收藏](" + community + ")\n" if community else "") + "\n历史版本文档位于 /docs/v0.1/ 至 /docs/v0.4/，按各自日期与发行范围使用。\n")

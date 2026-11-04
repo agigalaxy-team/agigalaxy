@@ -8,6 +8,8 @@ from unittest.mock import patch
 
 from build import copy_example_images, windows_filesystem_path
 from guide_pages import render_markdown
+from public_manual import publish_manual
+from zipfile import ZipFile
 import chrome
 from product_pages import render_homepage, render_product_pages
 from public_reading import reading_tree
@@ -144,7 +146,9 @@ class PublicNavigationTests(unittest.TestCase):
             metadata = {'backendRelease':'0.0.1','publicApiObservedAt':'fixture','currentNativeClient':{'version':'0.1.5','releaseUrl':'https://example.test/releases/native-v0.1.5','assetBase':'https://example.test/download/native-v0.1.5/','installationUrl':'https://example.test/install-go'},'nativeClientDownload':{'downloadBase':'/downloads/native-client/0.0.1/','package':{'version':'0.0.1','filename':'fixture.zip','bytes':128,'sha256':'a'*64}}}
             (output/'release.json').write_text(json.dumps(metadata),encoding='utf-8')
             with patch.object(chrome,'OUT',output),patch.object(chrome,'PREVIEW',True):
-                render_product_pages({'page':chrome.page,'write':chrome.write,'OUT':output,'PREVIEW':True,'RUNTIME_DATA':True})
+                site = {'page':chrome.page,'write':chrome.write,'OUT':output,'PREVIEW':True,'RUNTIME_DATA':True}
+                render_product_pages(site)
+                publish_manual(site)
             self.assertFalse(list(output.rglob('*.html')))
             home=json.loads((output/'assets/home-content.json').read_text(encoding='utf-8'))
             self.assertIn('同一身份',json.dumps(home,ensure_ascii=False))
@@ -156,6 +160,15 @@ class PublicNavigationTests(unittest.TestCase):
             self.assertNotIn('fixture.zip',json.dumps(download))
             docs=json.loads((output/'assets/public-pages/docs/index.json').read_text(encoding='utf-8'))
             self.assertIn('https://example.test/install-go',json.dumps(docs))
+            self.assertIn('/docs/galaxy/',json.dumps(docs))
+            self.assertIn('/skills/galaxy.zip',json.dumps(download))
+            agent=(output/'agent.md').read_text(encoding='utf-8')
+            self.assertIn('https://agigalaxy.org/skills/galaxy/SKILL.md',agent)
+            self.assertIn('https://agigalaxy.org/downloads/',agent)
+            self.assertNotIn('native-v0.1.5',agent)
+            with ZipFile(output/'skills/galaxy.zip') as archive:
+                self.assertEqual(archive.read('galaxy/SKILL.md'), (output/'skills/galaxy/SKILL.md').read_bytes())
+                self.assertIn('galaxy/references/identity.md',archive.namelist())
             self.assertIn('SHA-256',json.dumps(verification))
             self.assertIn('native-v0.1.5/SHA256SUMS',json.dumps(verification))
             self.assertIn('a'*64,json.dumps(verification))

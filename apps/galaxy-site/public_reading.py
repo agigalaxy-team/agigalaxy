@@ -46,7 +46,7 @@ class ReadingTree(HTMLParser):
             if name in ('src', 'alt', 'loading', 'decoding') and tag != 'img':
                 raise ValueError('Image attributes require an image')
             properties[name] = value
-        if tag == 'img' and (not re.fullmatch(r'/media/cms/[a-zA-Z0-9_-]+/(?:[a-zA-Z0-9._~-]|%[0-9a-fA-F]{2})+', properties.get('src', ''))
+        if tag == 'img' and ((properties.get('src') not in CONTRACT['staticImages'] and not re.fullmatch(r'/media/cms/[a-zA-Z0-9_-]+/(?:[a-zA-Z0-9._~-]|%[0-9a-fA-F]{2})+', properties.get('src', '')))
                 or 'alt' not in properties or properties.get('loading') != 'lazy' or properties.get('decoding') != 'async'
                 or any(key in properties and not re.fullmatch(r'[1-9][0-9]{0,5}', properties[key]) for key in ('width', 'height'))):
             raise ValueError('Unsafe public reading image')

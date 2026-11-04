@@ -10,7 +10,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 
 LABELS = {"installation": "安装客户端", "hosts": "宿主与接入", "runtime": "使用与专业配置"}
-TOKEN = re.compile(r"(`[^`\n]+`|\[[^\]\n]+\]\([^\s)]+\)|\*\*[^*\n]+\*\*)")
+TOKEN = re.compile(r"(`[^`\n]+`|!?\[[^\]\n]+\]\([^\s)]+\)|\*\*[^*\n]+\*\*)")
 
 
 def page_path(source):
@@ -20,29 +20,39 @@ def page_path(source):
     return str(path.with_suffix('')) + '/'
 
 
-def inline(text, source, pages):
+def inline(text, source, pages, repository=None, local_assets=()):
     result = []
     for part in TOKEN.split(text):
         if part.startswith('`') and part.endswith('`'):
             result.append('<code>' + escape(part[1:-1]) + '</code>')
         elif part.startswith('**') and part.endswith('**'):
             result.append('<strong>' + escape(part[2:-2]) + '</strong>')
-        elif part.startswith('[') and '](' in part:
-            label, href = part[1:-1].split('](', 1)
+        elif part.startswith(('[', '![')) and '](' in part:
+            image = part.startswith('!')
+            label, href = part[2 if image else 1:-1].split('](', 1)
             parsed = urlsplit(urljoin('https://agigalaxy.org' + source, href))
             if parsed.scheme not in ('https', 'http') or not parsed.netloc or parsed.username or parsed.password:
                 raise ValueError('Unsupported guide link')
             if parsed.netloc == 'agigalaxy.org':
-                href = urlunsplit(('', '', pages.get(parsed.path, parsed.path), parsed.query, parsed.fragment))
-            download = ' download' if href.startswith('/downloads/') else ''
-            result.append('<a href="' + escape(href, quote=True) + '"' + download + '>' + escape(label) + '</a>')
+                if repository and not href.startswith(('/', 'https://', 'http://', '#')) and parsed.path not in pages and parsed.path not in local_assets:
+                    href = repository + urlunsplit(('', '', parsed.path, parsed.query, parsed.fragment))
+                else:
+                    href = urlunsplit(('', '', pages.get(parsed.path, parsed.path), parsed.query, parsed.fragment))
+            if image:
+                result.append('<img src="' + escape(href, quote=True) + '" alt="' + escape(label, quote=True) + '" loading="lazy" decoding="async">')
+            else:
+                download = ' download' if href.startswith('/downloads/') and PurePosixPath(parsed.path).suffix else ''
+                result.append('<a href="' + escape(href, quote=True) + '"' + download + '>' + escape(label) + '</a>')
         else:
             # Keep archived source bytes intact; prose navigation uses words.
             result.append(escape(part.replace(' → ', '、')))
     return ''.join(result)
 
 
-def render_markdown(markdown, source, pages):
+def render_markdown(markdown, source, pages, *, repository=None, local_assets=()):
+    def render(text):
+        return inline(text, source, pages, repository, local_assets)
+
     lines = markdown.splitlines()
     if not lines or not lines[0].startswith('# '):
         raise ValueError('Each versioned guide needs one title')
@@ -68,8 +78,17 @@ def render_markdown(markdown, source, pages):
         if heading:
             level, text = len(heading[1]), heading[2]
             anchor = 'section-' + str(len(headings) + 1)
+            if repository:
+                slug = re.sub(r'[^\w -]', '', text.lower()).replace(' ', '-')
+                if slug:
+                    anchor = slug
+                    used = {item[1] for item in headings}
+                    index = 1
+                    while anchor in used:
+                        anchor = f'{slug}-{index}'
+                        index += 1
             headings.append((level, anchor, text))
-            blocks.append(f'<h{level} id="{anchor}">' + inline(text, source, pages) + f'</h{level}>')
+            blocks.append(f'<h{level} id="{anchor}">' + render(text) + f'</h{level}>')
             i += 1
             continue
         if line.startswith('|'):
@@ -83,8 +102,8 @@ def render_markdown(markdown, source, pages):
             if any(len(row) != len(head) for row in body):
                 raise ValueError('Mismatched guide table columns')
             blocks.append('<div class="guide-table" role="region" aria-label="配置与支持对照" tabindex="0"><table><thead><tr>' +
-                          ''.join('<th scope="col">' + inline(cell, source, pages) + '</th>' for cell in head) +
-                          '</tr></thead><tbody>' + ''.join('<tr>' + ''.join('<td>' + inline(cell, source, pages) + '</td>' for cell in row) + '</tr>' for row in body) +
+                          ''.join('<th scope="col">' + render(cell) + '</th>' for cell in head) +
+                          '</tr></thead><tbody>' + ''.join('<tr>' + ''.join('<td>' + render(cell) + '</td>' for cell in row) + '</tr>' for row in body) +
                           '</tbody></table></div>')
             continue
         item = re.fullmatch(r'(- |\d+\. )(.+)', line)
@@ -92,7 +111,7 @@ def render_markdown(markdown, source, pages):
             tag, pattern = ('ol', r'\d+\. (.+)') if item[1] != '- ' else ('ul', r'- (.+)')
             entries = []
             while i < len(lines) and (match := re.fullmatch(pattern, lines[i].strip())):
-                entries.append('<li>' + inline(match[1], source, pages) + '</li>')
+                entries.append('<li>' + render(match[1]) + '</li>')
                 i += 1
             blocks.append('<' + tag + '>' + ''.join(entries) + '</' + tag + '>')
             continue
@@ -101,7 +120,7 @@ def render_markdown(markdown, source, pages):
         while i < len(lines) and lines[i].strip() and not re.match(r'^(#{1,6} |```|\||- |\d+\. )', lines[i].strip()):
             paragraph.append(lines[i].strip())
             i += 1
-        blocks.append('<p>' + inline(' '.join(paragraph), source, pages) + '</p>')
+        blocks.append('<p>' + render(' '.join(paragraph)) + '</p>')
     return title, ''.join(blocks), headings
 
 
