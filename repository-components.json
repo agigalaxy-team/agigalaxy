@@ -256,6 +256,8 @@
         "scripts/native-download-inputs.mjs",
         "scripts/native-license-notices.mjs",
         "scripts/prepare-client-candidate.mjs",
+        "scripts/prepare-native-container.mjs",
+        "scripts/prepare-native-npm.mjs",
         "scripts/test-client-install.mjs",
         "scripts/verify-native-client-download.mjs",
         "scripts/verify-native-download.mjs",
