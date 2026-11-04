@@ -28,6 +28,7 @@ type ManagedNativeInstallationInput struct {
 	SubjectType      string            `json:"subjectType"`
 	NodeExecutable   string            `json:"nodeExecutable,omitempty"`
 	HostExecutable   string            `json:"hostExecutable,omitempty"`
+	KeepIdentity     bool              `json:"-"`
 }
 type ManagedNativeInstallationPlan struct {
 	Action               string `json:"action"`

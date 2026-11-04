@@ -50,9 +50,11 @@ Skill 配合当前 Agent 根据环境选择和修复，不为普通桌面额外�
 
 ## 升级、退出与移除
 
-1. 从[官网下载页](https://agigalaxy.org/downloads/)下载当前正式版的完整平台包，核验后解压到新目录。`galaxy update` 使用本地提供的包，本身不下载新版。
-2. 在**新包目录**运行 `./galaxy update --host codex`，Windows PowerShell 运行 `.\galaxy.exe update --host codex`。其他宿主替换为实际宿主 ID。沿用已有资料目录及银河配置；结果中的 `release.releaseId` 应与下载版本一致。
-3. 如果服务仍在跑旧版，处理完在办确认后用新包中的 `galaxy service restart` 切换。若旧服务提示不支持交接，完成在办工作后按提示执行 `galaxy service stop` 和 `galaxy service start`，再按宿主需要重载连接。用 `galaxy service status` 检查 `service.releaseId`，确认新版已在运行。
+运行 `galaxy update --host codex`。其他宿主替换为实际宿主 ID。客户端从官网检查、下载和校验新版，沿用已有 ID、资料目录及银河配置，并核对新服务的实际运行版本。`--dry-run` 只查看版本。已经是当前版本时，同版配置刷新使用 `galaxy repair`。
+
+更新显示待切换时，完成在办确认后再次运行更新。旧服务提示不支持交接时，先结束正在使用银河的任务并关闭旧的宿主连接，再执行 `galaxy update --host codex --restart-legacy`。宿主需要重载 MCP 时，按原方式回到当前聊天。
+
+如果原版的 `update` 只会重配旧包，从官网下载[一次性迁移脚本](https://agigalaxy.org/downloads/galaxy-update.mjs)。在有 Node.js 22 或更高版本和 `tar` 的机器上运行 `node galaxy-update.mjs --host codex`。脚本会自动下载并核验当前正式版，升级现有安装。以后可直接用 `galaxy update`。
 
 共用服务按需启动，关闭单个 Agent 只结束其连接，用户可以主动退出并再次启动；不设置开机自启，容器生命周期由所选环境管理。
 

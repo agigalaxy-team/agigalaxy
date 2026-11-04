@@ -63,6 +63,10 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	flags.BoolVar(&input.LocalOnly, "local-only", false, "")
 	organization := flags.Bool("organization", false, "")
 	dryRun := flags.Bool("dry-run", false, "")
+	var restartLegacy bool
+	if action == "update" {
+		flags.BoolVar(&restartLegacy, "restart-legacy", false, "")
+	}
 	if flags.Parse(args) != nil || flags.NArg() != 0 {
 		return fault.New("native_arguments_invalid", 400)
 	}
@@ -120,7 +124,14 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 		}
 		return printValue(result)
 	}
-	if action != "repair" && input.PackageDirectory == "" {
+	if action == "update" && !*dryRun {
+		unlock, err := nativebridge.LockUpdate()
+		if err != nil {
+			return err
+		}
+		defer unlock()
+	}
+	if action != "repair" && action != "update" && input.PackageDirectory == "" {
 		input.PackageDirectory, err = candidateDirectory()
 		if err != nil {
 			return err
@@ -195,6 +206,9 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	if *organization {
 		input.SubjectType = "organization"
 	}
+	if action == "update" {
+		return managedUpdate(ctx, input, supplied["package-dir"], *dryRun, restartLegacy, officialUpdateSource())
+	}
 	plan, err := native.PreviewManagedNativeInstallation(ctx, input)
 	if err != nil {
 		return err
@@ -203,13 +217,13 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 		return printValue(plan)
 	}
 	result, applyError := native.ApplyManagedNativeInstallation(ctx, plan)
-	return completeManagedInstallation(ctx, result, applyError, action == "update")
+	return completeManagedInstallation(ctx, result, applyError)
 }
 
-func completeManagedInstallation(ctx context.Context, result map[string]any, applyError error, replaceDesired bool) error {
+func completeManagedInstallation(ctx context.Context, result map[string]any, applyError error) error {
 	if applyError == nil && result != nil {
 		if release, ok := result["release"].(*native.NativeRelease); ok && result["hostConfigured"] == true {
-			desired, changed, err := nativebridge.SelectDesiredRelease(release.Executable, replaceDesired)
+			desired, changed, err := nativebridge.SelectDesiredRelease(release.Executable, false)
 			if err != nil {
 				result["serviceReleaseSelected"] = false
 				applyError = err

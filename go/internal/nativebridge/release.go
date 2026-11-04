@@ -17,6 +17,23 @@ type DesiredRelease struct {
 	ReleaseID  string `json:"releaseId"`
 }
 
+// LockUpdate serializes updates to the shared service across host profiles.
+func LockUpdate() (func(), error) {
+	dir, _, _, err := paths()
+	if err != nil {
+		return nil, err
+	}
+	lock := flock.New(filepath.Join(dir, "update.lock"))
+	acquired, err := lock.TryLock()
+	if err != nil {
+		return nil, err
+	}
+	if !acquired {
+		return nil, fault.New("native_update_in_progress", 409)
+	}
+	return func() { _ = lock.Close() }, nil
+}
+
 // SetDesiredRelease records an already prepared complete release as the next
 // on-demand service executable; it does not stop the currently running core.
 func SetDesiredRelease(executable string) (DesiredRelease, error) {

@@ -254,5 +254,5 @@ func setupCommand(ctx context.Context, args []string) error {
 		return err
 	}
 	value, applyError := native.ApplyManagedNativeInstallation(ctx, managed)
-	return completeManagedInstallation(ctx, value, applyError, false)
+	return completeManagedInstallation(ctx, value, applyError)
 }

@@ -43,6 +43,7 @@ def publish_manual(site):
                      + '<article class="guide-body">' + body + '</article>')
 
     site["write"]("agent.md", (REPO / "docs/public/ai-reading.md").read_text(encoding="utf-8"))
+    site["write"]("downloads/galaxy-update.mjs", (REPO / "scripts/galaxy-update-legacy.mjs").read_text(encoding="utf-8"))
     skill = REPO / "integrations/native-v2/skills/galaxy"
     paths = [skill / "SKILL.md", *sorted((skill / "references").glob("*.md"))]
     archive_path = site["OUT"] / "skills/galaxy.zip"

@@ -2,6 +2,8 @@ package native
 
 import (
 	"context"
+
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 )
 
 // managedPrepareIdentity preserves an existing owner and creates one only for
@@ -10,6 +12,16 @@ func managedPrepareIdentity(ctx context.Context, input ManagedNativeInstallation
 	store, err := NewStore(input.DataDirectory, input.Endpoint)
 	if err != nil {
 		return nil, err
+	}
+	if input.KeepIdentity {
+		owner, err := store.Owner(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if owner == "" {
+			return nil, fault.New("native_update_identity_missing", 409)
+		}
+		return map[string]any{"created": false, "existingIdentityPreserved": true}, nil
 	}
 	scope, err := store.ChoiceScope(ctx)
 	if err != nil {

@@ -154,6 +154,7 @@ func usage() {
   galaxy setup --local-only [--host <host id>] [--data-dir <path>] [--organization]
   galaxy service start|status|stop|restart|run    Shared local runtime; no login autostart
   galaxy install|update|repair [--host <id>] [--package-dir <release>] [--install-root <path>] [--data-dir <path>] [--config <file>|--local-only] [--dry-run]
+  galaxy update checks the official release when --package-dir is omitted. Use --restart-legacy after closing old host connections if handover is unsupported.
   galaxy uninstall --host <id> [--install-root <path>]  Remove host integration; keep owned data
   galaxy install --mcp-config <file> --skill-dir <dir> --mcp-format json-mcpServers|json-servers|toml-mcp_servers [--local-only]
   galaxy ingress [--config <file>|--data-dir <path>]    Persist one host observation from stdin
