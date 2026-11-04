@@ -215,7 +215,12 @@ def main():
                  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
                  ''.join('<url><loc>https://agigalaxy.org' + page + '</loc></url>' for page in pages) + '</urlset>\n')
     types = {'.json':'application/json', '.css':'text/css', '.svg':'image/svg+xml', '.png':'image/png', '.gif':'image/gif', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.md':'text/plain', '.txt':'text/plain', '.xml':'application/xml', '.js':'text/javascript', '.mjs':'text/javascript', '.html':'text/html', '.zip':'application/zip', '.tgz':'application/gzip'}
-    files = [{'path': source.relative_to(output).as_posix(), 'contentType': types.get(source.suffix, 'application/octet-stream')} for source in sorted(output.rglob('*')) if source.is_file() and source.name != 'public-assets.json']
+    files = []
+    for source in sorted(output.rglob('*')):
+        if source.is_file() and source.name != 'public-assets.json':
+            relative = source.relative_to(output).as_posix()
+            content_type = 'text/markdown' if relative == 'agent.md' else types.get(source.suffix, 'application/octet-stream')
+            files.append({'path': relative, 'contentType': content_type})
     chrome.write('public-assets.json', json.dumps({'version':1,'files':files}, ensure_ascii=False, separators=(',', ':')) + '\n')
     print(json.dumps({'output': str(output), 'preview': preview,
                       'siteRelease': metadata['version'], 'apiRelease': metadata['backendRelease'],
