@@ -39,9 +39,8 @@
   "publicApiObservedAt": "2026-10-12T14:08:04.536263+00:00",
   "currentNativeClient": {
     "version": "0.1.5",
-    "releaseUrl": "https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.5",
-    "assetBase": "https://github.com/agigalaxy-team/agigalaxy/releases/download/native-v0.1.5/",
-    "installationUrl": "https://github.com/agigalaxy-team/agigalaxy/blob/native-v0.1.5/docs/public/getting-started.md#客户端安装"
+    "assetBase": "/downloads/native/0.1.5/",
+    "installationUrl": "/docs/galaxy/getting-started/#客户端安装"
   },
   "nativeClientDownload": {
     "revision": "0.1.16",

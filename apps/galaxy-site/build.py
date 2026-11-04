@@ -77,6 +77,7 @@ def main():
     parser.add_argument('--release-data', type=Path, default=ROOT / 'release-data.json')
     parser.add_argument('--archive-source', type=Path, help='Captured public assets for a not-yet-published release; every file must match the catalog hash')
     parser.add_argument('--preserved-public-source', type=Path, help='Copy the selected existing public release files without fetching or recalculating archive digests')
+    parser.add_argument('--native-release-source', type=Path, help='Stage verified files from the current Native release before the website publishes them')
     parser.add_argument('--offline', action='store_true', help='Use already verified cached public archives')
     parser.add_argument('--node', default='node', help='Node.js executable used by the shared website UI renderer')
     args = parser.parse_args()
@@ -108,6 +109,9 @@ def main():
     cache = ROOT / '.cache' / 'public-archive'
     archive_source = resolved_file_path(args.archive_source) if args.archive_source else None
     preserved_source = resolved_file_path(args.preserved_public_source) if args.preserved_public_source else None
+    native_source = resolved_file_path(args.native_release_source) if args.native_release_source else None
+    if native_source and not native_source.is_dir():
+        raise ValueError('Choose an existing Native release directory')
     if preserved_source and (archive_source or not preserved_source.is_dir() or preserved_source.is_symlink()):
         raise ValueError('Choose one existing public release directory')
     cache.mkdir(parents=True, exist_ok=True)
@@ -124,32 +128,45 @@ def main():
         cached = cache / digest
         if cached.is_symlink():
             raise ValueError('Archive cache must contain regular files')
-        source = archive_source.joinpath(*relative.parts) if archive_source else None
+        source_root = archive_source
+        source = source_root.joinpath(*relative.parts) if source_root else None
         archive_name = 'archives/public/' + name if name in ('docs/index.html', 'downloads/index.html') else name
-        if preserved_source:
-            selected = preserved_source / archive_name
+        selected = preserved_source / archive_name if preserved_source else None
+        native_download = name.startswith('downloads/native/')
+        if native_download and (selected is None or not selected.exists()):
+            selected = None
+            if native_source and name.startswith(metadata['currentNativeClient']['assetBase'].lstrip('/')):
+                source_root = native_source
+                filename = relative.name
+                source = native_source / ('SHA256SUMS' if filename == 'SHA256SUMS.txt' else filename)
+                if not source.is_file() or not resolved_file_path(source).is_relative_to(native_source):
+                    raise ValueError('Native release source is missing an approved file: ' + name)
+            elif preview and source is None:
+                return
+        if selected is not None:
             if selected.is_symlink() or not selected.is_file() or not resolved_file_path(selected).is_relative_to(preserved_source):
                 raise ValueError('The selected existing release is missing a public file: ' + name)
             raw = selected.read_bytes()
-            if name.startswith('open-source/') and hashlib.sha256(raw).hexdigest() != digest:
+            if (native_download or name.startswith('open-source/')) and hashlib.sha256(raw).hexdigest() != digest:
                 raise ValueError('Corresponding source differs from its catalog: ' + name)
         elif source and source.exists():
-            if source.is_symlink() or not resolved_file_path(source).is_relative_to(archive_source):
+            if source.is_symlink() or not resolved_file_path(source).is_relative_to(source_root):
                 raise ValueError('Captured public asset escaped the selected source')
             raw = source.read_bytes()
             if hashlib.sha256(raw).hexdigest() != digest:
                 raise ValueError('Captured public asset differs from its catalog: ' + name)
-            cached.write_bytes(raw)
+            if source_root != native_source:
+                cached.write_bytes(raw)
         else:
             raw = cached.read_bytes() if cached.exists() else None
-        if not preserved_source and (raw is None or hashlib.sha256(raw).hexdigest() != digest):
-            if args.offline:
-                raise ValueError('Missing verified archive: ' + name)
-            with urllib.request.urlopen(origin + '/' + urllib.parse.quote(archive_name), timeout=30) as response:
-                raw = response.read()
-            if hashlib.sha256(raw).hexdigest() != digest:
-                raise ValueError('Published archive bytes changed: ' + name)
-            cached.write_bytes(raw)
+            if raw is None or hashlib.sha256(raw).hexdigest() != digest:
+                if args.offline:
+                    raise ValueError('Missing verified archive: ' + name)
+                with urllib.request.urlopen(origin + '/' + urllib.parse.quote(archive_name), timeout=30) as response:
+                    raw = response.read()
+                if hashlib.sha256(raw).hexdigest() != digest:
+                    raise ValueError('Published archive bytes changed: ' + name)
+                cached.write_bytes(raw)
         target = output.joinpath(*relative.parts)
         resolved_target = resolved_file_path(target)
         if not resolved_target.is_relative_to(output) or target.is_symlink():

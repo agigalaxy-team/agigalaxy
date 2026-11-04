@@ -33,7 +33,6 @@ def render_product_pages(site):
     current = metadata["currentNativeClient"]
     version = escape(current["version"])
     install_guide = escape(current["installationUrl"], quote=True)
-    release_url = escape(current["releaseUrl"], quote=True)
     asset_base = escape(current["assetBase"], quote=True)
 
     def intro(title, text):
@@ -90,12 +89,14 @@ def render_product_pages(site):
         + '<div id="leave">' + section("导出与删除", '<p>已同步工作在账户中管理。选定归档的完整会话保持私有，可以阅读、导出、删除或设置自动清理。</p><nav class="reading-resources" aria-label="本人资料管理"><a href="/app/account?section=settings&view=work">已同步工作</a><a href="/app/account?section=settings&view=archives">私有会话</a></nav>') + '</div>'
         + section("本地身份与设备资料", '<p>需要导出本地 ID 对应的服务资料、管理设备或申请删除时，在当前设备连接本地银河后办理。退出在线账户或解除关联不会删除本地身份和履历。</p>', "/app/settings/privacy", "身份资料与设备设置"))
 
+    platforms = (('windows', 'Windows'), ('linux', 'Linux'), ('darwin', 'macOS'))
+    architectures = (('amd64', 'x64'), ('arm64', 'ARM64'))
     platform_links = ''.join(
         f'<div><dt>{label}</dt><dd>' + ' · '.join(
             f'<a href="{asset_base}galaxy-native-go-{version}-{os}-{arch}.tgz" aria-label="下载 {label} {name}">{name}</a>'
-            for arch, name in (('amd64', 'x64'), ('arm64', 'ARM64'))
+            for arch, name in architectures
         ) + '</dd></div>'
-        for os, label in (('windows', 'Windows'), ('linux', 'Linux'), ('darwin', 'macOS'))
+        for os, label in platforms
     )
     page("/downloads/", "客户端下载", "下载银河 Go 客户端，接入常用的 AI 工具。",
         intro("客户端下载", "把银河接入常用的 AI 工具。")
@@ -105,7 +106,7 @@ def render_product_pages(site):
         + '</dl><a class="button" href="' + install_guide + '">安装说明</a></div>'
         + '<aside><h3>让 Agent 帮你安装</h3><p>把 Agent 初始化入口交给正在使用的 AI，让它识别环境并完成接入。</p><a class="text-link" href="'
         + '/agent.md">Agent 初始化入口</a><a class="text-link" href="/skills/galaxy.zip" download>下载 Galaxy Skill</a></aside></section>'
-        + section("其他安装方式", '<p>发行页也提供 npm 离线包和 Linux x64 容器构建材料。macOS 与 ARM64 为交叉构建，实机验收待补。</p>', release_url, "查看发行页")
+        + section("其他安装方式", '<p>官网也提供 npm 离线包和 Linux x64 容器构建材料。macOS 与 ARM64 为交叉构建，实机验收待补。</p>', "/downloads/verification/#additional-packages", "查看其他安装包")
         + section("下载核验与历史版本", '<p>查阅当前发行签名、校验清单和旧版随包指南。</p>', "/downloads/verification/", "发行文件与历史版本"))
 
     history_links = ''
@@ -122,11 +123,33 @@ def render_product_pages(site):
             f'<a href="{old_base}release.jws">旧版签名</a></nav>'
             f'<p><a href="{old_base}{old_package}">原客户端包</a> · {package["bytes"]} 字节 · SHA-256 <code>{escape(package["sha256"])}</code></p>'
         )
+    signature_links = ''.join(
+        f'<div><dt>{label} {name}</dt><dd>'
+        f'<a href="{asset_base}galaxy-native-go-{version}-{os}-{arch}.tgz.jws">签名</a> · '
+        f'<a href="{asset_base}galaxy-native-go-{version}-{os}-{arch}.tgz.report.json">核验报告</a></dd></div>'
+        for os, label in platforms for arch, name in architectures
+    )
+    npm_links = ''.join(
+        f'<div><dt>{label}</dt><dd>' + ' · '.join(
+            f'<a href="{asset_base}galaxy-native-{os}-{arch}-{version}.tgz">{name}</a>'
+            for arch, name in architectures
+        ) + '</dd></div>'
+        for os, label in platforms
+    )
     page("/downloads/verification/", "下载核验与历史版本", "核对当前发行的校验清单，查阅历史安装资料。",
         intro("下载核验与历史版本", "查阅当前发行的校验文件和旧版本。")
-        + '<nav class="reading-topics" aria-label="核验资料目录"><a href="/downloads/">返回客户端下载</a><a href="#release-files">发行文件</a><a href="#past-guides">历史版本</a></nav>'
-        + '<div id="release-files">' + section("Go 客户端 " + version, '<p>发行附件包含各平台的签名、核验报告与验证工具。</p><a href="' + asset_base
-            + 'SHA256SUMS">下载 SHA-256 校验清单</a>', release_url, "查看签名与验证工具") + '</div>'
+        + '<nav class="reading-topics" aria-label="核验资料目录"><a href="/downloads/">返回客户端下载</a>'
+        + '<a href="#release-files">发行文件</a><a href="#additional-packages">其他安装包</a><a href="#past-guides">历史版本</a></nav>'
+        + '<div id="release-files">' + section("Go 客户端 " + version,
+            '<nav class="reading-resources" aria-label="核验工具">'
+            f'<a href="{asset_base}SHA256SUMS.txt" download>SHA-256 校验清单</a>'
+            f'<a href="{asset_base}verify-native-client-download.mjs" download>签名验证工具</a>'
+            f'<a href="{asset_base}verifier-build.json">验证工具构建信息</a></nav>'
+            '<dl class="release-facts">' + signature_links + '</dl>') + '</div>'
+        + '<div id="additional-packages">' + section("其他安装包",
+            f'<p><a href="{asset_base}galaxy-native-{version}.tgz">npm 启动器</a>'
+            f' · <a href="{asset_base}galaxy-native-container-{version}-linux-amd64.tgz">Linux x64 容器构建材料</a></p>'
+            '<dl class="release-facts">' + npm_links + '</dl>') + '</div>'
         + '<div id="past-guides">' + section("历史版本", history_links
             + '<nav class="reading-resources" aria-label="历史入口原件"><a href="/archives/public/docs/index.html">旧版文档入口原件</a><a href="/archives/public/downloads/index.html">旧版下载入口原件</a></nav>',
             "/docs/v0.3/installation.md", "其他历史安装说明") + '</div>')

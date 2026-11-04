@@ -6,7 +6,7 @@
 
 1. 读取[当前 Galaxy Skill](https://agigalaxy.org/skills/galaxy/SKILL.md)。需要本地安装 Skill 或读取完整参考时，下载[完整 Skill 包](https://agigalaxy.org/skills/galaxy.zip)。安装前也可直接读取网页上的 Skill，无需先有银河 MCP。
 2. 识别当前 Agent、系统、处理器和用户配置，检查已有银河客户端、ID 和资料。已有可用核心时复用，只为当前宿主和当前用户接入。
-3. 需要新安装或升级时，从[官网下载页](https://agigalaxy.org/downloads/)发现当前正式发行、匹配的包和该版说明。Agent 自行选择原生包、npm 或合适的容器，校验发行材料，并根据实际宿主运行安装、修复或升级。优先使用发行包自带的同版 Skill 与运行资源。
+3. 需要新安装或升级时，从[官网下载页](https://agigalaxy.org/downloads/)发现当前正式版，跟随页面链接直接从官网下载适合当前系统和宿主的原生包、npm 离线包或容器材料。用[官网核验资料](https://agigalaxy.org/downloads/verification/)校验发行，再按安装说明接入。优先使用发行包自带的同版 Skill 与运行资源。
 4. 按安装器与当前宿主实际支持的方式完成接入。需本人确认时显示具体事项。已有身份直接沿用；需要创建 ID、关联在线账户或启用私有同步时分别处理。配置完成后实际读取一次银河状态，再回到当前任务；若宿主要求重新加载配置，按宿主原方式接续原会话。
 
 给尚未安装的 Agent 可以只发一句：

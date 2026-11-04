@@ -8,17 +8,17 @@
 
 让 Agent 自行安装时，把 [Agent 初始化入口](https://agigalaxy.org/agent.md) 交给它。入口会引导它找到适用的 Skill、正式发行与对应安装说明。
 
-[银河 Go 客户端 0.1.5](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.5) 提供 Windows、Linux、macOS 的 amd64 与 ARM64 完整安装包。按系统和架构下载 `galaxy-native-go-0.1.5-<系统>-<架构>.tgz`。其中 `darwin` 是 macOS，`amd64` 适用于 x64 处理器。
+[官网下载页](https://agigalaxy.org/downloads/) 提供当前正式版及 Windows、Linux、macOS 的 x64 与 ARM64 完整安装包。按系统和架构点击对应的下载链接。其中 `darwin` 是 macOS，`amd64` 适用于 x64 处理器。安装包、校验资料和 Skill 均可直接从官网获取。
 
-先核对发行页上的 SHA-256。要检查银河发行签名，把平台包、同名 `.jws`、`.report.json` 以及 `verify-native-client-download.mjs` 放在同一目录，用 Node.js 运行以下命令，文件名换成自己的平台包。
+从[官网下载核验资料](https://agigalaxy.org/downloads/verification/#release-files)获取 SHA-256 清单。要检查银河发行签名，把平台包、同名 `.jws`、`.report.json` 以及 `verify-native-client-download.mjs` 放在同一目录，用 Node.js 运行以下命令，将 `PACKAGE.tgz` 换成下载的文件名。
 
 ```sh
-node verify-native-client-download.mjs . galaxy-native-go-0.1.5-windows-amd64.tgz
+node verify-native-client-download.mjs . PACKAGE.tgz
 ```
 
 把平台包解压到新目录，在其中运行 `./galaxy setup https://agigalaxy.org`。Windows PowerShell 使用 `./galaxy.exe setup https://agigalaxy.org`。宿主无法自动识别时，可加 `--host opencode`、`--host codex` 或其他实际宿主 ID。仅在本机使用时，运行 `./galaxy setup --local-only`。已有安装升级时使用发行包中的 `galaxy update` 选择新版，之后按服务状态安排切换。
 
-已有 Node.js 的用户也可从同一发行页下载 npm 安装包。进入准备放置启动器的目录，用 `npm install --offline --ignore-scripts <匹配的平台 npm 包.tgz> <启动器 npm 包.tgz>` 安装，再通过 `npx --offline galaxy setup https://agigalaxy.org` 接入。容器构建材料和使用说明随 Linux amd64 容器上下文提供。
+已有 Node.js 的用户也可从[官网其他安装包](https://agigalaxy.org/downloads/verification/#additional-packages)下载 npm 安装包。进入准备放置启动器的目录，用 `npm install --offline --ignore-scripts <匹配的平台 npm 包.tgz> <启动器 npm 包.tgz>` 安装，再通过 `npx --offline galaxy setup https://agigalaxy.org` 接入。容器构建材料和使用说明随 Linux amd64 容器上下文提供。
 
 可以把本页交给正在使用的 Agent：
 

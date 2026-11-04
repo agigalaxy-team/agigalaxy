@@ -43,6 +43,8 @@ npm run dev
 
 `node scripts/build-product.mjs --offline --web-output outputs/site-runtime` 生成独立运行包：Node standalone、当前静态资产及公开内容数据。`node outputs/site-runtime/start.mjs` 可运行；`--previous-runtime <上次运行包>` 仅携带上一构建自身的公共静态资产，不拷贝旧代码、业务数据或累积更早构建。输出目录须独立且为空。
 
+官网客户端下载使用版本化地址，文件摘要登记于网站的 `public-archive.json`。首发或升级客户端时，网站发行构建用 `--native-release-source <已签名发行文件目录>` 引入平台包、原 `SHA256SUMS` 及附件，逐个校验后放入运行包；后续构建可用 `--preserved-public-source` 从上一运行包的 `content` 继承，或从官网读取。已发布的版本地址保持原始字节。
+
 `GALAXY_SITE_BASELINE_ROOT` 指软件公开内容，`GALAXY_SITE_PUBLIC_ROOT` 可指定同一公开资源目录；`GALAXY_SITE_CONTENT_ROOT` 选 CMS 发布指针。未配置内容指针时为明确 baseline；已配置但损坏则失败，不能静默显示旧内容。公开资源只来自编译清单或当前选中的 CMS 媒体。
 
 `GALAXY_WEB_CONFIG_FILE` 为服务器读取的公开连接配置文件，`/galaxy-web-config.json` 只返回 endpoint、当前公钥等原允许字段，不输出凭据或文件路径。该 API 的浏览器策略仍须允许准确网站 Origin。
