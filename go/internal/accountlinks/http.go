@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/identityreturn"
 	"github.com/google/uuid"
 )
 
@@ -41,8 +42,13 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(Object{"error": fault.Code(e), "requestId": requestID})
 	}
-	if h.Links != nil && strings.HasPrefix(operation, "native-review/") {
-		h.Links.serveNativeReview(w, r, strings.TrimPrefix(operation, "native-review/"))
+	if h.Links != nil && r.URL.Path == identityreturn.NativeReviewPath {
+		ticket, _ := r.Cookie(identityreturn.NativeReviewCookie)
+		if ticket == nil {
+			http.NotFound(w, r)
+			return
+		}
+		h.Links.serveNativeReview(w, r, ticket.Value)
 		return
 	}
 	if h.Links == nil {
@@ -60,6 +66,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(e)
 			return
 		}
+		delete(result, "reviewPath")
 		json.NewEncoder(w).Encode(result)
 		return
 	}

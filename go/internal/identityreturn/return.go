@@ -54,7 +54,10 @@ type displayTicket struct {
 	expires time.Time
 }
 
-var nativeReviewPath = regexp.MustCompile(`^/v1/identity/native-review/[0-9a-f-]{36}$`)
+const NativeReviewCookie = "__Host-galaxy-native-review"
+const NativeReviewPath = "/v1/identity/native-review"
+
+var nativeReviewPath = regexp.MustCompile(`^/v1/identity/native-review/([0-9a-f-]{36})$`)
 var returnPath = regexp.MustCompile(`(?i)^/v1/identity/return/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`)
 var callbackPath = regexp.MustCompile(`^/v1/identity/callback/([a-z0-9][a-z0-9._-]{0,63})$`)
 
@@ -283,8 +286,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if AcceptsHTML(r) {
 			state, err := h.callback(r.Context(), match[1], h.endpoint+r.URL.RequestURI())
 			success, status := false, 200
-			if err == nil && nativeReviewPath.MatchString(state) {
-				cleanRedirect(w, state)
+			if ticket := nativeReviewPath.FindStringSubmatch(state); err == nil && ticket != nil {
+				http.SetCookie(w, &http.Cookie{Name: NativeReviewCookie, Value: ticket[1], Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 300})
+				cleanRedirect(w, NativeReviewPath)
 				return
 			}
 			if err == nil && state == "awaiting-local-signature" {

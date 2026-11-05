@@ -2,10 +2,11 @@ package native
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/httpboundary"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/identityreturn"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/portal"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
 	"github.com/google/uuid"
@@ -53,13 +54,28 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 	links.NativeIssuer = issuer
 	original, _ := url.Parse(meta.Origin)
 	routes := accountlinks.Handler{Links: links, Next: httputil.NewSingleHostReverseProxy(original)}
+	callbackHandler, e := identityreturn.New(identityreturn.Options{Endpoint: meta.Configuration.Endpoint, Callback: func(ctx context.Context, provider, returned string) (string, error) {
+		out, err := links.Callback(ctx, provider, returned)
+		if out["state"] == "awaiting-native-approval" {
+			return text(out["reviewPath"]), err
+		}
+		return text(out["state"]), err
+	}, Next: routes, Now: now})
+	if e != nil {
+		t.Fatal(e)
+	}
+	boundary, e := httpboundary.New(httpboundary.Config{Endpoint: meta.Configuration.Endpoint})
+	if e != nil {
+		t.Fatal(e)
+	}
+	handler := boundary.Handler(callbackHandler)
 	// The fixture serves the production handler on loopback instead of using
 	// the configured HTTPS name; preserve the expected browser Origin.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.Header.Get("Origin") == "http://"+req.Host {
 			req.Header.Set("Origin", meta.Configuration.Endpoint)
 		}
-		routes.ServeHTTP(w, req)
+		handler.ServeHTTP(w, req)
 	}))
 	defer server.Close()
 	transport.origin, _ = url.Parse(server.URL)
@@ -196,16 +212,6 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 			login = value
 		}
 		callback := meta.Authorize(login.loginURL)
-		resp, err := http.Get(server.URL + callback)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var body map[string]any
-		err = json.NewDecoder(resp.Body).Decode(&body)
-		resp.Body.Close()
-		if err != nil || resp.StatusCode != 200 || body["state"] != "awaiting-native-approval" {
-			t.Fatalf("login callback: %d %v %v", resp.StatusCode, body, err)
-		}
 		var exists bool
 		if err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bindings WHERE subject_id=$1)", subject).Scan(&exists); err != nil || exists {
 			t.Fatalf("login created a binding before confirmation: %v %v", exists, err)
@@ -217,10 +223,11 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
             const review=await browser.newPage();await review.goto(process.argv[2]);
             await review.getByText('fixture-account@example.invalid',{exact:true}).waitFor();
             await review.getByText(process.argv[3],{exact:true}).waitFor();
+            const before=await page.textContent('body');if(before.includes('已处理'))throw Error('connected without confirmation');
             await review.getByRole('button',{name:'确认关联',exact:true}).click();
             await page.getByText('已处理，可以回到原聊天。',{exact:true}).waitFor({timeout:15000});
             console.log(JSON.stringify({confirmed:true}));} finally { await browser.close(); }`
-		if initializationNode(t, script, text(uploadObject(first)["url"]), server.URL+text(body["reviewPath"]), subject)["confirmed"] != true {
+		if initializationNode(t, script, text(uploadObject(first)["url"]), server.URL+callback, subject)["confirmed"] != true {
 			t.Fatal("browser did not finish")
 		}
 		if err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM community_account_links WHERE subject_id=$1)", subject).Scan(&exists); err != nil || !exists {

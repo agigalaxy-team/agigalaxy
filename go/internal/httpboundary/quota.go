@@ -325,7 +325,13 @@ func (b *Boundary) serve(w http.ResponseWriter, r *http.Request, next http.Handl
 	if e != nil {
 		return e
 	}
-	u, e := RequestURL(r, b.config.Endpoint, b.config.Origins)
+	origins := b.config.Origins
+	// This official page posts only to its own API origin; it does not need
+	// the API host added to the cross-origin allowlist for other routes.
+	if r.Method == "POST" && r.URL.Path == "/v1/identity/native-review" && header(r, "Origin") == b.config.Endpoint && !has(origins, b.config.Endpoint) {
+		origins = append(append([]string{}, origins...), b.config.Endpoint)
+	}
+	u, e := RequestURL(r, b.config.Endpoint, origins)
 	if e != nil {
 		if limited := b.legacy.Consume(address, w); limited != nil {
 			return limited
@@ -355,7 +361,7 @@ func (b *Boundary) serve(w http.ResponseWriter, r *http.Request, next http.Handl
 	if e != nil {
 		return e
 	}
-	done, e := ApplyBrowserPolicy(r, w, b.config.Origins)
+	done, e := ApplyBrowserPolicy(r, w, origins)
 	if e != nil || done {
 		return e
 	}

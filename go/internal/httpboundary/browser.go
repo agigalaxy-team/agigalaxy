@@ -126,7 +126,10 @@ func Category(method, path string, credential, website bool) string {
 	if method == "POST" && (match(`^/v1/(?:bindings|consents|proofs|context-grants)/`+id+`/revoke$`, path) || has([]string{"/v1/data-exports/revoke", "/v1/audit/grants/revoke", "/v1/deletion-requests/status", "/v1/deletion-requests/submit"}, path)) {
 		return "revocation"
 	}
-	if method == "POST" && (has([]string{"/v1/binding-challenges", "/v2/binding-challenges", "/v1/bindings", "/v1/session-challenges", "/v1/sessions"}, path) || strings.HasPrefix(path, "/v2/identity/control/")) {
+	if method == "POST" && path == "/v1/identity/native-status" {
+		return query()
+	}
+	if method == "POST" && (has([]string{"/v1/identity/native-begin", "/v1/identity/native-claim", "/v1/binding-challenges", "/v2/binding-challenges", "/v1/bindings", "/v1/session-challenges", "/v1/sessions"}, path) || strings.HasPrefix(path, "/v2/identity/control/")) {
 		return "binding"
 	}
 	if has([]string{"/mcp/docs", "/.well-known/galaxy-network.json", "/.well-known/galaxy-signing-keys.json", "/v1/policy", "/v1/signing-keys/status", "/v1/service-status", "/v1/honor/rules", "/v1/honor/ranking", "/v1/honor/rule-history", "/v1/builders/specification"}, path) {
