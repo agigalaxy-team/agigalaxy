@@ -31,6 +31,9 @@ func registerInitializationTools(server *mcp.Server, tools *toolRuntime, runtime
 		if e != nil {
 			return toolError(e)
 		}
+		if runtime != nil {
+			networkInitializationProjection(result, "preview")
+		}
 		return toolResult(result)
 	})
 	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_initialize", Description: "Prepare the reviewed local identity and modules after the person's choice, then connect the selected service when configured. Preserve an existing identity and upload choices.", InputSchema: inputSchema}, "local_initialization_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -41,6 +44,9 @@ func registerInitializationTools(server *mcp.Server, tools *toolRuntime, runtime
 		preview, e := PreviewInitialization(input)
 		if e != nil {
 			return toolError(e)
+		}
+		if runtime != nil {
+			networkInitializationProjection(preview, "preview")
 		}
 		message := initializationReviewMessage(preview)
 		if runtime != nil {
@@ -60,14 +66,56 @@ func registerInitializationTools(server *mcp.Server, tools *toolRuntime, runtime
 			delete(result, "connectionCreated")
 			connection, err := runtime.ConnectService(ctx)
 			if err != nil {
+				networkInitializationProjection(result, "disconnected")
 				result["serviceAccess"] = map[string]any{"state": "disconnected", "error": runtimeErrorCode(err)}
 				return result, nil
 			}
-			result["localOnly"] = false
+			networkInitializationProjection(result, "ready")
 			result["serviceAccess"] = map[string]any{"state": "ready", "connection": connection}
 			return result, nil
 		})
 	})
+}
+
+// Project the network MCP contract without changing the local Store contract.
+func networkInitializationProjection(value map[string]any, state string) {
+	if state == "preview" && value["canInitialize"] == false {
+		return
+	}
+	value["localOnly"] = false
+	if state == "preview" {
+		value["remoteEffects"] = "none"
+		value["onConfirmation"] = "initialize-local-and-connect-service"
+		value["notes"] = []string{"This preview has no side effects. Confirmation initializes locally and connects the selected service, including device registration when needed."}
+		return
+	}
+	// A failed request can have reached the service; do not assert no effect.
+	value["remoteEffects"] = "unknown"
+	if state == "ready" {
+		value["remoteEffects"] = "service-connected"
+	}
+	result := uploadObject(value["result"])
+	if len(result) == 0 {
+		return
+	}
+	delete(result, "localOnly")
+	if plan, ok := result["plan"].(map[string]any); ok {
+		delete(plan, "localOnly")
+		delete(plan, "remoteEffects")
+		delete(plan, "notes")
+	} else {
+		delete(result, "remoteEffects")
+		delete(result, "notes")
+	}
+	if integration, ok := result["integration"].(map[string]any); ok {
+		delete(integration, "localOnly")
+		delete(integration, "remoteEffects")
+	}
+	if identity, ok := result["galaxyId"].(map[string]any); ok {
+		delete(identity, "localOnly")
+		delete(identity, "transport")
+		delete(identity, "note")
+	}
 }
 
 func initializationReviewMessage(preview map[string]any) string {

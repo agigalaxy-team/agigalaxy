@@ -49,3 +49,20 @@ func TestMCPInitializationRequiresActualChoiceBeforeIdentity(t *testing.T) {
 		t.Fatal("missing explicit privacy level accepted")
 	}
 }
+
+func TestNetworkInitializationProjection(t *testing.T) {
+	preview, err := PreviewInitialization(InitializationInput{SubjectType: "person"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	networkInitializationProjection(preview, "preview")
+	if preview["remoteEffects"] != "none" || preview["onConfirmation"] != "initialize-local-and-connect-service" || preview["localOnly"] != false {
+		t.Fatalf("incorrect preview: %v", preview)
+	}
+	result := map[string]any{"initialized": true, "localOnly": true, "result": map[string]any{"localOnly": true, "plan": map[string]any{"remoteEffects": "none", "notes": []string{"local only"}}}}
+	networkInitializationProjection(result, "ready")
+	plan := uploadObject(uploadObject(result["result"])["plan"])
+	if result["localOnly"] != false || result["remoteEffects"] != "service-connected" || plan["remoteEffects"] != nil || plan["notes"] != nil {
+		t.Fatalf("incorrect completed result: %v", result)
+	}
+}
