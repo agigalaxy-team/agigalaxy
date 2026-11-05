@@ -43,6 +43,9 @@ func hostReplaceSelected(path, text string, previous *string) error {
 		if string(raw) != *previous {
 			return hostConfigurationFailure("setup_opencode_config_changed")
 		}
+		if string(raw) == text {
+			return nil
+		}
 	}
 	temporary := path + ".galaxy-" + uuid.NewString() + ".tmp"
 	if e := hostWriteNew(temporary, []byte(text)); e != nil {
@@ -109,6 +112,9 @@ func PreviewOpenCodeConfiguration(ctx context.Context, directory string, input H
 		if err := hostFile(filepath.Join(input.PackageDirectory, "opencode-v2.js")); err != nil {
 			return nil, err
 		}
+		if err := hostFile(filepath.Join(input.PackageDirectory, "opencode-v2-server.js")); err != nil {
+			return nil, err
+		}
 	}
 	pluginPath := filepath.Join(directory, "galaxy-native.tui.mjs")
 	if input.OpenCodeLayout == "v2" {
@@ -150,19 +156,34 @@ func PreviewOpenCodeConfiguration(ctx context.Context, directory string, input H
 	}
 	if input.OpenCodeLayout == "v2" {
 		manifest := filepath.Join(filepath.Dir(plan.Plugin), "package.json")
-		f := hostSelectedFile{path: manifest, text: "{\"name\":\"galaxy-native-opencode\",\"type\":\"module\",\"exports\":{\"./tui\":\"./tui.js\"}}\n", missing: true}
+		f := hostSelectedFile{path: manifest, text: hostOpenCodeV2Manifest, missing: true}
 		if raw, err := os.ReadFile(manifest); err == nil {
 			if err = hostFile(manifest); err != nil {
 				return nil, err
 			}
 			f.previous, f.missing = string(raw), false
-			if f.previous != f.text {
+			if f.previous != f.text && !(f.previous == hostOpenCodeV2LegacyManifest && present && input.OpenCodePriorLayout == "v2") {
 				return nil, hostConfigurationFailure("setup_opencode_config_conflict")
 			}
 		} else if !os.IsNotExist(err) {
 			return nil, err
 		}
 		plan.files = append(plan.files, f)
+		serverPath := filepath.Join(filepath.Dir(plan.Plugin), "server.js")
+		server := hostSelectedFile{path: serverPath, text: hostOpenCodeV2ServerPlugin(input), missing: true}
+		if raw, err := os.ReadFile(serverPath); err == nil {
+			if err = hostFile(serverPath); err != nil {
+				return nil, err
+			}
+			server.previous, server.missing = string(raw), false
+			prior := HostConfigurationInput{PackageDirectory: filepath.Dir(text(previous["skillPath"])), ConfigPath: text(previous["configPath"]), DataDirectory: text(previous["dataDirectory"])}
+			if server.previous != server.text && (!present || input.OpenCodePriorLayout != "v2" || server.previous != hostOpenCodeV2ServerPlugin(prior)) {
+				return nil, hostConfigurationFailure("setup_host_config_conflict")
+			}
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
+		plan.files = append(plan.files, server)
 	}
 	oldPlugin := text(previous["plugin"])
 	oldSkill := text(previous["skillPath"])
@@ -198,7 +219,7 @@ func PreviewOpenCodeConfiguration(ctx context.Context, directory string, input H
 			return nil, e
 		}
 		for _, file := range files {
-			if basename == "cli" && input.OpenCodeLayout == "v1" && file.missing {
+			if basename == "cli" && file.missing {
 				continue
 			}
 			if basename == "tui" && input.OpenCodeLayout == "v2" && (file.missing || input.OpenCodePriorSpec == nil || input.OpenCodePriorLayout == "v2") {
@@ -278,6 +299,47 @@ func PreviewOpenCodeConfiguration(ctx context.Context, directory string, input H
 				if e == nil {
 					file.text, e = hostSetConfiguration(file.text, []string{"skills", "paths"}, next)
 				}
+				if e == nil && (input.OpenCodeLayout == "v2" || input.OpenCodePriorLayout == "v2") {
+					plugins := config["plugins"]
+					if plugins == nil {
+						plugins = []any{}
+					}
+					list, ok := plugins.([]any)
+					if !ok {
+						return nil, hostConfigurationFailure("setup_opencode_config_conflict")
+					}
+					updated := []any{}
+					insertAt := -1
+					for _, item := range list {
+						own := ""
+						if v, ok := item.(string); ok {
+							own = v
+						} else if v, ok := item.([]any); ok && len(v) > 0 {
+							own = text(v[0])
+						} else if v, ok := item.(map[string]any); ok {
+							own = text(v["package"])
+						}
+						if own == pluginURL || oldPlugin != "" && own == oldPlugin {
+							if insertAt < 0 {
+								insertAt = len(updated)
+							}
+							continue
+						}
+						if insertAt < 0 && (own == "-*" || own == "-galaxy.*" || own == "-galaxy.opencode.stable.server") {
+							insertAt = len(updated)
+						}
+						updated = append(updated, item)
+					}
+					if input.OpenCodeLayout == "v2" {
+						if insertAt < 0 {
+							insertAt = len(updated)
+						}
+						updated = append(updated, nil)
+						copy(updated[insertAt+1:], updated[insertAt:])
+						updated[insertAt] = pluginURL
+					}
+					file.text, e = hostSetConfiguration(file.text, []string{"plugins"}, updated)
+				}
 			} else {
 				pluginKey := "plugin"
 				if basename == "cli" {
@@ -313,7 +375,7 @@ func PreviewOpenCodeConfiguration(ctx context.Context, directory string, input H
 					}
 					next = append(next, item)
 				}
-				if !(basename == "tui" && input.OpenCodeLayout == "v2") && !(basename == "cli" && input.OpenCodeLayout == "v1") {
+				if !(basename == "tui" && input.OpenCodeLayout == "v2") && basename != "cli" {
 					if insertAt < 0 {
 						insertAt = len(next)
 					}

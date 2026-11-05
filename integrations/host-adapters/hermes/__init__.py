@@ -4,6 +4,7 @@ import hashlib
 import logging
 import os
 import subprocess
+import threading
 import uuid
 
 log = logging.getLogger("galaxy-work")
@@ -39,18 +40,30 @@ class Host:
         self.seq = 0
     def call(self, method, params=None):
         self.seq += 1
-        self.proc.stdin.write(json.dumps({"id":str(self.seq),"method":method,"params":params or {}}, ensure_ascii=False)+"\n")
-        self.proc.stdin.flush()
-        response=json.loads(self.proc.stdout.readline())
-        if response.get("id") != str(self.seq) or "error" in response:
+        request_id=str(self.seq)
+        response=[]
+        def run():
+            try:
+                self.proc.stdin.write(json.dumps({"id":request_id,"method":method,"params":params or {}}, ensure_ascii=False)+"\n")
+                self.proc.stdin.flush()
+                response.append(json.loads(self.proc.stdout.readline()))
+            except Exception:
+                response.append(None)
+        thread=threading.Thread(target=run,daemon=True)
+        thread.start(); thread.join(2.5)
+        if thread.is_alive():
+            self.proc.kill()
+            raise RuntimeError("galaxy_host_request_timeout")
+        value=response[0] if response else None
+        if not value or value.get("id") != request_id or "error" in value:
             raise RuntimeError("galaxy_host_request_failed")
-        return response.get("result")
+        return value.get("result")
     def enqueue(self, observation, include_work=False):
         delivery=str(uuid.uuid4())
         raw=json.dumps({"deliveryId":delivery,"observation":observation},ensure_ascii=False)+"\n"
         for attempt in range(2):
             try:
-                result=subprocess.run(self.ingress_args,input=raw,text=True,encoding="utf-8",stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=15,env=self.env,check=True,creationflags=subprocess.CREATE_NO_WINDOW if os.name=="nt" else 0)
+                result=subprocess.run(self.ingress_args,input=raw,text=True,encoding="utf-8",stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=2.5,env=self.env,check=True,creationflags=subprocess.CREATE_NO_WINDOW if os.name=="nt" else 0)
                 accepted=json.loads(result.stdout)
                 if accepted.get("queued") is True and accepted.get("deliveryId")==delivery: break
             except Exception:
@@ -63,7 +76,8 @@ class Host:
         result=self.call("history.get",{"galaxyId":owner["id"],"host":"hermes","sessionId":observation["sessionId"],"limit":1})
         return result.get("work") if result else None
     def close(self):
-        self.proc.stdin.close()
+        try: self.proc.stdin.close()
+        except (BrokenPipeError, OSError): pass
         try: self.proc.wait(timeout=2)
         except subprocess.TimeoutExpired:
             self.proc.kill(); self.proc.wait()
@@ -73,6 +87,12 @@ def _record(host, session, event, source_id, text, model=None):
     facts={"host":"hermes"}
     if model: facts["selectedModel"]=model
     return host.enqueue({"host":"hermes","sessionId":session,"sourceId":source_id,"kind":"message","source":{"kind":"user-statement" if event=="user" else "model-report"},"content":{"excerpt":text[:1200],"originalLength":len(text),"retained":"excerpt" if text else "none","availableFromHost":False},"details":{"role":role,"completed":event!="user"},"environment":facts},include_work=event=="user")
+
+_LEARNING_GUIDANCE = "银河可在需要时提供本机经验、公开资料与协作帮助。按当前任务决定是否使用；本机经验只是参考，用户要求和当前证据优先。使用 galaxy_local_experience_search 搜索，galaxy_local_experience_get 按需读取；对外分享或联系沿用户授权。"
+def learning_context(work=None):
+    if isinstance(work,dict) and work.get("pending") and isinstance(work.get("workId"),str):
+        return _LEARNING_GUIDANCE+"\n当前工作有尚未处理的本机观察；可在合适阶段用 galaxy_local_work_pending 和 galaxy_local_work_summary 接续。"
+    return _LEARNING_GUIDANCE
 
 def register(ctx):
     archive_offsets = {}
@@ -120,9 +140,10 @@ def register(ctx):
         try:
             host=Host(ctx)
             saved=_record(host,session_id,"user","prompt:"+str(turn_id or uuid.uuid4()),user_message,model) if isinstance(user_message,str) else None
-            if saved and saved.get("pending") and isinstance(saved.get("workId"),str):
-                return {"context":"银河已积累当前工作的待整理本机观察。当前 Agent 可在自然阶段用 galaxy_local_work_pending 和 galaxy_local_work_summary 按需整理；工作引用 "+json.dumps(saved["workId"],ensure_ascii=False)+"。"}
-        except Exception: log.warning("Galaxy work observation unavailable")
+            return {"context":learning_context(saved)}
+        except Exception:
+            log.warning("Galaxy work observation unavailable")
+            return {"context":learning_context()}
         finally:
             finish(host,session_id)
     def record_tool(session_id=None, tool_name=None, tool_call_id=None, status=None, **kwargs):

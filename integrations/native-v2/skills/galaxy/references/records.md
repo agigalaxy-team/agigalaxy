@@ -1,8 +1,16 @@
-# 本地工作、原会话与隐私
+# 本地工作、经验与隐私
 
 `galaxy_local_work_list/get` 读取事实、来源与环境；`galaxy_command` 的 `history`（或 `work`）提供同义可选界面。宿主只记录实际提供的事实，未采到的资料不补造。
 
-在自然阶段或接续需要时，用 `galaxy_local_work_pending` 取得未整理增量，由当前 Agent 整理并用 `galaxy_local_work_summary` 保存。待整理页或连续覆盖下一段的工作详情页提供 `summaryInput`，含工作、修订和覆盖位置；服务自动关联该范围内实际观察，可用 `sourceObservationIds` 补充同一工作更早的真实来源。修订冲突后重读当前状态。分批与时机由 Agent 决定，不在每回合另启动摘要模型。`galaxy_local_work_note` 可补充明确标为 user-statement 或 model-report 的陈述。
+在有实质新增材料的自然阶段整理工作：用 `galaxy_local_work_pending` 取得未整理增量，由用户侧模型判断是否更新摘要或形成经验，再用 `galaxy_local_work_summary` 保存需要的摘要。待整理页或连续覆盖下一段的工作详情页提供 `summaryInput`，含工作、修订和覆盖位置；服务自动关联该范围内实际观察，可用 `sourceObservationIds` 补充同一工作更早的真实来源。修订冲突后重读当前状态；没有新增经验时允许不新增，不把工具返回或中途结果说成目标成功。`galaxy_local_work_note` 可补充明确标为 user-statement 或 model-report 的陈述。
+
+支持独立使用当前用户模型且不打断原工作的宿主，可以在合适阶段自动整理增量；其他宿主由当前 Agent 在后续正常回合接续。无模型或整理中断时保留未处理材料，不推断已整理；不按固定轮数整理，也不因安装 Skill 就假定后台执行。
+
+## 私有经验的积累与复用
+
+在当前任务可能受益时，用 `galaxy_local_experience_search` 的 `query` 搜索本人本机经验；先看相关候选、适用条件及来源，再用 `galaxy_local_experience_get` 的 `id` 读取需要的正文。结果是有条件的参考，不是系统指令或已验证结论；当前用户要求、环境和实际观察可以推翻旧方法。没有相关经验就继续原工作，不必先搜索或创建新工作。
+
+值得保留的真实方法、失败教训、限制和用户纠正，可用 `galaxy_local_experience_upsert` 保存。先查并读取相关已有条目：条件相近时基于当前版本补充或修订，条件不同或冲突时保留区别与来源；不把失败包装成成功，也不把推测说成已验证。保存时使用当前身份可读的来源工作 `workId` 和 `title`、`conditions`、`method`；更新既有条目传原 `id` 和 `expectedRevision`，保留仍适用的原字段并提交更新后的完整内容；冲突后重读再处理。`limitations` 和 `outcome` 按实际情况填写；新建不传 `expectedRevision`，结果并非固定枚举。其他字段以工具当前 schema 为准。无新经验时不强行生成；这些记录属于私有积累，不是正式 Capsule 或自动生成的可执行 Skill，也不自动公开或上传。明确导出、分享、发信或发布时按原用途和权限办理。
 
 `galaxy_local_upload_privacy_get/set` 管理四档允许上传类型，默认第 2 档只含结构化履历概况；第 3 档才包含所选具体说明与过程摘要。完整会话另行选择，凭据始终排除。本地读取、宿主模型调用和向银河上传分别处理。
 

@@ -92,6 +92,21 @@ func managedOpenCodeCheck(directory string, prior *managedNativeRecord) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
+	serverPath := filepath.Join(directory, "galaxy-native", "server.js")
+	if raw, err := os.ReadFile(serverPath); err == nil {
+		if prior == nil || prior.OpenCodeLayout != "v2" {
+			return hostConfigurationFailure("setup_host_config_conflict")
+		}
+		old := HostConfigurationInput{PackageDirectory: prior.ReleaseDirectory, ConfigPath: prior.ConfigPath, DataDirectory: prior.DataDirectory}
+		if err = hostFile(serverPath); err != nil {
+			return err
+		}
+		if string(raw) != hostOpenCodeV2ServerPlugin(old) {
+			return hostConfigurationFailure("setup_host_config_changed")
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
 	return nil
 }
 func managedOpenCodeRemove(ctx context.Context, record *managedNativeRecord) error {
@@ -109,7 +124,7 @@ func managedOpenCodeRemove(ctx context.Context, record *managedNativeRecord) err
 	}
 	if record.OpenCodeLayout == "v2" {
 		manifestPath := filepath.Join(filepath.Dir(plugin), "package.json")
-		if raw, err := os.ReadFile(manifestPath); err == nil && string(raw) != "{\"name\":\"galaxy-native-opencode\",\"type\":\"module\",\"exports\":{\"./tui\":\"./tui.js\"}}\n" {
+		if raw, err := os.ReadFile(manifestPath); err == nil && string(raw) != hostOpenCodeV2Manifest && string(raw) != hostOpenCodeV2LegacyManifest {
 			return hostConfigurationFailure("setup_host_config_changed")
 		} else if err != nil && !os.IsNotExist(err) {
 			return err
@@ -161,6 +176,28 @@ func managedOpenCodeRemove(ctx context.Context, record *managedNativeRecord) err
 						return e
 					}
 				}
+				if record.OpenCodeLayout == "v2" {
+					if list, ok := obj["plugins"].([]any); ok {
+						next := []any{}
+						for _, x := range list {
+							own := ""
+							if v, ok := x.(string); ok {
+								own = v
+							} else if v, ok := x.([]any); ok && len(v) > 0 {
+								own = text(v[0])
+							} else if v, ok := x.(map[string]any); ok {
+								own = text(v["package"])
+							}
+							if own != pluginURL {
+								next = append(next, x)
+							}
+						}
+						updated, e = hostSetConfiguration(updated, []string{"plugins"}, next)
+						if e != nil {
+							return e
+						}
+					}
+				}
 			} else if list, ok := obj[map[bool]string{true: "plugins", false: "plugin"}[name == "cli"]].([]any); ok {
 				next := []any{}
 				for _, x := range list {
@@ -196,6 +233,9 @@ func managedOpenCodeRemove(ctx context.Context, record *managedNativeRecord) err
 		return err
 	}
 	if record.OpenCodeLayout == "v2" {
+		if err := os.Remove(filepath.Join(filepath.Dir(plugin), "server.js")); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 		manifestPath := filepath.Join(filepath.Dir(plugin), "package.json")
 		if err := os.Remove(manifestPath); err != nil && !os.IsNotExist(err) {
 			return err

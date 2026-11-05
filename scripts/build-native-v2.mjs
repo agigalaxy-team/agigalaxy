@@ -49,13 +49,13 @@ export async function buildGoNativeCandidate({destination,sourceDirectory=root,v
  await run(goExecutable,['build','-mod=readonly','-trimpath','-buildvcs=false','-o',join(destination,binary),'./cmd/galaxy'],{cwd:join(sourceDirectory,'go'),windowsHide:true,env:{...process.env,GOOS:goos,GOARCH:goarch,CGO_ENABLED:'0',GOTOOLCHAIN:'local',GOFLAGS:'-mod=readonly'}});
  const artifacts={[binary]:sha(await readFile(join(destination,binary)))},sources={...goLicenses.sourceHashes},dependencies={},dependencyResolution={};
  const inputs={},externalImports=new Set();
- for(const [file,source,factory] of [['opencode.js','native-galaxy.tui.ts','createNativeGalaxyPlugin'],['opencode-v2.js','native-galaxy-v2.tui.ts','createNativeGalaxyPluginV2']]){
+ for(const [file,source,factory] of [['opencode.js','native-galaxy.tui.ts','createNativeGalaxyPlugin'],['opencode-v2.js','native-galaxy-v2.tui.ts','createNativeGalaxyPluginV2'],['opencode-v2-server.js','native-galaxy-v2.server.ts','createNativeGalaxyServerPluginV2']]){
   const virtual=`go-${file}-candidate.mjs`;
   const entry=`import {fileURLToPath} from 'node:url';import {${factory} as createPlugin} from './integrations/host-adapters/opencode-stable/${source}';const executable=fileURLToPath(new URL('./${binary}',import.meta.url));export function ${factory}(options={}){return createPlugin({...options,backend:'go',executable:options.executable??executable});}export default ${factory}();`;
   const result=await build({absWorkingDir:sourceDirectory,stdin:{contents:entry,resolveDir:sourceDirectory,sourcefile:virtual,loader:'js'},outfile:join(destination,file),bundle:true,splitting:false,platform:'node',format:'esm',target:'node22',packages:'external',external:['bun:sqlite','@opencode/plugin/tui','solid-js','solid-js/*'],metafile:true,write:false,sourcemap:false});
   for(const output of result.outputFiles){const name=relative(destination,output.path).replaceAll('\\','/');await writeFile(output.path,output.contents,{flag:'wx'});artifacts[name]=sha(output.contents);}
   for(const [name,info] of Object.entries(result.metafile.inputs)){if(name!==virtual){if(inputs[name])inputs[name].imports.push(...info.imports);else inputs[name]={...info,imports:[...info.imports]};}}
-  for(const output of Object.values(result.metafile.outputs))for(const item of output.imports)if(item.external&&!item.path.startsWith('node:')&&item.path!=='bun:sqlite'&&item.path!=='@opencode/plugin/tui'&&!(file==='opencode-v2.js'&&packageName(item.path)==='solid-js'))externalImports.add(packageName(item.path));
+  for(const output of Object.values(result.metafile.outputs))for(const item of output.imports)if(item.external&&!item.path.startsWith('node:')&&item.path!=='bun:sqlite'&&item.path!=='@opencode/plugin/tui'&&!(file==='opencode-v2-server.js'&&item.path==='@opencode/plugin')&&!(file==='opencode-v2.js'&&packageName(item.path)==='solid-js'))externalImports.add(packageName(item.path));
  }
  for(const source of Object.keys(inputs)){
   if(source.replaceAll('\\','/').includes('/node_modules/')||source.startsWith('node_modules/'))throw Error('Unexpected bundled dependency source');

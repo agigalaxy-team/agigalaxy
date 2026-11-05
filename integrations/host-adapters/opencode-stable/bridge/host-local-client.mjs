@@ -15,7 +15,7 @@ export function createHostLocalClient({configPath=process.env.GALAXY_NATIVE_CONF
  const snapshot=call('local.snapshot'),status=call('local.integrationStatus'),connection=call('local.connectionStatus'),reset=call('local.resetIntegration');
  return Object.freeze({
   initialize:call('native.initialize'),preparationStatus:call('native.preparationStatus'),deferPreparation:call('native.deferPreparation'),
-  history:Object.freeze({identity:call('history.identity'),beginCapture:call('history.beginCapture'),observeEnvironment:call('history.observeEnvironment'),observe:call('history.observe'),list:call('history.list'),get:call('history.get'),pending:call('history.pending')}),
+  history:Object.freeze({identity:call('history.identity'),beginCapture:call('history.beginCapture'),observeEnvironment:call('history.observeEnvironment'),observe:call('history.observe'),list:call('history.list'),get:call('history.get'),pending:call('history.pending'),review:Object.freeze({prepare:call('history.review.prepare'),apply:call('history.review.apply'),release:call('history.review.release')}),experience:Object.freeze({search:call('history.experience.search'),get:call('history.experience.get')})}),
   archive:Object.freeze({settings:call('archive.settings'),captureMessage:call('archive.captureMessage'),configure:call('archive.configure')}),
   store:Object.freeze({getLocalSnapshot:(_directory)=>snapshot(),getGalaxyIntegrationStatus:(_directory)=>status(),resetGalaxyIntegration:(_directory)=>reset()}),
   connection:Object.freeze({getGalaxyConnectionStatus:(_directory)=>connection()}),

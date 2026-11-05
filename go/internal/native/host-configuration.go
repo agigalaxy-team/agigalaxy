@@ -161,6 +161,13 @@ func hostOpenCodePlugin(input HostConfigurationInput) string {
 func hostOpenCodeV2Plugin(input HostConfigurationInput) string {
 	return "import {createNativeGalaxyPluginV2} from " + hostJSONString(hostFileURL(filepath.Join(input.PackageDirectory, "opencode-v2.js"))) + ";\nexport default createNativeGalaxyPluginV2(" + hostJSONString(map[string]any{"backend": "go", "executable": hostExecutable(input.PackageDirectory), "configPath": input.ConfigPath, "dataDirectory": input.DataDirectory, "endpoint": input.Endpoint}) + ");\n"
 }
+
+const hostOpenCodeV2LegacyManifest = "{\"name\":\"galaxy-native-opencode\",\"type\":\"module\",\"exports\":{\"./tui\":\"./tui.js\"}}\n"
+const hostOpenCodeV2Manifest = "{\"name\":\"galaxy-native-opencode\",\"type\":\"module\",\"exports\":{\"./tui\":\"./tui.js\",\"./server\":\"./server.js\"}}\n"
+
+func hostOpenCodeV2ServerPlugin(input HostConfigurationInput) string {
+	return "import {createNativeGalaxyServerPluginV2} from " + hostJSONString(hostFileURL(filepath.Join(input.PackageDirectory, "opencode-v2-server.js"))) + ";\nexport default createNativeGalaxyServerPluginV2(" + hostJSONString(map[string]any{"executable": hostExecutable(input.PackageDirectory), "configPath": input.ConfigPath, "dataDirectory": input.DataDirectory}) + ");\n"
+}
 func hostExecutable(directory string) string { entry, _ := hostCandidate(directory); return entry }
 
 func (input HostConfigurationInput) launch() ([]string, map[string]string) {
@@ -233,6 +240,9 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 			if e = hostFile(filepath.Join(input.PackageDirectory, "opencode-v2.js")); e != nil {
 				return nil, e
 			}
+			if e = hostFile(filepath.Join(input.PackageDirectory, "opencode-v2-server.js")); e != nil {
+				return nil, e
+			}
 		}
 	}
 	if selected["codex"] {
@@ -294,14 +304,18 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 		} else {
 			mcp["servers"] = map[string]any{"galaxy": server}
 		}
-		add("opencode/opencode.json", map[string]any{"$schema": "https://opencode.ai/config.json", "mcp": mcp, "skills": map[string]any{"paths": []string{filepath.Join(input.Destination, "opencode", ".agents", "skills")}}})
+		config := map[string]any{"$schema": "https://opencode.ai/config.json", "mcp": mcp, "skills": map[string]any{"paths": []string{filepath.Join(input.Destination, "opencode", ".agents", "skills")}}}
+		if layout == "v2" {
+			config["plugins"] = []string{hostFileURL(filepath.Join(input.Destination, "opencode", "galaxy-native"))}
+		}
+		add("opencode/opencode.json", config)
 		if layout == "v1" {
 			add("opencode/galaxy.tui.mjs", hostOpenCodePlugin(input))
 			add("opencode/tui.json", map[string]any{"$schema": "https://opencode.ai/tui.json", "plugin": []string{hostFileURL(filepath.Join(input.Destination, "opencode", "galaxy.tui.mjs"))}})
 		} else {
 			add("opencode/galaxy-native/tui.js", hostOpenCodeV2Plugin(input))
-			add("opencode/galaxy-native/package.json", map[string]any{"name": "galaxy-native-opencode", "type": "module", "exports": map[string]any{"./tui": "./tui.js"}})
-			add("opencode/cli.json", map[string]any{"$schema": "https://opencode.ai/v2/cli.json", "plugins": []string{hostFileURL(filepath.Join(input.Destination, "opencode", "galaxy-native"))}})
+			add("opencode/galaxy-native/server.js", hostOpenCodeV2ServerPlugin(input))
+			add("opencode/galaxy-native/package.json", hostOpenCodeV2Manifest)
 		}
 		addSkill("opencode/.agents/skills/galaxy")
 	}

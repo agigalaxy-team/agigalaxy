@@ -23,6 +23,7 @@
 | 登录、认证扩展与安全配置 | [认证工程](technical/authentication.md) |
 | 来源观察、CI事实与远程签名声明 | [来源观察](technical/source-observations.md) |
 | 完整客户端、通用插件开发准备、开源复用与宿主/平台边界 | [Native工程](technical/native-client.md) |
+| 普通工作中的适时求助、经验整理与再次复用 | [客户端经验方案](technical/native-learning-plan.md) |
 | 固定上游、源码范围与许可 | [来源和许可](technical/source-and-licensing.md) |
 | 配置、发布、认证与运行服务 | [部署](operations/deployment.md) |
 | 指标、告警、日志与独立监测 | [可观测性](operations/observability.md) |

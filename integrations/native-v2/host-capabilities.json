@@ -17,6 +17,17 @@
       ],
       "config": "opencode/opencode.json",
       "tui": "opencode/tui.json",
+      "layouts": {
+        "v1": {"modelPlugins": "legacy", "tuiPlugins": "opencode/tui.json#plugin"},
+        "v2": {"modelPlugins": "opencode/opencode.json#plugins", "packageExports": ["./server", "./tui"]}
+      },
+      "localLearning": {
+        "entry": "opencode-v2-server.js",
+        "execution": "user-host-model-at-recorded-stage",
+        "recordingScope": "current-foreground-TUI-session",
+        "cliWithoutTui": "MCP and model guidance; automatic recording not yet connected",
+        "acceptance": "See current WORK_STATUS; configuration does not establish runtime support."
+      },
       "skill": "opencode/.agents/skills/galaxy",
       "formatEvidence": "official-document-and-generated-local-configuration",
       "sources": [
@@ -206,5 +217,5 @@
       "note": "Independent of GitHub Copilot in VS Code; configuration and runtime must be verified separately."
     }
   ],
-  "updatedAt": "2026-11-03"
+  "updatedAt": "2026-11-06"
 }

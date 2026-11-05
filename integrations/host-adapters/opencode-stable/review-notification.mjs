@@ -1,0 +1,2 @@
+// OpenCode portable RPC uses JSON Schema; both server and TUI share this contract.
+export const reviewNotificationContract={id:'galaxy.local-work',methods:{ready:{input:{type:'object',properties:{sessionId:{type:'string'},galaxyId:{type:'string'},lastUserMessageId:{type:'string'}},required:['sessionId','galaxyId','lastUserMessageId'],additionalProperties:false},output:{type:'object',properties:{accepted:{type:'boolean'}},required:['accepted'],additionalProperties:false}}},events:{}};

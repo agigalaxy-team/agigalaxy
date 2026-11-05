@@ -18,7 +18,7 @@ declare module '@opencode/plugin/tui' {
     readonly app: { readonly version: string };
     readonly renderer: { readonly width: number; readonly height: number };
     readonly location: LocationRef | undefined;
-    readonly client: { readonly message: { list(input: { sessionID: string; limit?: number; cursor?: string; order?: 'asc' | 'desc' },
+    readonly client: { rpc(definition: unknown): { ready(input: unknown,options?: {location?: {directory?: string}}): Promise<unknown> }; readonly message: { list(input: { sessionID: string; limit?: number; cursor?: string; order?: 'asc' | 'desc' },
       options?: { signal?: AbortSignal }): Promise<{ data: Message[]; cursor: { next?: string | null } }> } };
     readonly data: {
       listen(handler: (event: { details: { type: string; data: Record<string, unknown> } }) => void): () => void;
@@ -41,4 +41,17 @@ declare module '@opencode/plugin/tui' {
   }
   interface Definition { readonly id: string; readonly setup: (context: Context) => Cleanup | void | Promise<Cleanup | void> }
   export const Plugin: { define(plugin: Definition): Definition };
+}
+// Public OpenCode v2.2.3 server plugin surface used by Galaxy.
+declare module '@opencode/plugin' {
+ type Registration={dispose():Promise<void>};
+ type Model={readonly providerID:string;readonly id:string};
+ type Context={
+  session:{hook(name:'prompt',callback:(event:{readonly sessionID:string;readonly messageID:string;prompt:{text:string}})=>void|Promise<void>):Promise<Registration>;
+   hook(name:'context',callback:(event:{readonly sessionID:string;readonly model:Model;system:Array<{text:string;[key:string]:unknown}>})=>void|Promise<void>):Promise<Registration>;
+   hook(name:'experimental.idle',callback:(event:{readonly sessionID:string;readonly background:readonly unknown[]})=>void|Promise<void>):Promise<Registration>};
+  rpc:{register(definition:unknown,handlers:{ready(input:{sessionId:string;galaxyId:string;lastUserMessageId:string}):Promise<{accepted:boolean}>}):Promise<Registration>};
+  experimental:{generate:{text(input:{model?:Model;prompt:string}):Promise<{text:string}>}};
+ };
+ export const Plugin:{define(input:{id:string;setup(context:Context):void|(()=>void|Promise<void>)|Promise<void|(()=>void|Promise<void>)>}):unknown};
 }

@@ -364,7 +364,9 @@ export function createGalaxyAdapter(
           const lastUser = [...state.session.messages(sessionId)]
             .reverse()
             .find((message) => message.role === 'user');
-          const query = lastUser
+          const query = typeof (lastUser as any)?.v2Original?.text === 'string'
+            ? (lastUser as any).v2Original.text.trim()
+            : lastUser
             ? state
                 .part(lastUser.id)
                 .filter(

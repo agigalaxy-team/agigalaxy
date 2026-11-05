@@ -37,7 +37,12 @@ func (s *Store) WorkPending(ctx context.Context, q WorkQuery) (any, error) {
 		if e != nil {
 			return e
 		}
-		after := integer(summary["through_sequence"])
+		summaryThrough := integer(summary["through_sequence"])
+		reviewed, e := reviewedSequenceWithin(ctx, db, work["id"])
+		if e != nil {
+			return e
+		}
+		after := max(summaryThrough, reviewed)
 		rows, e := rowsMaps(ctx, db, observationsSQL+" WHERE o.work_id=? AND o.sequence>? ORDER BY o.sequence LIMIT ?", work["id"], after, q.Limit+1)
 		if e != nil {
 			return e
@@ -71,6 +76,9 @@ func (s *Store) WorkPending(ctx context.Context, q WorkQuery) (any, error) {
 		if processing == nil {
 			processing = map[string]any{"state": "pending", "code": nil}
 		}
+		if len(observations) == 0 && processing["state"] == "pending" {
+			processing = map[string]any{"state": "idle", "code": nil}
+		}
 		var previous any
 		if summary != nil {
 			previous = map[string]any{"title": summary["title"], "summary": summary["summary"], "outcome": summary["outcome"], "exclusions": array(summary["exclusions_json"])}
@@ -79,7 +87,7 @@ func (s *Store) WorkPending(ctx context.Context, q WorkQuery) (any, error) {
 		if len(observations) > 0 {
 			summaryInput = workSummaryInput(owner, work["id"], integer(summary["revision"]), through)
 		}
-		out = map[string]any{"galaxyId": owner, "workId": work["id"], "expectedRevision": integer(summary["revision"]), "afterSequence": after, "throughSequence": through, "summaryInput": summaryInput, "observations": observations, "environments": environments, "hasMore": hasMore, "processing": processing, "previousSummary": previous}
+		out = map[string]any{"galaxyId": owner, "workId": work["id"], "expectedRevision": integer(summary["revision"]), "afterSequence": after, "summaryThroughSequence": summaryThrough, "reviewedThroughSequence": reviewed, "throughSequence": through, "summaryInput": summaryInput, "observations": observations, "environments": environments, "hasMore": hasMore, "processing": processing, "previousSummary": previous}
 		return nil
 	})
 	return out, e

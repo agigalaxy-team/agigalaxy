@@ -83,6 +83,8 @@ CI [`product-checks.yml`](../../.github/workflows/product-checks.yml) 按真实 
 
 完成一批实质改动再集中验证；表中是可选入口，同输入已有结果直接复用。
 
+Native 常驻服务按当前系统用户的运行缓存复用；独立资料目录不等于独立进程环境。集成检查同时隔离资料、宿主配置和运行缓存（例如 Windows 的 `LOCALAPPDATA`、Linux 的 `XDG_CACHE_HOME`），只结束本次实例，不修改用户已有的暂停状态。检查开发中的同版本候选时，用正式 `update --package-dir` 采用新程序并读取实际运行路径；重复安装后的版本号相同不能证明进程已换成新内容。
+
 | 变化 | 入口 |
 |---|---|
 | JS 合同/客户端/恢复 | `npm test -- packages/galaxy-client/test/<相关文件>.test.mjs` 或当前 Web/A2A/平台工具测试 |

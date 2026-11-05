@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -37,7 +38,7 @@ func installationFixturePackage(t *testing.T) string {
 	if e != nil {
 		t.Fatal(e)
 	}
-	for name, value := range map[string]string{"galaxy.exe": "synthetic binary fixture", "galaxy": "synthetic binary fixture", "opencode.js": "export function createNativeGalaxyPlugin(options){return options}", "opencode-v2.js": "export function createNativeGalaxyPluginV2(options){return options}", "HOSTS.md": "Original-format isolated host instructions", "host-capabilities.json": string(matrix), "package.json": `{"name":"isolated-candidate","dependencies":{}}`} {
+	for name, value := range map[string]string{"galaxy.exe": "synthetic binary fixture", "galaxy": "synthetic binary fixture", "opencode.js": "export function createNativeGalaxyPlugin(options){return options}", "opencode-v2.js": "export function createNativeGalaxyPluginV2(options){return options}", "opencode-v2-server.js": "export function createNativeGalaxyServerPluginV2(options){return options}", "HOSTS.md": "Original-format isolated host instructions", "host-capabilities.json": string(matrix), "package.json": `{"name":"isolated-candidate","dependencies":{}}`} {
 		if e = os.WriteFile(filepath.Join(dir, name), []byte(value), 0700); e != nil {
 			t.Fatal(e)
 		}
@@ -451,8 +452,12 @@ func TestOpenCodeV2ManagedMigrationPreservesUserSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	plugins := cliConfig["plugins"].([]any)
-	if len(plugins) != 3 || plugins[0] != "other.plugin" || plugins[2] != "-galaxy.opencode.stable.tui" {
+	if len(plugins) != 2 || plugins[0] != "other.plugin" || plugins[1] != "-galaxy.opencode.stable.tui" {
 		t.Fatal(plugins)
+	}
+	globalPlugins, ok := config["plugins"].([]any)
+	if !ok || len(globalPlugins) != 1 || globalPlugins[0] != hostFileURL(filepath.Join(dir, "galaxy-native")) {
+		t.Fatal("server plugin not registered globally", config["plugins"])
 	}
 	if uploadObject(cliConfig["theme"])["name"] != "dark" {
 		t.Fatal("theme changed")
@@ -460,4 +465,57 @@ func TestOpenCodeV2ManagedMigrationPreservesUserSettings(t *testing.T) {
 	if _, err = os.Stat(filepath.Join(dir, "galaxy-native", "package.json")); err != nil {
 		t.Fatal(err)
 	}
+	if raw, err := os.ReadFile(filepath.Join(dir, "galaxy-native", "server.js")); err != nil || string(raw) != hostOpenCodeV2ServerPlugin(input) {
+		t.Fatal("server entry missing", err)
+	}
+	// Existing 0.1.12 V2 installs had only a TUI export in cli.json. Repair
+	// must migrate the same owned package while preserving unrelated entries.
+	manifestPath := filepath.Join(dir, "galaxy-native", "package.json")
+	if err = os.WriteFile(manifestPath, []byte(hostOpenCodeV2LegacyManifest), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Remove(filepath.Join(dir, "galaxy-native", "server.js")); err != nil {
+		t.Fatal(err)
+	}
+	oldGlobal, err := hostRemoveConfiguration(string(mustReadHostTest(t, filepath.Join(dir, "opencode.json"))), []string{"plugins"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(dir, "opencode.json"), []byte(oldGlobal), 0600); err != nil {
+		t.Fatal(err)
+	}
+	legacyCLI := `{"plugins":["other.plugin",` + hostJSONString(hostFileURL(filepath.Join(dir, "galaxy-native"))) + `]}`
+	if err = os.WriteFile(filepath.Join(dir, "cli.json"), []byte(legacyCLI), 0600); err != nil {
+		t.Fatal(err)
+	}
+	input.OpenCodePriorLayout = "v2"
+	plan, err = PreviewOpenCodeConfiguration(ctx, dir, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = InstallOpenCodeConfigurationReviewed(ctx, plan, true); err != nil {
+		t.Fatal(err)
+	}
+	var migrated, migratedCLI map[string]any
+	if _, err = readJSON(filepath.Join(dir, "opencode.json"), &migrated); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = readJSON(filepath.Join(dir, "cli.json"), &migratedCLI); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(migratedCLI["plugins"], []any{"other.plugin"}) {
+		t.Fatal(migratedCLI)
+	}
+	if !reflect.DeepEqual(migrated["plugins"], []any{hostFileURL(filepath.Join(dir, "galaxy-native"))}) {
+		t.Fatal(migrated)
+	}
+}
+
+func mustReadHostTest(t *testing.T, path string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }

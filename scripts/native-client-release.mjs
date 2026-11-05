@@ -26,7 +26,7 @@ export async function inspectNativeClientCandidate({source,sourceDirectory=root}
   manifest.mcp?.command!==(manifest.target.goos==='windows'?'galaxy.exe':'galaxy')||!isDeepStrictEqual(manifest.mcp.args,['native']))fail('Go Native candidate metadata differs');
  for(const[name,digest]of Object.entries(hashes))if(!/^[a-f0-9]{64}$/.test(digest)||sha(await bytes(inside(sourceDirectory,name)))!==digest)fail('Go Native source changed: '+name);
  for(const[name,digest]of Object.entries(manifest.artifacts))if(!/^[a-f0-9]{64}$/.test(digest)||sha(await bytes(inside(source,name)))!==digest)fail('Go Native artifact differs: '+name);
- for(const required of [manifest.mcp.command,'opencode.js','opencode-v2.js','HOSTS.md','README.md','skills/galaxy/SKILL.md','go-dependency-licenses.json'])if(!manifest.artifacts[required])fail('Candidate artifact missing: '+required);
+ for(const required of [manifest.mcp.command,'opencode.js','opencode-v2.js','opencode-v2-server.js','HOSTS.md','README.md','skills/galaxy/SKILL.md','go-dependency-licenses.json'])if(!manifest.artifacts[required])fail('Candidate artifact missing: '+required);
  const legal=await object(join(source,'go-dependency-licenses.json'));if(legal.scope!=='standalone-native-go-binary'||!Array.isArray(legal.missing)||legal.missing.length)fail('Go dependency license texts missing');
  for(const[name,version]of Object.entries(packageJson.dependencies))if((await object(join(source,'node_modules',name,'package.json'))).version!==version||lock.packages?.['node_modules/'+name]?.version!==version)fail('Native dependency differs: '+name);
  await verifyNativeLicenseNotices({candidate:source});

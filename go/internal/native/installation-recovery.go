@@ -142,11 +142,31 @@ func managedNativeStateMatches(r *managedNativeRecord) (bool, error) {
 		if !present || text(meta["skillPath"]) != filepath.Join(r.ReleaseDirectory, "skills") || text(meta["plugin"]) != pluginRef {
 			return false, nil
 		}
+		serverEnabled := false
+		if r.OpenCodeLayout == "v2" {
+			if _, e := os.Stat(filepath.Join(r.ReleaseDirectory, "opencode-v2-server.js")); e == nil {
+				serverEnabled = true
+			} else if !os.IsNotExist(e) {
+				return false, e
+			}
+			if serverEnabled {
+				dir := filepath.Join(r.HostConfigPath, "galaxy-native")
+				manifest, e := os.ReadFile(filepath.Join(dir, "package.json"))
+				if e != nil || string(manifest) != hostOpenCodeV2Manifest {
+					return false, nil
+				}
+				input := HostConfigurationInput{PackageDirectory: r.ReleaseDirectory, ConfigPath: r.ConfigPath, DataDirectory: r.DataDirectory}
+				server, e := os.ReadFile(filepath.Join(dir, "server.js"))
+				if e != nil || string(server) != hostOpenCodeV2ServerPlugin(input) {
+					return false, nil
+				}
+			}
+		}
 		files, err := hostSelectedConfigurations(r.HostConfigPath, "opencode")
 		if err != nil {
 			return false, err
 		}
-		found := false
+		found, pluginFound := false, false
 		for _, f := range files {
 			if f.missing {
 				continue
@@ -163,8 +183,55 @@ func managedNativeStateMatches(r *managedNativeRecord) (bool, error) {
 			if managedOpenCodeSpecMatches(value, r.ManagedSpec) {
 				found = true
 			}
+			if serverEnabled {
+				if plugins, ok := obj["plugins"].([]any); ok {
+					for _, item := range plugins {
+						own := ""
+						if v, ok := item.(string); ok {
+							own = v
+						} else if v, ok := item.([]any); ok && len(v) > 0 {
+							own = text(v[0])
+						} else if v, ok := item.(map[string]any); ok {
+							own = text(v["package"])
+						}
+						if own == pluginRef {
+							pluginFound = true
+						}
+					}
+				}
+			}
 		}
-		return found, nil
+		if serverEnabled {
+			cli, e := hostSelectedConfigurations(r.HostConfigPath, "cli")
+			if e != nil {
+				return false, e
+			}
+			for _, f := range cli {
+				if f.missing || filepath.Ext(f.path) != ".json" {
+					continue
+				}
+				obj, e := hostConfigurationObject(f.text)
+				if e != nil {
+					return false, e
+				}
+				if entries, ok := obj["plugins"].([]any); ok {
+					for _, item := range entries {
+						own := ""
+						if v, ok := item.(string); ok {
+							own = v
+						} else if v, ok := item.([]any); ok && len(v) > 0 {
+							own = text(v[0])
+						} else if v, ok := item.(map[string]any); ok {
+							own = text(v["package"])
+						}
+						if own == pluginRef {
+							return false, nil
+						}
+					}
+				}
+			}
+		}
+		return found && (!serverEnabled || pluginFound), nil
 	}
 	if r.Host == "deepseek-harness" {
 		spec, ok := r.ManagedSpec.(map[string]any)

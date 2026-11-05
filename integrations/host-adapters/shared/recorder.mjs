@@ -49,23 +49,29 @@ export const uniqueId=()=>randomUUID();
 export function environment(host,input) {
   return {host,platform:process.platform,architecture:process.arch,runtime:'node',runtimeVersion:process.versions.node,...(typeof input.model==='string'?{selectedModel:input.model}:{})};
 }
+const learningGuidance='银河可在需要时提供本机经验、公开资料与协作帮助。按当前任务决定是否使用；本机经验只是参考，用户要求和当前证据优先。使用 galaxy_local_experience_search 搜索，galaxy_local_experience_get 按需读取；对外分享或联系沿用户授权。';
+export function learningContext({work}={}) {
+ return learningGuidance+(work?.pending&&typeof work.workId==='string'?'\n当前工作有尚未处理的本机观察；可在合适阶段用 galaxy_local_work_pending 和 galaxy_local_work_summary 接续。':'');
+}
+const hookDeadline=(promise,milliseconds=2500)=>{let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('galaxy_host_timeout')),milliseconds);})]).finally(()=>clearTimeout(timer));};
 export async function runHook(host,normalize) {
   let recorder,output={};
   try {
     process.stdin.setEncoding('utf8');
     let input=''; for await(const chunk of process.stdin){input+=chunk;if(input.length>9*1024*1024)throw Error('hook_input_too_large');}
     const value=JSON.parse(input), event=normalize(value);
+    if(value.hook_event_name==='UserPromptSubmit')output={hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext:learningContext()}};
     if(event||typeof value?.session_id==='string'){
       const options={host};
       for(let i=2;i<process.argv.length;i+=2){const name=process.argv[i], value=process.argv[i+1]; if(!value)throw Error('hook_argument_invalid'); if(name==='--executable')options.executable=value; else if(name==='--config')options.configPath=value; else if(name==='--data-dir'){options.dataDirectory=value;options.configPath=null;} else if(name==='--host-executable'){ /* accepted for existing configurations */ } else throw Error('hook_argument_invalid');}
       recorder=createHostRecorder(options);
       try {
-        const saved=event?await recorder.record(event,{includeWork:value.hook_event_name==='UserPromptSubmit'}):null;
-        if(value.hook_event_name==='UserPromptSubmit' && saved?.pending && typeof saved.workId==='string'){
-          output={hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext:`银河已积累当前工作的待整理本机观察。当前 Agent 可在自然阶段用 galaxy_local_work_pending 和 galaxy_local_work_summary 按需整理；工作引用 ${JSON.stringify(saved.workId)}。`}};
+        const saved=event?await hookDeadline(recorder.record(event,{includeWork:value.hook_event_name==='UserPromptSubmit'})):null;
+        if(value.hook_event_name==='UserPromptSubmit') {
+          output={hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext:learningContext({work:saved})}};
         }
       } finally {
-        try {await recorder.captureSelectedTranscript(value.session_id,value.transcript_path);}
+        try {await hookDeadline(recorder.captureSelectedTranscript(value.session_id,value.transcript_path));}
         catch {process.stderr.write('galaxy selected conversation capture unavailable\n');}
       }
     }

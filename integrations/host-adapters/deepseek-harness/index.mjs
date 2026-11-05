@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {createHostRecorder,content} from '../shared/recorder.mjs';
+import {createHostRecorder,content,learningContext} from '../shared/recorder.mjs';
 
 // DSH session/event is post-commit and scoped by the host's Cordis context.
 // Ordinary work facts do not consume seed history; explicitly selected archives
@@ -36,9 +36,27 @@ export const name='galaxy-work';
 export const inject=['sessions'];
 export function apply(ctx, config={}) {
  const recorder=createHostRecorder({host:'deepseek-harness',executable:config.executable,configPath:config.configPath,dataDirectory:config.dataDirectory});
- const queues=new Map(),archiveOwners=new Map();let closing=false;
+ const queues=new Map(),archiveOwners=new Map(),learning=new Map();let closing=false;
+ // The system-prompt provider is optional. DSH assemblies carry an actual
+ // agent/session, so never borrow another session's candidate snapshot.
+ if(typeof ctx.inject==='function')ctx.inject(['systemPrompt'],child=>{
+  child.systemPrompt.context({name:'galaxy-work:learning',order:10000,interpolate:false,
+   text:context=>context.agent?learning.get(context.agent.id)?.text??learningContext():''});
+  child.on('system-prompt/assemble',async (assembly,context,next)=>{
+   const id=context.agent?.id, pending=id&&queues.get(id);
+   if(pending){let timer;try{await Promise.race([pending,new Promise(resolve=>{timer=setTimeout(resolve,1500);})]);}finally{clearTimeout(timer);}}
+   const result=await next();if(!id)return result;
+   const text=learning.get(id)?.text??learningContext();
+   const contribution=result.contexts.find(item=>item.name==='galaxy-work:learning');
+   if(contribution)contribution.text=text;
+   return result;
+  });
+ });
+ ctx.on('session/disposed',session=>{if(session?.id)learning.delete(session.id);});
  ctx.on('session/event',(session,event)=>{
   if(closing||!Number.isSafeInteger(event?.seq))return;
+  const user=event.type==='user/message'&&event.data?.source?.kind==='user'?event.data.content?.filter(x=>x?.type==='text'&&typeof x.text==='string').map(x=>x.text).join('\n'):null;
+  if(typeof user==='string')learning.set(session.id,{seq:event.seq,text:learningContext()});
   const prior=queues.get(session.id)||Promise.resolve();
   const next=prior.then(async()=>{try {
    const incoming=normalizeEvent(session,event);
@@ -57,6 +75,10 @@ export function apply(ctx, config={}) {
     const observation=normalizeEvent(session,item);
     if(observation)await recorder.record(observation);
     await recorder.advanceCursor({galaxyId:cursor.galaxyId,sessionId:session.id,seq});
+   }
+   if(typeof user==='string'&&learning.get(session.id)?.seq===event.seq){
+    const work=await recorder.workFor(session.id).catch(()=>null);
+    if(learning.get(session.id)?.seq===event.seq)learning.set(session.id,{seq:event.seq,text:learningContext({work})});
    }
   } finally {
    try {
@@ -80,7 +102,7 @@ export function apply(ctx, config={}) {
   }).catch(()=>{ctx.logger?.warn?.('Galaxy local work observation or recovery unavailable');});
   queues.set(session.id,next);void next.finally(()=>{if(queues.get(session.id)===next)queues.delete(session.id);});
  });
- ctx.effect(()=>()=>{closing=true;return Promise.allSettled([...queues.values()]).then(()=>recorder.close());});
+ ctx.effect(()=>()=>{closing=true;learning.clear();return Promise.allSettled([...queues.values()]).then(()=>recorder.close());});
 }
 export default {name,inject,apply};
 

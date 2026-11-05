@@ -79,6 +79,30 @@ func hostDecode[T any](raw json.RawMessage) (T, error) {
 
 func (s *Store) hostCall(ctx context.Context, method string, params json.RawMessage) (any, error) {
 	switch method {
+	case "history.review.prepare", "history.review.release":
+		x, e := hostDecode[WorkReviewRequest](params)
+		if e != nil {
+			return nil, e
+		}
+		if method == "history.review.prepare" {
+			return s.PrepareWorkReview(ctx, x)
+		}
+		return s.ReleaseWorkReview(ctx, x)
+	case "history.review.apply":
+		x, e := hostDecode[WorkReviewApply](params)
+		if e != nil {
+			return nil, e
+		}
+		return s.ApplyWorkReview(ctx, x)
+	case "history.experience.search", "history.experience.get":
+		x, e := hostDecode[WorkExperienceQuery](params)
+		if e != nil {
+			return nil, e
+		}
+		if method == "history.experience.get" {
+			return s.GetWorkExperience(ctx, x)
+		}
+		return s.SearchWorkExperience(ctx, x)
 	case "history.sourceCursor", "history.advanceSourceCursor":
 		return s.hostSourceCursor(ctx, method, params)
 	case "history.drainIngress":

@@ -1,9 +1,10 @@
 import {runWithOwner} from 'solid-js';
 import {createV2SessionAdapter} from './v2-session-adapter.mjs';
+import {reviewNotificationContract} from './review-notification.mjs';
 
 // Translate the public V2 context to the narrow interface used by the existing
 // Galaxy menu. Dialogs remain owned and rendered by OpenCode.
-export function createV2Host(context) {
+export function createV2Host(context, diagnostics = undefined) {
  const abort=new AbortController(), slots=new Map();
  let dialogCleanup, dialogGeneration=0;
  const disposeDialog=()=>{const fn=dialogCleanup;dialogCleanup=undefined;fn?.();};
@@ -35,8 +36,9 @@ export function createV2Host(context) {
   void pending.finally(()=>{if(generation===dialogGeneration)disposeDialog();}).catch(()=>{});
  }},DialogAlert:input=>({kind:'alert',input}),DialogPrompt:input=>({kind:'prompt',input}),DialogSelect:input=>({kind:'select',input})};
  const {route,state,event,client,v2,closeData}=createV2SessionAdapter(context);
+ v2.reviewReady=input=>context.client.rpc(reviewNotificationContract).ready(input,{location:context.location?{directory:context.location.directory}:undefined});
  const lifecycle={signal:abort.signal,onDispose(fn){abort.signal.addEventListener('abort',fn,{once:true});return()=>abort.signal.removeEventListener('abort',fn);}};
  return {api:{app:context.app,renderer:context.renderer,route,state,event,keymap,ui,lifecycle,client,
-  v2},
+  v2:{...v2,diagnostics}},
   close(){abort.abort();++dialogGeneration;if(dialogCleanup)context.ui.dialog.clear();disposeDialog();closeData();for(const slot of slots.values())slot.update(draft=>{draft.active=false;draft.commands=[];draft.bindings=[];});slots.clear();}};
 }

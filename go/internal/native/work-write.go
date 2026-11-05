@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS work_environments(id TEXT PRIMARY KEY,owner_id TEXT N
 CREATE TABLE IF NOT EXISTS work_observations(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,work_id TEXT NOT NULL,source_id TEXT NOT NULL,revision INTEGER NOT NULL,kind TEXT NOT NULL,occurred_at TEXT,observed_at TEXT NOT NULL,source_json TEXT NOT NULL,content_json TEXT,details_json TEXT NOT NULL,environment_id TEXT,exclusions_json TEXT NOT NULL DEFAULT '[]',UNIQUE(work_id,source_id,revision));
 CREATE INDEX IF NOT EXISTS work_observation_sources ON work_observations(work_id,source_id,revision);
 CREATE TABLE IF NOT EXISTS work_summaries(work_id TEXT NOT NULL,revision INTEGER NOT NULL,through_sequence INTEGER NOT NULL,created_at TEXT NOT NULL,title TEXT NOT NULL,summary TEXT NOT NULL,outcome TEXT NOT NULL,model TEXT,sources_json TEXT NOT NULL,execution_json TEXT,exclusions_json TEXT NOT NULL DEFAULT '[]',PRIMARY KEY(work_id,revision));
-CREATE TABLE IF NOT EXISTS work_summary_state(work_id TEXT PRIMARY KEY,state TEXT NOT NULL,code TEXT,updated_at TEXT NOT NULL);`
+CREATE TABLE IF NOT EXISTS work_summary_state(work_id TEXT PRIMARY KEY,state TEXT NOT NULL,code TEXT,updated_at TEXT NOT NULL);
+`
 
 func (s *Store) historyWrite(ctx context.Context, requested string, scope *ChoiceScope, run func(*sql.DB, string) error) error {
 	return s.With(ctx, true, func(dir string) error {
@@ -659,6 +660,10 @@ func (s *Store) deleteWork(ctx context.Context, q WorkQuery, scope *ChoiceScope)
 		if e = deleteHostIngressWithin(ctx, db, id, text(work["id"]), text(work["host"]), text(work["session_id"])); e != nil {
 			return e
 		}
+		if e = deleteWorkLearningWithin(ctx, db, id, text(work["id"])); e != nil {
+			return e
+		}
+
 		for _, table := range []string{"work_observations", "work_summaries", "work_summary_state"} {
 			if _, e = db.ExecContext(ctx, "DELETE FROM "+table+" WHERE work_id=?", work["id"]); e != nil {
 				return e

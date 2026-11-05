@@ -23,7 +23,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive
   const diagnostics=hostDiagnostics(api);
   diagnostics.emit({event:'host_recording',stage:'recording',outcome:'started',host:'opencode'});
   let accepting = true, closing, chain = Promise.resolve(), active = null, errorCode = null, selectedModel, actualModel;
-  let environmentKey = '', lastOwner = '';
+  let environmentKey = '', lastOwner = '', synchronizedSince = 0;
   let selectedModelKey = '', actualModelKey = '';
   let archiveSelectionKey = '', archiveBackfillState = null;
   const archiveJobs = new Map(), archiveControllers = new Set();
@@ -76,7 +76,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive
       const since=lastOwner&&lastOwner!==owner.id?Date.now():Math.max(activatedAt,Date.parse(owner.createdAt)||0);
       const capture = await history.beginCapture({galaxyId: owner.id, host: 'opencode', sessionId,observedAt:new Date(since).toISOString()});
       active = {...capture, since: Date.parse(capture.startedAt)};
-      seen.clear(); environmentKey = '';
+      seen.clear(); environmentKey = ''; synchronizedSince = active.since;
       selectedModel = undefined; actualModel = undefined; selectedModelKey = ''; actualModelKey = '';
       lastOwner = owner.id;
     }
@@ -215,7 +215,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive
       }
     }
   }
-  async function reconcile() {
+  async function reconcile({synchronize = false} = {}) {
     const sessionId=currentSession();
     if(!(await ensureSession(sessionId)))return;
     const settings=await synchronizeArchiveSelection().catch(error=>{
@@ -231,7 +231,9 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive
     const hostSession=api.state?.session?.get?.(sessionId);
     const session=hostSession?.id===sessionId?{id:hostSession.id,title:short(hostSession.title,180),
       workspaceId:typeof (hostSession.workspaceID??hostSession.directory)==='string'?(hostSession.workspaceID??hostSession.directory):undefined}:null;
-    const entries=(api.state?.session?.messages?.(sessionId)||[]).map(source=>{
+    const sources=synchronize&&api.v2?.synchronizedMessages ? await api.v2.synchronizedMessages(sessionId,synchronizedSince || active.since) : (api.state?.session?.messages?.(sessionId)||[]);
+    if(sessionId!==currentSession()||active?.sessionId!==sessionId)return;
+    const entries=sources.map(source=>{
       const info={id:source.id,sessionID:source.sessionID,role:source.role,
         time:{created:source.time?.created,completed:source.time?.completed},
         providerID:source.providerID,modelID:source.modelID,
@@ -256,6 +258,9 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive
     await saveEnvironment();
     if(snapshot.session?.title)await save({sourceId:'session-title',kind:'session',title:snapshot.session.title,source:{kind:'host-event'},details:{revisionBasis:'local-observation',sourceVersion:'unknown',event:'session-title',title:snapshot.session.title}});
     for(const item of snapshot.entries)await saveMessage(item,snapshot.session?.workspaceId);
+    const lastUser=[...sources].reverse().find(item=>item.role==='user');
+    if(synchronize&&Number.isFinite(lastUser?.time?.created))synchronizedSince=lastUser.time.created;
+    return {sessionId,galaxyId:active.galaxyId,lastUserMessageId:lastUser?.id};
   }
   async function receive(event) {
     const sessionId=event.sessionId;
@@ -265,11 +270,15 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive
     if(event.type==='session.updated'||event.type==='message.updated'||event.type==='message.part.updated'){await reconcile();return;}
     if (event.type === 'session.next.model.switched') {selectedModel = event.model;selectedModelKey=`${String(Number.isFinite(event.timestamp)?event.timestamp:Date.now()).padStart(16,'0')}:${event.id||'model-selection'}`; environmentKey = ''; await ensureSession(sessionId);return;}
     if (event.type === 'session.status' || event.type === 'session.idle') {
-      await reconcile();
+      const completed = await reconcile({synchronize:event.type === 'session.idle' || event.status === 'idle'});
       await save({sourceId: event.id ? `event:${event.id}` : 'session-status', kind: 'session', source: {kind: 'host-event'},
         details: {status: event.type === 'session.idle' ? 'idle' : short(event.status, 80), workOutcome: 'unknown'}});
       if (event.type === 'session.idle' || event.status === 'idle') {
         notifyArchiveReady(active.galaxyId,sessionId);
+        if(completed?.lastUserMessageId && api.v2?.reviewReady) {
+          diagnostics.emit({event:'host_summary',stage:'summary',outcome:'started',host:'opencode',error:Error('local_work_review_notify_started')});
+          try {const result=await api.v2.reviewReady(completed);diagnostics.emit({event:'host_summary',stage:'summary',outcome:result?.accepted?'succeeded':'deferred',host:'opencode',error:Error(result?.accepted?'local_work_review_notify_accepted':'local_work_review_pending')});} catch(error) {diagnostics.emit({event:'host_summary',stage:'summary',outcome:'failed',host:'opencode',error:Object.assign(Error('local_work_review_notify_failed'),{cause:error})});}
+        } else diagnostics.emit({event:'host_summary',stage:'summary',outcome:'deferred',host:'opencode',error:Error('local_work_review_no_user')});
       }
     } else if (event.type === 'message.removed' || event.type === 'message.part.removed' || event.type === 'session.error') {
       await save({sourceId: event.id ? `event:${event.id}` : `${event.type}:${event.messageId || event.partId || ''}`, kind: 'gap',

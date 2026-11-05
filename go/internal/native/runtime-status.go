@@ -78,7 +78,7 @@ func (r *Runtime) Status(ctx context.Context, options RuntimeStatusOptions) (map
 			selectedOwner = current.Active.SubjectID
 		}
 		enabled := current.Permission != nil && current.Permission.Enabled
-		out = map[string]any{"version": 2, "endpoint": r.config.Endpoint, "website": r.config.Website, "identity": owner, "subjectType": subjectType, "clientKind": clientKind, "connected": snapshot != nil, "connection": snapshot, "connectionChoice": map[string]any{"revision": current.Revision, "enabled": enabled, "subjectId": selectedOwner, "deviceId": device}, "localInitialized": initialized, "modelService": "user-host", "backgroundModel": "not-started", "embeddedUi": "unverified", "activeEntries": []string{"match", "publish", "participate"}, "helpPaths": []string{"continue-current-ai", "capsule-or-history", "open-assistance", "bounty-or-expert"}}
+		out = map[string]any{"version": 2, "endpoint": r.config.Endpoint, "website": r.config.Website, "identity": owner, "subjectType": subjectType, "clientKind": clientKind, "connected": snapshot != nil, "connection": snapshot, "connectionChoice": map[string]any{"revision": current.Revision, "enabled": enabled, "subjectId": selectedOwner, "deviceId": device}, "localInitialized": initialized, "modelService": "user-host", "embeddedUi": "unverified", "activeEntries": []string{"match", "publish", "participate"}, "helpPaths": []string{"continue-current-ai", "capsule-or-history", "open-assistance", "bounty-or-expert"}}
 		if connectionError != "" {
 			out["connectionError"] = connectionError
 		}

@@ -161,7 +161,16 @@ func workView(ctx context.Context, db *sql.DB, r map[string]any) (any, error) {
 	if summary != nil {
 		source = "user-model"
 	}
-	return map[string]any{"workId": r["id"], "galaxyId": r["owner_id"], "host": r["host"], "sessionId": r["session_id"], "title": title, "summary": text(summary["summary"]), "outcome": outcome, "summaryRevision": integer(summary["revision"]), "lastSequence": r["last_sequence"], "startedAt": r["started_at"], "updatedAt": r["updated_at"], "exclusions": array(summary["exclusions_json"]), "processing": processing, "pending": integer(r["last_sequence"]) > integer(summary["through_sequence"]), "environmentVersion": env, "sourceKind": source, "localOnly": true}, nil
+	reviewed, e := reviewedSequenceWithin(ctx, db, r["id"])
+	if e != nil {
+		return nil, e
+	}
+	summaryThrough := integer(summary["through_sequence"])
+	pending := integer(r["last_sequence"]) > max(summaryThrough, reviewed)
+	if !pending && processing["state"] == "pending" {
+		processing = map[string]any{"state": "idle", "code": nil}
+	}
+	return map[string]any{"summaryThroughSequence": summaryThrough, "reviewedThroughSequence": reviewed, "workId": r["id"], "galaxyId": r["owner_id"], "host": r["host"], "sessionId": r["session_id"], "title": title, "summary": text(summary["summary"]), "outcome": outcome, "summaryRevision": integer(summary["revision"]), "lastSequence": r["last_sequence"], "startedAt": r["started_at"], "updatedAt": r["updated_at"], "exclusions": array(summary["exclusions_json"]), "processing": processing, "pending": pending, "environmentVersion": env, "sourceKind": source, "localOnly": true}, nil
 }
 func (s *Store) WorkGet(ctx context.Context, q WorkQuery) (any, error) {
 	if e := workLimit(&q, "get"); e != nil {
@@ -209,7 +218,11 @@ func (s *Store) WorkGet(ctx context.Context, q WorkQuery) (any, error) {
 			}
 			last := integer(rows[len(rows)-1]["sequence"])
 			through := integer(previous["through_sequence"])
-			if q.AfterSequence <= through && last > through {
+			reviewed, e := reviewedSequenceWithin(ctx, db, work["id"])
+			if e != nil {
+				return e
+			}
+			if q.AfterSequence <= max(through, reviewed) && last > max(through, reviewed) {
 				summaryInput = workSummaryInput(owner, work["id"], integer(previous["revision"]), last)
 			}
 		}

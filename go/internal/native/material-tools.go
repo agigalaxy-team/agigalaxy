@@ -3,6 +3,7 @@ package native
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
@@ -54,6 +55,18 @@ func (s *Store) workDeletePreview(ctx context.Context, q WorkQuery) (any, error)
 		if e != nil {
 			return e
 		}
+		counts["experienceCount"] = int64(0)
+		table, e := oneMap(ctx, db, "SELECT name FROM sqlite_schema WHERE name='work_experience_sources'")
+		if e != nil {
+			return e
+		}
+		if table != nil {
+			count, e := oneMap(ctx, db, "SELECT count(DISTINCT id) AS n FROM work_experience_sources WHERE owner_id=? AND work_id=?", owner, work["id"])
+			if e != nil {
+				return e
+			}
+			counts["experienceCount"] = count["n"]
+		}
 		counts["galaxyId"] = owner
 		counts["workId"] = work["id"]
 		counts["host"] = work["host"]
@@ -66,6 +79,7 @@ func (s *Store) workDeletePreview(ctx context.Context, q WorkQuery) (any, error)
 }
 
 func registerLocalMaterialTools(server *mcp.Server, rt *toolRuntime) {
+	registerWorkExperienceTools(server, rt)
 	noteProperties := map[string]any{"galaxyId": localMaterialIdentitySchema(), "host": stringSchema(), "sessionId": stringSchema(), "sourceId": stringSchema(), "title": materialString(0, 180), "text": materialString(1, 4000), "sourceKind": map[string]any{"type": "string", "enum": []string{"user-statement", "model-report"}, "default": "model-report"}}
 	addNativeTool(server, &mcp.Tool{Name: "galaxy_local_work_note", Description: "Add an explicitly labelled user statement or model report to a local work session. It cannot impersonate a host observation or turn a success claim into verified success.", InputSchema: objectSchema(noteProperties, "host", "sessionId", "text"), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}}, "local_work_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var x WorkNoteInput
@@ -149,7 +163,7 @@ func registerLocalMaterialTools(server *mcp.Server, rt *toolRuntime) {
 		if selected == nil {
 			selected = map[string]any{"galaxyId": owner, "workId": x.WorkID}
 		}
-		message := userChoiceMessage("galaxy_local_work_delete", selected, "删除下列本机工作记录及摘要。宿主自己的会话和云端副本保留。")
+		message := userChoiceMessage("galaxy_local_work_delete", selected, fmt.Sprintf("删除下列本机工作记录、摘要及关联的 %d 条私有经验中依赖此工作的修订；受影响的当前经验将停止用于检索。宿主自己的会话和云端副本保留。", integer(uploadObject(selected)["experienceCount"])))
 		return rt.review(ctx, req, x, message, func(ctx context.Context, scope *ChoiceScope) (any, error) { return rt.store.deleteWork(ctx, x, scope) })
 	})
 	addNativeTool(server, &mcp.Tool{Name: "galaxy_local_archive_delete", Description: "Delete the selected private local archive and stop capturing that session. Clears its queued local snapshot bodies; does not delete host originals, ordinary work facts or an independent cloud replica.", InputSchema: objectSchema(map[string]any{"galaxyId": localMaterialIdentitySchema(), "archiveSessionId": materialUUID()}, "archiveSessionId"), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}}, "local_archive_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {

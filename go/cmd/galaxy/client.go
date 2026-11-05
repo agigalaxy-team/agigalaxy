@@ -123,6 +123,10 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	flags.BoolVar(&input.LocalOnly, "local-only", false, "")
 	organization := flags.Bool("organization", false, "")
 	dryRun := flags.Bool("dry-run", false, "")
+	var ifNeeded bool
+	if action == "repair" {
+		flags.BoolVar(&ifNeeded, "if-needed", false, "")
+	}
 	var restartLegacy bool
 	if action == "update" {
 		flags.BoolVar(&restartLegacy, "restart-legacy", false, "")
@@ -184,7 +188,7 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 		}
 		return printValue(result)
 	}
-	if !*dryRun {
+	if !*dryRun && !ifNeeded {
 		unlock, err := nativebridge.WaitUpdate(ctx)
 		if err != nil {
 			return err
@@ -266,7 +270,7 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	if *organization {
 		input.SubjectType = "organization"
 	}
-	if action != "update" && !*dryRun {
+	if action != "update" && !*dryRun && !ifNeeded {
 		input.PackageDirectory, err = preferSelectedRelease(ctx, input.PackageDirectory)
 		if err != nil {
 			return err
@@ -274,6 +278,32 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	}
 	if action == "update" {
 		return managedUpdate(ctx, input, supplied["package-dir"], *dryRun, restartLegacy, officialUpdateSource())
+	}
+	if ifNeeded {
+		// Automatic maintenance must never recreate an identity the user removed.
+		input.KeepIdentity = true
+		if *dryRun {
+			return fault.New("native_arguments_invalid", 400)
+		}
+		ready, err := native.ManagedOpenCodeReady(ctx, input)
+		if err != nil {
+			return err
+		}
+		if ready {
+			return printValue(map[string]any{"action": "repair", "host": input.Host, "alreadyReady": true})
+		}
+		unlock, err := nativebridge.WaitUpdate(ctx)
+		if err != nil {
+			return err
+		}
+		defer unlock()
+		ready, err = native.ManagedOpenCodeReady(ctx, input)
+		if err != nil {
+			return err
+		}
+		if ready {
+			return printValue(map[string]any{"action": "repair", "host": input.Host, "alreadyReady": true})
+		}
 	}
 	plan, err := native.PreviewManagedNativeInstallation(ctx, input)
 	if err != nil {

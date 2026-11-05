@@ -29,7 +29,8 @@ const codes=new Set(['EACCES','EADDRINUSE','EAGAIN','EBUSY','ECANCELED','ECONNAB
   'host_executable_required','host_timeout_invalid','host_disconnected','host_frame_too_large','host_process_failed',
   'host_protocol_invalid','host_rpc_failed','host_rpc_unknown','host_closed','host_process_shutdown_unconfirmed',
   'host_model_execution_unavailable','host_model_interrupted','host_model_summary_failed',
-  'local_work_model_failed','local_work_model_session_invalid','local_work_model_interrupted','local_work_model_output_invalid',
+  'local_work_model_not_found','local_work_model_unsupported','local_work_model_invalid_request','local_work_model_unavailable','local_work_model_provider','local_work_model_authentication','local_work_model_rate_limit','local_work_model_content_filter','local_work_model_overloaded','local_work_review_preparing','local_work_review_generating','local_work_review_generated','local_work_review_parsed','local_work_review_applying','local_work_review_applied','local_work_review_busy','local_work_review_empty','local_work_review_pending','local_work_review_prompt','local_work_review_idle','local_work_review_ready','local_work_review_no_prompt','local_work_review_prompt_mismatch','local_work_review_wait_idle','local_work_review_wait_model','local_work_review_scheduled','local_work_review_notify_started','local_work_review_notify_accepted','local_work_review_no_user','local_work_review_notify_failed','local_work_review_conflict','local_experience_revision_conflict','local_experience_unavailable',
+  'invalid_review','invalid_review_summary','invalid_review_experiences','invalid_review_experience','local_work_model_failed','local_work_model_session_invalid','local_work_model_interrupted','local_work_model_output_invalid',
   'local_work_input_invalid','local_work_observation_too_large','local_work_source_revision_conflict','local_work_ingress_cancelled',
   'local_work_summary_revision_conflict','local_work_recording_unavailable','local_archive_selection_unavailable',
   'host_messages_unavailable','local_archive_capture_unavailable','selected_archive_sync_unavailable',
@@ -59,9 +60,13 @@ function frames(error){
   return result;
 }
 export function safeNativeError(error,depth=0,seen=new Set()){
-  const name=valueOf(error,'name'),code=valueOf(error,'code'),message=valueOf(error,'message');
-  const selected=codes.has(code)?code:codes.has(message)?message:'native_operation_failed';
+  const name=valueOf(error,'name'),code=valueOf(error,'code'),message=valueOf(error,'message'),tag=valueOf(error,'_tag');
+  const typed={'Generate.ModelNotFoundError':'local_work_model_not_found','Generate.UnsupportedModelError':'local_work_model_unsupported','Generate.InvalidRequestError':'local_work_model_invalid_request','Generate.UnavailableError':'local_work_model_unavailable'};
+  const reasons={authentication:'local_work_model_authentication',rate_limit:'local_work_model_rate_limit',content_filter:'local_work_model_content_filter',invalid_request:'local_work_model_invalid_request',overloaded:'local_work_model_overloaded',provider:'local_work_model_provider'};
+  const classified=tag==='Generate.ProviderRequestError'?(reasons[valueOf(error,'reason')]??'local_work_model_provider'):typed[tag];
+  const selected=classified??(codes.has(code)?code:codes.has(message)?message:'native_operation_failed');
   const result={errorName:names.has(name)?name:'Error',errorCode:selected,stackFrames:frames(error)};
+  const status=valueOf(error,'status');if(tag==='Generate.ProviderRequestError'&&Number.isInteger(status)&&status>=100&&status<=599)result.status=status;
   if(error&&typeof error==='object'&&depth<2&&!seen.has(error)){
     seen.add(error);const cause=valueOf(error,'cause');
     if(cause&&typeof cause==='object'&&!seen.has(cause))result.cause=safeNativeError(cause,depth+1,seen);
@@ -132,6 +137,7 @@ export function nativeDiagnostics(component='native'){
 // drawing JSON over the user's current work. Older hosts without this endpoint
 // remain usable; diagnostic availability is reported separately.
 export function hostDiagnostics(api){
+  if(api.v2?.diagnostics)return api.v2.diagnostics;
   if(hostReporters.has(api))return hostReporters.get(api);
   const endpoint=api.client?.app;
   let failures=0;
@@ -145,13 +151,13 @@ export function hostDiagnostics(api){
     status:()=>({mode:'host',ready:typeof endpoint?.log==='function',writeFailures:failures}),close:()=>Promise.resolve()});
   hostReporters.set(api,reporter);return reporter;
 }
-export async function createNativeDiagnostics({component='native',env=process.env}={}){
+export async function createNativeDiagnostics({component='native',env=process.env,quietFallback=false}={}){
   try{
     const configuration=runtimeLogConfiguration({...env,GALAXY_RUNTIME_LOG_ROTATE_BYTES:env.GALAXY_RUNTIME_LOG_ROTATE_BYTES??'1048576',GALAXY_RUNTIME_LOG_MAX_FILES:env.GALAXY_RUNTIME_LOG_MAX_FILES??'4'});
     return createNativeDiagnosticReporter(await createRuntimeLogger({component,...configuration,release:env.GALAXY_NATIVE_RELEASE,
       eventFormatter:nativeDiagnosticFields,defaultDestination:process.stderr}));
   }catch(error){
-    const fallback=nativeDiagnostics(component);
+    const fallback=quietFallback?hostDiagnostics({}):nativeDiagnostics('native');
     fallback.emit({event:'native_runtime',stage:'configuration',outcome:'failed',error:Object.assign(Error('native_log_configuration_unavailable'),{cause:error})});
     return Object.freeze({...fallback,close:()=>Promise.resolve()});
   }
