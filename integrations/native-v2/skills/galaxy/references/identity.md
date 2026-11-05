@@ -6,8 +6,8 @@
 
 `galaxy_identity_recovery` 的 `set`、`recover`、`resume` 分别用于设置恢复、恢复身份设备控制及接续待完成恢复；`resume` 可不提供编号，在本机页面由本人选择待续操作。恢复码只由本人在临时本机页面查看或输入，不放入工具参数或聊天。恢复设备控制不会自动恢复本地资料或连接服务。
 
-确认需要新建本机银河 ID 时，用 `galaxy_native_initialize_preview` 和 `galaxy_native_initialize` 按同一组实际选择办理；不需要的字段使用工具实际默认。ID 默认个人，可选组织；独立 Worker 身份使用 `galaxy_local_worker_identity_create`。选择账户已关联的 ID 不等于新建本机 ID。初始化、连接、关联账户和材料上传分别处理。
+确认需要新建本机银河 ID 时，用 `galaxy_native_initialize_preview` 和 `galaxy_native_initialize` 按同一组实际选择办理；不需要的字段使用工具实际默认。ID 默认个人，可选组织；独立 Worker 身份使用 `galaxy_local_worker_identity_create`。选择账户已关联的 ID 不等于新建本机 ID。本机初始化与材料上传不作为账户接入中的重复步骤。
 
-`galaxy_native_connect` 沿用当前本机 ID。连接官方服务时，按工具返回的页面让本人登录并确认所显示的账户与本机 ID；客户端接着登记设备并关联账户。连接其他服务按该服务的本机确认流程办理。未打开浏览器不等于用户拒绝；缺接入时参考[接入与维护](setup.md)。
+`galaxy_native_connect` 沿用当前本机 ID。连接官方服务时，按工具返回的页面让本人登录并确认所显示的账户与本机 ID；客户端自动接续设备登记与账户关联，不再要求本人批准内部权限清单。完成以 `access.state: ready` 及实际 `officialAccount.state: linked` 为依据；单独的 `connected: true` 只证明设备连接。账户状态未知时如实读取原进度，不宣称成功。旧核心缺少账户流程或状态时，按[接入与维护](setup.md)更新并采用新版，保留原 ID 和资料。连接其他服务按该服务的本机确认流程办理。未打开浏览器不等于用户拒绝；缺接入时参考[接入与维护](setup.md)。
 
 单独管理已有账户关联、Personal MCP OAuth 或网页设备接续时，按需读[账户、OAuth 与网页设备管理](identity-management.md)；网页链接和原聊天返回见[网页与聊天接续](continuation.md)。

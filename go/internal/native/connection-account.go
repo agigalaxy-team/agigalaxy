@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +13,13 @@ import (
 )
 
 const officialNativeAuthority = "https://official.agigalaxy.org"
+
+// Match the same HTTPS origin without changing the configured bytes used by
+// signatures, account validation, storage keys or requests.
+func isOfficialNativeAuthority(endpoint string) bool {
+	u, err := url.Parse(endpoint)
+	return err == nil && strings.EqualFold(u.Scheme, "https") && strings.EqualFold(u.Hostname(), "official.agigalaxy.org") && (u.Port() == "" || u.Port() == "443") && u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == "" && !u.ForceQuery
+}
 
 type nativeAccountConnect struct {
 	runtime  *Runtime
@@ -27,11 +35,12 @@ type nativeAccountLogin struct {
 
 // accountStatus reflects the verified server association for this connected identity.
 // A failed lookup cannot establish that an association is absent.
-func (c *nativeAccountConnect) accountStatus(ctx context.Context) map[string]any {
+func (r *Runtime) officialAccountStatus(ctx context.Context) map[string]any {
+	accounts := NewNativeIdentityAccounts(r)
 	after := ""
 	seen := map[string]bool{}
 	for {
-		value, err := c.accounts.Read(ctx, NativeIdentityAccountRead{Action: "query", After: after, Limit: 100})
+		value, err := accounts.Read(ctx, NativeIdentityAccountRead{Action: "query", After: after, Limit: 100})
 		if err != nil {
 			return map[string]any{"state": "unavailable"}
 		}
@@ -78,7 +87,7 @@ func (c *nativeAccountConnect) login(ctx context.Context, scope ChoiceScope) (*n
 	issuer, issuerErr := url.Parse(text(out["issuer"]))
 	expires := time.Unix(integer(out["expiresAt"]), 0)
 	secure := parseErr == nil && issuerErr == nil && target.Scheme == issuer.Scheme &&
-		(target.Scheme == "https" || scope.Endpoint != officialNativeAuthority && target.Scheme == "http" && target.Hostname() == "127.0.0.1")
+		(target.Scheme == "https" || !isOfficialNativeAuthority(scope.Endpoint) && target.Scheme == "http" && target.Hostname() == "127.0.0.1")
 	if !secure || target.Host == "" || target.Host != issuer.Host || target.User != nil || target.Fragment != "" ||
 		!nativeAccountProvider(out, scope.Endpoint, true) || !controlUUID(out["loginId"]) || out["subjectId"] != scope.Owner || out["bindingId"] != "" || out["endpoint"] != scope.Endpoint || out["galaxyAuthorization"] != false ||
 		!expires.After(now) || expires.After(now.Add(time.Duration(300+connectionClockSkewSeconds)*time.Second)) {

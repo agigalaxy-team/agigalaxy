@@ -165,7 +165,7 @@ func (r *Runtime) commandSurface(ctx context.Context, name string, input Command
 		return map[string]any{"command": name, "route": "galaxy-privacy-controls", "state": "ready", "privacy": privacy, "nextTools": []string{"galaxy_local_upload_privacy_set", "galaxy_local_archive_settings", "galaxy_local_archive_list"}, "localOnly": true}, nil
 	}
 	local := uploadObject(snapshot["identity"])
-	if scope.Owner != "" && scope.Owner != text(local["id"]) {
+	if name != "connect" && scope.Owner != "" && scope.Owner != text(local["id"]) {
 		status, e := r.Status(ctx, RuntimeStatusOptions{})
 		if e != nil {
 			return nil, e
@@ -181,10 +181,8 @@ func (r *Runtime) commandSurface(ctx context.Context, name string, input Command
 		if e != nil {
 			return nil, e
 		}
-		state := "not-connected"
-		if status["connected"] == true {
-			state = "connected"
-		}
+		state := text(uploadObject(status["access"])["state"])
+		if state == "" { state = "unknown" }
 		return map[string]any{"command": name, "route": route, "state": state, "title": title, "connectionContract": status, "nextTools": []string{"galaxy_native_connect", "galaxy_native_status"}, "localOnly": true}, nil
 	case "help":
 		return map[string]any{"command": name, "state": "ready", "route": route, "title": title, "message": "Choose a Galaxy command. Commands do not create a Galaxy ID unless the final initialization confirmation is completed.", "commands": templates["help"], "localOnly": true}, nil

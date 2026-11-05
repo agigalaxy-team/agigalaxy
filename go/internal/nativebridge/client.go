@@ -82,6 +82,30 @@ func Status(ctx context.Context) (Info, error) {
 
 // Ensure respects a user pause unless ExplicitStart is set by a deliberate start action.
 func Ensure(ctx context.Context, options Options) (Info, error) {
+	unlock, err := WaitUpdate(ctx)
+	if err != nil {
+		return Info{}, err
+	}
+	defer unlock()
+	return EnsureLocked(ctx, options)
+}
+
+// EnsureLocked requires the update lock and adopts the selected release before use.
+func EnsureLocked(ctx context.Context, options Options) (Info, error) {
+	info, err := ensureRaw(ctx, options)
+	if err != nil {
+		return info, err
+	}
+	if info.SwitchState == "unavailable" {
+		return info, fault.New("native_release_pointer_unavailable", 409)
+	}
+	if info.SwitchState == "restart-required" {
+		return HandoverLocked(ctx)
+	}
+	return info, nil
+}
+
+func ensureRaw(ctx context.Context, options Options) (Info, error) {
 	dir, _, pause, err := paths()
 	if err != nil {
 		return Info{}, err
@@ -166,6 +190,14 @@ func Connect(ctx context.Context, profile Profile, channel Channel) (io.ReadWrit
 	if channel != MCP && channel != Host {
 		return nil, errors.New("invalid native service channel")
 	}
+	unlock, err := WaitUpdate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	if _, err = EnsureLocked(ctx, Options{}); err != nil {
+		return nil, err
+	}
 	c, r, _, err := exchange(ctx, request{Version: ProtocolVersion, Action: "connect", Profile: profile, Channel: channel})
 	if err != nil {
 		return nil, err
@@ -176,7 +208,16 @@ func Connect(ctx context.Context, profile Profile, channel Channel) (io.ReadWrit
 // Relay keeps both directions byte-for-byte, including server-initiated MCP calls.
 func Relay(ctx context.Context, p Profile, ch Channel, input io.Reader, output io.Writer) error {
 	request := request{Version: ProtocolVersion, Action: "connect", Profile: p, Channel: ch, RelayControlVersion: 1}
+	unlock, err := WaitUpdate(ctx)
+	if err != nil {
+		return err
+	}
+	if _, err = EnsureLocked(ctx, Options{}); err != nil {
+		unlock()
+		return err
+	}
 	raw, reader, response, err := exchange(ctx, request)
+	unlock()
 	if fault.Code(err) == "native_service_draining" {
 		// No host bytes were consumed or sent. Wait for the handover to finish
 		// or resume, then open the first stream without replaying an operation.
@@ -265,6 +306,16 @@ func Stop(ctx context.Context) error {
 // Handover explicitly restarts the core, using a prepared release when set.
 // Existing sessions close and retain their original operation IDs.
 func Handover(ctx context.Context) (Info, error) {
+	unlock, err := WaitUpdate(ctx)
+	if err != nil {
+		return Info{}, err
+	}
+	defer unlock()
+	return HandoverLocked(ctx)
+}
+
+// HandoverLocked requires the update lock; callers must not force-stop a busy service.
+func HandoverLocked(ctx context.Context) (Info, error) {
 	desired, desiredErr := GetDesiredRelease()
 	if desiredErr != nil && !errors.Is(desiredErr, os.ErrNotExist) {
 		return Info{}, desiredErr
@@ -285,7 +336,7 @@ func Handover(ctx context.Context) (Info, error) {
 	}
 	current, e := Status(ctx)
 	if errors.Is(e, ErrPaused) || errors.Is(e, ErrUnavailable) {
-		return ready(Ensure(ctx, Options{ExplicitStart: true}))
+		return ready(ensureRaw(ctx, Options{ExplicitStart: true}))
 	}
 	if e != nil {
 		return Info{}, e
@@ -301,11 +352,17 @@ func Handover(ctx context.Context) (Info, error) {
 			return Info{}, fault.New("native_restart_executable_unavailable", 409)
 		}
 	}
-	c, _, old, e := exchange(ctx, request{Version: ProtocolVersion, Action: "handover-drain"})
+	drainCtx, cancelDrain := context.WithTimeout(ctx, 5*time.Second)
+	c, _, old, e := exchange(drainCtx, request{Version: ProtocolVersion, Action: "handover-drain"})
+	timedOut := errors.Is(drainCtx.Err(), context.DeadlineExceeded)
+	cancelDrain()
+	if timedOut && e != nil {
+		return current, fault.New("native_handover_waiting_requests", 409)
+	}
 	if e == nil {
 		_ = c.Close()
 	} else if isUnavailable(e) {
-		return ready(Ensure(ctx, Options{Executable: fallback}))
+		return ready(ensureRaw(ctx, Options{Executable: fallback}))
 	} else {
 		if fault.Code(e) == "native_service_action_invalid" {
 			return current, fault.New("native_handover_legacy_unsupported", 409)
@@ -338,5 +395,5 @@ func Handover(ctx context.Context) (Info, error) {
 		case <-ticker.C:
 		}
 	}
-	return ready(Ensure(ctx, Options{Executable: fallback}))
+	return ready(ensureRaw(ctx, Options{Executable: fallback}))
 }

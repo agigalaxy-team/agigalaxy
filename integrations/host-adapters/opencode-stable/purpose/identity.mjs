@@ -4,13 +4,22 @@ import { nativeChoiceUrl } from '../../../native-v2/compact-app/browser-choice.m
 import { nativeConfigurationMessage } from '../../../native-v2/presentation/native-configuration-message.mjs';
 import { plain, unwrap, fingerprint } from './presentation.mjs';
 
+const isOfficialOrigin = endpoint => {
+  try {
+    const url = new URL(endpoint);
+    return url.origin === 'https://official.agigalaxy.org' && !url.username && !url.password && url.pathname === '/' && !url.search && !url.hash;
+  } catch { return false; }
+};
+const isOfficial = status => isOfficialOrigin(status.endpoint) || status.access?.kind === 'official-account' || !!status.officialAccount;
+const accessReady = status => status.connected === true && (!isOfficial(status) || status.officialAccount?.state === 'linked');
+
 export function createPurposeIdentity(session) {
   function identity(onReady = null, back = session.onBack) {
     if (!session.nativeTools) return session.onBack();
     void session.run(
       () => session.native('galaxy_native_status'),
       (status) => {
-        const ready = status.connected === true && (!status.officialAccount || status.officialAccount.state === 'linked');
+        const ready = accessReady(status);
         if (onReady && ready) return onReady();
         const body = [nativeConnectionMessage(status, session.language)];
         session.menu(
@@ -121,8 +130,7 @@ export function createPurposeIdentity(session) {
       initial = null,
       initialSubject = null,
       connectStarted = resume,
-      officialConnect = false,
-      connectStartedAt = resume ? Date.now() : 0;
+      officialConnect = false;
     const title =
       name === 'galaxy_native_initialize'
         ? session.label('在本机准备身份', 'Prepare this device')
@@ -140,7 +148,7 @@ export function createPurposeIdentity(session) {
         const beforeKey = fingerprint(before);
         if (initial === null) {
           initial = beforeKey;
-          officialConnect = !!before.officialAccount;
+          officialConnect = isOfficial(before);
           initialSubject = JSON.stringify([before.identity ?? null, before.endpoint ?? null]);
           if (session.owner !== null && session.owner !== beforeKey)
             throw Error('current_identity_changed');
@@ -148,6 +156,8 @@ export function createPurposeIdentity(session) {
           ? JSON.stringify([before.identity ?? null, before.endpoint ?? null]) !== initialSubject
           : beforeKey !== initial)
           throw Error('current_identity_changed');
+        if (name === 'galaxy_native_connect' && isOfficial(before) && before.connected === true && !before.officialAccount && !before.connectionOperation)
+          throw Object.assign(new Error('native_account_status_upgrade_required'), {code: 'native_account_status_upgrade_required'});
         // Only this explicitly selected identity transition may change the menu's
         // owner/binding. The Native server checks its original real choice before
         // executing; generic reads and writes retain the ordinary owner fence.
@@ -167,10 +177,10 @@ export function createPurposeIdentity(session) {
           if (operation?.identity && operation.identity !== before.identity || operation?.endpoint && operation.endpoint !== before.endpoint) throw Error('current_identity_changed');
           if (operation?.state === 'declined') value = {state: 'declined'};
           else if (['failed', 'unconfirmed'].includes(operation?.state)) throw Error(operation.error ?? 'native_connection_unconfirmed');
-          else if ((operation?.state === 'finished' || !operation) && before.connected === true && (!before.officialAccount || before.officialAccount.state === 'linked')) {
+          else if ((operation?.state === 'finished' || !operation) && accessReady(before)) {
             session.owner = fingerprint(before);
             return done();
-          } else if (operation?.state === 'finished' || (!operation && Date.now() - connectStartedAt > 310000)) {
+          } else if (operation?.state === 'finished' || !operation) {
             throw Error('native_identity_transition_unconfirmed');
           } else {
             session.messageTimer = setTimeout(() => void tick(), 1500);
@@ -178,7 +188,7 @@ export function createPurposeIdentity(session) {
             return;
           }
         } else {
-          if (name === 'galaxy_native_connect' && officialConnect) { connectStarted = true; connectStartedAt = Date.now(); }
+          if (name === 'galaxy_native_connect' && officialConnect) { connectStarted = true; }
           value = unwrap(await session.nativeTools.call(name, input));
         }
         if (!session.alive(v)) return;
@@ -222,7 +232,7 @@ export function createPurposeIdentity(session) {
         if (
           (name === 'galaxy_native_initialize' &&
             (!after.identity || value.identity !== after.identity)) ||
-          (name === 'galaxy_native_connect' && (after.connected !== true || after.officialAccount && after.officialAccount.state !== 'linked')) ||
+          (name === 'galaxy_native_connect' && !accessReady(after)) ||
           (name === 'galaxy_native_disconnect' && after.connected === true)
         )
           throw Error('native_identity_transition_unconfirmed');
@@ -232,7 +242,9 @@ export function createPurposeIdentity(session) {
         if (session.alive(v))
           session.message(
             title,
-            String(error.message).startsWith('native_configuration_')
+            error?.code === 'native_account_status_upgrade_required'
+              ? session.label('当前银河客户端无法核实账户是否已关联，请更新客户端后继续；已有身份和连接会保留。', 'This Galaxy client cannot verify the account association. Update the client to continue; your identity and connection are retained.')
+              : String(error.message).startsWith('native_configuration_')
               ? nativeConfigurationMessage(error, session.language)
               : session.label(
                   '暂时无法确认这次操作的结果。请查看当前状态。',

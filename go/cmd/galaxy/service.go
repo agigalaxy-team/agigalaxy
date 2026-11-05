@@ -10,9 +10,6 @@ import (
 )
 
 func relayNative(ctx context.Context, profile nativebridge.Profile, channel nativebridge.Channel) error {
-	if _, err := nativebridge.Ensure(ctx, nativebridge.Options{}); err != nil {
-		return err
-	}
 	return nativebridge.Relay(ctx, profile, channel, os.Stdin, os.Stdout)
 }
 

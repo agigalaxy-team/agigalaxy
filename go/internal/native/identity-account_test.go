@@ -211,6 +211,15 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 		for _, value := range attempt.pending {
 			login = value
 		}
+		redirectClient := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		redirected, err := redirectClient.Get(text(uploadObject(first)["url"]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		redirected.Body.Close()
+		if redirected.StatusCode != http.StatusSeeOther || redirected.Header.Get("Location") != login.loginURL {
+			t.Fatal("account login introduced another local approval")
+		}
 		callback := meta.Authorize(login.loginURL)
 		var exists bool
 		if err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bindings WHERE subject_id=$1)", subject).Scan(&exists); err != nil || exists {
@@ -218,14 +227,13 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 		}
 		script := `import {chromium} from 'playwright';
             const browser=await chromium.launch({headless:true});try {
-            const page=await browser.newPage();await page.goto(process.argv[1]);
-            await page.getByRole('link',{name:'登录银河账户'}).waitFor();
             const review=await browser.newPage();await review.goto(process.argv[2]);
             await review.getByText('fixture-account@example.invalid',{exact:true}).waitFor();
             await review.getByText(process.argv[3],{exact:true}).waitFor();
-            const before=await page.textContent('body');if(before.includes('银河账户关联已完成'))throw Error('connected without confirmation');
+            const before=await (await review.request.get(process.argv[1]+'?status=1')).json();if(before.state!=='awaiting-account')throw Error('connected without confirmation');
             await review.getByRole('button',{name:'确认关联',exact:true}).click();
-            await page.getByText('银河账户关联已完成，可以回到原聊天。',{exact:true}).waitFor({timeout:15000});
+            for(;;){const state=await (await review.request.get(process.argv[1]+'?status=1')).json();if(state.state==='finished')break;if(!['awaiting-account','processing'].includes(state.state))throw Error('association did not complete');await new Promise(r=>setTimeout(r,200));}
+            const page=await browser.newPage();await page.goto(process.argv[1]);await page.getByText('银河账户关联已完成，可以回到原聊天。',{exact:true}).waitFor();
             console.log(JSON.stringify({confirmed:true}));} finally { await browser.close(); }`
 		if initializationNode(t, script, text(uploadObject(first)["url"]), server.URL+callback, subject)["confirmed"] != true {
 			t.Fatal("browser did not finish")

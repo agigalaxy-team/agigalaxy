@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -43,6 +44,64 @@ func defaultClientRoot(home string) string {
 		}
 		return filepath.Join(base, "galaxy", "client")
 	}
+}
+
+// A repair from an older host must use the newer selected release's complete
+// payload, not copy old host resources alongside the newer shared core.
+func preferSelectedRelease(ctx context.Context, directory string) (string, error) {
+	requested, err := updatePackageVersion(directory)
+	if err != nil {
+		return "", err
+	}
+	chosen := directory
+	consider := func(version, executable string) error {
+		if version == "" {
+			return nil
+		}
+		comparison, err := compareUpdateVersions(version, requested)
+		if err != nil {
+			return err
+		}
+		if comparison <= 0 {
+			return nil
+		}
+		if !filepath.IsAbs(executable) {
+			return fault.New("native_release_pointer_unavailable", 409)
+		}
+		selectedDir := filepath.Dir(executable)
+		actual, err := updatePackageVersion(selectedDir)
+		if err != nil {
+			return err
+		}
+		info, err := os.Stat(executable)
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() || actual != version {
+			return fault.New("native_release_pointer_unavailable", 409)
+		}
+		chosen, requested = selectedDir, version
+		return nil
+	}
+	selected, err := nativebridge.GetDesiredRelease()
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	if err == nil {
+		if err = consider(selected.ReleaseID, selected.Executable); err != nil {
+			return "", err
+		}
+	}
+	running, err := nativebridge.Status(ctx)
+	if err != nil && !errors.Is(err, nativebridge.ErrUnavailable) && !errors.Is(err, nativebridge.ErrPaused) {
+		return "", err
+	}
+	if err == nil {
+		if err = consider(running.ReleaseID, running.Executable); err != nil {
+			return "", err
+		}
+	}
+	return chosen, nil
 }
 
 // Installation actions are explicit CLI requests. The same plan/apply methods
@@ -125,8 +184,8 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 		}
 		return printValue(result)
 	}
-	if action == "update" && !*dryRun {
-		unlock, err := nativebridge.LockUpdate()
+	if !*dryRun {
+		unlock, err := nativebridge.WaitUpdate(ctx)
 		if err != nil {
 			return err
 		}
@@ -207,6 +266,12 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	if *organization {
 		input.SubjectType = "organization"
 	}
+	if action != "update" && !*dryRun {
+		input.PackageDirectory, err = preferSelectedRelease(ctx, input.PackageDirectory)
+		if err != nil {
+			return err
+		}
+	}
 	if action == "update" {
 		return managedUpdate(ctx, input, supplied["package-dir"], *dryRun, restartLegacy, officialUpdateSource())
 	}
@@ -221,6 +286,7 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	return completeManagedInstallation(ctx, result, applyError)
 }
 
+// The caller holds the update lock through installation and selection.
 func completeManagedInstallation(ctx context.Context, result map[string]any, applyError error) error {
 	if applyError == nil && result != nil {
 		if release, ok := result["release"].(*native.NativeRelease); ok && result["hostConfigured"] == true {
@@ -236,15 +302,42 @@ func completeManagedInstallation(ctx context.Context, result map[string]any, app
 				result["serviceReleaseSelected"] = selected
 				result["serviceReleaseChanged"] = changed
 				result["installedService"] = desired
-				if running, statusError := nativebridge.Status(ctx); statusError == nil {
+				running, statusErr := nativebridge.Status(ctx)
+				switch {
+				case statusErr == nil:
 					result["service"] = running
+					if running.SwitchState == "restart-required" {
+						adopted, err := nativebridge.HandoverLocked(ctx)
+						if err != nil {
+							result["serviceAdoption"] = "pending"
+							result["serviceAdoptionError"] = fault.Code(err)
+							applyError = err
+						} else {
+							result["service"] = adopted
+							result["serviceAdoption"] = "current"
+						}
+					} else if running.SwitchState == "current" {
+						result["serviceAdoption"] = "current"
+					} else {
+						result["serviceAdoption"] = "pending"
+						applyError = fault.New("native_release_pointer_unavailable", 409)
+					}
+				case errors.Is(statusErr, nativebridge.ErrPaused), errors.Is(statusErr, nativebridge.ErrUnavailable):
+					result["serviceAdoption"] = "not-running"
+				default:
+					result["serviceAdoption"] = "unknown"
+					applyError = statusErr
 				}
 			}
 		}
 	}
 	if result != nil {
 		if humanOutput && applyError != nil {
-			fmt.Fprintln(os.Stdout, "银河安装未完成。")
+			if result["releaseInstalled"] == true && result["hostConfigured"] == true && result["serviceAdoption"] == "pending" {
+				fmt.Fprintln(os.Stdout, "银河已安装，服务尚未完成切换。")
+			} else {
+				fmt.Fprintln(os.Stdout, "银河安装未完成。")
+			}
 		} else if err := printValue(result); err != nil {
 			return err
 		}

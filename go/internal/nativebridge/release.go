@@ -1,12 +1,15 @@
 package nativebridge
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/gofrs/flock"
@@ -34,6 +37,61 @@ func LockUpdate() (func(), error) {
 	return func() { _ = lock.Close() }, nil
 }
 
+// WaitUpdate serializes selection and adoption with in-progress updates.
+func WaitUpdate(ctx context.Context) (func(), error) {
+	for {
+		unlock, err := LockUpdate()
+		if err == nil {
+			return unlock, nil
+		}
+		if fault.Code(err) != "native_update_in_progress" {
+			return nil, err
+		}
+		timer := time.NewTimer(50 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func compareReleaseID(left, right string) (int, error) {
+	parse := func(value string) ([3]uint64, error) {
+		var out [3]uint64
+		parts := strings.Split(value, ".")
+		if len(parts) != 3 {
+			return out, fault.New("native_release_version_invalid", 409)
+		}
+		for i, part := range parts {
+			n, err := strconv.ParseUint(part, 10, 32)
+			if err != nil || strconv.FormatUint(n, 10) != part {
+				return out, fault.New("native_release_version_invalid", 409)
+			}
+			out[i] = n
+		}
+		return out, nil
+	}
+	a, err := parse(left)
+	if err != nil {
+		return 0, err
+	}
+	b, err := parse(right)
+	if err != nil {
+		return 0, err
+	}
+	for i := range a {
+		if a[i] < b[i] {
+			return -1, nil
+		}
+		if a[i] > b[i] {
+			return 1, nil
+		}
+	}
+	return 0, nil
+}
+
 // SetDesiredRelease records an already prepared complete release as the next
 // on-demand service executable; it does not stop the currently running core.
 func SetDesiredRelease(executable string) (DesiredRelease, error) {
@@ -42,8 +100,7 @@ func SetDesiredRelease(executable string) (DesiredRelease, error) {
 }
 
 // SelectDesiredRelease atomically selects the prepared release. When replace
-// is false an existing selection wins, preventing repair of another host from
-// silently rolling back a newer selection. The bool reports an actual write.
+// is false only a newer valid release replaces an existing selection. The bool reports an actual write.
 func SelectDesiredRelease(executable string, replace bool) (DesiredRelease, bool, error) {
 	var d DesiredRelease
 	if !filepath.IsAbs(executable) {
@@ -74,8 +131,21 @@ func SelectDesiredRelease(executable string, replace bool) (DesiredRelease, bool
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return d, false, err
 	}
-	if err == nil && (!replace || current.ReleaseID == id && sameReleaseExecutable(current.Executable, executable)) {
-		return current, false, nil
+	if _, versionErr := compareReleaseID(id, id); versionErr != nil {
+		return d, false, versionErr
+	}
+	if err == nil && current.ReleaseID != "" {
+		if !replace {
+			cmp, compareErr := compareReleaseID(id, current.ReleaseID)
+			if compareErr != nil {
+				return d, false, compareErr
+			}
+			if cmp <= 0 {
+				return current, false, nil
+			}
+		} else if current.ReleaseID == id && sameReleaseExecutable(current.Executable, executable) {
+			return current, false, nil
+		}
 	}
 	d = DesiredRelease{Executable: executable, ReleaseID: id}
 	data, err := json.Marshal(d)

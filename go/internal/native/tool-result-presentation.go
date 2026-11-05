@@ -92,7 +92,26 @@ func nativeResultLines(data any, isError bool) []string {
 	}
 	lines := []string{}
 	if object, ok := data.(map[string]any); ok {
+		access, _ := object["access"].(map[string]any)
+		accountAccess := access["kind"] == "official-account"
+		if accountAccess {
+			switch access["state"] {
+			case "ready":
+				lines = append(lines, "银河账户已关联。")
+			case "account-required":
+				lines = append(lines, "尚未关联银河账户。")
+			case "unknown":
+				if object["connected"] == true {
+					lines = append(lines, "账户关联状态暂时无法读取。")
+				} else {
+					lines = append(lines, "尚未接入银河。")
+				}
+			}
+		}
 		for _, key := range []string{"state", "status"} {
+			if accountAccess {
+				break
+			}
 			if state, ok := object[key].(string); ok && nativeReadableStates[state] != "" {
 				lines = append(lines, nativeReadableStates[state]+"。")
 				break
@@ -100,8 +119,15 @@ func nativeResultLines(data any, isError bool) []string {
 		}
 		if object["state"] == "user-choice-needs-browser" {
 			if url, ok := object["url"].(string); ok && url != "" {
-				lines = append(lines, "打开本机页面完成选择：\n"+url)
+				if object["reason"] == "official-account-login" {
+					lines = []string{"登录银河账户并确认本机身份：\n" + url}
+				} else {
+					lines = append(lines, "打开页面完成选择：\n"+url)
+				}
 			}
+		}
+		if object["state"] == "linked" {
+			lines = append(lines, "银河账户已关联。")
 		}
 	}
 	lines = append(lines, nativeAuthoredLines(data)...)

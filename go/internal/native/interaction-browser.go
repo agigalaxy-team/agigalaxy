@@ -469,6 +469,12 @@ func (b *BrowserChoices) serve(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"state": copy.state, "message": interactionOutcome(copy)})
 		return
 	}
+	// Account association is confirmed on the signed-in website. The local
+	// surface only carries the pending operation; it is not another approval.
+	if copy.state == "awaiting-account" && copy.input.ExternalApproval != nil && copy.input.LoginURL != "" {
+		http.Redirect(w, r, copy.input.LoginURL, http.StatusSeeOther)
+		return
+	}
 	var output strings.Builder
 	view := interactionBrowserView(copy.input)
 	data := struct {

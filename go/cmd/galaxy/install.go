@@ -15,6 +15,7 @@ import (
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/native"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/nativebridge"
 )
 
 func candidateDirectory() (string, error) {
@@ -208,6 +209,15 @@ func setupCommand(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
+	}
+	unlock, err := nativebridge.WaitUpdate(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	input.PackageDirectory, err = preferSelectedRelease(ctx, input.PackageDirectory)
+	if err != nil {
+		return err
 	}
 	plan, err := native.PreviewNativeInstallation(ctx, input, native.ServiceConfigurationOptions{})
 	if err != nil {

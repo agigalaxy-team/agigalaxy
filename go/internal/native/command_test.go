@@ -388,3 +388,70 @@ func TestCommandToolStrictSchemasAndBlankWorkerReview(t *testing.T) {
 		t.Fatal("blank Worker review missing", result, count)
 	}
 }
+
+// A live device connection alone is not evidence of an official account link.
+func TestNativeAccessProjection(t *testing.T) {
+	for _, tc := range []struct {
+		endpoint      string
+		connected     bool
+		account, want string
+	}{
+		{officialNativeAuthority, false, "unavailable", "unknown"},
+		{officialNativeAuthority, true, "unavailable", "unknown"},
+		{officialNativeAuthority, true, "unlinked", "account-required"},
+		{officialNativeAuthority, true, "linked", "ready"},
+		{"https://another.invalid", true, "", "ready"},
+		{"https://another.invalid", false, "", "disconnected"},
+	} {
+		status := map[string]any{"endpoint": tc.endpoint, "connected": tc.connected}
+		var account map[string]any
+		if tc.account != "" {
+			account = map[string]any{"state": tc.account}
+		}
+		projectNativeAccess(status, account)
+		if got := uploadObject(status["access"])["state"]; got != tc.want {
+			t.Fatalf("endpoint=%s connected=%v account=%s: got %v", tc.endpoint, tc.connected, tc.account, got)
+		}
+	}
+}
+
+func TestCommandConnectDoesNotAssumeOfficialAccount(t *testing.T) {
+	store, err := NewStore(t.TempDir(), officialNativeAuthority)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := commandRuntime(t, store)
+	result, err := r.Command(context.Background(), CommandInput{Command: "connect"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := uploadObject(result)
+	status := uploadObject(out["connectionContract"])
+	if out["state"] != "unknown" || uploadObject(status["officialAccount"])["state"] != "unavailable" || status["connected"] != false {
+		t.Fatalf("unverified account reported as connected: %v", out)
+	}
+}
+
+func TestOfficialNativeAuthorityOrigin(t *testing.T) {
+	for _, tc := range []struct {
+		endpoint string
+		want     bool
+	}{
+		{"https://official.agigalaxy.org", true},
+		{"https://OFFICIAL.AGIGALAXY.ORG:443", true},
+		{"https://official.agigalaxy.org:444", false},
+		{"http://official.agigalaxy.org", false},
+		{"https://official.agigalaxy.org.evil.invalid", false},
+		{"https://official.agigalaxy.org/path", false},
+		{"https://user@official.agigalaxy.org", false},
+	} {
+		if got := isOfficialNativeAuthority(tc.endpoint); got != tc.want {
+			t.Fatalf("origin %q: got %v", tc.endpoint, got)
+		}
+	}
+	status := map[string]any{"endpoint": "https://OFFICIAL.AGIGALAXY.ORG:443", "connected": true}
+	projectNativeAccess(status, map[string]any{"state": "unlinked"})
+	if uploadObject(status["access"])["state"] != "account-required" {
+		t.Fatalf("official origin bypassed account: %v", status)
+	}
+}

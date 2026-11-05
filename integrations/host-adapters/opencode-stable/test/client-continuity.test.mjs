@@ -32,3 +32,27 @@ test('a completed official connection follows the same identity without repeatin
     assert.deepEqual(messages,[]);
   } finally {globalThis.setTimeout=originalTimer;}
 });
+
+
+test('an official device connection without account evidence is not treated as ready', async () => {
+  const status={identity:'existing-identity',endpoint:'https://official.agigalaxy.org',connected:true};
+  let continued=0, options;
+  const session={nativeTools:{},language:'zh-CN',onBack(){},label(cn){return cn;},native:async()=>status,
+    run:async(read,done)=>done(await read()),menu(title,items){options=items;}};
+  createPurposeIdentity(session).identity(()=>continued++);
+  await new Promise(setImmediate);
+  assert.equal(continued,0);
+  assert.ok(options.some(item=>item[0]==='连接当前身份'));
+});
+
+
+test('a connected old official core requests an update without reconnecting or waiting', async () => {
+  let completed=0; const calls=[], messages=[];
+  const session={version:0,owner:null,language:'zh-CN',stopMessages(){},alive(v){return v===this.version;},label(cn){return cn;},info(){},
+    message(title,text){messages.push({title,text});},nativeTools:{async call(name){calls.push(name);return {structuredContent:{identity:'existing-identity',endpoint:'https://OFFICIAL.AGIGALAXY.ORG:443',connected:true}};}}};
+  createPurposeIdentity(session).identityChoice('galaxy_native_connect',{},()=>completed++);
+  await new Promise(setImmediate);
+  assert.equal(completed,0);
+  assert.deepEqual(calls,['galaxy_native_status']);
+  assert.match(messages[0]?.text,/更新客户端/);
+});

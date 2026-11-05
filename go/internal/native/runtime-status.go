@@ -108,7 +108,56 @@ func (r *Runtime) Status(ctx context.Context, options RuntimeStatusOptions) (map
 		out["connected"] = false
 		out["connection"] = nil
 	}
+	var account map[string]any
+	if isOfficialNativeAuthority(r.config.Endpoint) {
+		account = map[string]any{"state": "unavailable"}
+		if out["connected"] == true {
+			account = r.officialAccountStatus(ctx)
+			// The account read must still refer to the same selection and session
+			// that produced this status, even if either changes during the query.
+			selection, err := r.connection.selection(ctx)
+			if err != nil {
+				return nil, err
+			}
+			currentSnapshot, err := r.connection.Snapshot(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if selection.fingerprint != fingerprint || currentSnapshot == nil || snapshot == nil || currentSnapshot.Generation != snapshot.Generation {
+				return nil, connectionFailure("native_connection_selection_changed")
+			}
+		}
+	}
+	projectNativeAccess(out, account)
 	return out, nil
+}
+
+// Device connectivity and the current identity's verified account association
+// are separate facts. Unknown is never interpreted as an absent association.
+func projectNativeAccess(status, account map[string]any) {
+	connected := status["connected"] == true
+	if !isOfficialNativeAuthority(text(status["endpoint"])) {
+		state := "disconnected"
+		if connected {
+			state = "ready"
+		}
+		status["access"] = map[string]any{"kind": "service", "state": state}
+		return
+	}
+	if account == nil {
+		account = map[string]any{"state": "unavailable"}
+	}
+	status["officialAccount"] = account
+	state := "unknown"
+	if connected {
+		switch account["state"] {
+		case "linked":
+			state = "ready"
+		case "unlinked":
+			state = "account-required"
+		}
+	}
+	status["access"] = map[string]any{"kind": "official-account", "state": state}
 }
 func runtimeTruthy(v any) bool {
 	switch value := v.(type) {

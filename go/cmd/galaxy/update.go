@@ -83,16 +83,19 @@ func managedUpdate(ctx context.Context, input native.ManagedNativeInstallationIn
 	if dryRun {
 		result["updateState"] = "preview"
 		result["upgradeAvailable"] = comparison > 0
+		if local && comparison == 0 {
+			result["localPackageCheckRequired"] = true
+		}
 		return printValue(result)
 	}
-	if comparison == 0 && observed.ReleaseID == target && observed.SwitchState == "current" {
+	if comparison == 0 && !local && observed.ReleaseID == target && observed.SwitchState == "current" {
 		result["updateState"] = "up_to_date"
 		return printValue(result)
 	}
-	if comparison == 0 && desired.ReleaseID == target && (!errors.Is(statusErr, nativebridge.ErrPaused) || restartLegacy) {
+	if comparison == 0 && !local && desired.ReleaseID == target && (!errors.Is(statusErr, nativebridge.ErrPaused) || restartLegacy) {
 		return activateUpdate(ctx, target, restartLegacy, result)
 	}
-	if comparison == 0 && (desired.ReleaseID != "" || observed.ReleaseID != "") && desired.ReleaseID != target {
+	if comparison == 0 && !local && (desired.ReleaseID != "" || observed.ReleaseID != "") && desired.ReleaseID != target {
 		name := "galaxy"
 		if runtime.GOOS == "windows" {
 			name += ".exe"
@@ -102,7 +105,7 @@ func managedUpdate(ctx context.Context, input native.ManagedNativeInstallationIn
 		}
 		return activateUpdate(ctx, target, restartLegacy, result)
 	}
-	if comparison == 0 {
+	if comparison == 0 && !local {
 		result["updateState"] = "installed_not_running"
 		return printValue(result)
 	}
@@ -137,16 +140,21 @@ func managedUpdate(ctx context.Context, input native.ManagedNativeInstallationIn
 	if _, err = nativebridge.SetDesiredRelease(release.Executable); err != nil {
 		return updateFailure("selection_failed", target, err)
 	}
+	if current, statusErr := nativebridge.Status(ctx); statusErr == nil && current.SwitchState == "current" && current.ReleaseID == target {
+		result["runningVersion"] = current.ReleaseID
+		result["updateState"] = "up_to_date"
+		return printValue(result)
+	}
 	return activateUpdate(ctx, target, restartLegacy, result)
 }
 
 func activateUpdate(ctx context.Context, target string, restartLegacy bool, result map[string]any) error {
-	info, err := nativebridge.Handover(ctx)
+	info, err := nativebridge.HandoverLocked(ctx)
 	if restartLegacy && (fault.Code(err) == "native_handover_legacy_unsupported" || fault.Code(err) == "native_handover_legacy_connection") {
 		if err = nativebridge.Stop(ctx); err == nil {
 			startCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 			defer cancel()
-			info, err = nativebridge.Ensure(startCtx, nativebridge.Options{ExplicitStart: true})
+			info, err = nativebridge.EnsureLocked(startCtx, nativebridge.Options{ExplicitStart: true})
 		}
 	}
 	if err == nil {

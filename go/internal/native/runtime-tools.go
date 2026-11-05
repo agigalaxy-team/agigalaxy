@@ -23,11 +23,7 @@ func registerRuntimeTools(server *mcp.Server, tools *toolRuntime, runtime *Runti
 		if e != nil {
 			return toolError(e)
 		}
-		if runtime.config.Endpoint == officialNativeAuthority {
-			result["officialAccount"] = map[string]any{"state": "unavailable"}
-			if result["connected"] == true {
-				result["officialAccount"] = accountConnect.accountStatus(ctx)
-			}
+		if isOfficialNativeAuthority(runtime.config.Endpoint) {
 			if scope, err := runtime.store.ChoiceScope(ctx); err == nil {
 				if operation := tools.browser.accountProgress(ctx, scope); operation != nil {
 					result["connectionOperation"] = operation
@@ -41,7 +37,7 @@ func registerRuntimeTools(server *mcp.Server, tools *toolRuntime, runtime *Runti
 		if e != nil {
 			return toolError(e)
 		}
-		if runtime.config.Endpoint == officialNativeAuthority {
+		if isOfficialNativeAuthority(runtime.config.Endpoint) {
 			if scope, err := runtime.store.ChoiceScope(ctx); err == nil {
 				if operation := tools.browser.accountProgress(ctx, scope); operation != nil {
 					switch operation["state"] {
@@ -52,11 +48,10 @@ func registerRuntimeTools(server *mcp.Server, tools *toolRuntime, runtime *Runti
 			}
 		}
 		if current["connected"] == true {
-			if runtime.config.Endpoint != officialNativeAuthority {
+			if !isOfficialNativeAuthority(runtime.config.Endpoint) {
 				return toolResult(current)
 			}
-			status := accountConnect.accountStatus(ctx)
-			current["officialAccount"] = status
+			status := uploadObject(current["officialAccount"])
 			if status["state"] == "linked" {
 				return toolResult(current)
 			}
@@ -68,7 +63,7 @@ func registerRuntimeTools(server *mcp.Server, tools *toolRuntime, runtime *Runti
 		if e != nil {
 			return toolError(e)
 		}
-		if runtime.config.Endpoint == officialNativeAuthority {
+		if isOfficialNativeAuthority(runtime.config.Endpoint) {
 			value, err := accountConnect.review(ctx, tools.browser, plan)
 			if err != nil {
 				return toolError(err)

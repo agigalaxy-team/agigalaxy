@@ -69,7 +69,7 @@ func printHumanValue(value any) error {
 				message += " 客户端版本：" + release.ReleaseID + "。"
 			}
 			if result["serviceReleaseSelected"] == false {
-				message += " 当前服务使用的版本尚未切换。"
+				message += " 已沿用原先选定的共享服务版本。"
 			}
 		} else if result["recoveryJournal"] != nil {
 			message = "操作未完成，需要处理上次操作的恢复记录。"
@@ -84,7 +84,9 @@ func humanUpdateState(state string, result map[string]any) string {
 	switch state {
 	case "preview":
 		if available, ok := result["upgradeAvailable"].(bool); ok {
-			if available {
+			if result["localPackageCheckRequired"] == true {
+				message = "版本相同；应用时将检查并安装所选包。"
+			} else if available {
 				message = "发现可用更新，尚未应用。"
 			} else {
 				message = "所检查的版本没有比已安装版本更新。"
