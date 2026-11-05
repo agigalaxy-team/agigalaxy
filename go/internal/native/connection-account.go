@@ -152,15 +152,30 @@ func (c *nativeAccountConnect) review(ctx context.Context, b *BrowserChoices, pl
 		if selected == nil || *selected != scope {
 			return nil, connectionFailure("native_connection_selection_changed")
 		}
-		var err error
-		if _, err = c.runtime.ConnectReviewed(ctx, plan, selected); err != nil {
+		current, err := c.runtime.connection.selection(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if current.fingerprint != plan.SelectionDigest {
+			return nil, connectionFailure("native_connection_selection_changed")
+		}
+		status, err := c.runtime.Status(ctx, RuntimeStatusOptions{SkipAccount: true})
+		if err != nil {
+			return nil, err
+		}
+		if status["connected"] == true {
+			snapshot, ok := status["connection"].(*ConnectionSnapshot)
+			if !ok || snapshot.SubjectID != scope.Owner || snapshot.Endpoint != scope.Endpoint || text(snapshot.Control["deviceId"]) != scope.DeviceID {
+				return nil, connectionFailure("native_connection_selection_changed")
+			}
+		} else if _, err = c.runtime.ConnectReviewed(ctx, plan, selected); err != nil {
 			return nil, err
 		}
 		newScope, err := c.runtime.store.ChoiceScope(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if newScope.Owner != scope.Owner || newScope.Endpoint != scope.Endpoint {
+		if newScope.Owner != scope.Owner || newScope.Endpoint != scope.Endpoint || status["connected"] == true && newScope != scope {
 			return nil, connectionFailure("native_connection_selection_changed")
 		}
 		claimed, err := c.runtime.Call(ctx, "/v1/identity/native-claim", login.input(), ConnectionCallOptions{ExpectedScope: &newScope})

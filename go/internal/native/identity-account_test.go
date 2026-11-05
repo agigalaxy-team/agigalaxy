@@ -177,55 +177,72 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 		t.Fatal("terminal original operation was not retained", pending)
 	}
 
-	t.Run("first-use-in-browser", func(t *testing.T) {
-		config := meta.Configuration
-		config.DataDirectory = t.TempDir()
-		local, err := NewStore(config.DataDirectory, config.Endpoint)
-		if err != nil {
-			t.Fatal(err)
+	for _, alreadyConnected := range []bool{false, true} {
+		name := "first-use-in-browser"
+		if alreadyConnected {
+			name = "connected-before-account"
 		}
-		if _, err = local.Initialize(ctx, InitializationInput{SubjectType: "person"}, true, nil); err != nil {
-			t.Fatal(err)
-		}
-		subject, err := local.Owner(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		runtime, err := NewRuntime(local, config, ConnectionOptions{HTTPClient: &http.Client{Transport: transport}, Now: now})
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer runtime.Close()
-		browser := NewBrowserChoices(local, now)
-		defer browser.Close()
-		plan, err := runtime.PrepareConnect(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		attempt := &nativeAccountConnect{runtime: runtime, accounts: NewNativeIdentityAccounts(runtime), pending: map[ChoiceScope]*nativeAccountLogin{}}
-		first, err := attempt.review(ctx, browser, plan)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var login *nativeAccountLogin
-		for _, value := range attempt.pending {
-			login = value
-		}
-		redirectClient := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-		redirected, err := redirectClient.Get(text(uploadObject(first)["url"]))
-		if err != nil {
-			t.Fatal(err)
-		}
-		redirected.Body.Close()
-		if redirected.StatusCode != http.StatusSeeOther || redirected.Header.Get("Location") != login.loginURL {
-			t.Fatal("account login introduced another local approval")
-		}
-		callback := meta.Authorize(login.loginURL)
-		var exists bool
-		if err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bindings WHERE subject_id=$1)", subject).Scan(&exists); err != nil || exists {
-			t.Fatalf("login created a binding before confirmation: %v %v", exists, err)
-		}
-		script := `import {chromium} from 'playwright';
+		t.Run(name, func(t *testing.T) {
+			config := meta.Configuration
+			config.DataDirectory = t.TempDir()
+			local, err := NewStore(config.DataDirectory, config.Endpoint)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = local.Initialize(ctx, InitializationInput{SubjectType: "person"}, true, nil); err != nil {
+				t.Fatal(err)
+			}
+			subject, err := local.Owner(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			runtime, err := NewRuntime(local, config, ConnectionOptions{HTTPClient: &http.Client{Transport: transport}, Now: now})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer runtime.Close()
+			var beforeConnection *ConnectionSnapshot
+			var beforeSelection connectionSelection
+			if alreadyConnected {
+				beforeConnection, err = runtime.ConnectService(ctx)
+				if err != nil || beforeConnection == nil {
+					t.Fatalf("service connection: %v", err)
+				}
+				beforeSelection, err = runtime.connection.selection(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			browser := NewBrowserChoices(local, now)
+			defer browser.Close()
+			plan, err := runtime.PrepareConnect(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			attempt := &nativeAccountConnect{runtime: runtime, accounts: NewNativeIdentityAccounts(runtime), pending: map[ChoiceScope]*nativeAccountLogin{}}
+			first, err := attempt.review(ctx, browser, plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var login *nativeAccountLogin
+			for _, value := range attempt.pending {
+				login = value
+			}
+			redirectClient := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+			redirected, err := redirectClient.Get(text(uploadObject(first)["url"]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			redirected.Body.Close()
+			if redirected.StatusCode != http.StatusSeeOther || redirected.Header.Get("Location") != login.loginURL {
+				t.Fatal("account login introduced another local approval")
+			}
+			callback := meta.Authorize(login.loginURL)
+			var exists bool
+			if err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bindings WHERE subject_id=$1)", subject).Scan(&exists); err != nil || exists != alreadyConnected {
+				t.Fatalf("login created a binding before confirmation: %v %v", exists, err)
+			}
+			script := `import {chromium} from 'playwright';
             const browser=await chromium.launch({headless:true});try {
             const review=await browser.newPage();await review.goto(process.argv[2]);
             await review.getByText('fixture-account@example.invalid',{exact:true}).waitFor();
@@ -235,16 +252,28 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
             for(;;){const state=await (await review.request.get(process.argv[1]+'?status=1')).json();if(state.state==='finished')break;if(!['awaiting-account','processing'].includes(state.state))throw Error('association did not complete');await new Promise(r=>setTimeout(r,200));}
             const page=await browser.newPage();await page.goto(process.argv[1]);await page.getByText('银河账户关联已完成，可以回到原聊天。',{exact:true}).waitFor();
             console.log(JSON.stringify({confirmed:true}));} finally { await browser.close(); }`
-		if initializationNode(t, script, text(uploadObject(first)["url"]), server.URL+callback, subject)["confirmed"] != true {
-			t.Fatal("browser did not finish")
-		}
-		if err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM community_account_links WHERE subject_id=$1)", subject).Scan(&exists); err != nil || !exists {
-			t.Fatalf("browser did not link the current ID: %v %v", exists, err)
-		}
-		connected, err := runtime.Status(ctx, RuntimeStatusOptions{RestoreSelected: true})
-		if err != nil || connected["connected"] != true || connected["identity"] != subject {
-			t.Fatalf("original runtime identity not connected: %v", err)
-		}
-	})
+			if initializationNode(t, script, text(uploadObject(first)["url"]), server.URL+callback, subject)["confirmed"] != true {
+				t.Fatal("browser did not finish")
+			}
+			var linkCount int
+			if err := pool.QueryRow(ctx, "SELECT count(*) FROM community_account_links WHERE subject_id=$1", subject).Scan(&linkCount); err != nil || linkCount != 1 {
+				t.Fatalf("browser account link count: %d, %v", linkCount, err)
+			}
+			if alreadyConnected {
+				afterConnection, err := runtime.connection.Snapshot(ctx)
+				if err != nil || afterConnection == nil || afterConnection.BindingID != beforeConnection.BindingID || afterConnection.Generation != beforeConnection.Generation {
+					t.Fatalf("account linking replaced the service connection: before=%+v after=%+v err=%v", beforeConnection, afterConnection, err)
+				}
+				afterSelection, err := runtime.connection.selection(ctx)
+				if err != nil || afterSelection.fingerprint != beforeSelection.fingerprint || afterSelection.Revision != beforeSelection.Revision {
+					t.Fatalf("account linking changed the selected identity or device: %v", err)
+				}
+			}
+			connected, err := runtime.Status(ctx, RuntimeStatusOptions{RestoreSelected: true})
+			if err != nil || connected["connected"] != true || connected["identity"] != subject {
+				t.Fatalf("original runtime identity not connected: %v", err)
+			}
+		})
+	}
 
 }
