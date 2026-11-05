@@ -51,7 +51,11 @@ func userChoiceMessage(name string, input any, message string) string {
 	}
 	lines := []string{strings.TrimSpace(message)}
 	seen := map[string]bool{}
+	identityAction := strings.Contains(name, "identity") || strings.HasPrefix(name, "galaxy_device_") || name == "galaxy_native_connect" || name == "galaxy_native_account_connect" || name == "galaxy_native_initialize"
 	for _, line := range choiceContentLines(value, 0) {
+		if !identityAction && strings.HasPrefix(line, "银河 ID：") {
+			continue
+		}
 		if !seen[line] && !strings.Contains(message, line) {
 			lines = append(lines, line)
 			seen[line] = true

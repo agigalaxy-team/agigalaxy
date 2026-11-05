@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -131,13 +130,11 @@ func connectFirstIdentityInBrowser(t *testing.T, ctx context.Context, runtime *R
 	call := func() map[string]any {
 		t.Helper()
 		result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "galaxy_native_connect", Arguments: map[string]any{}})
-		if err != nil || result == nil || result.IsError || len(result.Content) == 0 {
+		if err != nil || result == nil || result.IsError {
 			t.Fatalf("connect tool: %+v, %v", result, err)
 		}
 		var payload map[string]any
-		if err = protocol.Decode([]byte(result.Content[0].(*mcp.TextContent).Text), &payload); err != nil {
-			t.Fatal(err)
-		}
+		nativeTestDecodeResult(t, result, &payload)
 		return payload
 	}
 	before := transport.count()
@@ -146,7 +143,7 @@ func connectFirstIdentityInBrowser(t *testing.T, ctx context.Context, runtime *R
 	if err != nil || link == nil || link.Hostname() != "127.0.0.1" || pending["state"] != "user-choice-needs-browser" || pending["reason"] != "browser-confirmation" || pending["sideEffect"] != false {
 		t.Fatal("connection did not return a local review", pending, err)
 	}
-	script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const page=await browser.newPage();await page.goto(process.argv[1]);await page.getByRole('button',{name:'允许本次操作',exact:true}).click();await page.getByText('已处理，可以回到原聊天。',{exact:true}).waitFor();console.log(JSON.stringify({confirmed:true}));}finally{await browser.close();}`
+	script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const page=await browser.newPage();await page.goto(process.argv[1]);await page.getByRole('button',{name:'连接银河',exact:true}).click();await page.getByText('处理结果已返回。',{exact:true}).waitFor();console.log(JSON.stringify({confirmed:true}));}finally{await browser.close();}`
 	if initializationNode(t, script, link.String())["confirmed"] != true || hostForms != 0 || transport.count() <= before {
 		t.Fatal("the browser did not complete the original connection without a second tool call")
 	}

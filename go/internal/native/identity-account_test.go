@@ -223,9 +223,9 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
             const review=await browser.newPage();await review.goto(process.argv[2]);
             await review.getByText('fixture-account@example.invalid',{exact:true}).waitFor();
             await review.getByText(process.argv[3],{exact:true}).waitFor();
-            const before=await page.textContent('body');if(before.includes('已处理'))throw Error('connected without confirmation');
+            const before=await page.textContent('body');if(before.includes('银河账户关联已完成'))throw Error('connected without confirmation');
             await review.getByRole('button',{name:'确认关联',exact:true}).click();
-            await page.getByText('已处理，可以回到原聊天。',{exact:true}).waitFor({timeout:15000});
+            await page.getByText('银河账户关联已完成，可以回到原聊天。',{exact:true}).waitFor({timeout:15000});
             console.log(JSON.stringify({confirmed:true}));} finally { await browser.close(); }`
 		if initializationNode(t, script, text(uploadObject(first)["url"]), server.URL+callback, subject)["confirmed"] != true {
 			t.Fatal("browser did not finish")

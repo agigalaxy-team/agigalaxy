@@ -54,15 +54,8 @@ func materialCall(t *testing.T, c *mcp.ClientSession, name string, args any, wan
 	if r.IsError != wantError {
 		t.Fatalf("%s error=%v result=%v", name, r.IsError, r.Content)
 	}
-	if len(r.Content) != 1 {
-		t.Fatalf("non-text-only result: %v", r)
-	}
-	text, ok := r.Content[0].(*mcp.TextContent)
-	if !ok {
-		t.Fatalf("result is not text: %v", r)
-	}
 	var out map[string]any
-	if e = json.Unmarshal([]byte(text.Text), &out); e != nil {
+	if e = json.Unmarshal(nativeTestResultBytes(t, r, false), &out); e != nil {
 		t.Fatal(e)
 	}
 	return out

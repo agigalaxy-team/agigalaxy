@@ -69,20 +69,8 @@ func TestRuntimeFactoryHelpWebPreviewPanelLocalBatch(t *testing.T) {
 		if e != nil || result == nil || result.IsError {
 			t.Fatalf("%s: %v %#v", name, e, result)
 		}
-		if result.StructuredContent != nil {
-			return result, psObject(result.StructuredContent)
-		}
-		if len(result.Content) != 1 {
-			t.Fatalf("%s has no JSON result", name)
-		}
-		content, ok := result.Content[0].(*mcp.TextContent)
-		if !ok {
-			t.Fatalf("%s result is not text", name)
-		}
 		var value map[string]any
-		if e = protocol.Decode([]byte(content.Text), &value); e != nil {
-			t.Fatal(e)
-		}
+		nativeTestDecodeResult(t, result, &value)
 		return result, value
 	}
 	_, created := call("galaxy_help_start", map[string]any{"localTaskRef": "original synthetic local conversation"})
@@ -122,20 +110,10 @@ func TestRuntimeFactoryHelpWebPreviewPanelLocalBatch(t *testing.T) {
 	}
 	const draft = "synthetic device-only draft must not enter model context"
 	result, model := call("galaxy_panel_draft_save", map[string]any{"viewId": viewID, "expectedRevision": 0, "draft": draft})
-	if len(result.Content) != 1 {
-		t.Fatalf("panel result missing model JSON: %#v", result.Content)
-	}
-	modelText, ok := result.Content[0].(*mcp.TextContent)
-	if !ok {
-		t.Fatal("panel model JSON is not text")
-	}
-	encodedModel, e := protocol.Encode(result.StructuredContent)
-	if e != nil || !bytes.Equal(encodedModel, []byte(modelText.Text)) {
-		t.Fatal("panel model JSON differs from structured content")
-	}
 	var contentModel map[string]any
-	if e = protocol.Decode([]byte(modelText.Text), &contentModel); e != nil || text(contentModel["viewId"]) != viewID {
-		t.Fatalf("panel model JSON lost view reference: %v %#v", e, contentModel)
+	nativeTestDecodeResult(t, result, &contentModel)
+	if text(contentModel["viewId"]) != viewID {
+		t.Fatalf("panel model projection lost view reference: %#v", contentModel)
 	}
 	visible, e := protocol.Encode(map[string]any{"content": result.Content, "structuredContent": result.StructuredContent})
 	if e != nil {

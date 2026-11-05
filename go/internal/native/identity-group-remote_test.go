@@ -174,9 +174,7 @@ func TestNativeIdentityGroupRemoteOriginalToolsAndUnknownReceipt(t *testing.T) {
 			t.Fatalf("pending: %v %v", e, r)
 		}
 		var rows []any
-		if e = protocol.Decode([]byte(r.Content[0].(*mcp.TextContent).Text), &rows); e != nil {
-			t.Fatal(e)
-		}
+		nativeTestDecodeResult(t, r, &rows)
 		return rows
 	}
 	makeIntent := func() map[string]any {

@@ -65,15 +65,47 @@ func TestClientConfirmationKeepsChosenContentAndDoesNotInventCompletion(t *testi
 
 func clientResultData(t *testing.T, result *mcp.CallToolResult) map[string]any {
 	t.Helper()
-	raw, err := json.Marshal(result.StructuredContent)
-	if err != nil {
-		t.Fatal(err)
-	}
 	var data map[string]any
-	if err := protocol.Decode(raw, &data); err != nil {
-		t.Fatal(err)
-	}
+	nativeTestDecodeResult(t, result, &data)
 	return data
+}
+
+// Decode the MCP wire result without treating human-readable content as JSON.
+// Legacy internal results still expose JSON only through text content.
+func nativeTestDecodeResult(t *testing.T, result *mcp.CallToolResult, out any) {
+	t.Helper()
+	_, array := out.(*[]any)
+	if err := protocol.Decode(nativeTestResultBytes(t, result, array), out); err != nil {
+		t.Fatalf("invalid machine result: %v", err)
+	}
+}
+
+func nativeTestResultBytes(t *testing.T, result *mcp.CallToolResult, array bool) []byte {
+	t.Helper()
+	if result == nil {
+		t.Fatal("missing tool result")
+	}
+	if result.StructuredContent != nil {
+		raw, err := json.Marshal(result.StructuredContent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if array {
+			var wrapper map[string]json.RawMessage
+			if json.Unmarshal(raw, &wrapper) == nil && wrapper["items"] != nil {
+				return wrapper["items"]
+			}
+		}
+		return raw
+	}
+	if len(result.Content) != 1 {
+		t.Fatalf("missing structured or legacy JSON result: %#v", result)
+	}
+	content, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatalf("legacy result is not text: %#v", result)
+	}
+	return []byte(content.Text)
 }
 
 func TestClientResultKeepsOriginalWireValues(t *testing.T) {
