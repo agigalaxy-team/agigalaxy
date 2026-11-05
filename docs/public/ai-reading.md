@@ -19,6 +19,10 @@
 
 [在 GitHub 查看 Skill 源文件](https://github.com/agigalaxy-team/agigalaxy/tree/main/integrations/native-v2/skills/galaxy)；相应客户端发行也提供可下载的 Skill 包。
 
+## 按需使用 Skill
+
+Skill 入口只负责识别当前任务；安装接入、网络参与、工作记录、隐私同步、身份账户、维护排错及扩展能力分别放在对应模块中。先读入口，再只读当前任务需要的模块；任务涉及多种能力时按需组合，也可与当前宿主已有 Skill 配合。无需预先加载全部参考或按固定业务顺序操作。普通结果直接说明实际事项，协议字段和诊断材料仅在排错需要时展开。
+
 ## 按问题阅读
 
 | 要了解什么 | 从这里开始 |
