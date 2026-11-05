@@ -13,6 +13,11 @@ import (
 
 func TestRuntimeReadOnlyStatusMatchesOriginalWithoutCreatingData(t *testing.T) {
 	fixture := uploadRows(readNativeContractFixture(t, "runtime-status-v1.json")["states"])
+	// Keep the original read/identity assertions and add the new explicit
+	// access fact for these disconnected third-party fixture states.
+	for _, state := range fixture {
+		uploadObject(state)["access"] = map[string]any{"kind": "service", "state": "disconnected"}
+	}
 	ctx := context.Background()
 	dir := filepath.Join(t.TempDir(), "absent")
 	store, e := NewStore(dir, "https://status.invalid")

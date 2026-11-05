@@ -314,6 +314,12 @@ func Handover(ctx context.Context) (Info, error) {
 	return HandoverLocked(ctx)
 }
 
+// Only the post-acknowledgement exit wait treats a closed connection as
+// transient. Ordinary status calls must still report transport errors.
+func handoverExitTransient(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, net.ErrClosed) || handoverExitPlatformError(err)
+}
+
 // HandoverLocked requires the update lock; callers must not force-stop a busy service.
 func HandoverLocked(ctx context.Context) (Info, error) {
 	desired, desiredErr := GetDesiredRelease()
@@ -384,7 +390,7 @@ func HandoverLocked(ctx context.Context) (Info, error) {
 		if errors.Is(statusErr, ErrPaused) {
 			return Info{}, ErrPaused
 		}
-		if statusErr != nil {
+		if statusErr != nil && !handoverExitTransient(statusErr) {
 			return Info{}, statusErr
 		}
 		select {

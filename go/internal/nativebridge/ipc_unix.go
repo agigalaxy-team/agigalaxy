@@ -109,3 +109,7 @@ func startDaemon(exe string) error {
 func isUnavailable(err error) bool {
 	return errors.Is(err, syscall.ENOENT) || errors.Is(err, syscall.ECONNREFUSED)
 }
+
+func handoverExitPlatformError(err error) bool {
+	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE)
+}
