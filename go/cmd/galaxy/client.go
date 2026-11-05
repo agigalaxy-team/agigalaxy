@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -242,7 +243,9 @@ func completeManagedInstallation(ctx context.Context, result map[string]any, app
 		}
 	}
 	if result != nil {
-		if err := printValue(result); err != nil {
+		if humanOutput && applyError != nil {
+			fmt.Fprintln(os.Stdout, "银河安装未完成。")
+		} else if err := printValue(result); err != nil {
 			return err
 		}
 	}

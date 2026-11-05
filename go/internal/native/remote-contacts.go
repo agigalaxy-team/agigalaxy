@@ -79,15 +79,11 @@ func registerSelectedRemoteTools(server *mcp.Server, tools *toolRuntime, contrac
 				return toolError(e)
 			}
 			if contract["needsChoice"] == true {
-				raw, e := jstext.EncodeJSON(value)
-				if e != nil {
-					return toolError(e)
-				}
-				return tools.review(ctx, req, value, text(contract["description"])+"\n"+string(raw), func(ctx context.Context, scope *ChoiceScope) (any, error) { return run(ctx, name, value, scope) })
+				return tools.review(ctx, req, value, userChoiceTitle(name), func(ctx context.Context, scope *ChoiceScope) (any, error) { return run(ctx, name, value, scope) })
 			}
 			result, e := run(ctx, name, value, nil)
 			if e != nil {
-				out, encoding := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write})
+				out, encoding := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write && nativeOutcomeUnknown(e)})
 				if out != nil {
 					out.IsError = true
 				}

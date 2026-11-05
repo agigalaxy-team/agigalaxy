@@ -41,8 +41,10 @@ func addNativeTool(server *mcp.Server, tool *mcp.Tool, invalidCode string, handl
 		}
 		var value any
 		if json.Unmarshal(data, &value) != nil || resolved.Validate(&value) != nil {
-			return toolError(fault.New(invalidCode, 400))
+			result, err := toolError(fault.New(invalidCode, 400))
+			return presentNativeToolResult(result), err
 		}
-		return handler(ctx, request)
+		result, err := handler(ctx, request)
+		return presentNativeToolResult(result), err
 	})
 }

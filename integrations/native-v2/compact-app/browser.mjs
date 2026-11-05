@@ -36,4 +36,4 @@ app.addEventListener('toolresult',result=>{
  view.receive(result);
 });
 app.onteardown=async()=>{try{await view.flush?.();}finally{app.removeEventListener('hostcontextchanged',keepLocalAlongside);preferences.close();view.close();}return{};};
-app.connect().catch(()=>{document.getElementById('galaxy').textContent='此宿主未完成 MCP Apps 连接。请继续使用原聊天的银河工具和完整网页入口。';});
+app.connect().catch(()=>{document.getElementById('galaxy').textContent='银河面板暂时无法打开。';});

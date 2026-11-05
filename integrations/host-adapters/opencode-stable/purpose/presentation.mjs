@@ -1,14 +1,15 @@
 export const unwrap = (result) => {
-  if (result?.isError)
-    throw new Error(
-      result.structuredContent?.error ?? 'current_content_unavailable',
-    );
-  if (result?.structuredContent) return result.structuredContent;
-  try {
-    return JSON.parse(result.content[0].text);
-  } catch {
-    return result;
+  if (result?.resultType === 'input_required') return {state: 'host-choice-required'};
+  let data = result?.structuredContent;
+  if (data === undefined && result?.content?.[0]?.type === 'text') {
+    try { data = JSON.parse(result.content[0].text); } catch { /* Human-readable content is not machine data. */ }
   }
+  data ??= result;
+  if (result?.isError || data?.error) {
+    const code = data?.error ?? 'current_content_unavailable';
+    throw Object.assign(new Error(code), {code, ...(data && typeof data === 'object' ? data : {})});
+  }
+  return data;
 };
 export const plain = (value) =>
   String(value ?? '')

@@ -1,8 +1,8 @@
+import { unwrap } from './purpose/presentation.mjs';
 import {nativeAudienceLabel} from '../../native-v2/presentation/native-result.mjs';
 import {nativeChoiceUrl} from '../../native-v2/compact-app/browser-choice.mjs';
 
 const plain=value=>String(value??'').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ');
-const unwrap=r=>{if(r?.resultType==='input_required')return{state:'host-choice-required'};const v=r?.structuredContent??(r?.content?.[0]?.text?JSON.parse(r.content[0].text):r);if(r?.isError||v?.error)throw Object.assign(Error(v?.error??'current_content_unavailable'),{code:v?.error});return v;};
 const same=(a,b)=>a?.id===b?.id&&a?.version===b?.version;
 const latest=rows=>[...new Map((rows??[]).filter(r=>!r.supersededInVisibleHistory).sort((a,b)=>a.version-b.version).map(r=>[r.id,r])).values()];
 const failureText={capsule_work_current_success_required:'所选工作当前没有可用的成功结果。请在原工作继续，结果准备后再整理方法。',

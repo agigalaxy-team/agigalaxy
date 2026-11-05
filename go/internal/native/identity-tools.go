@@ -2,7 +2,6 @@ package native
 
 import (
 	"context"
-	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -53,12 +52,8 @@ func registerIdentityControlTools(server *mcp.Server, tools *toolRuntime, runtim
 		if e != nil {
 			return identityDeviceResult(nil, e)
 		}
-		raw, e := protocol.Encode(preview)
-		if e != nil {
-			return identityDeviceResult(nil, e)
-		}
 		review := map[string]any{"previewId": input.PreviewID, "preview": preview, "operationId": uploadObject(preview)["operationId"]}
-		message := fmt.Sprintf("本人确认撤销准确设备。\n%s\n仅撤销此权威下目标设备的控制访问、现有绑定和凭据。保留原GUID、历史证明及恢复材料；不删除资料、不恢复资料。结果不明保留原操作核对。", raw)
+		message := "移除下列设备的访问权限。该设备将无法继续使用此银河身份；已有资料保留。"
 		return tools.review(ctx, req, review, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 			return devices.ConfirmReviewed(ctx, input.PreviewID, scope)
 		})
@@ -78,12 +73,8 @@ func registerIdentityControlTools(server *mcp.Server, tools *toolRuntime, runtim
 		if uploadObject(original)["operationId"] != input.OperationID {
 			return identityDeviceResult(nil, connectionFailure("device_management_native_operation_unavailable"))
 		}
-		raw, e := protocol.Encode(original)
-		if e != nil {
-			return identityDeviceResult(nil, e)
-		}
 		review := map[string]any{"operationId": input.OperationID, "original": original}
-		return tools.review(ctx, req, review, fmt.Sprintf("停止本机重试准确设备操作：%s\n不取消服务器操作，不恢复设备访问；原证明和操作定位保留用于只读核对。", raw), func(ctx context.Context, scope *ChoiceScope) (any, error) {
+		return tools.review(ctx, req, review, "停止等待这次设备操作。已发送到服务器的请求仍可能完成。", func(ctx context.Context, scope *ChoiceScope) (any, error) {
 			latest, e := devices.Read(ctx, "pending", "")
 			if e != nil {
 				return nil, e

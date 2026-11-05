@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -25,8 +24,14 @@ func registerRuntimeTools(server *mcp.Server, tools *toolRuntime, runtime *Runti
 			return toolError(e)
 		}
 		if runtime.config.Endpoint == officialNativeAuthority {
-			if status := tools.browser.accountProgress(text(result["identity"]), runtime.config.Endpoint); status != nil {
-				result["officialAccount"] = status
+			result["officialAccount"] = map[string]any{"state": "unavailable"}
+			if result["connected"] == true {
+				result["officialAccount"] = accountConnect.accountStatus(ctx)
+			}
+			if scope, err := runtime.store.ChoiceScope(ctx); err == nil {
+				if operation := tools.browser.accountProgress(ctx, scope); operation != nil {
+					result["connectionOperation"] = operation
+				}
 			}
 		}
 		return toolResult(result)
@@ -36,8 +41,28 @@ func registerRuntimeTools(server *mcp.Server, tools *toolRuntime, runtime *Runti
 		if e != nil {
 			return toolError(e)
 		}
-		if current["connected"] == true && runtime.config.Endpoint != officialNativeAuthority {
-			return toolResult(current)
+		if runtime.config.Endpoint == officialNativeAuthority {
+			if scope, err := runtime.store.ChoiceScope(ctx); err == nil {
+				if operation := tools.browser.accountProgress(ctx, scope); operation != nil {
+					switch operation["state"] {
+					case "awaiting-account", "processing", "unconfirmed":
+						return toolResult(operation)
+					}
+				}
+			}
+		}
+		if current["connected"] == true {
+			if runtime.config.Endpoint != officialNativeAuthority {
+				return toolResult(current)
+			}
+			status := accountConnect.accountStatus(ctx)
+			current["officialAccount"] = status
+			if status["state"] == "linked" {
+				return toolResult(current)
+			}
+			if status["state"] == "unavailable" {
+				return toolError(connectionFailure("native_account_link_status_unavailable"))
+			}
 		}
 		plan, e := runtime.PrepareConnect(ctx)
 		if e != nil {
@@ -50,10 +75,7 @@ func registerRuntimeTools(server *mcp.Server, tools *toolRuntime, runtime *Runti
 			}
 			return toolResult(value)
 		}
-		message := fmt.Sprintf("连接当前银河身份 %s\n服务：%s\n设备：%s\n允许请求的范围：%s\n连接时验证当前控制权；不会上传本机笔记或会话原件，也不启动模型。", plan.GalaxyID, plan.Endpoint, plan.DeviceID, strings.Join(plan.Scopes, "、"))
-		if plan.FirstUse {
-			message = fmt.Sprintf("首次连接银河身份 %s\n服务：%s\n将登记这台本机为该身份的首个控制设备，随后建立连接；本机可以管理自己的身份与设备。\n允许请求的范围：%s\n私钥只留在本机，不上传笔记或会话原件，也不启动模型。", plan.GalaxyID, plan.Endpoint, strings.Join(plan.Scopes, "、"))
-		}
+		message := fmt.Sprintf("使用此银河身份连接所选服务。\n银河 ID：%s\n服务：%s", plan.GalaxyID, plan.Endpoint)
 		return tools.reviewOn(ctx, req, plan, message, true, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 			connection, e := runtime.ConnectReviewed(ctx, plan, scope)
 			if e != nil {

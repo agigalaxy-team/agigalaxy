@@ -25,6 +25,34 @@ type nativeAccountLogin struct {
 	until                time.Time
 }
 
+// accountStatus reflects the verified server association for this connected identity.
+// A failed lookup cannot establish that an association is absent.
+func (c *nativeAccountConnect) accountStatus(ctx context.Context) map[string]any {
+	after := ""
+	seen := map[string]bool{}
+	for {
+		value, err := c.accounts.Read(ctx, NativeIdentityAccountRead{Action: "query", After: after, Limit: 100})
+		if err != nil {
+			return map[string]any{"state": "unavailable"}
+		}
+		page := uploadObject(value)
+		for _, item := range uploadRows(page["items"]) {
+			if uploadObject(item)["state"] == "linked" {
+				return map[string]any{"state": "linked"}
+			}
+		}
+		next := text(page["nextAfter"])
+		if next == "" {
+			return map[string]any{"state": "unlinked"}
+		}
+		if seen[next] {
+			return map[string]any{"state": "unavailable"}
+		}
+		seen[next] = true
+		after = next
+	}
+}
+
 func (c *nativeAccountConnect) login(ctx context.Context, scope ChoiceScope) (*nativeAccountLogin, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -100,9 +128,15 @@ func (c *nativeAccountConnect) review(ctx context.Context, b *BrowserChoices, pl
 		return nil, err
 	}
 	input := BrowserChoiceInput{Name: "galaxy_native_account_connect", Scope: scope,
-		Input:            map[string]any{"galaxyId": scope.Owner, "loginId": login.id, "expiresAt": login.until.Unix()},
-		Message:          "登录银河官网并确认账户与本机 ID。完成后，这里会显示接入结果。",
-		LoginURL:         login.loginURL,
+		Input:    map[string]any{"galaxyId": scope.Owner, "loginId": login.id, "expiresAt": login.until.Unix()},
+		Message:  "请在银河官网登录并确认账户与本机 ID。确认后，此页面会显示接入结果。",
+		LoginURL: login.loginURL,
+		FirstUseSelectionDigest: func() string {
+			if plan.FirstUse {
+				return plan.SelectionDigest
+			}
+			return ""
+		}(),
 		ExternalApproval: func(ctx context.Context) (bool, error) { return c.approved(ctx, scope, login) },
 	}
 	return b.Review(ctx, input, func(ctx context.Context, selected *ChoiceScope) (any, error) {

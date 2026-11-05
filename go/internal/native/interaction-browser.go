@@ -35,12 +35,13 @@ type BrowserChoices struct {
 type choiceAction func(context.Context, *ChoiceScope) (any, error)
 
 type BrowserChoiceInput struct {
-	Name             string
-	Input            any
-	Message          string
-	Scope            ChoiceScope
-	LoginURL         string
-	ExternalApproval func(context.Context) (bool, error)
+	Name                    string
+	Input                   any
+	Message                 string
+	Scope                   ChoiceScope
+	LoginURL                string
+	ExternalApproval        func(context.Context) (bool, error)
+	FirstUseSelectionDigest string
 }
 type interactionBrowserEntry struct {
 	key       string
@@ -302,25 +303,51 @@ func interactionResultUncertain(result any) bool {
 
 // accountProgress is a view of the same temporary operation, not a second
 // link request. Local device connection alone cannot mark this linked.
-func (b *BrowserChoices) accountProgress(owner, endpoint string) map[string]any {
+func (b *BrowserChoices) accountProgress(ctx context.Context, scope ChoiceScope) map[string]any {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.pruneLocked()
 	var selected *interactionBrowserEntry
-	for _, entry := range b.entries {
-		if entry.input.Name == "galaxy_native_account_connect" && entry.input.Scope.Owner == owner && entry.input.Scope.Endpoint == endpoint &&
+	var selectedPath string
+	for path, entry := range b.entries {
+		original := entry.input.Scope
+		matches := original.DeviceID == scope.DeviceID
+		if !matches && original.DeviceID == "" && entry.input.FirstUseSelectionDigest != "" && (scope.Revision == original.Revision+1 || scope.Revision == original.Revision+2) {
+			// First-use bootstrap persists its exact target before changing selection.
+			// Only that device, for this original selection, can inherit the operation.
+			_ = b.store.With(ctx, false, func(dir string) error {
+				var row map[string]any
+				_, err := readJSON(connectionRecordPath(dir, "native-first-connect:"+original.Endpoint+":"+original.Owner), &row)
+				if err != nil {
+					return err
+				}
+				request := uploadObject(row["request"])
+				matches = row["selectionDigest"] == entry.input.FirstUseSelectionDigest && connectionEqual(row["scope"], identityClone(original)) && request["subjectId"] == original.Owner && request["kind"] == "bootstrap" && uploadObject(request["newDevice"])["deviceId"] == scope.DeviceID
+				return nil
+			})
+		}
+		if entry.input.Name == "galaxy_native_account_connect" && original.Owner == scope.Owner && original.Endpoint == scope.Endpoint && matches &&
 			(selected == nil || entry.expires.After(selected.expires)) {
 			selected = entry
+			selectedPath = path
 		}
 	}
 	if selected == nil {
 		return nil
 	}
-	state := selected.state
-	if state == "finished" {
-		state = "linked"
+	result := map[string]any{"state": selected.state, "identity": scope.Owner, "endpoint": scope.Endpoint}
+	if selected.state == "awaiting-account" || selected.state == "processing" {
+		result["url"] = b.origin + selectedPath
 	}
-	return map[string]any{"state": state}
+	if selected.completed {
+		if selected.result != nil {
+			result["result"] = selected.result
+		}
+		if selected.err != nil {
+			result["error"] = runtimeErrorCode(selected.err)
+		}
+	}
+	return result
 }
 
 func (b *BrowserChoices) Close() error {
@@ -348,7 +375,7 @@ func interactionResponse(w http.ResponseWriter, status int, body string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "same-origin")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(status)
 	_, _ = io.WriteString(w, body)
@@ -436,20 +463,44 @@ func (b *BrowserChoices) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(copy.exact)
 		return
 	}
-	if copy.running || copy.state == "awaiting-account" {
-		w.Header().Set("Refresh", "2")
+	if r.URL.RawQuery == "status=1" {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(map[string]any{"state": copy.state, "message": interactionOutcome(copy)})
+		return
 	}
 	var output strings.Builder
 	view := interactionBrowserView(copy.input)
 	data := struct {
-		Path, State, Until, LoginURL string
-		View                         interactionChoiceView
-	}{r.URL.Path, copy.state, copy.expires.Local().Format("15:04:05"), copy.input.LoginURL, view}
+		Path, State, Until, LoginURL, Outcome string
+		View                                  interactionChoiceView
+	}{r.URL.Path, copy.state, copy.expires.Local().Format("15:04:05"), copy.input.LoginURL, interactionOutcome(copy), view}
 	if e := interactionReviewTemplate.Execute(&output, data); e != nil {
 		interactionResponse(w, 500, "本机审阅页面暂不可用。")
 		return
 	}
 	interactionResponse(w, 200, output.String())
+}
+
+func interactionOutcome(entry interactionBrowserEntry) string {
+	switch entry.state {
+	case "awaiting-account":
+		return "请在打开的银河官网页面登录并确认，完成后此页面会显示结果。"
+	case "processing":
+		return "正在处理，请稍候。"
+	case "finished":
+		if entry.input.Name == "galaxy_native_account_connect" {
+			return "银河账户关联已完成，可以回到原聊天。"
+		}
+		return userChoiceOutcome(entry.result)
+	case "failed":
+		return "操作未完成。"
+	case "unconfirmed":
+		return "结果尚未确认。"
+	case "declined", "declined-delivered":
+		return "已取消。"
+	}
+	return ""
 }
 
 type interactionChoiceRow struct{ Label, Text string }
@@ -459,15 +510,8 @@ type interactionChoiceView struct {
 }
 
 func interactionBrowserView(input BrowserChoiceInput) interactionChoiceView {
-	titles := map[string]string{"galaxy_native_initialize": "创建本机身份", "galaxy_native_connect": "连接银河", "galaxy_local_archive_configure": "保存本机私有原文范围", "galaxy_local_upload_privacy_set": "保存上传类型与范围", "galaxy_local_settings_save": "保存这些选择", "galaxy_local_archive_delete": "删除所选本机原文", "galaxy_local_work_delete": "删除所选本机履历", "galaxy_work_sync_choice": "保存履历到账户", "galaxy_archive_sync_choice": "保存原会话到账户", "galaxy_work_cloud_delete": "删除本人云端履历", "galaxy_archive_cloud_delete": "删除本人云端原会话"}
-	title := titles[input.Name]
-	if input.Name == "galaxy_identity_account_execute" || input.Name == "galaxy_native_account_connect" {
-		title = "账户关联"
-	}
-	if title == "" {
-		title = "继续本次操作"
-	}
+	title := userChoiceTitle(input.Name)
 	return interactionChoiceView{Title: title, Note: "关闭页面不会确认。", Rows: []interactionChoiceRow{{"本次内容与范围", input.Message}}, Sections: []interactionChoiceRow{}}
 }
 
-var interactionReviewTemplate = template.Must(template.New("review").Parse(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>银河 · {{.View.Title}}</title><style>body{font:16px/1.65 system-ui;max-width:680px;margin:28px auto;padding:0 20px 48px;background:#fff;color:#25252c}header{color:#686471;font-size:14px}h1{font-size:26px;margin:20px 0}h2{font-size:14px;color:#686471;margin:0 0 5px}section{margin:22px 0}.content{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}dl{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:12px 18px}dl div{padding:7px 0}dt{color:#686471;font-size:14px}dd{margin:0;overflow-wrap:anywhere}button{font:inherit;padding:11px 22px;margin:8px 10px 8px 0;border:1px solid #e5e7eb;border-radius:9px;background:white;cursor:pointer}.primary{background:#9d496a;color:white;border-color:#9d496a}button:focus-visible,a:focus-visible,button:focus-visible{outline:3px solid #d8a9be;outline-offset:3px}.muted{font-size:14px;color:#686471}.ref{font-size:14px;color:#686471}.ref{overflow-wrap:anywhere}a{color:#9d496a}.login{display:inline-block;padding:10px 18px;border:1px solid #9d496a;border-radius:9px;text-decoration:none}</style><header>银河 · 当前宿主的本机选择</header><h1>{{.View.Title}}</h1>{{range .View.Rows}}<section><h2>{{.Label}}</h2><p class="content">{{.Text}}</p></section>{{end}}{{if .View.Sections}}<dl>{{range .View.Sections}}<div><dt>{{.Label}}</dt><dd>{{.Text}}</dd></div>{{end}}</dl>{{end}}<p class="muted">{{.View.Note}}有效至 {{.Until}}。</p>{{if eq .State "awaiting-account"}}{{if .LoginURL}}<a class="login" href="{{.LoginURL}}" target="_blank" rel="noopener noreferrer">登录银河账户</a>{{end}}{{else if eq .State "pending"}}<form method="post" action="{{.Path}}"><button class="primary" type="submit" name="action" value="allow">允许本次操作</button><button type="submit" name="action" value="decline">取消</button></form>{{else}}<p>{{if eq .State "processing"}}正在处理，请稍候。{{else if eq .State "finished"}}已处理，可以回到原聊天。{{else if eq .State "failed"}}未能完成这次操作。{{else if eq .State "unconfirmed"}}暂时无法确认结果。请在原聊天查看这次操作。{{else}}已取消，本次操作没有获得授权。{{end}}</p>{{end}}<section aria-label="来源与诊断"><h2>来源与诊断</h2><p>保留本次输入、准确身份与引用，供需要核对或诊断时查看。</p><a href="{{.Path}}?download=1" download="galaxy-operation.json">下载本次完整操作</a></section></html>`))
+var interactionReviewTemplate = template.Must(template.New("review").Parse(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>银河 · {{.View.Title}}</title><style>body{font:16px/1.65 system-ui;max-width:680px;margin:28px auto;padding:0 20px 48px;background:#fff;color:#25252c}header{color:#686471;font-size:14px}h1{font-size:26px;margin:20px 0}h2{font-size:14px;color:#686471;margin:0 0 5px}section{margin:22px 0}.content{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}dl{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:12px 18px}dl div{padding:7px 0}dt{color:#686471;font-size:14px}dd{margin:0;overflow-wrap:anywhere}button{font:inherit;padding:11px 22px;margin:8px 10px 8px 0;border:1px solid #e5e7eb;border-radius:9px;background:white;cursor:pointer}.primary{background:#9d496a;color:white;border-color:#9d496a}button:focus-visible,a:focus-visible,button:focus-visible{outline:3px solid #d8a9be;outline-offset:3px}.muted{font-size:14px;color:#686471}.ref{font-size:14px;color:#686471}.ref{overflow-wrap:anywhere}a{color:#9d496a}.login{display:inline-block;padding:10px 18px;border:1px solid #9d496a;border-radius:9px;text-decoration:none}</style><header>AGI Galaxy</header><h1>{{.View.Title}}</h1>{{range .View.Rows}}<section><h2>{{.Label}}</h2><p class="content">{{.Text}}</p></section>{{end}}{{if .View.Sections}}<dl>{{range .View.Sections}}<div><dt>{{.Label}}</dt><dd>{{.Text}}</dd></div>{{end}}</dl>{{end}}<p class="muted">{{.View.Note}}有效至 {{.Until}}。</p>{{if eq .State "awaiting-account"}}{{if .LoginURL}}<a class="login" href="{{.LoginURL}}" target="_blank" rel="noopener noreferrer">登录银河账户</a>{{end}}{{else if eq .State "pending"}}<form method="post" action="{{.Path}}"><button class="primary" type="submit" name="action" value="allow">{{.View.Title}}</button><button type="submit" name="action" value="decline">取消</button></form>{{else}}<p id="outcome">{{.Outcome}}</p>{{end}}{{if eq .State "awaiting-account"}}<p id="outcome">{{.Outcome}}</p>{{end}}<details><summary>查看操作详情</summary><a href="{{.Path}}?download=1" download="galaxy-operation.json">下载本次操作</a></details>{{if or (eq .State "processing") (eq .State "awaiting-account")}}<script>const output=document.getElementById('outcome'); async function poll(){try{const r=await fetch(location.pathname+'?status=1',{cache:'no-store'});if(!r.ok)return;const data=await r.json();output.textContent=data.message;if(data.state==='processing'||data.state==='awaiting-account')setTimeout(poll,2000);}catch(e){setTimeout(poll,3000)}}setTimeout(poll,2000);</script>{{end}}</html>`))

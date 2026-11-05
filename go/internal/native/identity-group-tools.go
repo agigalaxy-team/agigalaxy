@@ -41,7 +41,7 @@ func registerNativeIdentityGroupTools(server *mcp.Server, tools *toolRuntime, ru
 				if uploadObject(preview)["state"] != nil {
 					return toolResult(preview)
 				}
-				message := "请本人核对完整身份显示关系：受影响的原身份、原资料引用及哈希、更正、接收人、可见范围与当前设备。原ID、事实作者、权限、配额及能力不合并。\n" + hostJSONString(preview)
+				message := "调整下列身份的显示关系。各身份的资料归属和权限保持独立。"
 				return tools.review(ctx, req, preview, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					return host.ExecuteReviewed(ctx, text(input["previewId"]), scope)
 				})

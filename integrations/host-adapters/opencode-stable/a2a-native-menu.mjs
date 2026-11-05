@@ -1,7 +1,7 @@
+import { unwrap } from './purpose/presentation.mjs';
 import {authoredRows,nativeStateLabel,nativeAudienceLabel,a2aParticipantContent} from '../../native-v2/presentation/native-result.mjs';
 import {nativeChoiceUrl} from '../../native-v2/compact-app/browser-choice.mjs';
 
-const unwrap=r=>{if(r?.resultType==='input_required')return{state:'host-choice-required'};const d=r?.structuredContent??r;if(r?.isError)throw Object.assign(Error(d.error??'a2a_operation_incomplete'),{associationId:d.associationId});return d;};
 const plain=v=>String(v??'').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ');
 const terminal=new Set(['completed','failed','rejected','canceled']);
 

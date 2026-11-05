@@ -7,18 +7,69 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/native"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/nativebridge"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
+var humanOutput bool
+var outputAction string
+var outputDryRun bool
+
 func run(ctx context.Context, args []string) error {
+	humanOutput = false
+	outputAction = ""
+	outputDryRun = false
+	if len(args) == 0 || len(args) == 1 && args[0] == "--json" {
+		outputAction = "status"
+		if info, err := os.Stdout.Stat(); err == nil {
+			humanOutput = info.Mode()&os.ModeCharDevice != 0
+		}
+		if len(args) == 1 {
+			humanOutput = false
+			args = nil
+		}
+	} else {
+		outputAction = args[0]
+		switch outputAction {
+		case "setup", "install", "update", "repair", "uninstall", "service", "status", "identity", "version", "--version", "help", "--help", "-h":
+			if info, err := os.Stdout.Stat(); err == nil {
+				humanOutput = info.Mode()&os.ModeCharDevice != 0
+			}
+			filtered := make([]string, 0, len(args))
+			for _, arg := range args {
+				if arg == "--json" {
+					humanOutput = false
+				} else {
+					if arg == "--dry-run" {
+						outputDryRun = true
+					}
+					filtered = append(filtered, arg)
+				}
+			}
+			args = filtered
+		}
+	}
 	if len(args) < 1 {
 		return localCommand(ctx, "status", nil)
 	}
 	switch args[0] {
+	case "version", "--version":
+		directory, err := candidateDirectory()
+		if err != nil {
+			return err
+		}
+		version, err := updatePackageVersion(directory)
+		if humanOutput && errors.Is(err, os.ErrNotExist) {
+			_, err = fmt.Fprintln(os.Stdout, "当前程序未附带版本信息。")
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(os.Stdout, "Galaxy "+version)
+		return err
 	case "help", "--help", "-h":
 		usage()
 		return nil
@@ -69,12 +120,10 @@ func run(ctx context.Context, args []string) error {
 		if e != nil {
 			return e
 		}
-		b, e := protocol.Encode(map[string]any{"identity": v, "localOnly": true})
-		if e != nil {
-			return e
+		if humanOutput {
+			return printHumanStatus(ctx, v, false)
 		}
-		_, e = fmt.Fprintln(os.Stdout, string(b))
-		return e
+		return printValue(map[string]any{"identity": v, "localOnly": true})
 	default:
 		return fault.New("native_command_unknown", 400)
 	}
@@ -84,10 +133,18 @@ func main() {
 	defer stop()
 	if e := run(ctx, os.Args[1:]); e != nil {
 		if errors.Is(e, nativebridge.ErrPaused) {
-			slog.Info("galaxy service stopped", "code", "native_service_paused")
+			if humanOutput {
+				fmt.Fprintln(os.Stderr, "银河服务已停止。")
+			} else {
+				slog.Info("galaxy service stopped", "code", "native_service_paused")
+			}
 			os.Exit(75)
 		}
-		slog.Error("galaxy command failed", "code", fault.Code(e))
+		if humanOutput {
+			fmt.Fprintln(os.Stderr, "银河未能完成操作，请让当前 Agent 协助处理。")
+		} else {
+			slog.Error("galaxy command failed", "code", fault.Code(e))
+		}
 		os.Exit(1)
 	}
 }

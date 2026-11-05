@@ -93,8 +93,12 @@ export function createPurposeMenu({
       throw Error('current_identity_changed');
     owner ??= fingerprint(before);
     const data = unwrap(await nativeTools.call(name, args));
-    const after = unwrap(await nativeTools.call('galaxy_native_status', {}));
-    if (owner !== fingerprint(after)) throw Error('current_identity_changed');
+    // Preserve the actual result if the subsequent read fails. A changed
+    // binding closes this menu's fence before any later operation.
+    try {
+      const after = unwrap(await nativeTools.call('galaxy_native_status', {}));
+      if (owner !== fingerprint(after)) owner = Symbol('identity-changed');
+    } catch { /* The next operation must recheck status before it runs. */ }
     return data;
   }
   async function run(fn, done, back = onBack) {

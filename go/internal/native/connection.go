@@ -340,6 +340,12 @@ type ConnectionHTTPError struct {
 }
 type ConnectionRequestError struct{ Code, Outcome string }
 
+// businessRequestError distinguishes the selected business request from setup requests.
+type businessRequestError struct{ err error }
+
+func (e *businessRequestError) Error() string { return e.err.Error() }
+func (e *businessRequestError) Unwrap() error { return e.err }
+
 func (e *ConnectionRequestError) Error() string { return e.Code }
 func (e *ConnectionRequestError) Unwrap() error { return fault.New(e.Code, 503) }
 func connectionUnknown(code string) error {
@@ -543,6 +549,7 @@ func (c *Connection) Call(ctx context.Context, path string, input any, options C
 	}
 	result, requestError := c.send(ctx, path, input, method, credential, account, max, capture)
 	if requestError != nil {
+		requestError = &businessRequestError{err: requestError}
 		lease.requireSession = false
 	}
 	if e = c.check(ctx, lease); e != nil {

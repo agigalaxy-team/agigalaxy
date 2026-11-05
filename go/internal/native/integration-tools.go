@@ -218,7 +218,7 @@ func registerIntegrationTools(server *mcp.Server, tools *toolRuntime) {
 				}
 			}
 			if isOne(name, "galaxy_local_upload_privacy_set", "galaxy_local_settings_save", "galaxy_local_worker_identity_create") {
-				return tools.review(ctx, request, input, "本人选择当前本机资料设置或独立Worker身份；不连接服务、不上传、不启动模型。\n"+hostJSONString(input), func(ctx context.Context, selected *ChoiceScope) (any, error) {
+				return tools.review(ctx, request, input, "保存所选本机设置。", func(ctx context.Context, selected *ChoiceScope) (any, error) {
 					if selected == nil || scope == nil || *selected != *scope {
 						return nil, connectionFailure("local_identity_changed")
 					}

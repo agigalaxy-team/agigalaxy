@@ -16,6 +16,9 @@ import (
 )
 
 func printValue(value any) error {
+	if humanOutput {
+		return printHumanValue(value)
+	}
 	raw, e := protocol.Encode(value)
 	if e != nil {
 		return e
@@ -77,6 +80,14 @@ func localCommand(ctx context.Context, name string, args []string) error {
 	if e != nil {
 		return e
 	}
+	if humanOutput && name == "status" {
+		status, ok := value.(map[string]any)
+		if !ok {
+			return fault.New("native_status_invalid", 500)
+		}
+		identity, _ := status["identity"].(map[string]any)
+		return printHumanStatus(ctx, identity, status["recoveryRequired"] == true)
+	}
 	return printValue(value)
 }
 func serviceConfigurationCommand(ctx context.Context, args []string) error {
@@ -137,7 +148,10 @@ func menuCommand(ctx context.Context, args []string) error {
 	return printValue(value)
 }
 func usage() {
-	fmt.Fprintln(os.Stdout, `Galaxy Go development candidate
+	fmt.Fprintln(os.Stdout, `Galaxy 客户端
+
+  galaxy version                               显示客户端版本
+  状态、身份及安装维护命令在终端显示简明结果；使用 --json 获取机器可读结果。
 
   galaxy native --config <absolute file>       MCP stdio
   galaxy host --config <absolute file>         Trusted host JSONL
@@ -148,7 +162,7 @@ func usage() {
   galaxy integration-host [--data-dir <path>] Local-only trusted Host JSONL; no service configuration
   galaxy service-config inspect --website <HTTPS origin> [--endpoint <HTTPS origin>]
   galaxy service-config prepare --website <HTTPS origin> --endpoint <HTTPS origin> --data-dir <absolute path> --output <new absolute file> [--root-pins-file <absolute JSON> --trust-directory <absolute path>] [--network-type official|hub]
-  galaxy host-configs <absolute config> <new output directory> [--package-dir <candidate>] [--hosts <comma-separated ids>]
+  galaxy host-configs <absolute config> <new output directory> [--package-dir <release>] [--hosts <comma-separated ids>]
   galaxy host-configs <new output directory> --local-only [--data-dir <path>] [--hosts <comma-separated ids>]
   galaxy setup <website URL> [--host <host id>] [--data-dir <path>] [--organization]
   galaxy setup --local-only [--host <host id>] [--data-dir <path>] [--organization]

@@ -10,31 +10,13 @@ export function createPurposeIdentity(session) {
     void session.run(
       () => session.native('galaxy_native_status'),
       (status) => {
-        if (onReady && status.connected === true) return onReady();
-        const body = [
-          nativeConnectionMessage(status, session.language),
-          ...(status.identity
-            ? [
-                session.label('当前银河身份：', 'Current Galaxy identity: ') +
-                  plain(status.identity),
-              ]
-            : [
-                session.label(
-                  '这台设备尚未准备银河身份。可以在本机准备；连接服务会另行显示实际范围。',
-                  'This device has no prepared Galaxy identity. Prepare it locally; connecting to a service shows its actual scope separately.',
-                ),
-              ]),
-          ...(status.endpoint
-            ? [
-                session.label('当前服务：', 'Current service: ') +
-                  plain(status.endpoint),
-              ]
-            : []),
-        ];
+        const ready = status.connected === true && (!status.officialAccount || status.officialAccount.state === 'linked');
+        if (onReady && ready) return onReady();
+        const body = [nativeConnectionMessage(status, session.language)];
         session.menu(
           session.label('身份与设备', 'Identity and devices') +
             ' · ' +
-            (status.connected === true
+            (ready
               ? session.label('已连接', 'Connected')
               : status.connectionError
                 ? session.label('连接暂不可用', 'Connection unavailable')
@@ -42,12 +24,6 @@ export function createPurposeIdentity(session) {
                   ? session.label('尚未连接', 'Disconnected')
                   : session.label('尚未准备', 'Not prepared')),
           [
-            [session.label('读取并验证服务信息', 'Read and verify service information'), () => void session.run(
-              async () => unwrap(await session.nativeTools.call('galaxy_native_discovery', {})),
-              (info) => session.info(session.label('服务信息已验证', 'Service information verified'),
-                [plain(info.displayName), plain(info.operator), plain(info.endpoint), session.label('签名有效；未因此连接或授权。', 'Signature valid; this does not connect or authorize.')].join('\n'),
-                () => identity(onReady, back)),
-            )],
             ...(!status.identity
               ? [
                   [
@@ -61,32 +37,14 @@ export function createPurposeIdentity(session) {
                   ],
                 ]
               : []),
-            ...(status.identity && status.connected !== true
-              ? [
-                  status.connectionChoice?.enabled === true
-                    ? [
-                        session.label(
-                          '重试当前连接',
-                          'Retry current connection',
-                        ),
-                        () => identity(onReady, back),
-                      ]
-                    : [
-                        session.label('连接当前身份', 'Connect this identity'),
-                        () =>
-                          identityChoice('galaxy_native_connect', {}, () =>
-                            identity(onReady, back),
-                          ),
-                      ],
-                ]
+            ...(status.identity && !ready
+              ? [[session.label('连接当前身份', 'Connect this identity'),
+                  () => identityChoice('galaxy_native_connect', {}, () => identity(onReady, back), ['awaiting-account', 'processing'].includes(status.connectionOperation?.state))]]
               : []),
             ...(status.identity ? [[session.label('保存身份恢复码', 'Save an identity recovery code'), () => recoveryPage('set', () => identity(null, back))]] : []),
             [session.label('使用恢复码找回原身份', 'Recover an identity with its code'), () => recoveryPage('recover', () => identity(null, back))],
-            [session.label('继续原恢复操作', 'Continue a recovery operation'), () => {
-              session.stopMessages(); const v=++session.version;
-              session.prompt({title:session.label('输入原恢复操作编号（不是恢复码）','Enter the original recovery operation ID, not the recovery code'),placeholder:'',value:'',onCancel:()=>identity(null,back),onConfirm:(value)=>{if(session.alive(v)) recoveryPage('resume',()=>identity(null,back),value.trim());}});
-            }],
-            ...(status.connected === true
+            [session.label('继续身份恢复', 'Continue identity recovery'), () => recoveryPage('resume', () => identity(null, back))],
+            ...(ready
               ? [
                   [
                     session.label(
@@ -100,7 +58,7 @@ export function createPurposeIdentity(session) {
                   ],
                 ]
               : []),
-            ...(status.connected === true
+            ...(ready
               ? [
                   [
                     session.label(
@@ -112,7 +70,7 @@ export function createPurposeIdentity(session) {
                   ],
                 ]
               : []),
-            ...(status.connected === true
+            ...(ready
               ? [
                   [
                     session.label(
@@ -135,10 +93,6 @@ export function createPurposeIdentity(session) {
                   () => identity(onReady, back),
                 ),
             ],
-            [
-              session.label('回到原工作', 'Return to original work'),
-              session.onReturnWork,
-            ],
           ],
           back,
         );
@@ -159,12 +113,16 @@ export function createPurposeIdentity(session) {
     );
   }
 
-  function identityChoice(name, input, done = identity) {
+  function identityChoice(name, input, done = identity, resume = false) {
     session.stopMessages();
     const v = ++session.version;
     let busy = false,
       choiceUrl = null,
-      initial = null;
+      initial = null,
+      initialSubject = null,
+      connectStarted = resume,
+      officialConnect = false,
+      connectStartedAt = resume ? Date.now() : 0;
     const title =
       name === 'galaxy_native_initialize'
         ? session.label('在本机准备身份', 'Prepare this device')
@@ -182,14 +140,47 @@ export function createPurposeIdentity(session) {
         const beforeKey = fingerprint(before);
         if (initial === null) {
           initial = beforeKey;
+          officialConnect = !!before.officialAccount;
+          initialSubject = JSON.stringify([before.identity ?? null, before.endpoint ?? null]);
           if (session.owner !== null && session.owner !== beforeKey)
             throw Error('current_identity_changed');
-        } else if (beforeKey !== initial)
+        } else if (name === 'galaxy_native_connect'
+          ? JSON.stringify([before.identity ?? null, before.endpoint ?? null]) !== initialSubject
+          : beforeKey !== initial)
           throw Error('current_identity_changed');
         // Only this explicitly selected identity transition may change the menu's
         // owner/binding. The Native server checks its original real choice before
         // executing; generic reads and writes retain the ordinary owner fence.
-        const value = unwrap(await session.nativeTools.call(name, input));
+        let value;
+        if (name === 'galaxy_native_connect' && officialConnect && connectStarted) {
+          const operation = before.connectionOperation;
+          if (before.connectionError === 'current_device_control_required') throw Error(before.connectionError);
+          if (operation?.state === 'awaiting-account' && operation.url && !choiceUrl) {
+            const url = nativeChoiceUrl(operation.url);
+            if (!url) throw Error('local_choice_unavailable');
+            choiceUrl = url;
+            await session.nativeTools.openLink?.(url);
+            if (!session.alive(v)) return;
+            session.info(title, session.label('请在打开的页面核对并选择。完成后会自动继续。', 'Review and choose on the opened page. This will continue automatically.'), () => { if (session.alive(v)) void tick(); });
+          }
+
+          if (operation?.identity && operation.identity !== before.identity || operation?.endpoint && operation.endpoint !== before.endpoint) throw Error('current_identity_changed');
+          if (operation?.state === 'declined') value = {state: 'declined'};
+          else if (['failed', 'unconfirmed'].includes(operation?.state)) throw Error(operation.error ?? 'native_connection_unconfirmed');
+          else if ((operation?.state === 'finished' || !operation) && before.connected === true && (!before.officialAccount || before.officialAccount.state === 'linked')) {
+            session.owner = fingerprint(before);
+            return done();
+          } else if (operation?.state === 'finished' || (!operation && Date.now() - connectStartedAt > 310000)) {
+            throw Error('native_identity_transition_unconfirmed');
+          } else {
+            session.messageTimer = setTimeout(() => void tick(), 1500);
+            session.messageTimer.unref?.();
+            return;
+          }
+        } else {
+          if (name === 'galaxy_native_connect' && officialConnect) { connectStarted = true; connectStartedAt = Date.now(); }
+          value = unwrap(await session.nativeTools.call(name, input));
+        }
         if (!session.alive(v)) return;
         if (value.state === 'user-choice-needs-browser') {
           const url = nativeChoiceUrl(value.url);
@@ -201,8 +192,8 @@ export function createPurposeIdentity(session) {
             session.info(
               title,
               session.label(
-                '请在本机选择页核对这次内容与范围。允许后会自动继续；原工作仍保留。',
-                'Review this operation and scope in the local choice page. It continues after approval; the original work is retained.',
+                '请在打开的页面核对并选择。完成后会自动继续。',
+                'Review and choose on the opened page. This will continue automatically.',
               ) +
                 '\n\n' +
                 url,
@@ -219,8 +210,8 @@ export function createPurposeIdentity(session) {
           return session.message(
             title,
             session.label(
-              '这次操作未获准。可以继续原工作，或重新选择。',
-              'This operation was not approved. Continue the original work or choose again.',
+              '已取消。',
+              'Canceled.',
             ),
             identity,
           );
@@ -231,7 +222,7 @@ export function createPurposeIdentity(session) {
         if (
           (name === 'galaxy_native_initialize' &&
             (!after.identity || value.identity !== after.identity)) ||
-          (name === 'galaxy_native_connect' && after.connected !== true) ||
+          (name === 'galaxy_native_connect' && (after.connected !== true || after.officialAccount && after.officialAccount.state !== 'linked')) ||
           (name === 'galaxy_native_disconnect' && after.connected === true)
         )
           throw Error('native_identity_transition_unconfirmed');
@@ -244,8 +235,8 @@ export function createPurposeIdentity(session) {
             String(error.message).startsWith('native_configuration_')
               ? nativeConfigurationMessage(error, session.language)
               : session.label(
-                  '这次操作暂未完成。原身份与工作仍保留，请检查当前连接后再试。',
-                  'This operation has not completed. Existing identity and work are retained; check this connection before retrying.',
+                  '暂时无法确认这次操作的结果。请查看当前状态。',
+                  'The outcome cannot currently be confirmed. Check the current status.',
                 ),
             identity,
           );

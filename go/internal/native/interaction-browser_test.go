@@ -135,7 +135,7 @@ func TestInteractionBrowserExactChoiceAndOriginalOperationOnce(t *testing.T) {
 	if status := interactionPost(t, raw, origin, "action=allow", nil); status != 200 {
 		t.Fatal(status)
 	}
-	waitForInteractionResult(t, raw, "已处理，可以回到原聊天。")
+	waitForInteractionResult(t, raw, "设置已保存。")
 	saved := interactionChoice(t, browser, input, run)
 	if saved["settings"] == nil || calls.Load() != 1 {
 		t.Fatal(saved, calls.Load())
@@ -154,6 +154,38 @@ func TestInteractionBrowserExactChoiceAndOriginalOperationOnce(t *testing.T) {
 	}
 	if _, e = http.Get(raw); e == nil {
 		t.Fatal("closed review listener is still reachable")
+	}
+}
+
+func TestClientConnectionProgressFollowsOnlyItsOwnFirstDevice(t *testing.T) {
+	ctx := context.Background()
+	store := interactionTestStore(t)
+	original, _ := store.ChoiceScope(ctx)
+	browser := NewBrowserChoices(store, nil)
+	defer browser.Close()
+	input := BrowserChoiceInput{Name: "galaxy_native_account_connect", Scope: original, FirstUseSelectionDigest: "original-selection", Input: map[string]any{}}
+	interactionChoice(t, browser, input, func(context.Context, *ChoiceScope) (any, error) { return nil, nil })
+	device := "093c482c-8aef-47e9-9267-6990b58a3461"
+	if err := store.With(ctx, true, func(dir string) error {
+		return uploadNativeRecordWithin(dir, "native-first-connect:"+original.Endpoint+":"+original.Owner, map[string]any{
+			"selectionDigest": "original-selection", "scope": original,
+			"request": map[string]any{"subjectId": original.Owner, "kind": "bootstrap", "newDevice": map[string]any{"deviceId": device}},
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	next := original
+	next.DeviceID, next.Revision = device, original.Revision+1
+	if browser.accountProgress(ctx, next) == nil {
+		t.Fatal("first-device transition lost its original connection")
+	}
+	next.DeviceID = "2f6dc03e-b94d-4d50-a87a-1f2a09f1669d"
+	if browser.accountProgress(ctx, next) != nil {
+		t.Fatal("another device inherited the connection operation")
+	}
+	next.DeviceID, next.Owner = device, "another-identity"
+	if browser.accountProgress(ctx, next) != nil {
+		t.Fatal("another identity inherited the connection operation")
 	}
 }
 func TestInteractionBrowserCancellationExpiryAndScopeCannotApprove(t *testing.T) {
@@ -191,7 +223,7 @@ func TestInteractionBrowserCancellationExpiryAndScopeCannotApprove(t *testing.T)
 	}
 	body, _ := io.ReadAll(response.Body)
 	response.Body.Close()
-	if !strings.Contains(string(body), "已取消，本次操作没有获得授权") {
+	if !strings.Contains(string(body), "已取消。") {
 		t.Fatal(string(body))
 	}
 	currentRaw := text(next["url"])
@@ -246,7 +278,7 @@ func TestInteractionBrowserActualIsolatedHeadlessChoiceAndWindowClose(t *testing
 			}
 			pending := interactionChoice(t, browser, input, run)
 			before := calls.Load()
-			script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const context=await browser.newContext();const page=await context.newPage();await page.goto(process.argv[1]);const action=process.argv[2];if(action==='window-close'){await page.close();}else{await page.getByRole('button',{name:action==='allow'?'允许本次操作':'取消',exact:true}).click();await page.getByText(action==='allow'?'已处理，可以回到原聊天。':'已取消，本次操作没有获得授权。',{exact:true}).waitFor();}await context.close();console.log(JSON.stringify({isolatedHeadless:true,action}));}finally{await browser.close();}`
+			script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const context=await browser.newContext();const page=await context.newPage();await page.goto(process.argv[1]);const action=process.argv[2];if(action==='window-close'){await page.close();}else{await page.getByRole('button',{name:action==='allow'?'设置会话保存':'取消',exact:true}).click();await page.getByText(action==='allow'?'设置已保存。':'已取消。',{exact:true}).waitFor();}await context.close();console.log(JSON.stringify({isolatedHeadless:true,action}));}finally{await browser.close();}`
 			result := initializationNode(t, script, text(pending["url"]), action)
 			if result["isolatedHeadless"] != true {
 				t.Fatal(result)

@@ -105,7 +105,7 @@ func registerRemoteMaterialTools(server *mcp.Server, tools *toolRuntime, runtime
 			}
 			out, e := client.Call(ctx, name, input)
 			if e != nil {
-				result, encoding := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write})
+				result, encoding := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write && nativeOutcomeUnknown(e)})
 				if result != nil {
 					result.IsError = true
 				}

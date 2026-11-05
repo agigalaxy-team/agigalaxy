@@ -48,12 +48,8 @@ func registerNativeHandoffTools(server *mcp.Server, tools *toolRuntime, runtime 
 		if e != nil {
 			return toolError(e)
 		}
-		raw, e := protocol.Encode(preview)
-		if e != nil {
-			return toolError(e)
-		}
 		review := map[string]any{"offer": input.Offer, "preview": preview}
-		return tools.review(ctx, req, review, fmt.Sprintf("使用当前控制设备批准这里显示的准确公钥、银河身份与权限范围：\n%s\n签署的公开批准包由新设备验证并证明持有私钥后才能提交。此步骤不更换本机身份，也不连接新设备或恢复资料。", raw), func(ctx context.Context, current *ChoiceScope) (any, error) {
+		return tools.review(ctx, req, review, "允许下列新设备使用此银河身份。当前设备和资料保留。", func(ctx context.Context, current *ChoiceScope) (any, error) {
 			if *scope != *current {
 				return nil, connectionFailure("device_handoff_owner_changed")
 			}
@@ -71,12 +67,8 @@ func registerNativeHandoffTools(server *mcp.Server, tools *toolRuntime, runtime 
 		if e != nil {
 			return toolError(e)
 		}
-		raw, e := protocol.Encode(preview)
-		if e != nil {
-			return toolError(e)
-		}
 		review := map[string]any{"approval": input.Approval, "preview": preview}
-		return tools.review(ctx, req, review, fmt.Sprintf("在发出请求的本机接受准确原设备批准，并证明持有这一个已保存的设备私钥：\n%s\n提交只沿原operationId和原请求。没有选中设备时才选用该原设备，连接另行选择，资料恢复单独处理；已有另一选中设备时保留该选择。", raw), func(ctx context.Context, current *ChoiceScope) (any, error) {
+		return tools.review(ctx, req, review, "在这台设备上接续下列银河身份。", func(ctx context.Context, current *ChoiceScope) (any, error) {
 			if *scope != *current {
 				return nil, connectionFailure("device_handoff_owner_changed")
 			}

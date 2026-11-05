@@ -158,17 +158,13 @@ func registerRemoteSummaryDomainTools(server *mcp.Server, tools *toolRuntime, ru
 				if e != nil {
 					return toolError(e)
 				}
-				raw, e := protocol.Encode(normalized)
-				if e != nil {
-					return toolError(e)
-				}
-				return tools.review(ctx, request, normalized, "本人确认所示收件箱静音或阻止范围。不会撤销原公开事实，不标记本人已读，也不启动系统提醒或模型。\n"+string(raw), func(ctx context.Context, scope *ChoiceScope) (any, error) {
+				return tools.review(ctx, request, normalized, "保存下列消息的静音与屏蔽设置。", func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					return remoteSummaryCall(ctx, runtime, name, normalized, scope)
 				})
 			}
 			value, e := remoteSummaryCall(ctx, runtime, name, input, nil)
 			if e != nil {
-				result, encodeError := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write})
+				result, encodeError := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write && nativeOutcomeUnknown(e)})
 				if result != nil {
 					result.IsError = true
 				}

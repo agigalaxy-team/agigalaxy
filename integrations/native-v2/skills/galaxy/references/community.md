@@ -8,8 +8,11 @@
 
 银河 ID 的收藏与关联账户的网页收藏是不同范围。用户要读取或管理明确选定账户中的收藏时，使用 `galaxy_account_bookmarks`、`galaxy_account_bookmark_status`、`galaxy_account_bookmark_command` 和 `galaxy_account_bookmark_receipt`，传当前已关联的准确 `accountId`；列表按该账户和原筛选条件沿返回的 `nextAfter` 分页。账户写入结果未知时保留原 `operationId` 和 `payloadHash` 查原回执，当前收藏状态另查；收藏本身不授予来源正文访问。不要把银河 ID 收藏自动说成账户收藏，也不在两者间自动复制。
 
-进入完整网页时使用 `galaxy_open` 的 `community`（可选 `topic`、`query`）、`post`（准确帖子，可选版本）或 `bookmarks` 对象，字段以当前工具 schema 为准。原工作引用只留本机。返回时使用原 navigationId 调用 `galaxy_return`，按当前来源重新读取；源内容撤回、许可改变或暂不可核查时准确说明，不凭收藏或历史回执重放旧正文。
+进入完整网页可使用 `galaxy_open` 的 `community`（可选 `topic`、`query`）、`post`（准确帖子，可选版本）或 `bookmarks` 对象，字段以当前工具 schema 为准。网页返回和来源失效的处理见[网页与聊天接续](continuation.md)。
 
 发帖与回复需要真实内容和当前授权，沿当前提供的网页编辑入口进行。已有身份、主题、查询与草稿连续使用，不要求用户抄写对象编号。私人编辑尚未发布时，公开读者仍读取原版本；旧回复保持它所回应的版本语境，不自动解释为对新内容的评价。
 
-网页“用自己的 AI 继续”生成的请求可交给 `galaxy_work_continue`。按链接读取确切版本，并保留原页返回位置；不要替换成最新版，也不要把未选的私人构思、草稿或其他材料带入。工具可用、网页已呈现和真实宿主已验收分别表述。
+
+## 公开账户资料
+
+`galaxy_account_public_profile/ids/credentials/by_id/posts` 查询当前公开资料、ID 关联、外部凭据和公开帖子，不要求本机身份。沿 `nextAfter` 分页；公开范围由在线账户决定，未返回私有内容不表示它不存在。

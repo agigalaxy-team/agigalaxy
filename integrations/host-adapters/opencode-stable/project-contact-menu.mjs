@@ -1,10 +1,10 @@
+import { unwrap } from './purpose/presentation.mjs';
 import {discoveryQueryV2Schema} from '../../../packages/galaxy-contracts/src/discovery-schema-v2.mjs';
 import {authoredRows} from '../../native-v2/presentation/native-result.mjs';
 import {nativeChoiceUrl} from '../../native-v2/compact-app/browser-choice.mjs';
 
 const plain=value=>String(value??'').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ').slice(0,24000);
 const brief=value=>Array.from(plain(value)).slice(0,65).join('');
-const unwrap=value=>{const data=value?.structuredContent??value;if(value?.isError)throw Object.assign(Error(data.error??'current_content_unavailable'),{code:data.error});if(data===value&&value?.content?.[0]?.text){try{return JSON.parse(value.content[0].text);}catch{/* Already readable data. */}}return data;};
 const tags=value=>[...new Set(String(value).split(/[,，、\n]/).map(s=>s.trim()).filter(Boolean))];
 
 // Foreground Dialog navigation over existing Discovery, Contact and Chat. The

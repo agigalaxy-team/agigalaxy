@@ -113,7 +113,7 @@ func registerRemoteCommentTools(server *mcp.Server, tools *toolRuntime, runtime 
 			}
 			value, e := client.Call(ctx, name, input)
 			if e != nil {
-				result, encodeError := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write})
+				result, encodeError := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write && nativeOutcomeUnknown(e)})
 				if result != nil {
 					result.IsError = true
 				}

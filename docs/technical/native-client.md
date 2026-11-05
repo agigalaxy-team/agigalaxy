@@ -1,10 +1,22 @@
 # Native 客户端与宿主工程
 
-统一 Go Native 核心提供本机服务及 MCP 接口，stdio 入口作为宿主薄连接。当前源码候选使用目标平台的 `galaxy`（Windows 为 `galaxy.exe`）承接身份、资料、业务调用与连接；npm 引导、原生整版包和适用容器均交付同一核心。JavaScript／TypeScript 保留安装引导、OpenCode TUI、宿主 SDK 和 MCP Apps 界面，模型仍由用户宿主提供。v2 是协议标识，发行版本读取包清单的 `releaseId`，不能据协议名推断版本或验收范围。旧已签名发行包保持其原字节和启动方式；本地候选没有自动替换正式安装。构建与运行边界见 [Go 核心](../../go/README.md)、[Go 候选运行样例](../../go/deploy/README.md)和[实施计划](go-core-plan.md)。公共授权/原操作规则见[接口](interfaces.md#管理身份与原操作)。
+统一 Go Native 核心提供本机服务及 MCP 接口，stdio 入口作为宿主薄连接。客户端使用目标平台的 `galaxy`（Windows 为 `galaxy.exe`）承接身份、资料、业务调用与连接；npm 引导、原生整版包和适用容器均交付同一核心。JavaScript／TypeScript 保留安装引导、OpenCode TUI、宿主 SDK 和 MCP Apps 界面，模型仍由用户宿主提供。v2 是协议标识，发行版本读取包清单的 `releaseId`，不能据协议名推断版本或验收范围。旧已签名发行包保持其原字节和启动方式；源码改动经正式发行后由更新程序应用，不自行替换用户安装。构建与运行边界见 [Go 核心](../../go/README.md)、[Go 运行样例](../../go/deploy/README.md)和[实施计划](go-core-plan.md)。公共授权/原操作规则见[接口](interfaces.md#管理身份与原操作)。
 
-## 通用插件完整开发准备（2026-11-03）
+## 通用插件与共用本机服务
 
-本节合并已确认职责、当前源码接线及开发准备依据。共用服务、薄连接、安装维护、完整 MCP 和宿主适配已进入实现，不再作为待选的另一套客户端架构。候选尚未正式发行，实际检查与剩余工作以 [WORK_STATUS](../../WORK_STATUS.md) 为准；[功能核对](#功能实现核对2026-11-03)区分源码接线与实际验收。
+本节合并已确认职责、当前源码接线及开发准备依据。共用服务、薄连接、安装维护、完整 MCP 和宿主适配已进入实现，不再作为待选的另一套客户端架构。客户端已有正式发行；当前源码修改、实际检查与剩余工作以 [WORK_STATUS](../../WORK_STATUS.md) 为准；[功能核对](#功能实现核对2026-11-03)区分源码接线与实际验收。
+
+### 客户端交互与结果
+
+MCP 的结构化结果保留完整业务数据和诊断，可读内容呈现实际正文、操作结果及必要选择。宿主同时兼容旧版 JSON 文字结果；配置、签名、操作定位等由程序和 Agent 处理，不要求使用者理解或填写。业务结果与辅助状态读取分别交付，后续读取失败不抹掉已经取得的结果。
+
+连接状态区分稳定身份、当前连接、持久账户关联及短期登录进度。官方接入沿原 ID，一次发起后观察原操作；自身登记设备造成的正常变化继续接续，真正身份或权限变化仍约束后续读取与操作。本机确认页局部更新结果，记录保存、设备移除等确认以具体对象和实际影响展示。
+
+### Skill 的按需组合
+
+对宿主保持一个 `galaxy` 入口；入口按用户当前用途选择 `references/` 中的接入维护、查询帮助、社区、身份、本机记录、房间、协作或网页接续说明。高级身份管理再从身份模块深入读取，不在普通接入时加载全部细节。模块可以围绕同一任务组合，也可与宿主已有的工程或文档 Skill 协作；不创建固定业务编排或依赖未安装的 Skill。
+
+客户端包、官网独立 Skill ZIP 和稳定公开路径均从同一 Skill 源树递归生成。宿主仍按原格式安装整套目录，不假定每个宿主都能发现多个独立子 Skill。更新替换受管理目录；官网重复生成清理自己负责的旧 Skill 文件，避免出现内容不同步的模块。
 
 ### 已确认职责与当前运行结构
 
@@ -176,7 +188,7 @@ Unix 本机通信在地址长度允许时保留原缓存内 socket；超出系�
 
 服务版入口 `galaxy native --config <公开配置绝对路径>` 提供当前已接入的服务和本机工具；本机入口 `galaxy integration-mcp --data-dir <目录>` 不构造服务 Runtime 或连接服务。对应的 `host`、`integration-host` 只供可信宿主使用，不作为模型 MCP 工具。公开配置含 `version:2`、HTTPS `endpoint`/`website`、绝对 `dataDirectory` 和可信公钥；通过 `--config` 或 `GALAXY_NATIVE_CONFIG` 选择，不写入 token、私钥或恢复码。`service-config inspect/prepare` 负责读取所选服务信息和准备公开配置；显式根 pin、信任目录及轮换见下文。`setup` 保留从所选官网读取公开服务配置并展示计划、经本人确认后安装的原入口，也支持 `setup --local-only`；实际安装共用同一执行器；`host-configs` 只向新目录生成片段，不代表已安装或宿主已加载。命令参数以 `galaxy --help` 为准。
 
-`scripts/build-native-v2.mjs` 构建平台二进制、面板、Skill 和宿主资源，`scripts/prepare-client-candidate.mjs` 在构建时解析并锁定薄宿主依赖、归集许可并准备归档；已有缓存可用 `--offline`。`--goos`/`--goarch` 可选择目标，跨目标候选不在当前机器执行安装检查。归档名包含发行版本、OS 和架构。`scripts/prepare-native-npm.mjs` 从已准备候选生成 `@galaxy/native` 薄入口和对应平台包目录，仅列入本次提供的目标。启动器无参数时执行 `install`，无法唯一识别宿主时在交互终端提示输入宿主 ID，非交互环境可使用 `install --host <宿主ID>`；其他参数直接交给 Native 程序。`scripts/prepare-native-container.mjs` 从 Linux 候选生成容器构建上下文。正式发行的 npm 包可从发行页下载并离线安装；容器上下文用于本地构建。容器显式挂载专用资料目录和所需公开配置，用同一用户启动一个前台核心，再让各宿主通过 `docker exec -i` 连接同一容器；私有 IPC 在容器内。容器 `localhost` 不是桌面 `localhost`，不自动挂载整个用户目录、发布端口或部署数据库。容器准备器的第四个可选参数为基础镜像引用，也可由 `prepareNativeContainer({baseImage})` 传入；已核实的 `image@sha256:…` 可直接用于固定构建。默认值采用已经实际拉取并核对的 `node:22-bookworm-slim` 摘要，准确引用只在脚本中维护；显式覆盖时生成结果和说明仍区分固定摘要与可变标签。准备器不自动查询镜像，基础镜像更新与客户端发行分别处理。
+`scripts/build-native-v2.mjs` 构建平台二进制、面板、Skill 和宿主资源，`scripts/prepare-client-candidate.mjs` 在构建时解析并锁定薄宿主依赖、归集许可并准备归档；已有缓存可用 `--offline`。`--goos`/`--goarch` 可选择目标，跨目标构建产物不在当前机器执行安装检查。归档名包含发行版本、OS 和架构。`scripts/prepare-native-npm.mjs` 从已准备的客户端产物生成 `@galaxy/native` 薄入口和对应平台包目录，仅列入本次提供的目标。启动器无参数时执行 `install`，无法唯一识别宿主时在交互终端提示输入宿主 ID，非交互环境可使用 `install --host <宿主ID>`；其他参数直接交给 Native 程序。`scripts/prepare-native-container.mjs` 从 Linux 客户端产物生成容器构建上下文。正式发行的 npm 包可从发行页下载并离线安装；容器上下文用于本地构建。容器显式挂载专用资料目录和所需公开配置，用同一用户启动一个前台核心，再让各宿主通过 `docker exec -i` 连接同一容器；私有 IPC 在容器内。容器 `localhost` 不是桌面 `localhost`，不自动挂载整个用户目录、发布端口或部署数据库。容器准备器的第四个可选参数为基础镜像引用，也可由 `prepareNativeContainer({baseImage})` 传入；已核实的 `image@sha256:…` 可直接用于固定构建。默认值采用已经实际拉取并核对的 `node:22-bookworm-slim` 摘要，准确引用只在脚本中维护；显式覆盖时生成结果和说明仍区分固定摘要与可变标签。准备器不自动查询镜像，基础镜像更新与客户端发行分别处理。
 
 [Go Native 0.1.5](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.5) 正式发行包含六平台包、同源 npm 包及固定基础镜像的 Linux 容器上下文。较早 `0.1.0`／`0.1.4` 的实测仅对应原版本，实际验收范围见 [WORK_STATUS](../../WORK_STATUS.md)。
 
@@ -269,3 +281,5 @@ authentication默认none，或用`bearer-environment`指定该peer的`GALAXY_A2A
 Windows 固定 NotifyIcon 仅收到 BalloonTipShown 才记观察到展示。Linux 用同用户本地 Unix D-Bus/Python3/PyGObject/GIO，helper 仅收模式和数量，不收私有标题/正文/URL/收件人/对象ID；Notify 返回仅受理，`displayed:false`。固定服务唯一名称/通知ID撤回不重连猜测，未知尝试重启不重发。Windows 中的 Linux 检查使用受控 Node 替身，不是实体 Linux 桌面验收。
 
 macOS保留helper源码及可选预编译App的整包准备入口；本轮尚无对应机器的编译、签名、公证与真实桌面验收。command 必须为 `.../GalaxyNotifications.app/Contents/MacOS/GalaxyNotifications`，不退 AppleScript。已有 macOS SDK 时可用源码 `notifications/macos-helper/build.mjs` 向新绝对目录构建，仍不签名/安装/启动。permission 工具每次独立本人选择，仅未决定时请求系统 alert 权限；普通 status/enable 不弹窗，也不标已读。UNUserNotificationCenter.add 仅受理、展示未知；撤回请求与之后观察列表消失分开。Swift 编译、真实 Notification Center 和发行适用性需对应机器验证。
+
+安装和维护命令在交互终端输出简明结果；脚本可使用 `--json` 明确请求机器可读结果，非交互输出保留原有 JSON 格式。`galaxy version` 或 `galaxy --version` 显示该客户端包的版本。`setup` 自动预检并应用用户请求的配置；只有无法确定宿主时才询问宿主选择，内部校验和配置细节由程序处理。

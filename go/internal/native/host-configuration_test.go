@@ -94,6 +94,32 @@ func TestHostConfigurationSelectedFormatsAndOriginalAssets(t *testing.T) {
 			t.Fatal("generated host asset missing", path, e)
 		}
 	}
+	skillSource := filepath.Join(pkg, "skills", "galaxy")
+	for _, target := range []string{"opencode/.agents/skills/galaxy", "claude-code/.claude/skills/galaxy", "codex/.agents/skills/galaxy", "copilot-vscode/.github/skills/galaxy", "copilot-cli/.copilot/skills/galaxy"} {
+		if err := filepath.WalkDir(skillSource, func(path string, entry os.DirEntry, err error) error {
+			if err != nil || entry.IsDir() {
+				return err
+			}
+			rel, err := filepath.Rel(skillSource, path)
+			if err != nil {
+				return err
+			}
+			expected, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			actual, err := os.ReadFile(filepath.Join(input.Destination, filepath.FromSlash(target), rel))
+			if err != nil {
+				return err
+			}
+			if string(expected) != string(actual) {
+				t.Errorf("Skill module changed during host delivery: %s/%s", target, rel)
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func TestHostConfigurationOriginalDefaultHosts(t *testing.T) {

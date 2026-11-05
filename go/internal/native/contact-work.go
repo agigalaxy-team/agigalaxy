@@ -530,7 +530,7 @@ func registerNativeContactWorkTools(server *mcp.Server, tools *toolRuntime, r *R
 					break
 				}
 				value := map[string]any{"handle": id, "preview": preview}
-				result, reviewError := tools.review(ctx, req, value, "请本人核对这次独立联系、参与双方、当前机会或原联系和精确正文；不会创建任务、房间或替收件人接受。\n"+hostJSONString(value), func(ctx context.Context, scope *ChoiceScope) (any, error) { return h.execute(ctx, l, id, false, scope) })
+				result, reviewError := tools.review(ctx, req, value, "向所选成员发送下列联系内容。", func(ctx context.Context, scope *ChoiceScope) (any, error) { return h.execute(ctx, l, id, false, scope) })
 				if reviewError == nil && result != nil && !result.IsError {
 					decision := uploadObject(result.StructuredContent)
 					if decision == nil {

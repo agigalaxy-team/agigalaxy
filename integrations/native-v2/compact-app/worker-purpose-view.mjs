@@ -1,3 +1,4 @@
+import {panelErrorMessage} from './presentation.mjs';
 import {workerComponentResult} from './worker-result.mjs';
 import {nativeChoiceUrl} from './browser-choice.mjs';
 import {authoredRows,nativeAudienceLabel,nativeStateLabel,a2aParticipantContent} from '../presentation/native-result.mjs';
@@ -14,7 +15,7 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
  const labels=a2a?{...workerLabels,start:'交给所选服务处理',send:'交给所选服务处理',reply:'补充这次工作'}:workerLabels;
  const doc=root.ownerDocument,win=doc.defaultView;
  let current=null,generation=0,intent=0,busy=false,reading=false,destroyed=false,timer=null,choiceTimer=null,expiryTimer=null,browserChoice=null,browserChoiceUrl=null,scope=null;
- let summaryDraft='',outcomeDraft='inconclusive',limitsDraft='',restoredResult=null;
+ let summaryDraft='',outcomeDraft='inconclusive',limitsDraft='',replyDraft='',restoredResult=null;
  const el=(tag,text,cls)=>{const n=doc.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
  root.className='galaxy-compact';
  const header=el('header'),brand=el('strong','✧ 银河'),back=button('回到原工作',finish),status=el('output','','status');
@@ -22,7 +23,7 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
  const content=el('section'),review=el('section'),other=el('section'),actions=el('div',undefined,'actions');root.replaceChildren(header,status,content,review,actions,other);
  function button(title,run,secondary=false){const b=el('button',title,secondary?'secondary':undefined);b.type='button';b.addEventListener('click',()=>{if((!busy||b.dataset.return==='true')&&!destroyed){intent++;clearTimeout(timer);Promise.resolve(run()).catch(showError);}});return b;}
  function setBusy(value){busy=value;root.setAttribute('aria-busy',String(value));root.querySelectorAll('button').forEach(b=>{b.disabled=b.dataset.return!=='true'&&(value||b.dataset.waiting==='true');});}
- function readable(node,value){const rows=authoredRows(value);for(const row of rows){const section=el('section',undefined,'worker-content');if(['合计','商'].includes(row.label)&&!row.download)section.classList.add('arithmetic-output');if(row.download){const a=el('a','下载完整内容');a.download='galaxy-worker-content.json';a.href='data:application/json;charset=utf-8,'+encodeURIComponent(row.download);section.append(a);}else section.append(el('h3',row.label),el('p',row.text));node.append(section);}return rows;}
+ function readable(node,value){const rows=authoredRows(value).filter(row=>!row.download);for(const row of rows){const section=el('section',undefined,'worker-content');if(['合计','商'].includes(row.label)&&!row.download)section.classList.add('arithmetic-output');if(row.download)continue;section.append(el('h3',row.label),el('p',row.text));node.append(section);}return rows;}
  function diagnostics(value){const detail=el('details');detail.append(el('summary','来源与诊断'),el('p','需要核对准确版本、关联或原操作时，可以下载当前允许的信息。','muted'));
   if(value?.executionAuthority==='peer-reported'||value?.peer?.peer)detail.append(el('p','来源：'+(a2a?'所选服务':'所选 Worker')+'返回的内容。尚未独立验证。','muted'));
   const a=el('a','下载当前信息');a.download='galaxy-worker.json';a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(value,null,2));detail.append(a);return detail;}
@@ -49,16 +50,20 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
    receive(data);
    return data;
   }catch(error){if(stale())return;
-   if(appendList&&current){status.textContent='暂时无法读取更多工作，当前内容仍保留。';return;}
+   if(appendList&&current){status.textContent='暂时无法读取更多工作。';return;}
    const id=error.associationId??associationId();
    // A lost return may have committed. Query that association, never execute
    // the handle or generate another operation merely to make an error disappear.
-   if(recover&&name===tool.execute&&id){setBusy(false);status.textContent='正在确认原操作的结果…';return invoke(tool.read,{action:'get',associationId:id,...(a2a?{peerId:peerId()}:{})},{quiet:true,recover:false});}
+   if(recover&&name===tool.execute&&id){setBusy(false);status.textContent='正在确认结果…';return invoke(tool.read,{action:'get',associationId:id,...(a2a?{peerId:peerId()}:{})},{quiet:true,recover:false});}
    showError(error);
   }finally{if(background)reading=false;else if(!destroyed&&token===generation)setBusy(false);}
  }
- function showError(error){clearTimeout(timer);clearTimeout(choiceTimer);browserChoice=null;browserChoiceUrl=null;current=current?{ownerScope:current.ownerScope,viewId:current.viewId}:null;generation++;setBusy(false);
-  content.replaceChildren(el('h2','当前内容暂不可用'),el('p','原工作仍保留。回到原工作或重试读取当前允许的内容。'));review.replaceChildren();other.replaceChildren();actions.replaceChildren(button('重试读取',()=>read(error?.associationId)),diagnostics({error:error?.message??'worker_host_unavailable'}));status.textContent='操作暂未完成。';}
+ function showError(error){clearTimeout(timer);clearTimeout(choiceTimer);browserChoice=null;browserChoiceUrl=null;generation++;setBusy(false);
+  status.textContent=panelErrorMessage(error?.code??error?.message, '这项工作');
+  if(!current)content.replaceChildren(el('h2','当前工作暂不可用'));
+  for(const control of review.querySelectorAll('button')){control.dataset.waiting='true';control.disabled=true;}
+  if(!actions.querySelector('[data-retry-read]')){const retry=button('重试读取',()=>read(error?.associationId));retry.dataset.retryRead='true';actions.append(retry,diagnostics({error:error?.code??error?.message??'worker_host_unavailable'}));}
+ }
  async function showBrowserChoice(data){const prior=browserChoice,preview=current?.preview?.handle?current.preview:data.preview?.handle?data.preview:null,same=prior?.handle===preview?.handle&&browserChoiceUrl===data.url;
   browserChoice=preview;browserChoiceUrl=data.url;
   if(same){scheduleChoice();return;}
@@ -72,12 +77,12 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
   }
   if(destroyed||token!==generation)return;
   if(safe){box.append(el('p',openLink&&supportsOpenLink()?'当前宿主未打开本机选择页。可以从这里继续同一次选择。':'当前宿主没有提供打开页面的能力。可以从这里继续同一次选择。','muted'));const a=el('a','打开本机选择页');a.href=url;a.target='_blank';a.rel='noopener noreferrer';box.append(a);}
-  else{browserChoice=null;browserChoiceUrl=null;box.append(el('p','本次选择地址不可用。请回到原工作重新取得当前内容。','muted'));}
+  else{browserChoice=null;browserChoiceUrl=null;box.append(el('p','本次选择页面暂不可用，请重新选择。','muted'));}
   scheduleChoice();
  }
  async function finish(){clearTimeout(timer);if(busy)return;const refreshed=await read();if(!refreshed)return;const a=refreshed.selected?.association,p=refreshed.preview,r=refreshed.actionResult;
   if(handoff&&supportsHandoff())await handoff({associationId:a?.associationId??p?.associationId??r?.associationId??null,...(a2a?{peerId:peerId()}:{pack:a?.pack??p?.pack??null}),taskId:a?.taskId??null,caseId:a?.caseId??p?.caseId??null,attempt:a?.attempt??p?.attempt??null},refreshed);
-  status.textContent='可以回到原工作继续。';
+  status.textContent='已准备继续处理。';
  }
  function resultForm(selected){const state=selected.peer?.peer?.state??selected.peer?.status;
   if(!terminal.has(state)||selected.peer?.resultImportV2?.state==='acknowledged')return;
@@ -97,20 +102,20 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
    if(next?.state==='user-choice-needs-browser'){showBrowserChoice(next).catch(showError);return;}
   if(next?.kind!==(a2a?'galaxy-a2a-panel':'galaxy-worker-panel')||next.schemaVersion!==1)return;
   const id=next.selected?.association?.associationId??next.preview?.associationId??next.actionResult?.associationId??null;
-  const nextScope=JSON.stringify([next.ownerScope??next.viewId,id]);if(nextScope!==scope){summaryDraft='';outcomeDraft='inconclusive';limitsDraft='';restoredResult=null;scope=nextScope;}
+  const nextScope=JSON.stringify([next.ownerScope??next.viewId,id]);if(nextScope!==scope){summaryDraft='';outcomeDraft='inconclusive';limitsDraft='';replyDraft='';restoredResult=null;scope=nextScope;}
    const visible=value=>{const {viewId:_viewId,checkedAt:_checkedAt,...rest}=value??{};return JSON.stringify(rest);};
   if(!browserChoice&&current&&visible(next)===visible(current)){current=next;if(next.selected?.peer?.peer?.taskId&&!terminal.has(next.selected.peer.peer.state))scheduleRead();return;}
   const active=doc.activeElement?.dataset?.editor,selection=doc.activeElement?.selectionStart;
   const expanded=[...root.querySelectorAll('details[open]')].map(n=>n.querySelector('summary')?.textContent);
   current=next;browserChoice=null;browserChoiceUrl=null;generation++;clearTimeout(timer);clearTimeout(choiceTimer);clearTimeout(expiryTimer);setBusy(false);content.replaceChildren();review.replaceChildren();other.replaceChildren();actions.replaceChildren();
-  if(next.availability!=='ready'){content.append(el('h2',a2a?'当前宿主未连接所选服务':'当前宿主未连接 Worker'),el('p','可以回到原工作继续，或在设置中接入已有服务。'));status.textContent='';return;}
+  if(next.availability!=='ready'){content.append(el('h2',a2a?'当前宿主未连接所选服务':'当前宿主未连接 Worker'),el('p','请在设置中接入服务。'));status.textContent='';return;}
   const selected=next.selected,a=selected?.association,peer=selected?.peer,state=peer?.peer?.state??peer?.status;
-  if(a){content.append(el('h2',a.purpose??'当前工作'));if(selected.sourceUnavailable)content.append(el('p','原工作当前不可读取。已保留原操作，回执不会恢复旧内容访问。'));
-   else if(state!=='completed')content.append(el('p',(state==='working'?'正在处理':nativeStateLabel(state)??'原工作状态待确认')+'。','muted'));
+  if(a){content.append(el('h2',a.purpose??'当前工作'));if(selected.sourceUnavailable)content.append(el('p','这项工作的来源暂时无法读取。'));
+   else if(state!=='completed')content.append(el('p',(state==='working'?'正在处理':nativeStateLabel(state)??'状态待确认')+'。','muted'));
    const output=el('article',undefined,'worker-output'),rows=readable(output,peer?.peer);if(rows.length){content.append(output);}
-   else if(terminal.has(state))content.append(el('p','对端没有提供可显示的输出。可以回到原工作处理当前结果。'));
+   else if(terminal.has(state))content.append(el('p','对方没有提供可显示的输出。'));
    if(['input-required','auth-required'].includes(state)){content.append(el('p',state==='auth-required'?'所选服务需要处理它的授权；当前身份或凭据不会自动转交。':'对端需要补充内容。'));
-    if(a2a){const label=el('label','补充所选内容'),input=el('textarea');input.rows=3;input.maxLength=12000;input.dataset.editor='reply';label.append(input);content.append(label,button('查看补充内容',()=>{if(!input.value.trim()){input.focus();return;}return invoke(tool.prepare,{action:'reply',peerId:peerId(),associationId:a.associationId,text:input.value.trim()});}));}
+    if(a2a){const label=el('label','补充所选内容'),input=el('textarea');input.rows=3;input.maxLength=12000;input.dataset.editor='reply';input.value=replyDraft;input.addEventListener('input',()=>{replyDraft=input.value;});label.append(input);content.append(label,button('查看补充内容',()=>{if(!input.value.trim()){input.focus();return;}return invoke(tool.prepare,{action:'reply',peerId:peerId(),associationId:a.associationId,text:input.value.trim()});}));}
     else content.append(el('p','回到原聊天补充即可继续。'));}
    if(peer?.peer?.taskId&&!terminal.has(state))actions.append(button('停止这次工作',()=>invoke(tool.prepare,{action:'cancel',associationId:a.associationId,...(a2a?{peerId:peerId()}:{})}),true));
    if(selected.resultReceipt?.state==='acknowledged'||peer?.resultImportV2?.state==='acknowledged')content.append(el('p','这次结果已保留。','muted'));
@@ -125,9 +130,9 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
    const rows=readable(box,a2a&&p.action==='result'?a2aParticipantContent(p):p.exact);if(!rows.length)box.append(el('p',p.action==='cancel'?'请求所选服务停止当前工作。':'这次操作会保留当前工作的使用记录。'));
    box.append(el('p',['start','send','reply','cancel'].includes(p.action)?'由 '+(a2a?p.peerName??'所选服务':p.workerName??p.workerId??'所选服务')+' 处理这里选定的内容。':'保存后'+nativeAudienceLabel(p.visibility,p.recipients)+'可查看。'));
    if(p.exact){const submit=button(p.action==='cancel'?'选择停止':['start','send','reply'].includes(p.action)?'选择发送':'选择保存',()=>invoke(tool.execute,{handle:p.handle,previewHash:p.previewHash}));submit.dataset.choiceSubmit='true';box.append(submit);}
-   else box.append(el('p','当前预览不完整，请回到原工作重新取得内容。'));
+   else box.append(el('p','当前内容不完整，请重新选择。'));
    box.append(button('取消',()=>invoke(tool.abort,{handle:p.handle}),true),diagnostics(p));review.append(box);
-   const lifetime=Date.parse(p.expiresAt)-Date.now();if(Number.isFinite(lifetime)){const expire=()=>{if(destroyed||current?.preview?.handle!==p.handle)return;clearTimeout(choiceTimer);browserChoice=null;browserChoiceUrl=null;for(const b of root.querySelectorAll('[data-choice-submit]')){b.dataset.waiting='true';b.disabled=true;b.textContent='需要更新本次内容';}review.querySelector('[data-browser-choice]')?.remove();status.textContent='本次预览已过期。回到原工作即可重新取得当前内容。';};if(lifetime<=0)expire();else expiryTimer=setTimeout(expire,lifetime);}
+   const lifetime=Date.parse(p.expiresAt)-Date.now();if(Number.isFinite(lifetime)){const expire=()=>{if(destroyed||current?.preview?.handle!==p.handle)return;clearTimeout(choiceTimer);browserChoice=null;browserChoiceUrl=null;for(const b of root.querySelectorAll('[data-choice-submit]')){b.dataset.waiting='true';b.disabled=true;b.textContent='需要更新本次内容';}review.querySelector('[data-browser-choice]')?.remove();status.textContent='本次选择已过期，请重新选择。';};if(lifetime<=0)expire();else expiryTimer=setTimeout(expire,lifetime);}
   }
   if(next.actionResult){const r=next.actionResult,detail=r.result??r;
    const isLocal=detail.previewDiscarded||detail.localStopped;
@@ -163,5 +168,5 @@ export function mountWorkerPanel(root,{call,handoff,supportsHandoff=()=>true,dis
   },1500);}
  const onFocus=()=>{if(destroyed||busy)return;clearTimeout(timer);timer=setTimeout(()=>{if(destroyed||busy)return;if(browserChoice){const p=browserChoice;void invoke(tool.execute,{handle:p.handle,previewHash:p.previewHash},{quiet:true});}else if(current?.selected)void read(associationId(),false,{quiet:true});},150);};
  const onVisibility=()=>{if(doc.visibilityState==='visible')onFocus();};
- win?.addEventListener('focus',onFocus);doc.addEventListener('visibilitychange',onVisibility);return{receive,refresh:read,close(){destroyed=true;generation++;clearTimeout(timer);clearTimeout(choiceTimer);clearTimeout(expiryTimer);win?.removeEventListener('focus',onFocus);doc.removeEventListener('visibilitychange',onVisibility);current=null;browserChoice=null;browserChoiceUrl=null;summaryDraft='';limitsDraft='';root.replaceChildren();}};
+ win?.addEventListener('focus',onFocus);doc.addEventListener('visibilitychange',onVisibility);return{receive,refresh:read,close(){destroyed=true;generation++;clearTimeout(timer);clearTimeout(choiceTimer);clearTimeout(expiryTimer);win?.removeEventListener('focus',onFocus);doc.removeEventListener('visibilitychange',onVisibility);current=null;browserChoice=null;browserChoiceUrl=null;summaryDraft='';limitsDraft='';replyDraft='';root.replaceChildren();}};
 }

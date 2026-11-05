@@ -2,7 +2,6 @@ package native
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"time"
 
@@ -319,8 +318,8 @@ func registerNativeWorkerTools(server *mcp.Server, tools *toolRuntime, host *Nat
 					return workerPanelResult(data, settings.ComponentOnly != nil && settings.ComponentOnly(request)), nil
 				}
 				choice := map[string]any{"handle": input["handle"], "previewHash": input["previewHash"], "expiresAt": p.expiresAt, "preview": p.reviewData}
-				reviewJSON, _ := protocol.EncodeJS(choice)
-				result, e := tools.review(ctx, request, choice, fmt.Sprintf("本人仅确认所示 Worker、Pack 版本、实际 Configuration、Attempt、选中内容与接收范围。外部报告、Case Result 与 PackUse 各自独立选择，不启动模型或安装。\n%s\n关闭或取消不表示远端工作已取消；未知沿原操作核对。", reviewJSON), func(ctx context.Context, scope *ChoiceScope) (any, error) {
+
+				result, e := tools.review(ctx, request, choice, "使用所选协作服务处理下列工作与材料。", func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					if e = l.check(ctx); e != nil {
 						return nil, e
 					}

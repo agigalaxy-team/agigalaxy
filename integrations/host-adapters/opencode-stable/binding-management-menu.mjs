@@ -25,15 +25,15 @@ export function createBindingManagementMenu({controller,select,prompt,info,langu
   }
   function detail(item,back){
     menu(`${item.installationId}\n${item.bindingId}\n${stateName(item.state)}\n${label('建立','Created')}: ${item.createdAt}\n${label('到期','Expires')}: ${item.expiresAt}\n${label('撤销','Revoked')}: ${item.revokedAt??'-'}\nScopes: ${item.scopes.join(', ')}\n${label('撤销绑定只结束此绑定；同一身份的设备撤销或恢复码恢复另行由本人确认。','Revoking a binding ends only that binding. Device revocation or same-identity recovery requires separate personal confirmation.')}`,[
-      ...(item.state!=='revoked'?[[label('预览撤销此绑定','Preview revoking this binding'),()=>revoke(item.bindingId,back)]]:[]),
+      ...(item.state!=='revoked'?[[label('预览撤销此绑定','Preview revoking this binding'),()=>revoke(item,back)]]:[]),
       [label('查看此安装实例的全部绑定','List bindings for this installation'),()=>open({installationId:item.installationId})],
       [label('返回列表','Back to list'),back],
     ],back);
   }
-  function revoke(bindingId,back){void run(()=>controller.prepareBindingRevoke(bindingId),preview=>{
+  function revoke(item,back){void run(()=>controller.prepareBindingRevoke(item.bindingId),preview=>{
     const version=++generation;
     const leave=()=>{if(current(version)){generation++;controller.cancel();back();}};
-    showExactChoice({preview,title:label('撤销所选设备连接','Revoke the selected device connection'),select,info,language,isCurrent:()=>current(version),onCancel:leave,onConfirm:value=>{
+    showExactChoice({preview:{...preview,installationId:item.installationId,bindingId:item.bindingId,deviceName:item.deviceName},title:label('撤销所选设备连接','Revoke the selected device connection'),select,info,language,isCurrent:()=>current(version),onCancel:leave,onConfirm:value=>{
         if(!current(version))return;generation++;
         void run(()=>controller.executeBindingRevoke(preview,value),result=>message(label('指定绑定已撤销。','The selected binding was revoked.'),result.currentSessionEnded?onBack:back),
           ()=>message(label('若提交期间网络中断，请重新读取该绑定状态；不会自动重试。','If the network failed during submission, refresh the binding status. No automatic retry.'),onBack));

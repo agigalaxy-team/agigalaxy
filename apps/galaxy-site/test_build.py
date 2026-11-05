@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from build import copy_example_images, windows_filesystem_path
 from guide_pages import render_markdown
-from public_manual import publish_manual
+from public_manual import publish_manual, REPO
 from zipfile import ZipFile
 import chrome
 from product_pages import render_homepage, render_product_pages
@@ -149,6 +149,13 @@ class PublicNavigationTests(unittest.TestCase):
                 site = {'page':chrome.page,'write':chrome.write,'OUT':output,'PREVIEW':True,'RUNTIME_DATA':True}
                 render_product_pages(site)
                 publish_manual(site)
+                obsolete = output/'skills/galaxy/references/removed-module.md'
+                obsolete.write_text('old generated module', encoding='utf-8')
+                keep = output/'unrelated.txt'
+                keep.write_text('keep', encoding='utf-8')
+                publish_manual(site)
+                self.assertFalse(obsolete.exists())
+                self.assertEqual(keep.read_text(encoding='utf-8'), 'keep')
             self.assertFalse(list(output.rglob('*.html')))
             home=json.loads((output/'assets/home-content.json').read_text(encoding='utf-8'))
             self.assertIn('同一身份',json.dumps(home,ensure_ascii=False))
@@ -169,9 +176,16 @@ class PublicNavigationTests(unittest.TestCase):
             with ZipFile(output/'skills/galaxy.zip') as archive:
                 skill=archive.read('galaxy/SKILL.md')
                 self.assertEqual(skill, (output/'skills/galaxy/SKILL.md').read_bytes())
-                self.assertIn(b'https://agigalaxy.org/downloads/',skill)
-                self.assertIn(b'https://agigalaxy.org/docs/galaxy/getting-started/',skill)
-                self.assertIn('galaxy/references/identity.md',archive.namelist())
+                self.assertIn(b'references/setup.md',skill)
+                setup=archive.read('galaxy/references/setup.md')
+                self.assertIn(b'https://agigalaxy.org/downloads/',setup)
+                self.assertIn(b'https://agigalaxy.org/docs/galaxy/getting-started/',setup)
+                source=REPO/'integrations/native-v2/skills/galaxy'
+                expected={file.relative_to(source).as_posix():file.read_bytes() for file in source.rglob('*') if file.is_file()}
+                self.assertEqual(set(archive.namelist()), {'galaxy/'+name for name in expected})
+                for name,content in expected.items():
+                    self.assertEqual(archive.read('galaxy/'+name),content)
+                    self.assertEqual((output/'skills/galaxy'/name).read_bytes(),content)
             self.assertIn('SHA-256',json.dumps(verification))
             self.assertIn('/downloads/native/0.1.5/SHA256SUMS.txt',json.dumps(verification))
             self.assertIn('/downloads/native/0.1.5/galaxy-native-go-0.1.5-windows-amd64.tgz.jws',json.dumps(verification))

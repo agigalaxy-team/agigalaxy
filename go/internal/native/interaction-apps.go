@@ -422,11 +422,7 @@ func RegisterInteractionApps(server *mcp.Server, runtime *Runtime, artifact *Int
 		if handled {
 			message = readable
 		} else {
-			exact, e := protocol.Encode(shown)
-			if e != nil {
-				return interactionPanelError(e), nil
-			}
-			message += "\n" + string(exact)
+			message = userChoiceMessage(name, shown, message)
 		}
 		result, e := review(ctx, req, name, input, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 			if uploadScope != nil && (scope == nil || *scope != *uploadScope) {

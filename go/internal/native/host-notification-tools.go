@@ -53,11 +53,11 @@ func registerNativeHostNotificationTools(server *mcp.Server, tools *toolRuntime,
 				revision := host.permissionRevision
 				host.mu.Unlock()
 				value := map[string]any{"activationSession": activation, "choiceEpoch": epoch, "permissionRevision": revision, "authorizationContext": map[string]any{"subjectId": l.scope.Owner, "endpoint": l.scope.Endpoint, "bindingId": l.connection.bindingID, "generation": l.connection.generation}}
-				message := "请本人选择是否仅在本进程启用通用系统提醒，每60秒核对现有收件箱；系统不接收私有正文，不改人工已读，不调用模型。"
+				message := "开启银河消息的系统提醒。"
 				if name == "galaxy_host_notifications_permission" {
-					message = "请本人选择是否询问已配置macOS应用的系统提醒权限；这次选择不启用提醒、不显示通知，也不改变银河已读。"
+					message = "在系统中允许银河显示消息提醒。"
 				}
-				return tools.review(operation, request, value, message+"\n"+hostJSONString(value), func(operation context.Context, scope *ChoiceScope) (any, error) {
+				return tools.review(operation, request, value, message, func(operation context.Context, scope *ChoiceScope) (any, error) {
 					if name == "galaxy_host_notifications_enable" {
 						return host.EnableReviewed(operation, l, scope, epoch)
 					}

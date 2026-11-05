@@ -53,7 +53,7 @@ func registerRemoteChatTools(server *mcp.Server, tools *toolRuntime, runtime *Ru
 			}
 			value, e := chat.Call(ctx, name, normalized, nil)
 			if e != nil {
-				result, encodeError := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write})
+				result, encodeError := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write && nativeOutcomeUnknown(e)})
 				if result != nil {
 					result.IsError = true
 				}

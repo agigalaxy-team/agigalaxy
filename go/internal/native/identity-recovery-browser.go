@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -24,10 +26,73 @@ type recoveryBrowserEntry struct {
 	scope              ChoiceScope
 	service            *NativeRecovery
 	stage, id, message string
+	candidates         []recoveryCandidate
+}
+
+type recoveryCandidate struct{ ID, Subject, Label, When string }
+
+// Find only records belonging to the active selection or the exact selection
+// that initiated recovery. Key contents are never read during discovery.
+func recoveryCandidates(ctx context.Context, n *NativeRecovery, scope ChoiceScope) ([]recoveryCandidate, error) {
+	var candidates []recoveryCandidate
+	err := n.runtime.store.With(ctx, false, func(dir string) error {
+		entries, err := os.ReadDir(filepath.Join(dir, "native-v2", "keys"))
+		if os.IsNotExist(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			name := entry.Name()
+			if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || !strings.HasPrefix(name, "recovery-") || !strings.HasSuffix(name, ".pem") {
+				continue
+			}
+			id := strings.TrimSuffix(strings.TrimPrefix(name, "recovery-"), ".pem")
+			if !handoffUUID(id) {
+				continue
+			}
+			var row map[string]any
+			if _, err := readJSON(connectionRecordPath(dir, recoveryRecordKey(n.runtime.config.Endpoint, id)), &row); err != nil {
+				return err
+			}
+			if row == nil || row["operationId"] != id || row["state"] == "registered" || !connectionSubject.MatchString(text(row["subjectId"])) {
+				continue
+			}
+			label := ""
+			switch row["kind"] {
+			case "set-recovery":
+				if row["subjectId"] != scope.Owner || !connectionEqual(row["scope"], identityClone(scope)) {
+					continue
+				}
+				label = "设置恢复码，等待保存"
+			case "recover":
+				if !(scope.Owner == row["subjectId"] && scope.DeviceID == row["deviceId"]) && !connectionEqual(row["originalScope"], identityClone(scope)) {
+					continue
+				}
+				label = "恢复身份，等待核对"
+				if scope.Owner == row["subjectId"] && scope.DeviceID == row["deviceId"] {
+					label = "恢复身份，等待保存恢复码"
+				}
+			default:
+				continue
+			}
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			if !info.Mode().IsRegular() {
+				continue
+			}
+			candidates = append(candidates, recoveryCandidate{ID: id, Subject: text(row["subjectId"]), Label: label, When: info.ModTime().Local().Format("2006-01-02 15:04:05")})
+		}
+		return nil
+	})
+	return candidates, err
 }
 
 func (b *BrowserChoices) recoveryPage(ctx context.Context, n *NativeRecovery, mode, id string) (map[string]any, error) {
-	if !isOne(mode, "set", "recover", "resume") || mode == "resume" && !handoffUUID(id) || mode != "resume" && id != "" {
+	if !isOne(mode, "set", "recover", "resume") || mode == "resume" && id != "" && !handoffUUID(id) || mode != "resume" && id != "" {
 		return nil, connectionFailure("identity_recovery_input_invalid")
 	}
 	scope, e := b.store.ChoiceScope(ctx)
@@ -38,10 +103,25 @@ func (b *BrowserChoices) recoveryPage(ctx context.Context, n *NativeRecovery, mo
 		return nil, connectionFailure("local_identity_required")
 	}
 	stage := mode
+	var candidates []recoveryCandidate
+	if mode == "resume" && id == "" {
+		candidates, e = recoveryCandidates(ctx, n, scope)
+		if e != nil {
+			return nil, e
+		}
+		switch len(candidates) {
+		case 0:
+			stage = "no-pending"
+		case 1:
+			id = candidates[0].ID
+		default:
+			stage = "select"
+		}
+	}
 	if mode == "recover" {
 		id = uuid.NewString()
 	}
-	if mode == "resume" {
+	if mode == "resume" && id != "" {
 		var row map[string]any
 		e = b.store.With(ctx, false, func(dir string) error {
 			_, e := readJSON(connectionRecordPath(dir, recoveryRecordKey(n.runtime.config.Endpoint, id)), &row)
@@ -51,7 +131,7 @@ func (b *BrowserChoices) recoveryPage(ctx context.Context, n *NativeRecovery, mo
 			return nil, connectionFailure("identity_recovery_material_unavailable")
 		}
 		if row["kind"] == "set-recovery" {
-			if row["subjectId"] != scope.Owner {
+			if row["subjectId"] != scope.Owner || !connectionEqual(row["scope"], identityClone(scope)) {
 				return nil, connectionFailure("native_choice_binding_changed")
 			}
 			if row["state"] == "registered" {
@@ -60,6 +140,9 @@ func (b *BrowserChoices) recoveryPage(ctx context.Context, n *NativeRecovery, mo
 				stage = "set-save"
 			}
 		} else if row["kind"] == "recover" {
+			if !(scope.Owner == row["subjectId"] && scope.DeviceID == row["deviceId"]) && !connectionEqual(row["originalScope"], identityClone(scope)) {
+				return nil, connectionFailure("native_choice_binding_changed")
+			}
 			if scope.Owner == row["subjectId"] && scope.DeviceID == row["deviceId"] {
 				if row["state"] == "registered" {
 					stage = "done"
@@ -87,7 +170,7 @@ func (b *BrowserChoices) recoveryPage(ctx context.Context, n *NativeRecovery, mo
 	if b.recoveryEntries == nil {
 		b.recoveryEntries = map[string]*recoveryBrowserEntry{}
 	}
-	b.recoveryEntries[path] = &recoveryBrowserEntry{expires: b.now().Add(10 * time.Minute), scope: scope, service: n, stage: stage, id: id}
+	b.recoveryEntries[path] = &recoveryBrowserEntry{expires: b.now().Add(10 * time.Minute), scope: scope, service: n, stage: stage, id: id, candidates: candidates}
 	return map[string]any{"state": "user-choice-needs-browser", "url": b.origin + path, "expiresAt": b.recoveryEntries[path].expires.UnixMilli(), "reviewSurface": "temporary-local-browser", "recoveryCodeReturned": false, "sideEffect": false}, nil
 }
 func recoveryReply(w http.ResponseWriter, status int, body string) {
@@ -137,6 +220,37 @@ func (b *BrowserChoices) serveRecovery(w http.ResponseWriter, r *http.Request, p
 		action := form.Get("action")
 		page.message = ""
 		switch {
+		case page.stage == "no-pending" && action == "start-recovery" && len(form) == 1:
+			page.stage, page.id = "recover", uuid.NewString()
+		case page.stage == "select" && action == "select" && len(form) == 2 && len(form["selection"]) == 1:
+			selected := form.Get("selection")
+			candidates, err := recoveryCandidates(r.Context(), page.service, page.scope)
+			if err != nil {
+				page.message = "暂时无法读取待续恢复，请稍后重试。"
+				break
+			}
+			found := false
+			for _, candidate := range candidates {
+				if candidate.ID == selected {
+					found = true
+					page.id = selected
+					if strings.HasPrefix(candidate.Label, "设置") {
+						page.stage = "set-save"
+					} else if strings.Contains(candidate.Label, "保存") {
+						page.stage = "recover-save"
+					} else {
+						page.stage = "recover-reconcile"
+					}
+					break
+				}
+			}
+			if !found {
+				page.candidates = candidates
+				if len(candidates) == 0 {
+					page.stage = "no-pending"
+				}
+				page.message = "该恢复项目已变化，请重新选择。"
+			}
 		case page.stage == "set" && action == "prepare" && len(form) == 1:
 			result, e := page.service.PrepareSet(r.Context(), &page.scope)
 			if e != nil {
@@ -154,7 +268,7 @@ func (b *BrowserChoices) serveRecovery(w http.ResponseWriter, r *http.Request, p
 				page.message = "恢复码已登记。原身份和资料保持不变。"
 			} else if uploadObject(result["receipt"])["state"] == "requested" {
 				page.stage = "set-retry"
-				page.message = "服务记录原操作仍待提交。可由本人确认重试原签名。"
+				page.message = "恢复尚需继续，请确认是否继续。"
 			} else {
 				page.message = "原操作尚未完成，请稍后核对。"
 			}
@@ -167,7 +281,7 @@ func (b *BrowserChoices) serveRecovery(w http.ResponseWriter, r *http.Request, p
 				page.id = text(result["operationId"])
 			}
 			if e != nil {
-				if page.id != "" {
+				if result != nil && text(result["operationId"]) != "" {
 					page.stage = "recover-reconcile"
 					page.message = "结果暂不明，请核对原操作；不会自动重发。"
 				} else {
@@ -186,29 +300,7 @@ func (b *BrowserChoices) serveRecovery(w http.ResponseWriter, r *http.Request, p
 				page.message = "原操作尚未完成，请核对回执。"
 			}
 		case page.stage == "recover-reconcile" && action == "reconcile" && len(form) == 1:
-			result, e := page.service.Reconcile(r.Context(), page.id)
-			if e != nil {
-				page.message = "无法核对原操作，请稍后重试。"
-			} else if result["state"] == "registered-awaiting-save-declaration" || result["state"] == "registered" {
-				page.scope, e = b.store.ChoiceScope(r.Context())
-				if e != nil {
-					page.message = "请重新打开原操作。"
-				} else if result["state"] == "registered" {
-					page.stage = "done"
-					page.message = "恢复及保存声明已完成；连接需要另行确认。"
-				} else {
-					page.stage = "recover-save"
-				}
-			} else if result["state"] == "requested" {
-				page.stage = "recover-retry"
-				page.message = "服务记录原操作仍待提交。可由本人确认重试原签名。"
-			} else if result["state"] == "not-dispatched" {
-				page.stage = "recover"
-				page.id = uuid.NewString()
-				page.message = "原操作尚未签名或提交；可重新输入恢复码。"
-			} else {
-				page.message = "原操作尚未确认；没有重新提交。"
-			}
+			// Reconciliation runs below and does not resend the original operation.
 		case page.stage == "recover-save" && action == "saved" && len(form) == 1:
 			result, e := page.service.ConfirmNextSaved(r.Context(), page.id, &page.scope)
 			if e != nil {
@@ -218,7 +310,7 @@ func (b *BrowserChoices) serveRecovery(w http.ResponseWriter, r *http.Request, p
 				page.message = "恢复及保存声明已完成；连接需要另行确认。"
 			} else if uploadObject(result["receipt"])["state"] == "requested" {
 				page.stage = "declaration-retry"
-				page.message = "保存声明仍待提交。可由本人确认重试原签名。"
+				page.message = "保存确认尚需继续，请确认是否继续。"
 			} else {
 				page.message = "保存声明尚未完成，请稍后核对。"
 			}
@@ -257,6 +349,31 @@ func (b *BrowserChoices) serveRecovery(w http.ResponseWriter, r *http.Request, p
 			return
 		}
 	}
+	if page.stage == "recover-reconcile" {
+		result, e := page.service.Reconcile(r.Context(), page.id)
+		if e != nil {
+			page.message = "无法核对原操作，请稍后重试。"
+		} else if result["state"] == "registered-awaiting-save-declaration" || result["state"] == "registered" {
+			page.scope, e = b.store.ChoiceScope(r.Context())
+			if e != nil {
+				page.message = "请重新打开原操作。"
+			} else if result["state"] == "registered" {
+				page.stage = "done"
+				page.message = "恢复及保存声明已完成；连接需要另行确认。"
+			} else {
+				page.stage = "recover-save"
+			}
+		} else if result["state"] == "requested" {
+			page.stage = "recover-retry"
+			page.message = "恢复尚需继续，请确认是否继续。"
+		} else if result["state"] == "not-dispatched" {
+			page.stage = "recover"
+			page.id = uuid.NewString()
+			page.message = "此次恢复尚未提交；可重新输入恢复码。"
+		} else {
+			page.message = "原操作尚未确认；没有重新提交。"
+		}
+	}
 	code := ""
 	if page.stage == "set-save" || page.stage == "recover-save" {
 		var e error
@@ -266,7 +383,10 @@ func (b *BrowserChoices) serveRecovery(w http.ResponseWriter, r *http.Request, p
 		}
 	}
 	var output strings.Builder
-	data := struct{ Path, Stage, Message, Code, ID string }{r.URL.Path, page.stage, page.message, code, page.id}
+	data := struct {
+		Path, Stage, Message, Code string
+		Candidates                 []recoveryCandidate
+	}{r.URL.Path, page.stage, page.message, code, page.candidates}
 	if e := recoveryPageTemplate.Execute(&output, data); e != nil {
 		recoveryReply(w, 500, "恢复页面暂不可用。")
 		return
@@ -274,7 +394,7 @@ func (b *BrowserChoices) serveRecovery(w http.ResponseWriter, r *http.Request, p
 	recoveryReply(w, 200, output.String())
 }
 
-var recoveryPageTemplate = template.Must(template.New("identity-recovery").Parse(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>银河 · 身份恢复</title><style>body{font:16px/1.6 system-ui;max-width:680px;margin:36px auto;padding:0 18px}textarea,code{width:100%;overflow-wrap:anywhere}button{font:inherit;padding:10px 18px;margin:8px 8px 0 0}.secret{padding:16px;border:1px solid #777;user-select:all}</style><h1>银河身份恢复</h1>{{if .ID}}<p>原操作编号：<span>{{.ID}}</span></p>{{end}}{{if .Message}}<p>{{.Message}}</p>{{end}}{{if eq .Stage "set"}}<p>为当前身份准备新的恢复码。请亲自保存；确认保存后才登记，之前的恢复码将被替换。</p><form method="post" action="{{.Path}}"><button name="action" value="prepare">准备恢复码</button></form>{{else if eq .Stage "recover"}}<p>仅在本机输入原恢复码。恢复将保留原身份，撤销此服务上原设备与绑定，并生成新的恢复码。资料恢复和重新连接分别确认。</p><form method="post" action="{{.Path}}"><label for="code">原恢复码</label><textarea id="code" name="code" required autocomplete="off" spellcheck="false" rows="4"></textarea><button name="action" value="recover">本人确认恢复此身份</button></form>{{else if or (eq .Stage "set-save") (eq .Stage "recover-save")}}<p>请在自己的安全位置保存此恢复码。不要发送给助手或其他人。它只显示在本机页面。</p><p class="secret"><code>{{.Code}}</code></p><form method="post" action="{{.Path}}"><button name="action" value="saved">本人已保存此恢复码</button></form>{{else if or (eq .Stage "set-retry") (eq .Stage "recover-retry") (eq .Stage "declaration-retry")}}<p>已核对服务记录；确认仅重试同一操作的原签名字节，不生成新身份或新操作。</p><form method="post" action="{{.Path}}"><button name="action" value="retry">本人确认重试原操作</button></form>{{else if eq .Stage "recover-reconcile"}}<p>只查询原操作回执，不自动重新提交。</p><form method="post" action="{{.Path}}"><button name="action" value="reconcile">核对原操作</button></form>{{else}}<p>可关闭此页面。</p>{{end}}</html>`))
+var recoveryPageTemplate = template.Must(template.New("identity-recovery").Parse(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>银河 · 身份恢复</title><style>body{font:16px/1.6 system-ui;max-width:680px;margin:36px auto;padding:0 18px}textarea,code{width:100%;overflow-wrap:anywhere}button{font:inherit;padding:10px 18px;margin:8px 8px 0 0}.secret{padding:16px;border:1px solid #777;user-select:all}</style><h1>银河身份恢复</h1>{{if .Message}}<p>{{.Message}}</p>{{end}}{{if eq .Stage "no-pending"}}<p>当前没有可继续的恢复。可以开始恢复身份。</p><form method="post" action="{{.Path}}"><button name="action" value="start-recovery">开始恢复身份</button></form>{{else if eq .Stage "select"}}<p>请选择要继续的恢复：</p>{{range .Candidates}}<form method="post" action="{{$.Path}}"><p>身份：{{.Subject}} · {{.Label}} · {{.When}}</p><input type="hidden" name="selection" value="{{.ID}}"><button name="action" value="select">继续此恢复</button></form>{{end}}{{else if eq .Stage "set"}}<p>为当前身份准备新的恢复码。请亲自保存；确认保存后才登记，之前的恢复码将被替换。</p><form method="post" action="{{.Path}}"><button name="action" value="prepare">准备恢复码</button></form>{{else if eq .Stage "recover"}}<p>仅在本机输入原恢复码。恢复将保留原身份，撤销此服务上原设备与绑定，并生成新的恢复码。资料恢复和重新连接分别确认。</p><form method="post" action="{{.Path}}"><label for="code">原恢复码</label><textarea id="code" name="code" required autocomplete="off" spellcheck="false" rows="4"></textarea><button name="action" value="recover">本人确认恢复此身份</button></form>{{else if or (eq .Stage "set-save") (eq .Stage "recover-save")}}<p>请在自己的安全位置保存此恢复码。不要发送给助手或其他人。它只显示在本机页面。</p>{{if .Code}}<p class="secret"><code>{{.Code}}</code></p><form method="post" action="{{.Path}}"><button name="action" value="saved">本人已保存此恢复码</button></form>{{end}}{{else if or (eq .Stage "set-retry") (eq .Stage "recover-retry") (eq .Stage "declaration-retry")}}<p>已核对服务记录，此操作仍需继续。确认后将继续原来的恢复。</p><form method="post" action="{{.Path}}"><button name="action" value="retry">本人确认继续</button></form>{{else if eq .Stage "recover-reconcile"}}<p>暂时无法确认恢复进度，请稍后再次检查。</p><form method="post" action="{{.Path}}"><button name="action" value="reconcile">重新检查</button></form>{{else}}<p>可关闭此页面。</p>{{end}}</html>`))
 
 func registerNativeRecoveryTools(server *mcp.Server, tools *toolRuntime, runtime *Runtime) {
 	recovery := NewNativeRecovery(runtime)

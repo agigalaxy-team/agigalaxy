@@ -1,3 +1,4 @@
+import {authoredRows,isStructuredToolPayload} from '../presentation/native-result.mjs';
 const contentLabels = {
   title: '标题', summary: '内容', content: '内容', text: '内容', description: '说明', goal: '希望得到什么',
   currentSituation: '目前情况', purpose: '用途', reason: '原因', limitations: '适用限制',
@@ -18,17 +19,17 @@ export const operationLabel = value => ({prepared: '待发送', absent: '尚未�
 // Show authored text, but do not present partial machine records as prose.
 export function readableToolOutput(value, depth=0) {
   if (typeof value !== 'string' || !value.trim()) return '';
-  const text = value.trimStart();
+  const text=value.trimStart();
   if (text[0] !== '{' && text[0] !== '[') return value;
-  if(depth>=4)return '';
+  if (depth>=8) return '';
   try {
     const parsed=JSON.parse(text);
-    if(parsed&&typeof parsed==='object')return readableContent(parsed,{
-      allowedKeys:new Set(['content','text','message','summary','description','resultSummary']),
-      skipKeys:new Set(['metadata','details','execution','environment','debug']),
-    }).map(row=>readableToolOutput(row.text,depth+1)).filter(Boolean).join('\n\n');
-  } catch {}
-  return /^\{\s*"(?:[^"\\]|\\.)+"\s*:/.test(text) || /^\[\s*\{\s*"/.test(text) ? '' : value;
+    if (!isStructuredToolPayload(parsed)) return value;
+    return authoredRows(parsed).filter(row=>!row.download).map(row=>['内容','消息','说明','标题'].includes(row.label)?row.text:row.label+'：'+row.text).join('\n\n');
+  } catch {
+    // Incomplete machine-like object excerpts cannot be interpreted as a result.
+    return /^\{\s*"(?:[^"\\]|\\.)+"\s*:/.test(text) || /^\[\s*\{\s*"/.test(text) ? '' : value;
+  }
 }
 
 // Exact references, hashes and payloads stay in structuredContent. The human
@@ -51,12 +52,30 @@ export function readableContent(value, {limit = 24, maxText = 16000, allowedKeys
   walk(value); return rows;
 }
 
+export function mcpErrorCode(result, fallback) {
+  if (result?.structuredContent?.error) return result.structuredContent.error;
+  try { return JSON.parse(result?.content?.[0]?.text)?.error ?? fallback; } catch { return fallback; }
+}
+
+export function panelErrorMessage(code, subject='内容') {
+  if (['panel_identity_changed','local_identity_changed','local_work_identity_changed','local_archive_identity_changed'].includes(code)) return '当前身份已变化，请重新选择要查看的内容。';
+  if (['panel_connection_changed','a2a_connection_changed','receipt_status_authority_changed'].includes(code)) return '当前连接已变化，请重新选择要查看的内容。';
+  if (code==='chat_agent_not_authorized') return '当前回复授权已变化，请在完整对话中处理。';
+  if (code==='panel_draft_conflict') return '这份草稿在另一处发生了修改，请核对后保存。';
+  if (['a2a_preview_expired','a2a_preview_changed_or_expired','local_consent_expired','local_disclosure_expired'].includes(code)) return '本次内容已过期，请重新选择。';
+  if (['chat_message_conflict','local_summary_conflict','local_work_summary_revision_conflict'].includes(code)) return '内容已变化，请核对后继续。';
+  if (['local_recovery_required','local_work_identity_recovery_required','local_archive_identity_recovery_required'].includes(code)) return '本机资料需要恢复后才能继续。';
+  if (code==='local_storage_busy') return '本机资料正在使用，请稍后再试。';
+  return subject+'暂时无法处理，请稍后再试。';
+}
+
 export function panelText(data) {
-  if (data.error) return '当前内容暂时无法取得。保留原输入，稍后重试或继续原工作。';
+  if (data.error) return panelErrorMessage(data.error);
   if (data.url && !data.schemaVersion) return (data.launched ? '已请求打开当前内容。' : '可以打开当前内容：') + '\n' + data.url;
   if (data.draft && !data.schemaVersion) return '笔记已保存在本机。';
   const lines = [];
-  if (data.sourceError || data.helpError) lines.push('部分内容暂不可用，请继续原工作或稍后重试。');
+  if (data.sourceError) lines.push('当前内容暂时无法读取。');
+  if (data.helpError) lines.push('帮助暂时无法读取。');
   if (data.source) {
     lines.push(data.source.title ?? '当前工作');
     if (data.source.summary) lines.push(data.source.summary);
@@ -79,6 +98,6 @@ export function panelText(data) {
   if (data.preview) lines.push('已准备' + (actionLabels[data.preview.kind] ?? '本次操作') + '，请查看内容与范围。');
   if (data.actionResult) lines.push(operationLabel(data.actionResult.state));
   if (data.messageResult) lines.push(data.messageResult.state === 'accepted' ? '消息已发送。' : operationLabel(data.messageResult.state));
-  if (data.handoff) lines.push('可以带着当前结果继续原工作。');
-  return lines.join('\n\n') || '在原工作中说明想取得的帮助，银河将沿用已有内容和身份继续。';
+  if (data.handoff) lines.push('已准备好继续处理。');
+  return lines.join('\n\n') || '可以说明需要什么帮助。';
 }

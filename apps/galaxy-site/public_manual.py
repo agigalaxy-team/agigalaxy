@@ -1,6 +1,7 @@
 """Publish the repository manual and the common Native Skill on stable site URLs."""
 from html import escape
 from pathlib import Path
+import shutil
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from guide_pages import render_markdown
@@ -45,13 +46,44 @@ def publish_manual(site):
     site["write"]("agent.md", (REPO / "docs/public/ai-reading.md").read_text(encoding="utf-8"))
     site["write"]("downloads/galaxy-update.mjs", (REPO / "scripts/galaxy-update-legacy.mjs").read_text(encoding="utf-8"))
     skill = REPO / "integrations/native-v2/skills/galaxy"
-    paths = [skill / "SKILL.md", *sorted((skill / "references").glob("*.md"))]
-    archive_path = site["OUT"] / "skills/galaxy.zip"
+    # Publish the same complete Skill tree as the client package, including
+    # nested reference resources. Never follow a source symlink.
+    if skill.is_symlink():
+        raise ValueError("Skill source must not be a symbolic link")
+    paths = []
+    for path in sorted(skill.rglob("*")):
+        parts = path.relative_to(skill).parts
+        if (any(part in {"__pycache__", ".pytest_cache", ".git", "node_modules"} for part in parts)
+                or path.name == ".DS_Store" or path.suffix.lower() in {".pyc", ".pyo", ".tmp", ".swp"}
+                or path.name.endswith("~")):
+            continue
+        if path.is_symlink():
+            raise ValueError("Skill assets must not contain symbolic links")
+        if path.is_file():
+            paths.append(path)
+        elif not path.is_dir():
+            raise ValueError("Skill assets must be regular files or directories")
+    if skill / "SKILL.md" not in paths:
+        raise FileNotFoundError(skill / "SKILL.md")
+    output = Path(site["OUT"]).resolve()
+    skill_parent = output / "skills"
+    public_skill = skill_parent / "galaxy"
+    if (skill_parent.is_symlink() or public_skill.is_symlink()
+            or not public_skill.resolve().is_relative_to(output)
+            or public_skill.resolve() != public_skill):
+        raise ValueError("Generated Skill directory must stay inside the output directory")
+    if public_skill.exists():
+        if not public_skill.is_dir():
+            raise ValueError("Generated Skill target must be a directory")
+        shutil.rmtree(public_skill)
+    archive_path = skill_parent / "galaxy.zip"
+    if archive_path.is_symlink():
+        raise ValueError("Generated Skill archive must not be a symbolic link")
     archive_path.parent.mkdir(parents=True, exist_ok=True)
     with ZipFile(archive_path, "w") as archive:
         for path in paths:
             relative = "galaxy/" + path.relative_to(skill).as_posix()
-            target = site["OUT"] / "skills" / relative
+            target = public_skill / path.relative_to(skill)
             target.parent.mkdir(parents=True, exist_ok=True)
             content = path.read_bytes()
             target.write_bytes(content)

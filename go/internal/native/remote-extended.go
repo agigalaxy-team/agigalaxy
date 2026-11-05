@@ -207,11 +207,11 @@ func registerExtendedRemoteTools(server *mcp.Server, tools *toolRuntime, runtime
 				}
 				defer cancel()
 				value := map[string]any{"input": input, "authorizationContext": map[string]any{"subjectId": l.scope.Owner, "endpoint": l.scope.Endpoint, "bindingId": l.connection.bindingID, "generation": l.connection.generation}}
-				message := "请本人核对所选私有选择快照及服务范围；不会从摘要选择推断授权，也不扩大所选ID。\n"
+				message := "保存所选设置。\n"
 				if name == "galaxy_discovery_preferences_save" {
 					message = discoveryPreferencesMessage(uploadObject(input), l.scope)
 				} else {
-					message += hostJSONString(value)
+					message = userChoiceMessage(name, input, "保存所选设置。")
 				}
 				return tools.review(operation, req, value, message, func(operation context.Context, scope *ChoiceScope) (any, error) {
 					if scope == nil || *scope != l.scope {
@@ -225,7 +225,7 @@ func registerExtendedRemoteTools(server *mcp.Server, tools *toolRuntime, runtime
 			}
 			out, e := client.Call(ctx, name, input)
 			if e != nil {
-				result, encoding := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write})
+				result, encoding := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write && nativeOutcomeUnknown(e)})
 				if result != nil {
 					result.IsError = true
 				}

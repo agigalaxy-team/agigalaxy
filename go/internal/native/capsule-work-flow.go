@@ -270,7 +270,7 @@ func registerNativeCapsuleWorkTools(server *mcp.Server, tools *toolRuntime, runt
 					return toolResult(value)
 				}
 				value := map[string]any{"handle": input["handle"], "preview": preview}
-				return tools.review(ctx, req, value, "请本人核对所选方法用途、当前工作与精确结果、资料版本、许可证、可见范围和原操作。引用或阅读不代表成功复用。\n"+hostJSONString(value), func(ctx context.Context, scope *ChoiceScope) (any, error) {
+				return tools.review(ctx, req, value, "提交所选方法的使用内容与结果。", func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					return h.ExecuteReviewed(ctx, text(input["handle"]), scope)
 				})
 			}

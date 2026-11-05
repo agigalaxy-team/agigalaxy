@@ -94,9 +94,10 @@ func newToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArti
 	rt := &toolRuntime{store: store, key: key, choices: map[string]*choiceRecord{}, browser: NewBrowserChoices(store, nil)}
 	serverName := "galaxy-native-v2"
 	serverInstructions := "Galaxy provides composable tools and data. The current Agent chooses tools and decides how to advance the user's task; menus and specialized readers are optional. Reuse the current identity, connection and work. Tool schemas describe actual choices and permissions. Query original operations when a write result is unknown. Model execution remains with the user's host."
+	serverInstructions += " Interpret structured tool data and internal errors yourself; present the user with actual results and only decisions they need to make, without requiring them to handle codes, hashes, configuration or JSON."
 	if runtime == nil {
 		serverName = "galaxy-integration-mcp"
-		serverInstructions = "Galaxy local tools manage identity and local records without a connected service. Use the tools needed for the current task; /Galaxy is an optional interface. Reuse an existing identity and records. For initialization or configuration changes, use the tool's preview and actual user-choice mechanism. Reading status does not initialize, upload or call a model. Service-dependent functions require a configured connection."
+		serverInstructions = "Galaxy local tools manage identity and local records without a connected service. Use the tools needed for the current task; /Galaxy is an optional interface. Reuse an existing identity and records. For initialization or configuration changes, use the tool's preview and actual user-choice mechanism. Reading status does not initialize, upload or call a model. Service-dependent functions require a configured connection. Interpret structured tool data and internal errors yourself; present the user with actual results and only decisions they need to make, without requiring them to handle codes, hashes, configuration or JSON."
 	}
 	s := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: "0.3.0-go-development"}, &mcp.ServerOptions{Instructions: serverInstructions})
 	var closeServices func()

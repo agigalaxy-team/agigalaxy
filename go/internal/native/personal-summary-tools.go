@@ -160,7 +160,7 @@ func registerPersonalSummaryTools(server *mcp.Server, tools *toolRuntime, runtim
 					}
 					defer cancel()
 					review := map[string]any{"input": input, "authorizationContext": l.reviewContext()}
-					return tools.review(operation, req, review, "请本人核对这次私有摘要云端选择或删除的准确范围；本机笔记与房间分享保持各自原有权限。\n"+hostJSONString(review), func(operation context.Context, scope *ChoiceScope) (any, error) {
+					return tools.review(operation, req, review, "更新下列笔记的云端保存设置。", func(operation context.Context, scope *ChoiceScope) (any, error) {
 						if scope == nil || *scope != l.scope {
 							return nil, connectionFailure("summary_binding_changed")
 						}
@@ -187,7 +187,7 @@ func registerPersonalSummaryTools(server *mcp.Server, tools *toolRuntime, runtim
 				}
 				defer cancel()
 				review := map[string]any{"input": value, "authorizationContext": l.reviewContext()}
-				message := "请本人核对个人摘要的所选服务、房间范围和内容。私有云副本与房间分享分开；不会启动模型、读取整段聊天或扩大原资料权限。\n" + hostJSONString(review)
+				message := "向所选房间分享下列个人摘要。"
 				return tools.review(operation, req, review, message, func(operation context.Context, scope *ChoiceScope) (any, error) {
 					if e := l.reviewCheck(operation); e != nil {
 						return nil, e

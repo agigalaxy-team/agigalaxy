@@ -1,6 +1,5 @@
 // Human text and exact machine data share one result without making people
 // inspect transport records. This module has no authority or side effects.
-import {communityResultLines,bookmarkResultLines} from './native-community.mjs';
 const labels = {title:'标题',summary:'内容',text:'内容',description:'说明',purpose:'用途',goal:'目标',currentSituation:'目前情况',requestedScope:'需要的帮助',limitations:'限制',message:'消息',name:'名称',displayName:'名称',fileName:'文件',filename:'文件',reason:'说明',resultSummary:'结果',notes:'补充说明',value:'结果',values:'输入',inputCount:'输入数量',operation:'处理方式',delayMs:'所选等待（毫秒）',selectedDelayMs:'所选等待（毫秒）',about:'简介',claimedCapabilities:'自报能力',problemPattern:'适用问题',solutionStrategy:'解决方法',applicableScope:'适用范围',verificationMethod:'验证方法',tools:'工具',skills:'技能',mcpRefs:'连接工具',license:'许可证',approach:'方法',strategy:'方法',problem:'问题说明',attemptedApproaches:'已有尝试',scope:'范围',note:'补充说明',environmentDifference:'环境差异',issuer:'登录服务',externalSubject:'外部账户',providerId:'登录服务标识',modelFamily:'模型系列',inputScopeSummary:'输入范围',permissionScope:'权限范围',requestedFields:'所选字段',reasonCode:'追查事项',actions:'允许的操作'};
 labels.adoptedParts='实际采用的部分';
 labels.proposal='协助说明';
@@ -41,6 +40,16 @@ function referenceArtifact(object){return object.name==='Selected arithmetic out
  const text=part?.text??part?.content?.value;if(typeof text!=='string')return false;try{return !!referenceArithmetic(JSON.parse(text));}catch{return false;}
 });}
 
+// Decode only recognizable tool envelopes and typed results. Ordinary authored
+// strings, including JSON or code, stay as the author wrote them.
+export function isStructuredToolPayload(value) {
+ if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+ if (referenceArithmetic(value)) return true;
+ if (Array.isArray(value.content) && value.content.some(part => part && typeof part === 'object' && ['text','image','resource','resource_link','audio'].includes(part.type))) return true;
+ if (['structuredContent','resultType','isError','revisionBasis','sourceVersion','workerVersion','schemaVersion','payloadJson'].some(key => Object.hasOwn(value,key))) return true;
+ return typeof value.state==='string' && typeof value.operation==='string' && Object.hasOwn(value,'value');
+}
+
 export function authoredRows(value,{limit=80,maxText=48000}={}) {
  const rows=[],seen=new Set();
  function walk(object,depth=0){
@@ -50,11 +59,12 @@ export function authoredRows(value,{limit=80,maxText=48000}={}) {
   const arithmetic=referenceArithmetic(object);if(arithmetic){const signature=arithmetic.label+'\0'+arithmetic.text;if(!seen.has(signature)){seen.add(signature);rows.push(arithmetic);}return;}
   for(const [key,item]of Object.entries(object)){
    if(rows.length>=limit)break;
+   if(isStructuredToolPayload(object)&&['metadata','details','execution','environment','debug'].includes(key))continue;
    if(key==='name'&&referenceArtifact(object))continue;
    if(labels[key]&&(typeof item==='string'&&item.trim()||typeof item==='number'&&Number.isFinite(item)||key==='values'&&Array.isArray(item)&&item.every(value=>typeof value==='number'&&Number.isFinite(value))||contentLists.has(key)&&Array.isArray(item)&&item.length&&item.every(value=>typeof value==='string'))){
     let structured;
-    if(typeof item==='string'&&/^[\s]*[[{]/.test(item)){try{const parsed=JSON.parse(item);if(parsed&&typeof parsed==='object')structured=parsed;}catch{/* Ordinary authored text is preserved. */}}
-    if(structured){const signature='structured\0'+item;if(!seen.has(signature)){seen.add(signature);const before=rows.length;walk(structured,depth+1);if(rows.length===before)rows.push({label:labels[key],text:'结构化内容已返回。可下载完整内容，在当前工作中使用。'});rows.push({label:'完整内容',text:'保留原始字段与格式。',download:item});}continue;}
+    if(typeof item==='string'&&/^[\s]*[[{]/.test(item)){try{const parsed=JSON.parse(item);if(isStructuredToolPayload(parsed))structured=parsed;}catch{/* Ordinary authored text is preserved. */}}
+    if(structured){const signature='structured\0'+item;if(!seen.has(signature)){seen.add(signature);walk(structured,depth+1);}continue;}
     const text=key==='operation'?({sum:'求和',quotient:'除法'}[item]??String(item)):['reportedOutcome','outcome'].includes(key)?resultNames[item]??String(item):Array.isArray(item)?item.join('、'):String(item),signature=labels[key]+'\0'+text;
     if(!seen.has(signature)){seen.add(signature);rows.push({label:labels[key],text:text.slice(0,maxText)});}
    }else if(key==='payloadJson'&&typeof item==='string'){try{walk(JSON.parse(item),depth+1);}catch{/* Opaque bytes remain in the exact diagnostic. */}}
@@ -139,44 +149,4 @@ export function describeNativeChoice(name,input) {
   const localTitle={galaxy_local_settings_save:'保存这些选择',galaxy_local_upload_privacy_set:'保存上传类型与范围',galaxy_local_archive_configure:'保存本机私有原文范围',galaxy_local_worker_identity_create:'创建独立 Worker 身份',galaxy_local_archive_delete:'删除所选本机原文',galaxy_local_work_delete:'删除所选本机履历',galaxy_work_sync_choice:'保存履历到账户',galaxy_archive_sync_choice:'保存原会话到账户',galaxy_work_cloud_delete:'删除本人云端履历',galaxy_archive_cloud_delete:'删除本人云端原会话'}[name];
  return {title:localTitle??title,rows,sections,identityRefs,recipientRefs:(name==='galaxy_contact_work_execute'?preview.viewers:preview.recipientIds??recipients)?.filter(v=>typeof v==='string'&&v.startsWith('GUID'))??[],
   note:'只允许这里显示的内容与范围。关闭或取消不会批准。'};
-}
-
-export function nativeChoiceText(name,input){const choice=describeNativeChoice(name,input);return [choice.title,...choice.rows.map(row=>row.label+'：'+row.text),...choice.sections.map(row=>row.label+'：'+row.text),...choice.identityRefs.map(row=>row.label+'：'+row.value),choice.note].join('\n\n');}
-
-export function presentNativeResult(name,result,{readOnly=false}={}){
- if(result?.resultType==='input_required'||!Array.isArray(result?.content))return result;
- let data=result.structuredContent;
- if(data===undefined&&result.content.length===1&&result.content[0]?.type==='text'){try{data=JSON.parse(result.content[0].text);}catch{return result;}}
- if(data===undefined||data===null)return result;
- // Apps already supply their carefully scoped human presentation and private
- // component metadata. Do not turn it back into a second generic summary.
-  if(data.kind==='galaxy-local-work-panel'||data.kind==='galaxy-worker-panel'||data.kind==='galaxy-a2a-panel'||data.kind==='galaxy-help-panel'||data.schemaVersion===1&&data.viewId)return result;
- if(data.kind==='galaxy-work-continuation'||name==='galaxy_work_continue')return result;
- const lines=[],specific=result.isError||data.error?null:communityResultLines(name,data)??bookmarkResultLines(name,data);
- if(result.isError||data.error){const code=data.error??'';
-  lines.push(/(?:identity|connection)_required|local_identity_required/.test(code)?'当前设备尚未接入所需身份或服务。可以在原工作按需要接续身份，再继续。':
-   /identity|binding|connection/.test(code)?'当前身份或连接已变化，请在原工作重新取得当前允许的内容。':
-   /expired|preview_changed|scope_changed/.test(code)?'这次内容或范围已变化，请在原工作重新取得当前预览。':
-   /not_authorized|permission|grant/.test(code)?'当前授权已不允许这次操作。可以继续原工作，按实际需要选择范围。':
-   '当前内容暂不可用。可以继续原工作，稍后重试取得当前内容。');
-  if(data.reconcileOriginal||data.mayNeedReceiptReconciliation)lines.push('请先查询原操作的结果，再决定是否重试。');}
- else if(data.state==='user-choice-needs-browser'){lines.push(nativeChoiceText(data.operation??name,data.preview??{}),'打开本机审阅页完成选择：',data.url);}
-  else if(name==='galaxy_command'&&data.history){for(const work of data.history.items??[])lines.push(work.title+(work.summary?'\n'+work.summary:''));if(!lines.length)lines.push('开始工作后，履历会出现在这里。');}
-  else if(name==='galaxy_local_work_get'&&data.work){lines.push(data.work.title,data.work.summary||'还没有整理这段工作。');for(const observation of data.observations??[])if(observation.content?.excerpt)lines.push(observation.content.excerpt);}
-  else if(name==='galaxy_local_settings_save'||name==='galaxy_local_upload_privacy_set'){lines.push('已保存。');}
-  else if(name==='galaxy_command'){lines.push('可以继续原工作，或查看社区、帮助与消息。');if(data.state==='recovery-required')lines.push('本机准备暂未完成，原资料已保留。');}
- else if(name==='galaxy_native_status'){lines.push(nativeConnectionMessage(data));}
- else if(name==='galaxy_native_initialize'&&data.initialized){lines.push(data.existingIdentityPreserved?'已沿用已有身份完成这台设备的准备。':'这台设备的稳定身份已准备好。');lines.push('可以继续原工作；连接和外发范围按需要选择。');}
- else if(name==='galaxy_identity_account_read'&&data.authorizationUrl){lines.push('打开官方账户登录，完成后回到当前 AI 宿主核对账户与银河 ID：',data.authorizationUrl,'登录完成后，仍需在本机明确允许这次关联。');}
- else if(name.startsWith('galaxy_identity_account_')&&data.state==='linked'){lines.push('这个银河 ID 已关联到刚才核验的官方账户。可以回官网账户中心查看；其他 ID 与已有经历分别保留。');}
- else if(name.startsWith('galaxy_identity_account_')&&data.state==='revoked'){lines.push('这条银河账户关联已解除。原银河 ID 与已有经历保留。');}
- else if(specific){lines.push(...specific);}
- else{
-  if(data.url)lines.push(data.launched?'已请求打开当前内容。':'可以打开当前内容：',data.url);
-  const state=nativeStateLabel(data.state??data.status??data.receipt?.state);if(state)lines.push(state+'。');
-  for(const row of authoredRows(data,{limit:20,maxText:8000}))lines.push(row.label+'：'+row.text);
-  const items=Array.isArray(data)?data:data.items;if(Array.isArray(items)&&!items.length)lines.push('当前没有可显示的内容。');
-  if(!lines.length)lines.push(readOnly?'已读取当前允许的信息，可以继续原工作。':'本次操作已返回，可以继续原工作。');
- }
- return {...result,content:[{type:'text',text:lines.filter(Boolean).join('\n\n')}],structuredContent:Array.isArray(data)?{items:data}:data};
 }

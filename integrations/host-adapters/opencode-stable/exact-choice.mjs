@@ -1,6 +1,11 @@
 import {authoredRows,nativeAudienceLabel} from '../../native-v2/presentation/native-result.mjs';
 
 const plain=value=>String(value??'').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,' ');
+const identify=(value,name,fallback)=>{
+ const id=typeof value==='string'?value:value?.subjectId??value?.deviceId??value?.installationId??value?.bindingId??value?.id;
+ const display=name??(typeof value==='object'&&value?(value.displayName??value.name):undefined);
+ return [plain(display||fallback),id&&id!==display?plain(id):''].filter(Boolean).join(' · ');
+};
 const parsed=value=>{try{return typeof value==='string'?JSON.parse(value):value;}catch{return null;}};
 const scopeNames={binding:'设备连接',consent:'所选内容授权',history:'可见履历',assistance:'求助与参与',context:'所选材料',notifications:'消息通知',capsules:'知识胶囊',builders:'开放节点信息','case-teaser':'当前工作记录',proof:'来源证据',evidence:'提交的材料',audit:'本人操作记录','audit-review':'本人授权记录','data-export':'本人资料导出','data-delete':'本人资料删除'};
 
@@ -10,17 +15,20 @@ export function exactChoiceText(preview,{language='zh-CN',note='',readableConten
  const endpoint=preview.endpoint??payload.endpoint;if(endpoint)lines.push((zh?'服务：':'Service: ')+plain(endpoint));
  const recipients=intent.viewers??preview.viewers??payload.viewers??payload.recipientIds??[];
  const visibility=intent.visibility??payload.visibility??preview.visibility;if(visibility)lines.push((zh?'可见范围：':'Visibility: ')+nativeAudienceLabel(visibility,recipients));
- if(recipients.length)lines.push((zh?'所选接收身份：':'Selected recipient identities: ')+recipients.map(plain).join('、'));
+ const recipientNames=preview.recipientNames??payload.recipientNames;
+ if(recipients.length)lines.push((zh?'接收方：':'Recipients: ')+recipients.map((value,i)=>identify(value,recipientNames?.[i],zh?'成员':'Member')).join('、'));
  const target=payload.target??payload;
  const scopes=target.scopes??payload.scopes;if(scopes?.length)lines.push((zh?'所选权限：':'Selected permissions: ')+scopes.map(value=>zh?scopeNames[value]??plain(value):plain(value)).join('、'));
- for(const [key,label]of [['readerId',zh?'读取者身份':'Reader identity'],['subjectIds',zh?'允许查询的身份':'Permitted identities']]){
-  const value=payload[key];if(value)lines.push(label+'：'+(Array.isArray(value)?value.map(plain).join('、'):plain(value)));
- }
+ if(payload.readerId||payload.readerName)lines.push((zh?'读取者：':'Reader: ')+identify(payload.readerId,payload.readerName,zh?'身份':'Identity'));
+ if(payload.subjectIds?.length)lines.push((zh?'允许查询：':'Permitted subjects: ')+payload.subjectIds.map((value,i)=>identify(value,payload.subjectNames?.[i],zh?'身份':'Identity')).join('、'));
+ else if(payload.subjectNames?.length)lines.push((zh?'允许查询：':'Permitted subjects: ')+payload.subjectNames.map(plain).join('、'));
  const expires=intent.expiresAt??target.expiresAt??payload.expiresAt;if(expires&&(showAuthorizationExpiry||intent.expiresAt===undefined)){const date=new Date(typeof expires==='number'&&expires<1e12?expires*1000:expires);if(Number.isFinite(date.getTime()))lines.push((zh?'有效至：':'Valid until: ')+date.toLocaleString(zh?'zh-CN':'en-US'));}
  if(payload.action==='link'||payload.action==='unlink')lines.push(zh?'账户关联本身不授予业务资料读取权。':'Account association does not grant access to business data.');
  if(payload.action==='revoke-binding'){
-  lines.push((zh?'所选设备连接：':'Selected device connection: ')+plain(target.installationId??preview.installationId??''));
-  lines.push((zh?'绑定：':'Binding: ')+plain(target.bindingId??preview.bindingId??''));
+  const device=target.deviceId??target.installationId??preview.deviceId??preview.installationId;
+  const binding=target.bindingId??preview.bindingId;
+  lines.push((zh?'设备：':'Device: ')+identify(device,target.deviceName??preview.deviceName,payload.currentSession?(zh?'当前设备':'Current device'):(zh?'设备':'Device')));
+  if(binding)lines.push((zh?'连接：':'Connection: ')+plain(binding));
   lines.push(zh?'撤销后，关联会话及依赖授权失效。':'Revocation ends the associated sessions and dependent grants.');
   if(payload.currentSession)lines.push(zh?'这就是当前连接；撤销后本机会话会断开。':'This is the current connection; revocation ends this session.');
  }
@@ -41,7 +49,7 @@ export function showExactChoice({preview,title,select,info,isCurrent,onConfirm,o
    {number:'1',title:allowLabel||(zh?'允许本次内容与范围':'Allow this content and scope'),description:reviewInBody?'':content,disabled:typeof preview.confirmation!=='string'||!preview.confirmation}
   ],routes={1:activate(()=>{if(typeof preview.confirmation!=='string'||!preview.confirmation)return;settled=true;onConfirm(preview.confirmation);})};
   for(const [title,action]of actions){const number=String(options.length+1);options.push({number,title});routes[number]=activate(()=>{settled=true;action();});}
-  const source=String(options.length+1);options.push({number:source,title:zh?'查看来源与完整内容':'Inspect source and full content',description:zh?'需要核对具体字段或版本时查看。':'Inspect exact fields or versions when needed.'});
+  const source=String(options.length+1);options.push({number:source,title:zh?'查看诊断详情':'View diagnostics',description:zh?'需要核对具体字段或版本时查看。':'Inspect exact fields or versions when needed.'});
   routes[source]=activate(()=>{const body=[preview.previewJson,preview.payloadJson,preview.intentJson,preview.requestJson].filter(value=>typeof value==='string');const detail=++view;info(zh?'来源与完整内容':'Source and full content',body.join('\n\n'),()=>{if(valid()&&view===detail)show();});});
   const last=String(options.length+1);options.push({number:last,title:zh?'取消':'Cancel'});routes[last]=activate(cancel);
   select({title:plain(title)+(reviewInBody?'\n'+content:''),options,routes,onBack:activate(cancel)});

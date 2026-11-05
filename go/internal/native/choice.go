@@ -72,6 +72,7 @@ func (r *toolRuntime) reviewOn(ctx context.Context, req *mcp.CallToolRequest, in
 	if e != nil {
 		return toolError(e)
 	}
+	message = userChoiceMessage(req.Params.Name, input, message)
 	owner := scope.Owner
 	if owner == "" && !isOne(req.Params.Name, "galaxy_native_initialize", "galaxy_device_offer", "galaxy_device_accept", "galaxy_local_worker_identity_create") {
 		return toolError(fault.New("local_identity_required", 409))
@@ -118,10 +119,26 @@ func (r *toolRuntime) reviewOn(ctx context.Context, req *mcp.CallToolRequest, in
 	if req.ProtocolVersion() != "2026-07-28" {
 		answer, e := req.Session.Elicit(ctx, &mcp.ElicitParams{Mode: "form", Message: message, RequestedSchema: schema})
 		if e != nil {
+			if ctx.Err() != nil {
+				return toolError(ctx.Err())
+			}
+			v, err := r.browser.Review(ctx, BrowserChoiceInput{Name: req.Params.Name, Input: input, Message: message, Scope: scope}, run)
+			if err != nil {
+				return toolError(err)
+			}
+			return toolResult(v)
+		}
+		if answer == nil {
 			return toolError(fault.New("native_choice_unavailable", 503))
 		}
-		if answer.Action != "accept" || answer.Content["confirm"] != true {
+		if answer.Action == "cancel" {
+			return toolResult(map[string]any{"state": "canceled", "sideEffect": false})
+		}
+		if answer.Action == "decline" || answer.Action == "accept" && answer.Content["confirm"] == false {
 			return toolResult(map[string]any{"state": "declined", "sideEffect": false})
+		}
+		if answer.Action != "accept" || answer.Content["confirm"] != true {
+			return toolError(fault.New("native_choice_response_invalid", 400))
 		}
 		v, e := run(ctx, &scope)
 		if e != nil {
@@ -169,9 +186,19 @@ func (r *toolRuntime) reviewOn(ctx context.Context, req *mcp.CallToolRequest, in
 	if !ok {
 		return toolError(fault.New("native_choice_response_invalid", 400))
 	}
-	if answer.Action != "accept" || answer.Content["confirm"] != true {
+	if answer == nil {
+		return toolError(fault.New("native_choice_response_invalid", 400))
+	}
+	if answer.Action == "cancel" {
+		delete(r.choices, nonce)
+		return toolResult(map[string]any{"state": "canceled", "sideEffect": false})
+	}
+	if answer.Action == "decline" || answer.Action == "accept" && answer.Content["confirm"] == false {
 		delete(r.choices, nonce)
 		return toolResult(map[string]any{"state": "declined", "sideEffect": false})
+	}
+	if answer.Action != "accept" || answer.Content["confirm"] != true {
+		return toolError(fault.New("native_choice_response_invalid", 400))
 	}
 	record.Running = true
 	r.mu.Unlock()

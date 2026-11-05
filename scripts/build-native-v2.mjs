@@ -63,6 +63,10 @@ export async function buildGoNativeCandidate({destination,sourceDirectory=root,v
  // The Go installer consumes the same static skills/host formats. It never
  // copies the Node setup/host-configs runtime as a replacement business core.
  async function candidateAsset(sourceName,outputName){
+  if(sourceName.startsWith('integrations/native-v2/skills/galaxy/')){
+   const parts=sourceName.slice('integrations/native-v2/skills/galaxy/'.length).split('/'),name=parts.at(-1);
+   if(parts.some(part=>['__pycache__','.pytest_cache','.git','node_modules'].includes(part))||name==='.DS_Store'||/\.(?:pyc|pyo|tmp|swp)$/i.test(name)||name.endsWith('~'))return;
+  }
   const source=join(sourceDirectory,sourceName),info=await lstat(source);
   if(info.isSymbolicLink())throw Error('Candidate installation asset must be regular');
   if(info.isDirectory()){await mkdir(join(destination,outputName),{recursive:true});for(const name of await readdir(source))await candidateAsset(sourceName+'/'+name,outputName+'/'+name);return;}

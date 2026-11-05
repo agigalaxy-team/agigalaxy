@@ -4,7 +4,7 @@ import {build} from '../../../node_modules/esbuild/lib/main.js';
 import {writeFile,mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
-const out=fileURLToPath(new URL('../../../outputs/compact-dom/tmp/',import.meta.url)),events=[];
+const out=process.env.GALAXY_UI_TEST_OUTPUT??fileURLToPath(new URL('../../../outputs/compact-dom/tmp/',import.meta.url)),events=[];
 await mkdir(out,{recursive:true});
 const bundle=await build({entryPoints:['integrations/native-v2/compact-app/view.mjs'],bundle:true,write:false,format:'iife',globalName:'GalaxyPanel',platform:'browser'});
 const browser=await chromium.launch({headless:true});

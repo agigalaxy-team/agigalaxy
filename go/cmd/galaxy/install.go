@@ -97,8 +97,7 @@ func hostConfigurationsCommand(ctx context.Context, args []string) error {
 	return printValue(value)
 }
 
-// Setup presents the exact inspected plan before any identity or host-profile
-// change. It does not install implicitly when stdin is absent or closed.
+// Setup checks the installation before applying the explicitly requested setup.
 func setupCommand(ctx context.Context, args []string) error {
 	input := native.NativeInstallationInput{SubjectType: "person"}
 	for i := 0; i < len(args); i++ {
@@ -213,15 +212,6 @@ func setupCommand(ctx context.Context, args []string) error {
 	plan, err := native.PreviewNativeInstallation(ctx, input, native.ServiceConfigurationOptions{})
 	if err != nil {
 		return err
-	}
-	if err = printValue(plan); err != nil {
-		return err
-	}
-	fmt.Fprint(os.Stderr, "确认按以上方案准备本机身份和宿主配置？[y/N] ")
-	line, readErr := reader.ReadString('\n')
-	confirmed := readErr == nil && (strings.EqualFold(strings.TrimSpace(line), "y") || strings.EqualFold(strings.TrimSpace(line), "yes"))
-	if !confirmed {
-		return fault.New("setup_choice_required", 400)
 	}
 	configurationPath := ""
 	if !input.LocalOnly {

@@ -282,17 +282,13 @@ func registerRemoteBusinessTools(server *mcp.Server, tools *toolRuntime, runtime
 				if e != nil {
 					return toolError(e)
 				}
-				raw, e := protocol.Encode(normalized)
-				if e != nil {
-					return toolError(e)
-				}
-				return tools.review(ctx, req, normalized, "本人确认保存该项目的准确发现范围偏好；全局关闭或暂停仍有效。不发布项目、不发送邀请。\n"+string(raw), func(ctx context.Context, scope *ChoiceScope) (any, error) {
+				return tools.review(ctx, req, normalized, "保存这个项目的发现偏好。", func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					return remoteBusinessCall(ctx, runtime, name, normalized, scope, request)
 				})
 			}
 			value, e := remoteBusinessCall(ctx, runtime, name, input, nil, request)
 			if e != nil {
-				result, encodeError := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write})
+				result, encodeError := toolResult(map[string]any{"error": runtimeErrorCode(e), "mayNeedReceiptReconciliation": write && nativeOutcomeUnknown(e)})
 				if result != nil {
 					result.IsError = true
 				}
