@@ -4,9 +4,12 @@ import (
 	"context"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
+	"time"
 )
 
 type NativeInstallationInput struct {
@@ -44,6 +47,64 @@ func InstallationWebsiteOrigin(value string) (string, error) {
 	}
 	return origin, nil
 }
+
+var openCodeVersionPattern = regexp.MustCompile(`(?i)(?:opencode\s+v?)?(\d+)\.(\d+)\.(\d+)`)
+
+// A detected executable decides the layout. Without one, inspect only the
+// selected configuration; otherwise produce the current V2 form.
+func DetectOpenCodeLayout(ctx context.Context, executable, directory string) (string, string, error) {
+	if executable != "" {
+		probeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		raw, err := exec.CommandContext(probeCtx, executable, "--version").Output()
+		if err == nil {
+			match := openCodeVersionPattern.FindStringSubmatch(string(raw))
+			if len(match) > 1 {
+				if match[1] == "1" {
+					return "v1", strings.TrimSpace(string(raw)), nil
+				}
+				if match[1] == "2" {
+					return "v2", strings.TrimSpace(string(raw)), nil
+				}
+			}
+		}
+		if ctx.Err() != nil {
+			return "", "", ctx.Err()
+		}
+	}
+	files, err := hostSelectedConfigurations(directory, "opencode")
+	if err != nil {
+		return "", "", err
+	}
+	for _, f := range files {
+		if f.missing {
+			continue
+		}
+		value, e := hostConfigurationObject(f.text)
+		if e != nil {
+			return "", "", e
+		}
+		mcp := uploadObject(value["mcp"])
+		if _, ok := mcp["servers"]; ok {
+			return "v2", "", nil
+		}
+		if len(mcp) > 0 {
+			return "v1", "", nil
+		}
+	}
+	if _, err = os.Stat(filepath.Join(directory, "cli.json")); err == nil {
+		return "v2", "", nil
+	} else if !os.IsNotExist(err) {
+		return "", "", err
+	}
+	if _, err = os.Stat(filepath.Join(directory, "tui.json")); err == nil {
+		return "v1", "", nil
+	} else if !os.IsNotExist(err) {
+		return "", "", err
+	}
+	return "v2", "", nil
+}
+
 func FindOpenCodeExecutable(explicit, environmentPath string) (string, error) {
 	candidates := []string{explicit}
 	if explicit == "" {
@@ -53,9 +114,9 @@ func FindOpenCodeExecutable(explicit, environmentPath string) (string, error) {
 				continue
 			}
 			if runtime.GOOS == "windows" {
-				candidates = append(candidates, filepath.Join(directory, "opencode.exe"), filepath.Join(directory, "node_modules", "opencode-ai", "bin", "opencode.exe"))
+				candidates = append(candidates, filepath.Join(directory, "opencode.exe"), filepath.Join(directory, "opencode2.exe"), filepath.Join(directory, "node_modules", "opencode-ai", "bin", "opencode.exe"))
 			} else {
-				candidates = append(candidates, filepath.Join(directory, "opencode"))
+				candidates = append(candidates, filepath.Join(directory, "opencode"), filepath.Join(directory, "opencode2"))
 			}
 		}
 	}

@@ -17,7 +17,12 @@ import (
 func RunForeground(ctx context.Context) error { return run(ctx, true) }
 
 // Run owns the process lock and all profile runtimes until explicit stop or context cancellation.
-func Run(ctx context.Context) error { return run(ctx, false) }
+func Run(ctx context.Context) error {
+	if err := readServiceBootstrap(); err != nil {
+		return err
+	}
+	return run(ctx, false)
+}
 
 func run(ctx context.Context, foreground bool) error {
 	dir, ep, pause, err := paths()
@@ -66,6 +71,10 @@ func run(ctx context.Context, foreground bool) error {
 	session, sessionErr := WatchLoginSession(lifecycle, cancel)
 	if sessionErr != nil {
 		s.info.Lifecycle = map[string]any{"mode": "unavailable", "reason": sessionErr.Error()}
+	} else if session.Kind == "systemd-transient" {
+		s.info.Lifecycle = map[string]any{"mode": "managed", "manager": session.Kind}
+	} else if session.Kind == "environment-managed" {
+		s.info.Lifecycle = map[string]any{"mode": "environment-managed"}
 	} else {
 		s.info.Lifecycle = map[string]any{"mode": "observed", "session": session}
 	}

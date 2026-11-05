@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"syscall"
@@ -93,17 +92,6 @@ func dial(ctx context.Context, ep string) (net.Conn, error) {
 		return nil, e
 	}
 	return (&net.Dialer{}).DialContext(ctx, "unix", ep)
-}
-func startDaemon(exe string) error {
-	c := exec.Command(exe, "native-service")
-	c.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	c.Stdin = nil
-	c.Stdout = nil
-	c.Stderr = nil
-	if e := c.Start(); e != nil {
-		return e
-	}
-	return c.Process.Release()
 }
 
 func isUnavailable(err error) bool {

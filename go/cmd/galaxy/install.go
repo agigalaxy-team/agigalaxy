@@ -91,6 +91,24 @@ func hostConfigurationsCommand(ctx context.Context, args []string) error {
 			input.DataDirectory, input.Endpoint = configuration.DataDirectory, configuration.Endpoint
 		}
 	}
+	if slices.Contains(input.Hosts, "opencode") {
+		executable, e := native.FindOpenCodeExecutable("", os.Getenv("PATH"))
+		if e != nil {
+			return e
+		}
+		home, e := os.UserHomeDir()
+		if e != nil {
+			return e
+		}
+		dir, e := native.OpenCodeConfigurationDirectory(installationEnvironment(), home)
+		if e != nil {
+			return e
+		}
+		input.OpenCodeLayout, _, e = native.DetectOpenCodeLayout(ctx, executable, dir)
+		if e != nil {
+			return e
+		}
+	}
 	value, err := native.GenerateHostConfigurations(ctx, input)
 	if err != nil {
 		return err

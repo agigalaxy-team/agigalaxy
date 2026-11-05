@@ -19,13 +19,34 @@ func managedOpenCodeSpec(record *managedNativeRecord) (any, error) {
 		return nil, err
 	}
 	args, env := input.launch()
-	raw, err := json.Marshal(map[string]any{"type": "local", "command": append([]string{entry}, args...), "environment": env, "enabled": true})
+	specification := map[string]any{"type": "local", "command": append([]string{entry}, args...), "environment": env}
+	if record.OpenCodeLayout != "v2" {
+		specification["enabled"] = true
+	}
+	raw, err := json.Marshal(specification)
 	if err != nil {
 		return nil, err
 	}
 	var spec any
 	err = json.Unmarshal(raw, &spec)
 	return spec, err
+}
+func managedOpenCodeSpecMatches(value, expected any) bool {
+	if expected == nil {
+		return false
+	}
+	a, aok := value.(map[string]any)
+	b, bok := expected.(map[string]any)
+	if !aok || !bok {
+		return reflect.DeepEqual(value, expected)
+	}
+	// Enabled/disabled is the user's setting; retain it while matching ownership.
+	for _, key := range []string{"type", "command", "environment"} {
+		if !reflect.DeepEqual(a[key], b[key]) {
+			return false
+		}
+	}
+	return true
 }
 func managedOpenCodeCheck(directory string, prior *managedNativeRecord) error {
 	expected, err := managedOpenCodeSpec(prior)
@@ -44,18 +65,28 @@ func managedOpenCodeCheck(directory string, prior *managedNativeRecord) error {
 		if e != nil {
 			return e
 		}
-		if existing, ok := uploadObject(obj["mcp"])["galaxy"]; ok && !reflect.DeepEqual(existing, expected) {
-			return hostConfigurationFailure("setup_host_config_conflict")
+		mcp := uploadObject(obj["mcp"])
+		for _, existing := range []any{mcp["galaxy"], uploadObject(mcp["servers"])["galaxy"]} {
+			if existing != nil && !managedOpenCodeSpecMatches(existing, expected) {
+				return hostConfigurationFailure("setup_host_config_conflict")
+			}
 		}
 	}
 	plugin := filepath.Join(directory, "galaxy-native.tui.mjs")
+	if prior != nil && prior.OpenCodeLayout == "v2" {
+		plugin = filepath.Join(directory, "galaxy-native", "tui.js")
+	}
 	raw, err := os.ReadFile(plugin)
 	if err == nil {
 		if prior == nil {
 			return hostConfigurationFailure("setup_host_config_conflict")
 		}
 		old := HostConfigurationInput{LocalOnly: prior.LocalOnly, PackageDirectory: prior.ReleaseDirectory, ConfigPath: prior.ConfigPath, DataDirectory: prior.DataDirectory, Endpoint: prior.Endpoint}
-		if string(raw) != hostOpenCodePlugin(old) {
+		expectedPlugin := hostOpenCodePlugin(old)
+		if prior.OpenCodeLayout == "v2" {
+			expectedPlugin = hostOpenCodeV2Plugin(old)
+		}
+		if string(raw) != expectedPlugin {
 			return hostConfigurationFailure("setup_host_config_changed")
 		}
 	} else if !os.IsNotExist(err) {
@@ -70,12 +101,29 @@ func managedOpenCodeRemove(ctx context.Context, record *managedNativeRecord) err
 	oldSkill := filepath.Join(record.ReleaseDirectory, "skills")
 	plugin := filepath.Join(record.HostConfigPath, "galaxy-native.tui.mjs")
 	pluginURL := hostFileURL(plugin)
-	for _, name := range []string{"opencode", "tui"} {
+	names := []string{"opencode", "tui"}
+	if record.OpenCodeLayout == "v2" {
+		plugin = filepath.Join(record.HostConfigPath, "galaxy-native", "tui.js")
+		pluginURL = hostFileURL(filepath.Dir(plugin))
+		names = []string{"opencode", "cli"}
+	}
+	if record.OpenCodeLayout == "v2" {
+		manifestPath := filepath.Join(filepath.Dir(plugin), "package.json")
+		if raw, err := os.ReadFile(manifestPath); err == nil && string(raw) != "{\"name\":\"galaxy-native-opencode\",\"type\":\"module\",\"exports\":{\"./tui\":\"./tui.js\"}}\n" {
+			return hostConfigurationFailure("setup_host_config_changed")
+		} else if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	for _, name := range names {
 		files, err := hostSelectedConfigurations(record.HostConfigPath, name)
 		if err != nil {
 			return err
 		}
 		for _, file := range files {
+			if name == "cli" && filepath.Ext(file.path) != ".json" {
+				continue
+			}
 			if file.missing {
 				continue
 			}
@@ -88,8 +136,14 @@ func managedOpenCodeRemove(ctx context.Context, record *managedNativeRecord) err
 			}
 			updated := file.text
 			if name == "opencode" {
-				if _, ok := uploadObject(obj["mcp"])["galaxy"]; ok {
-					updated, e = hostRemoveConfiguration(updated, []string{"mcp", "galaxy"})
+				mcpPath := []string{"mcp", "galaxy"}
+				entry := uploadObject(obj["mcp"])["galaxy"]
+				if record.OpenCodeLayout == "v2" {
+					mcpPath = []string{"mcp", "servers", "galaxy"}
+					entry = uploadObject(uploadObject(obj["mcp"])["servers"])["galaxy"]
+				}
+				if managedOpenCodeSpecMatches(entry, record.ManagedSpec) {
+					updated, e = hostRemoveConfiguration(updated, mcpPath)
 					if e != nil {
 						return e
 					}
@@ -107,7 +161,7 @@ func managedOpenCodeRemove(ctx context.Context, record *managedNativeRecord) err
 						return e
 					}
 				}
-			} else if list, ok := obj["plugin"].([]any); ok {
+			} else if list, ok := obj[map[bool]string{true: "plugins", false: "plugin"}[name == "cli"]].([]any); ok {
 				next := []any{}
 				for _, x := range list {
 					own := ""
@@ -115,12 +169,18 @@ func managedOpenCodeRemove(ctx context.Context, record *managedNativeRecord) err
 						own = s
 					} else if tuple, ok := x.([]any); ok && len(tuple) > 0 {
 						own = text(tuple[0])
+					} else if object, ok := x.(map[string]any); ok {
+						own = text(object["package"])
 					}
 					if own != pluginURL {
 						next = append(next, x)
 					}
 				}
-				updated, e = hostSetConfiguration(updated, []string{"plugin"}, next)
+				key := "plugin"
+				if name == "cli" {
+					key = "plugins"
+				}
+				updated, e = hostSetConfiguration(updated, []string{key}, next)
 				if e != nil {
 					return e
 				}
@@ -134,6 +194,15 @@ func managedOpenCodeRemove(ctx context.Context, record *managedNativeRecord) err
 	}
 	if err := os.Remove(plugin); err != nil && !os.IsNotExist(err) {
 		return err
+	}
+	if record.OpenCodeLayout == "v2" {
+		manifestPath := filepath.Join(filepath.Dir(plugin), "package.json")
+		if err := os.Remove(manifestPath); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		if err := os.Remove(filepath.Dir(plugin)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	}
 	metadata := filepath.Join(record.HostConfigPath, "galaxy-installation.json")
 	var saved map[string]any

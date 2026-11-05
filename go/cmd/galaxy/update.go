@@ -88,6 +88,19 @@ func managedUpdate(ctx context.Context, input native.ManagedNativeInstallationIn
 		}
 		return printValue(result)
 	}
+	// A same-release OpenCode update still reconciles its selected host layout.
+	if comparison == 0 && !local && input.Host == "opencode" {
+		input.PackageDirectory = installed.PackageDirectory
+		plan, e := native.PreviewManagedNativeInstallation(ctx, input)
+		if e != nil {
+			return e
+		}
+		applied, e := native.ApplyManagedNativeInstallation(ctx, plan)
+		if e != nil {
+			return updateFailure("installation_failed", target, e)
+		}
+		result["hostConfigured"] = applied["hostConfigured"]
+	}
 	if comparison == 0 && !local && observed.ReleaseID == target && observed.SwitchState == "current" {
 		result["updateState"] = "up_to_date"
 		return printValue(result)

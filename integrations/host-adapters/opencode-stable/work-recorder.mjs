@@ -1,3 +1,4 @@
+import {v2WorkObservations} from './v2-work-observations.mjs';
 import {createHostLocalClient} from './bridge/host-local-client.mjs';
 import {hostDiagnostics} from './bridge/native-diagnostics.mjs';
 
@@ -91,21 +92,21 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive
       if (settings.galaxyId !== galaxyId) return {state:'cancelled',reason:'local_identity_changed'};
       if (!settings.settings.enabled || !settings.settings.sessions.some(item => item.host === host && item.sessionId === sessionId))
         return {state:'cancelled',reason:'not-selected'};
-      if (!api.client?.session?.messages) return {state:'unavailable',reason:'host_messages_unavailable'};
+      if (!api.v2?.syncMessages && !api.client?.session?.messages) return {state:'unavailable',reason:'host_messages_unavailable'};
       const controller = new AbortController(); archiveControllers.add(controller);
       const deadline = setTimeout(() => controller.abort(), 120000); deadline.unref?.();
       archiveBackfillState = {state:'reading-selected-session',host,sessionId};
       try {
         // This endpoint reads only the explicitly selected session. No session
         // search, attachment fetch, excerpt substitution or model is involved.
-        const response = await api.client.session.messages({sessionID:sessionId},{signal:controller.signal});
+        const response = api.v2?.syncMessages ? {data:(await api.v2.syncMessages(sessionId,{signal:controller.signal})).filter(m=>m.type==='user'||m.type==='assistant').map(m=>({info:{id:m.id,sessionID:sessionId},parts:[],original:m}))} : await api.client.session.messages({sessionID:sessionId},{signal:controller.signal});
         if (response?.error || !Array.isArray(response?.data)) throw Error('host_messages_unavailable');
         let copied = 0;
         for (const item of response.data) {
           if (!accepting || controller.signal.aborted) return {state:'cancelled',reason:'host_archive_interrupted',copied};
           if (item?.info?.sessionID !== sessionId || !item.info.id || !Array.isArray(item.parts)) continue;
           const hostSession=api.state?.session?.get?.(sessionId),workspaceId=hostSession?.workspaceID??hostSession?.directory;
-          const captured = await archive.captureMessage({galaxyId,host,sessionId,messageId:item.info.id,message:item.info,parts:item.parts,...(workspaceId?{workspaceId}:{})});
+          const captured = await archive.captureMessage({galaxyId,host,sessionId,messageId:item.info.id,message:item.original??item.info,parts:item.parts,...(workspaceId?{workspaceId}:{})});
           if (!captured.captured) return {state:'cancelled',reason:captured.reason,copied};
           copied++;
         }
@@ -237,12 +238,13 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive
         model:source.model?{providerID:source.model.providerID,modelID:source.model.modelID,id:source.model.id}:undefined};
       const hostParts=api.state?.part?.(source.id)||[],observations=[],message=workMessage(source);
       if(message)observations.push(message);
+      if(source.v2Original&&inWindow(info)) observations.push(...v2WorkObservations(source.v2Original,info,{asTime,content,short}));
       for(const part of new Map(hostParts.map(item=>[item.id,item])).values()){
         const observation=workPart(part,source);if(observation)observations.push(observation);
       }
       let original=null,originalFailed=false;
       if(selected&&source.sessionID===sessionId&&inWindow(source)&&(source.role==='user'||source.time?.completed)){
-        try{original=JSON.parse(JSON.stringify({info:source,parts:hostParts}));}catch{originalFailed=true;}
+        try{original=JSON.parse(JSON.stringify({info:source.v2Original??source,parts:source.v2Original?[]:hostParts}));}catch{originalFailed=true;}
       }
       return {info,observations,original,originalFailed};
     });

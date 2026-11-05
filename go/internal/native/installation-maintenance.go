@@ -92,7 +92,7 @@ func ResolveManagedNativeMaintenance(input ManagedNativeInstallationInput, suppl
 	if !supplied["node"] && record.NodeExecutable != "" {
 		input.NodeExecutable = record.NodeExecutable
 	}
-	if !supplied["host-executable"] && record.HostExecutable != "" {
+	if input.Host != "opencode" && !supplied["host-executable"] && record.HostExecutable != "" {
 		input.HostExecutable = record.HostExecutable
 	}
 	if !supplied["package-dir"] {

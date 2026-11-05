@@ -19,6 +19,18 @@ type managedNativeJournal struct {
 	PriorRaw string               `json:"priorRaw,omitempty"`
 }
 
+func managedBaselineEqual(current, recorded map[string]string, legacy bool) bool {
+	if !legacy {
+		return reflect.DeepEqual(current, recorded)
+	}
+	for key, value := range recorded {
+		if current[key] != value {
+			return false
+		}
+	}
+	return true
+}
+
 // Recover only settles a completed target or an untouched prior state. If a
 // host write stopped between files, leave the evidence in place for review.
 func recoverManagedNativeInstallation(recordPath string) error {
@@ -56,7 +68,7 @@ func recoverManagedNativeInstallation(recordPath string) error {
 			if e != nil {
 				return e
 			}
-			if reflect.DeepEqual(baseline, j.Baseline) && ((j.Prior == nil && missing) || (j.Prior != nil && !missing && string(current) == j.PriorRaw)) {
+			if managedBaselineEqual(baseline, j.Baseline, j.Target.Host == "opencode" && j.Target.OpenCodeLayout == "") && ((j.Prior == nil && missing) || (j.Prior != nil && !missing && string(current) == j.PriorRaw)) {
 				return os.Remove(path)
 			}
 			if j.Prior != nil {
@@ -123,7 +135,11 @@ func managedNativeStateMatches(r *managedNativeRecord) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		if !present || text(meta["skillPath"]) != filepath.Join(r.ReleaseDirectory, "skills") || text(meta["plugin"]) != hostFileURL(filepath.Join(r.HostConfigPath, "galaxy-native.tui.mjs")) {
+		pluginRef := hostFileURL(filepath.Join(r.HostConfigPath, "galaxy-native.tui.mjs"))
+		if r.OpenCodeLayout == "v2" {
+			pluginRef = hostFileURL(filepath.Join(r.HostConfigPath, "galaxy-native"))
+		}
+		if !present || text(meta["skillPath"]) != filepath.Join(r.ReleaseDirectory, "skills") || text(meta["plugin"]) != pluginRef {
 			return false, nil
 		}
 		files, err := hostSelectedConfigurations(r.HostConfigPath, "opencode")
@@ -139,7 +155,12 @@ func managedNativeStateMatches(r *managedNativeRecord) (bool, error) {
 			if e != nil {
 				return false, e
 			}
-			if reflect.DeepEqual(uploadObject(obj["mcp"])["galaxy"], r.ManagedSpec) {
+			mcp := uploadObject(obj["mcp"])
+			value := mcp["galaxy"]
+			if r.OpenCodeLayout == "v2" {
+				value = uploadObject(mcp["servers"])["galaxy"]
+			}
+			if managedOpenCodeSpecMatches(value, r.ManagedSpec) {
 				found = true
 			}
 		}
@@ -223,11 +244,20 @@ func managedNativeStateEmpty(r *managedNativeRecord) (bool, error) {
 			if e != nil {
 				return false, e
 			}
-			if _, ok := uploadObject(obj["mcp"])["galaxy"]; ok {
+			mcp := uploadObject(obj["mcp"])
+			entry := mcp["galaxy"]
+			if r.OpenCodeLayout == "v2" {
+				entry = uploadObject(mcp["servers"])["galaxy"]
+			}
+			if entry != nil {
 				return false, nil
 			}
 		}
-		_, err = os.Lstat(filepath.Join(r.HostConfigPath, "galaxy-native.tui.mjs"))
+		plugin := filepath.Join(r.HostConfigPath, "galaxy-native.tui.mjs")
+		if r.OpenCodeLayout == "v2" {
+			plugin = filepath.Join(r.HostConfigPath, "galaxy-native")
+		}
+		_, err = os.Lstat(plugin)
 		return os.IsNotExist(err), nil
 	}
 	if r.Host == "hermes" || r.Host == "deepseek-harness" {
@@ -263,7 +293,7 @@ func managedNativeBaseline(r *managedNativeRecord) (map[string]string, error) {
 	paths := []string{r.HostConfigPath}
 	if r.Host == "opencode" {
 		paths = nil
-		for _, name := range []string{"opencode.json", "opencode.jsonc", "tui.json", "tui.jsonc", "galaxy-native.tui.mjs", "galaxy-installation.json"} {
+		for _, name := range []string{"opencode.json", "opencode.jsonc", "tui.json", "tui.jsonc", "cli.json", "galaxy-native", "galaxy-native.tui.mjs", "galaxy-installation.json"} {
 			paths = append(paths, filepath.Join(r.HostConfigPath, name))
 		}
 	} else {
@@ -327,6 +357,9 @@ func managedNativeBaseline(r *managedNativeRecord) (map[string]string, error) {
 // old/new Galaxy entries, finish the same plan while preserving other entries.
 func reconcileManagedOpenCode(j *managedNativeJournal) (bool, error) {
 	target := &j.Target
+	if target.OpenCodeLayout == "v2" || j.Prior != nil && j.Prior.OpenCodeLayout == "v2" {
+		return reconcileManagedOpenCodeV2(j)
+	}
 	targetSpec, err := managedOpenCodeSpec(target)
 	if err != nil {
 		return false, err
@@ -389,6 +422,89 @@ func reconcileManagedOpenCode(j *managedNativeJournal) (bool, error) {
 		return false, nil
 	}
 	input := HostConfigurationInput{LocalOnly: target.LocalOnly, PackageDirectory: target.ReleaseDirectory, ConfigPath: target.ConfigPath, DataDirectory: target.DataDirectory, Endpoint: target.Endpoint}
+	plan, err := PreviewOpenCodeConfiguration(context.Background(), target.HostConfigPath, input)
+	if err != nil {
+		return false, err
+	}
+	_, err = InstallOpenCodeConfigurationReviewed(context.Background(), plan, true)
+	return err == nil, err
+}
+
+// Reconcile only entries that still match the original or intended owned spec.
+func reconcileManagedOpenCodeV2(j *managedNativeJournal) (bool, error) {
+	target := &j.Target
+	targetSpec, err := managedOpenCodeSpec(target)
+	if err != nil {
+		return false, err
+	}
+	priorSpec, err := managedOpenCodeSpec(j.Prior)
+	if err != nil {
+		return false, err
+	}
+	files, err := hostSelectedConfigurations(target.HostConfigPath, "opencode")
+	if err != nil {
+		return false, err
+	}
+	for _, f := range files {
+		if f.missing {
+			continue
+		}
+		obj, e := hostConfigurationObject(f.text)
+		if e != nil {
+			return false, e
+		}
+		mcp := uploadObject(obj["mcp"])
+		for _, value := range []any{mcp["galaxy"], uploadObject(mcp["servers"])["galaxy"]} {
+			if value != nil && !managedOpenCodeSpecMatches(value, targetSpec) && !managedOpenCodeSpecMatches(value, priorSpec) {
+				return false, nil
+			}
+		}
+	}
+	layout := target.OpenCodeLayout
+	if layout == "" {
+		layout = "v1"
+	}
+	plugin := filepath.Join(target.HostConfigPath, "galaxy-native", "tui.js")
+	targetPlugin := hostFileURL(filepath.Join(target.HostConfigPath, "galaxy-native"))
+	if layout == "v1" {
+		plugin = filepath.Join(target.HostConfigPath, "galaxy-native.tui.mjs")
+		targetPlugin = hostFileURL(plugin)
+	}
+	raw, err := os.ReadFile(plugin)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var meta map[string]any
+	if present, e := readJSON(filepath.Join(target.HostConfigPath, "galaxy-installation.json"), &meta); e != nil {
+		return false, e
+	} else if present {
+		valid := text(meta["plugin"]) == targetPlugin && text(meta["skillPath"]) == filepath.Join(target.ReleaseDirectory, "skills")
+		if j.Prior != nil {
+			oldPlugin := hostFileURL(filepath.Join(target.HostConfigPath, "galaxy-native.tui.mjs"))
+			if j.Prior.OpenCodeLayout == "v2" {
+				oldPlugin = hostFileURL(filepath.Join(target.HostConfigPath, "galaxy-native"))
+			}
+			valid = valid || text(meta["plugin"]) == oldPlugin && text(meta["skillPath"]) == filepath.Join(j.Prior.ReleaseDirectory, "skills")
+		}
+		if !valid {
+			return false, nil
+		}
+	}
+	input := HostConfigurationInput{OpenCodeLayout: layout, LocalOnly: target.LocalOnly, PackageDirectory: target.ReleaseDirectory, ConfigPath: target.ConfigPath, DataDirectory: target.DataDirectory, Endpoint: target.Endpoint}
+	expectedPlugin := hostOpenCodeV2Plugin(input)
+	if layout == "v1" {
+		expectedPlugin = hostOpenCodePlugin(input)
+	}
+	if string(raw) != expectedPlugin {
+		return false, nil
+	}
+	if j.Prior != nil {
+		input.OpenCodePriorSpec = j.Prior.ManagedSpec
+		input.OpenCodePriorLayout = j.Prior.OpenCodeLayout
+	}
 	plan, err := PreviewOpenCodeConfiguration(context.Background(), target.HostConfigPath, input)
 	if err != nil {
 		return false, err

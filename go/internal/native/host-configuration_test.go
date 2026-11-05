@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"net/http"
 	"os"
@@ -36,7 +37,7 @@ func installationFixturePackage(t *testing.T) string {
 	if e != nil {
 		t.Fatal(e)
 	}
-	for name, value := range map[string]string{"galaxy.exe": "synthetic binary fixture", "galaxy": "synthetic binary fixture", "opencode.js": "export function createNativeGalaxyPlugin(options){return options}", "HOSTS.md": "Original-format isolated host instructions", "host-capabilities.json": string(matrix), "package.json": `{"name":"isolated-candidate","dependencies":{}}`} {
+	for name, value := range map[string]string{"galaxy.exe": "synthetic binary fixture", "galaxy": "synthetic binary fixture", "opencode.js": "export function createNativeGalaxyPlugin(options){return options}", "opencode-v2.js": "export function createNativeGalaxyPluginV2(options){return options}", "HOSTS.md": "Original-format isolated host instructions", "host-capabilities.json": string(matrix), "package.json": `{"name":"isolated-candidate","dependencies":{}}`} {
 		if e = os.WriteFile(filepath.Join(dir, name), []byte(value), 0700); e != nil {
 			t.Fatal(e)
 		}
@@ -376,5 +377,87 @@ func TestCodexManagedTablesPreserveSubsequentUserTables(t *testing.T) {
 				t.Fatalf("recovery accepted a changed Galaxy table: %v, %v", matches, err)
 			}
 		})
+	}
+}
+
+func TestOpenCodeV2ManagedMigrationPreservesUserSettings(t *testing.T) {
+	ctx := context.Background()
+	pkg := installationFixturePackage(t)
+	dir := filepath.Join(t.TempDir(), "config")
+	if err := os.Mkdir(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	input := HostConfigurationInput{LocalOnly: true, PackageDirectory: pkg, DataDirectory: filepath.Join(t.TempDir(), "data"), OpenCodeLayout: "v1"}
+	first, err := PreviewOpenCodeConfiguration(ctx, dir, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = InstallOpenCodeConfigurationReviewed(ctx, first, true); err != nil {
+		t.Fatal(err)
+	}
+	legacyPath := filepath.Join(dir, "opencode.json")
+	legacyRaw, err := os.ReadFile(legacyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	disabledLegacy, err := hostSetConfiguration(string(legacyRaw), []string{"mcp", "galaxy", "enabled"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(legacyPath, []byte(disabledLegacy), 0600); err != nil {
+		t.Fatal(err)
+	}
+	args, env := input.launch()
+	prior := map[string]any{"type": "local", "command": append([]string{hostExecutable(pkg)}, args...), "environment": env, "enabled": true}
+	// Match real decoded JSON values, as the installation record does.
+	raw, err := hostJSON(prior)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err = json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	cli := `{"plugins":["other.plugin","-galaxy.opencode.stable.tui"],"theme":{"name":"dark"}}`
+	if err = os.WriteFile(filepath.Join(dir, "cli.json"), []byte(cli), 0600); err != nil {
+		t.Fatal(err)
+	}
+	input.OpenCodeLayout = "v2"
+	input.OpenCodePriorSpec = decoded
+	input.OpenCodePriorLayout = "v1"
+	plan, err := PreviewOpenCodeConfiguration(ctx, dir, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = InstallOpenCodeConfigurationReviewed(ctx, plan, true); err != nil {
+		t.Fatal(err)
+	}
+	var config map[string]any
+	if _, err = readJSON(filepath.Join(dir, "opencode.json"), &config); err != nil {
+		t.Fatal(err)
+	}
+	mcp := uploadObject(config["mcp"])
+	if _, ok := mcp["galaxy"]; ok {
+		t.Fatal("legacy managed entry remains")
+	}
+	if uploadObject(mcp["servers"])["galaxy"] == nil {
+		t.Fatal("v2 server missing")
+	}
+	if uploadObject(uploadObject(mcp["servers"])["galaxy"])["disabled"] != true {
+		t.Fatal("disabled choice was lost")
+	}
+	var cliConfig map[string]any
+	if _, err = readJSON(filepath.Join(dir, "cli.json"), &cliConfig); err != nil {
+		t.Fatal(err)
+	}
+	plugins := cliConfig["plugins"].([]any)
+	if len(plugins) != 3 || plugins[0] != "other.plugin" || plugins[2] != "-galaxy.opencode.stable.tui" {
+		t.Fatal(plugins)
+	}
+	if uploadObject(cliConfig["theme"])["name"] != "dark" {
+		t.Fatal("theme changed")
+	}
+	if _, err = os.Stat(filepath.Join(dir, "galaxy-native", "package.json")); err != nil {
+		t.Fatal(err)
 	}
 }

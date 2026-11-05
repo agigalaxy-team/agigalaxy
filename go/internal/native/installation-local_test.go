@@ -14,7 +14,7 @@ func TestHostConfigurationLocalOnlyAllHosts(t *testing.T) {
 	for _, host := range HostConfigurationOptions() {
 		hosts = append(hosts, host["id"])
 	}
-	input := HostConfigurationInput{LocalOnly: true, PackageDirectory: pkg, DataDirectory: filepath.Join(root, "data"), Destination: filepath.Join(root, "hosts"), Hosts: hosts}
+	input := HostConfigurationInput{LocalOnly: true, OpenCodeLayout: "v1", PackageDirectory: pkg, DataDirectory: filepath.Join(root, "data"), Destination: filepath.Join(root, "hosts"), Hosts: hosts}
 	result, err := GenerateHostConfigurations(context.Background(), input)
 	if err != nil {
 		t.Fatal(err)

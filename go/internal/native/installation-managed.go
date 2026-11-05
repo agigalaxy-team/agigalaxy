@@ -14,6 +14,8 @@ import (
 // entry points. Host must be the one explicitly selected current user host.
 type ManagedNativeInstallationInput struct {
 	Host             string            `json:"host"`
+	OpenCodeLayout   string            `json:"openCodeLayout,omitempty"`
+	OpenCodeVersion  string            `json:"openCodeVersion,omitempty"`
 	UserMCPPath      string            `json:"userMcpPath,omitempty"`
 	UserSkillPath    string            `json:"userSkillPath,omitempty"`
 	UserMCPFormat    string            `json:"userMcpFormat,omitempty"`
@@ -48,6 +50,8 @@ type ManagedNativeInstallationPlan struct {
 type managedNativeRecord struct {
 	Version           int                     `json:"version"`
 	Host              string                  `json:"host"`
+	OpenCodeLayout    string                  `json:"openCodeLayout,omitempty"`
+	OpenCodeVersion   string                  `json:"openCodeVersion,omitempty"`
 	ConfigFormat      string                  `json:"configFormat,omitempty"`
 	DataDirectory     string                  `json:"dataDirectory"`
 	ConfigPath        string                  `json:"configPath,omitempty"`
@@ -137,6 +141,18 @@ func PreviewManagedNativeInstallation(ctx context.Context, input ManagedNativeIn
 			return nil, err
 		}
 	}
+	if input.Host == "opencode" {
+		if input.HostExecutable == "" {
+			input.HostExecutable, err = FindOpenCodeExecutable("", input.Environment["PATH"])
+			if err != nil {
+				return nil, err
+			}
+		}
+		input.OpenCodeLayout, input.OpenCodeVersion, err = DetectOpenCodeLayout(ctx, input.HostExecutable, config)
+		if err != nil {
+			return nil, err
+		}
+	}
 	recordPath, err := managedRecordPath(input.InstallRoot, input.Host, config)
 	if err != nil {
 		return nil, err
@@ -218,8 +234,8 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 		return nil, err
 	}
 	result := map[string]any{"release": release, "host": input.Host, "dataDirectory": input.DataDirectory, "releaseInstalled": true, "releaseReused": release.Reused, "hostConfigured": false, "hostRuntimeTested": false, "dataPreserved": true, "identity": identity}
-	launch := HostConfigurationInput{LocalOnly: input.LocalOnly, PackageDirectory: release.Directory, ConfigPath: input.ConfigPath, DataDirectory: input.DataDirectory, Endpoint: input.Endpoint}
-	next := managedNativeRecord{Version: 1, Host: input.Host, DataDirectory: input.DataDirectory, ConfigPath: input.ConfigPath, Endpoint: input.Endpoint, LocalOnly: input.LocalOnly, PendingWebsite: input.PendingWebsite, HostConfigPath: plan.ConfigPath, SkillPath: plan.SkillPath, ReleaseDirectory: release.Directory, ConfigFormat: input.UserMCPFormat}
+	launch := HostConfigurationInput{OpenCodeLayout: input.OpenCodeLayout, LocalOnly: input.LocalOnly, PackageDirectory: release.Directory, ConfigPath: input.ConfigPath, DataDirectory: input.DataDirectory, Endpoint: input.Endpoint}
+	next := managedNativeRecord{Version: 1, Host: input.Host, OpenCodeLayout: input.OpenCodeLayout, OpenCodeVersion: input.OpenCodeVersion, DataDirectory: input.DataDirectory, ConfigPath: input.ConfigPath, Endpoint: input.Endpoint, LocalOnly: input.LocalOnly, PendingWebsite: input.PendingWebsite, HostConfigPath: plan.ConfigPath, SkillPath: plan.SkillPath, ReleaseDirectory: release.Directory, ConfigFormat: input.UserMCPFormat}
 	// The journal records the intended host state before the first host write.
 	adapter := input.Host
 	if input.Host == "custom" {
@@ -262,6 +278,7 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 		}
 	}
 	if input.Host == "opencode" {
+		next.HostExecutable = input.HostExecutable
 		var e error
 		next.ManagedSpec, e = managedOpenCodeSpec(&next)
 		if e != nil {
@@ -273,7 +290,9 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 		next.HookPrevious = plan.prior.HookPrevious
 		next.HookPath = plan.prior.HookPath
 		next.NodeExecutable = plan.prior.NodeExecutable
-		next.HostExecutable = plan.prior.HostExecutable
+		if next.HostExecutable == "" {
+			next.HostExecutable = plan.prior.HostExecutable
+		}
 		next.CodexHookTrust = plan.prior.CodexHookTrust
 	}
 	baseline, e := managedNativeBaseline(&next)
@@ -348,6 +367,10 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 		}
 		result["pluginConfigured"] = true
 	case "opencode":
+		if plan.prior != nil {
+			launch.OpenCodePriorSpec = plan.prior.ManagedSpec
+			launch.OpenCodePriorLayout = plan.prior.OpenCodeLayout
+		}
 		if err = managedOpenCodeCheck(plan.ConfigPath, plan.prior); err != nil {
 			return result, err
 		}
@@ -374,7 +397,9 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 		older = plan.prior.HookPrevious
 		next.HookPath = plan.prior.HookPath
 		next.NodeExecutable = plan.prior.NodeExecutable
-		next.HostExecutable = plan.prior.HostExecutable
+		if next.HostExecutable == "" {
+			next.HostExecutable = plan.prior.HostExecutable
+		}
 	}
 	hookReady := false
 	if input.Host == "codex" || input.Host == "claude-code" {

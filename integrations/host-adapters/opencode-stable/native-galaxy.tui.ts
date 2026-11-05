@@ -7,12 +7,12 @@ import {hostDiagnostics} from './bridge/native-diagnostics.mjs';
 import {spawn} from 'node:child_process';
 export {prepareOpenCodeLocalWork} from './bridge/host-local-client.mjs';
 
-type Options={configPath?:string;dataDirectory?:string;endpoint?:string;backend?:'go';executable?:string;onInputRequest?:(params:unknown,options:unknown)=>Promise<{action:'accept'|'decline'|'cancel';content?:Record<string,unknown>}>;openLink?:(url:string)=>Promise<unknown>;openBrowser?:(url:string)=>Promise<unknown>};
+type Options={registerShutdown?:(shutdown:()=>Promise<void>)=>void;configPath?:string;dataDirectory?:string;endpoint?:string;backend?:'go';executable?:string;onInputRequest?:(params:unknown,options:unknown)=>Promise<{action:'accept'|'decline'|'cancel';content?:Record<string,unknown>}>;openLink?:(url:string)=>Promise<unknown>;openBrowser?:(url:string)=>Promise<unknown>};
 
 // Ordinary install entry. Native is loaded lazily from the selected public
 // configuration, with the same real tools and choices used by stdio clients.
 // OpenCode continues to own its providers, conversation and unsent prompt.
-export function createNativeGalaxyPlugin({configPath,dataDirectory:installedDirectory,backend='go',executable, onInputRequest,openLink,openBrowser}:Options={}){
+export function createNativeGalaxyPlugin({configPath,dataDirectory:installedDirectory,backend='go',executable, onInputRequest,openLink,openBrowser,registerShutdown}:Options={}){
   if(backend!=='go')throw Error('native_bridge_backend_invalid');
   return createGalaxyPlugin(async()=>{
   // The public service configuration locates the same user-owned local store.
@@ -37,6 +37,7 @@ export function createNativeGalaxyPlugin({configPath,dataDirectory:installedDire
   let unregister:(()=>void)|undefined;
   let closing:Promise<void>|undefined;
   const shutdown=()=>closing??=(async()=>{try{await adapter.close();}finally{unregister?.();unregister=undefined;await Promise.all([bridge.close(),hostPersistence?.close()]);}})();
+  registerShutdown?.(shutdown);
   return{
    ...adapter,
    tui:async(api:StableHostApi)=>{

@@ -17,13 +17,16 @@ import (
 )
 
 type HostConfigurationInput struct {
-	LocalOnly        bool     `json:"localOnly,omitempty"`
-	PackageDirectory string   `json:"packageDirectory"`
-	ConfigPath       string   `json:"configPath"`
-	Destination      string   `json:"destination"`
-	Hosts            []string `json:"hosts"`
-	DataDirectory    string   `json:"dataDirectory,omitempty"`
-	Endpoint         string   `json:"endpoint,omitempty"`
+	OpenCodeLayout      string   `json:"openCodeLayout,omitempty"`
+	OpenCodePriorSpec   any      `json:"-"`
+	OpenCodePriorLayout string   `json:"-"`
+	LocalOnly           bool     `json:"localOnly,omitempty"`
+	PackageDirectory    string   `json:"packageDirectory"`
+	ConfigPath          string   `json:"configPath"`
+	Destination         string   `json:"destination"`
+	Hosts               []string `json:"hosts"`
+	DataDirectory       string   `json:"dataDirectory,omitempty"`
+	Endpoint            string   `json:"endpoint,omitempty"`
 }
 
 func HostConfigurationOptions() []map[string]string {
@@ -155,6 +158,9 @@ func hostJSONString(value any) string { raw, _ := protocol.Encode(value); return
 func hostOpenCodePlugin(input HostConfigurationInput) string {
 	return "import {createNativeGalaxyPlugin} from " + hostJSONString(hostFileURL(filepath.Join(input.PackageDirectory, "opencode.js"))) + ";\nexport default createNativeGalaxyPlugin(" + hostJSONString(map[string]any{"backend": "go", "executable": hostExecutable(input.PackageDirectory), "configPath": input.ConfigPath, "dataDirectory": input.DataDirectory, "endpoint": input.Endpoint}) + ");\n"
 }
+func hostOpenCodeV2Plugin(input HostConfigurationInput) string {
+	return "import {createNativeGalaxyPluginV2} from " + hostJSONString(hostFileURL(filepath.Join(input.PackageDirectory, "opencode-v2.js"))) + ";\nexport default createNativeGalaxyPluginV2(" + hostJSONString(map[string]any{"backend": "go", "executable": hostExecutable(input.PackageDirectory), "configPath": input.ConfigPath, "dataDirectory": input.DataDirectory, "endpoint": input.Endpoint}) + ");\n"
+}
 func hostExecutable(directory string) string { entry, _ := hostCandidate(directory); return entry }
 
 func (input HostConfigurationInput) launch() ([]string, map[string]string) {
@@ -223,6 +229,11 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 		if e = hostFile(filepath.Join(input.PackageDirectory, "opencode.js")); e != nil {
 			return nil, e
 		}
+		if input.OpenCodeLayout != "v1" {
+			if e = hostFile(filepath.Join(input.PackageDirectory, "opencode-v2.js")); e != nil {
+				return nil, e
+			}
+		}
 	}
 	if selected["codex"] {
 		if e = hostFile(filepath.Join(input.PackageDirectory, "host-templates", "codex", "galaxy-native-v2", ".codex-plugin", "plugin.json")); e != nil {
@@ -271,9 +282,27 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 	}
 	addSkill := func(name string) { operations = append(operations, func() error { return skill(name) }) }
 	if selected["opencode"] {
-		add("opencode/opencode.json", map[string]any{"$schema": "https://opencode.ai/config.json", "mcp": map[string]any{"galaxy": map[string]any{"type": "local", "command": append([]string{entry}, commandArgs...), "environment": spec["env"], "enabled": true}}, "skills": map[string]any{"paths": []string{filepath.Join(input.Destination, "opencode", ".agents", "skills")}}})
-		add("opencode/galaxy.tui.mjs", hostOpenCodePlugin(input))
-		add("opencode/tui.json", map[string]any{"$schema": "https://opencode.ai/tui.json", "plugin": []string{hostFileURL(filepath.Join(input.Destination, "opencode", "galaxy.tui.mjs"))}})
+		layout := input.OpenCodeLayout
+		if layout == "" {
+			layout = "v2"
+		}
+		server := map[string]any{"type": "local", "command": append([]string{entry}, commandArgs...), "environment": spec["env"]}
+		mcp := map[string]any{}
+		if layout == "v1" {
+			server["enabled"] = true
+			mcp["galaxy"] = server
+		} else {
+			mcp["servers"] = map[string]any{"galaxy": server}
+		}
+		add("opencode/opencode.json", map[string]any{"$schema": "https://opencode.ai/config.json", "mcp": mcp, "skills": map[string]any{"paths": []string{filepath.Join(input.Destination, "opencode", ".agents", "skills")}}})
+		if layout == "v1" {
+			add("opencode/galaxy.tui.mjs", hostOpenCodePlugin(input))
+			add("opencode/tui.json", map[string]any{"$schema": "https://opencode.ai/tui.json", "plugin": []string{hostFileURL(filepath.Join(input.Destination, "opencode", "galaxy.tui.mjs"))}})
+		} else {
+			add("opencode/galaxy-native/tui.js", hostOpenCodeV2Plugin(input))
+			add("opencode/galaxy-native/package.json", map[string]any{"name": "galaxy-native-opencode", "type": "module", "exports": map[string]any{"./tui": "./tui.js"}})
+			add("opencode/cli.json", map[string]any{"$schema": "https://opencode.ai/v2/cli.json", "plugins": []string{hostFileURL(filepath.Join(input.Destination, "opencode", "galaxy-native"))}})
+		}
 		addSkill("opencode/.agents/skills/galaxy")
 	}
 	if selected["claude-code"] {
