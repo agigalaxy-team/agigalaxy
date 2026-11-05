@@ -11,7 +11,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/resourcebudget"
 )
 
-func identityLinksHandler(ctx context.Context, registry *accountlinks.Service, policy *resourcebudget.Policy, next http.Handler, loaded ...func([]accountlinks.LoginProvider)) (http.Handler, error) {
+func identityLinksHandler(ctx context.Context, registry *accountlinks.Service, policy *resourcebudget.Policy, next http.Handler, nativeIssuer string, loaded ...func([]accountlinks.LoginProvider)) (http.Handler, error) {
 	if registry.Devices == nil {
 		return accountlinks.Handler{Next: next}, nil
 	}
@@ -26,6 +26,7 @@ func identityLinksHandler(ctx context.Context, registry *accountlinks.Service, p
 	if err != nil {
 		return nil, err
 	}
+	links.NativeIssuer = nativeIssuer
 	return identityreturn.New(identityreturn.Options{
 		Endpoint: registry.Endpoint,
 		Callback: func(ctx context.Context, provider, returned string) (string, error) {
@@ -36,6 +37,11 @@ func identityLinksHandler(ctx context.Context, registry *accountlinks.Service, p
 			state, ok := result["state"].(string)
 			if !ok {
 				return "", fault.New("identity_callback_result_invalid", 500)
+			}
+			if state == "awaiting-native-approval" {
+				if path, ok := result["reviewPath"].(string); ok {
+					return path, nil
+				}
 			}
 			return state, nil
 		},

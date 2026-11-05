@@ -83,7 +83,7 @@ func registerSelectedRemoteTools(server *mcp.Server, tools *toolRuntime, contrac
 				if e != nil {
 					return toolError(e)
 				}
-				return tools.review(ctx, req, value, text(contract["description"])+"\n"+string(raw), func(scope *ChoiceScope) (any, error) { return run(ctx, name, value, scope) })
+				return tools.review(ctx, req, value, text(contract["description"])+"\n"+string(raw), func(ctx context.Context, scope *ChoiceScope) (any, error) { return run(ctx, name, value, scope) })
 			}
 			result, e := run(ctx, name, value, nil)
 			if e != nil {

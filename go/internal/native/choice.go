@@ -63,11 +63,11 @@ func (s *Store) archiveChoiceMessage(ctx context.Context, x ArchiveInput) (strin
 	return message.String(), nil
 }
 
-func (r *toolRuntime) review(ctx context.Context, req *mcp.CallToolRequest, input any, message string, run func(*ChoiceScope) (any, error)) (*mcp.CallToolResult, error) {
+func (r *toolRuntime) review(ctx context.Context, req *mcp.CallToolRequest, input any, message string, run choiceAction) (*mcp.CallToolResult, error) {
 	return r.reviewOn(ctx, req, input, message, false, run)
 }
 
-func (r *toolRuntime) reviewOn(ctx context.Context, req *mcp.CallToolRequest, input any, message string, browserOnly bool, run func(*ChoiceScope) (any, error)) (*mcp.CallToolResult, error) {
+func (r *toolRuntime) reviewOn(ctx context.Context, req *mcp.CallToolRequest, input any, message string, browserOnly bool, run choiceAction) (*mcp.CallToolResult, error) {
 	scope, e := r.store.ChoiceScope(ctx)
 	if e != nil {
 		return toolError(e)
@@ -110,7 +110,7 @@ func (r *toolRuntime) reviewOn(ctx context.Context, req *mcp.CallToolRequest, in
 		if browserOnly {
 			if review, ok := v.(map[string]any); ok && review["state"] == "user-choice-needs-browser" {
 				review["reason"] = "browser-confirmation"
-				review["message"] = "请在运行银河客户端的电脑上打开此链接并确认，然后回到原会话继续连接。"
+				review["message"] = "请打开链接完成确认。页面会显示连接结果。"
 			}
 		}
 		return toolResult(v)
@@ -123,16 +123,21 @@ func (r *toolRuntime) reviewOn(ctx context.Context, req *mcp.CallToolRequest, in
 		if answer.Action != "accept" || answer.Content["confirm"] != true {
 			return toolResult(map[string]any{"state": "declined", "sideEffect": false})
 		}
-		v, e := run(&scope)
+		v, e := run(ctx, &scope)
 		if e != nil {
 			return toolError(e)
 		}
 		return toolResult(v)
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	locked := true
+	defer func() {
+		if locked {
+			r.mu.Unlock()
+		}
+	}()
 	for nonce, v := range r.choices {
-		if time.Now().After(v.Expires) {
+		if !v.Running && time.Now().After(v.Expires) {
 			delete(r.choices, nonce)
 		}
 	}
@@ -169,7 +174,11 @@ func (r *toolRuntime) reviewOn(ctx context.Context, req *mcp.CallToolRequest, in
 		return toolResult(map[string]any{"state": "declined", "sideEffect": false})
 	}
 	record.Running = true
-	v, e := run(&scope)
+	r.mu.Unlock()
+	locked = false
+	v, e := run(ctx, &scope)
+	r.mu.Lock()
+	locked = true
 	record.Running = false
 	if e != nil {
 		record.Result, _ = toolError(e)

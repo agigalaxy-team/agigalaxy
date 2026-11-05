@@ -109,7 +109,7 @@ func registerNativeA2aTools(server *mcp.Server, tools *toolRuntime, host *Native
 				}
 				choice := map[string]any{"operationId": input["operationId"], "preview": preview.Value()}
 				encoded, _ := protocol.EncodeJS(choice)
-				return tools.review(ctx, request, choice, fmt.Sprintf("仅执行所示外部 A2A peer、本人原 Attempt 与选中材料；结果仅为 peer 报告，不代表独立验证或验收。\n%s\n停止本机请求不表示远端已取消；未知结果保留原操作并核对，不自动重发。", encoded), func(scope *ChoiceScope) (any, error) {
+				return tools.review(ctx, request, choice, fmt.Sprintf("仅执行所示外部 A2A peer、本人原 Attempt 与选中材料；结果仅为 peer 报告，不代表独立验证或验收。\n%s\n停止本机请求不表示远端已取消；未知结果保留原操作并核对，不自动重发。", encoded), func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					host.mu.Lock()
 					state := preview.state
 					host.mu.Unlock()

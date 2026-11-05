@@ -41,7 +41,7 @@ func registerUploadTools(server *mcp.Server, rt *toolRuntime, runtime *Runtime) 
 				if e != nil {
 					return toolError(e)
 				}
-				return rt.review(ctx, req, input, message, func(scope *ChoiceScope) (any, error) {
+				return rt.review(ctx, req, input, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					if previewScope != nil && *previewScope != *scope {
 						return nil, connectionFailure("native_connection_selection_changed")
 					}

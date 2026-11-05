@@ -42,7 +42,7 @@ func registerNativeIdentityGroupTools(server *mcp.Server, tools *toolRuntime, ru
 					return toolResult(preview)
 				}
 				message := "请本人核对完整身份显示关系：受影响的原身份、原资料引用及哈希、更正、接收人、可见范围与当前设备。原ID、事实作者、权限、配额及能力不合并。\n" + hostJSONString(preview)
-				return tools.review(ctx, req, preview, message, func(scope *ChoiceScope) (any, error) {
+				return tools.review(ctx, req, preview, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					return host.ExecuteReviewed(ctx, text(input["previewId"]), scope)
 				})
 			}

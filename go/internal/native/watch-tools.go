@@ -45,7 +45,7 @@ func registerNativeWatchTools(server *mcp.Server, tools *toolRuntime, runtime *R
 			defer cancel()
 			ctx = operation
 			id := text(input["id"])
-			run := func(scope *ChoiceScope) (any, error) {
+			run := func(ctx context.Context, scope *ChoiceScope) (any, error) {
 				switch name {
 				case "galaxy_watch_host_capabilities":
 					driver, configuration, e := host.driver(l)
@@ -59,7 +59,7 @@ func registerNativeWatchTools(server *mcp.Server, tools *toolRuntime, runtime *R
 					if e != nil {
 						return nil, e
 					}
-					if e = l.check(ctx); e != nil {
+					if e := l.check(ctx); e != nil {
 						return nil, e
 					}
 					capabilities["configured"] = true
@@ -79,7 +79,7 @@ func registerNativeWatchTools(server *mcp.Server, tools *toolRuntime, runtime *R
 						if e != nil {
 							return nil, e
 						}
-						if e = l.check(ctx); e != nil {
+						if e := l.check(ctx); e != nil {
 							return nil, e
 						}
 						if capabilities["backgroundReaderSupported"] != true {
@@ -90,7 +90,7 @@ func registerNativeWatchTools(server *mcp.Server, tools *toolRuntime, runtime *R
 							return map[string]any{"state": "foreground-fallback", "reason": reason, "hostModelEnabled": false, "modelStarted": false, "modelCalls": 0, "foregroundFallback": true}, nil
 						}
 					}
-					if e = host.restore(ctx, l, false); e != nil {
+					if e := host.restore(ctx, l, false); e != nil {
 						return nil, e
 					}
 					return host.Activate(ctx, l, id, map[string]any{"model": input["model"], "cwd": configuration["cwd"]}, scope)
@@ -109,7 +109,7 @@ func registerNativeWatchTools(server *mcp.Server, tools *toolRuntime, runtime *R
 						return nil, watchFailure("watch_missing")
 					}
 					id = text(uploadObject(items[0])["id"])
-					if e = host.restore(ctx, l, true); e != nil {
+					if e := host.restore(ctx, l, true); e != nil {
 						return nil, e
 					}
 					_, e = host.Activate(ctx, l, id, nil, nil)
@@ -128,7 +128,7 @@ func registerNativeWatchTools(server *mcp.Server, tools *toolRuntime, runtime *R
 					runner := host.runners[watchRunnerKey(l, id)]
 					host.mu.Unlock()
 					if runner == nil {
-						if _, e = host.Activate(ctx, l, id, nil, nil); e != nil {
+						if _, e := host.Activate(ctx, l, id, nil, nil); e != nil {
 							return nil, e
 						}
 					}
@@ -141,7 +141,7 @@ func registerNativeWatchTools(server *mcp.Server, tools *toolRuntime, runtime *R
 					runner := host.runners[watchRunnerKey(l, id)]
 					host.mu.Unlock()
 					if runner == nil {
-						if _, e = host.Activate(ctx, l, id, nil, nil); e != nil {
+						if _, e := host.Activate(ctx, l, id, nil, nil); e != nil {
 							return nil, e
 						}
 					}
@@ -160,10 +160,10 @@ func registerNativeWatchTools(server *mcp.Server, tools *toolRuntime, runtime *R
 					if e != nil {
 						return nil, e
 					}
-					if e = host.restore(ctx, l, true); e != nil {
+					if e := host.restore(ctx, l, true); e != nil {
 						return nil, e
 					}
-					if _, e = host.Activate(ctx, l, id, nil, nil); e != nil {
+					if _, e := host.Activate(ctx, l, id, nil, nil); e != nil {
 						return nil, e
 					}
 					resumed["hostRuntimeState"] = "running-host"
@@ -173,17 +173,32 @@ func registerNativeWatchTools(server *mcp.Server, tools *toolRuntime, runtime *R
 			}
 			if isOne(name, "galaxy_watch_host_activate", "galaxy_watch_start", "galaxy_watch_pause", "galaxy_watch_resume") {
 				value := map[string]any{"input": input, "authorizationContext": map[string]any{"subjectId": l.scope.Owner, "endpoint": l.scope.Endpoint, "bindingId": l.connection.bindingID, "generation": l.connection.generation}}
-				return tools.review(ctx, request, value, "请本人核对这段工作的关注用途、房间与精确Agent许可；暂停会撤销原许可，恢复必须选择新的当前许可。只有明确选择宿主型号才会调用该用户宿主。\n"+hostJSONString(value), func(scope *ChoiceScope) (any, error) {
+				current := map[string]any{}
+				if id != "" {
+					status, _ := host.watch.Status(ctx, l, id)
+					if rows := uploadRows(status["items"]); len(rows) > 0 {
+						current = uploadObject(rows[0])
+					}
+				}
+				roomID := text(input["roomId"])
+				if roomID == "" {
+					roomID = text(current["roomId"])
+				}
+				var room map[string]any
+				if roomID != "" {
+					room, _ = NewNativeChat(runtime).Call(ctx, "galaxy_chat_room", map[string]any{"roomId": roomID}, &l.scope)
+				}
+				return tools.review(ctx, request, value, watchChoiceMessage(name, input, current, room), func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					if scope == nil || *scope != l.scope {
 						return nil, watchFailure("watch_binding_changed")
 					}
-					if e = l.check(ctx); e != nil {
+					if e := l.check(ctx); e != nil {
 						return nil, e
 					}
-					return run(scope)
+					return run(ctx, scope)
 				})
 			}
-			out, e := run(nil)
+			out, e := run(ctx, nil)
 			if e != nil {
 				return toolError(e)
 			}

@@ -3,6 +3,8 @@ package native
 import (
 	"testing"
 	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestPendingInteractionsCountsLiveChoicesAndPreviews(t *testing.T) {
@@ -18,20 +20,19 @@ func TestPendingInteractionsCountsLiveChoicesAndPreviews(t *testing.T) {
 		"recoverable": {state: "unknown", expiresAt: future.UnixMilli()},
 	}}
 	browser := NewBrowserChoices(nil, clock)
-	browser.entries["accepted"] = &interactionBrowserEntry{state: "accepted", expires: future}
+	browser.entries["account"] = &interactionBrowserEntry{state: "awaiting-account", expires: future}
 	browser.entries["declined"] = &interactionBrowserEntry{state: "declined-delivered", expires: future}
 	browser.recoveryEntries = map[string]*recoveryBrowserEntry{"open": {stage: "set-save", expires: future}, "done": {stage: "done", expires: future}}
-	rt := &toolRuntime{browser: browser, choices: map[string]*choiceRecord{"result": {Expires: future}, "expired": {Expires: past}}, pending: []func() (int, time.Time){accounts.pendingInteractions}}
+	rt := &toolRuntime{browser: browser, choices: map[string]*choiceRecord{"result": {Expires: future, Result: &mcp.CallToolResult{}}, "expired": {Expires: past}}, pending: []func() (int, time.Time){accounts.pendingInteractions}}
 	server := &ToolServer{tools: rt}
 	count, expiry := server.PendingInteractions()
-	if count != 5 || !expiry.Equal(future) {
+	if count != 4 || !expiry.Equal(future) {
 		t.Fatalf("pending = %d, %v", count, expiry)
 	}
 	accounts.previews["prepared"].state = "completed"
 	accounts.previews["running"].state = "unknown"
-	browser.entries["accepted"].state = "declined-delivered"
+	browser.entries["account"].completed = true
 	browser.recoveryEntries["open"].stage = "done"
-	delete(rt.choices, "result")
 	if count, expiry = server.PendingInteractions(); count != 0 || !expiry.IsZero() {
 		t.Fatalf("finished = %d, %v", count, expiry)
 	}

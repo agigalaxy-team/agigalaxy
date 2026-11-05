@@ -23,7 +23,7 @@ func interactionTestStore(t *testing.T) *Store {
 	}
 	return s
 }
-func interactionChoice(t *testing.T, b *BrowserChoices, input BrowserChoiceInput, run func(*ChoiceScope) (any, error)) map[string]any {
+func interactionChoice(t *testing.T, b *BrowserChoices, input BrowserChoiceInput, run choiceAction) map[string]any {
 	t.Helper()
 	result, e := b.Review(context.Background(), input, run)
 	if e != nil {
@@ -54,6 +54,26 @@ func interactionPost(t *testing.T, raw, origin, body string, headers map[string]
 	_, _ = io.Copy(io.Discard, response.Body)
 	return response.StatusCode
 }
+func waitForInteractionResult(t *testing.T, location, expected string) {
+	t.Helper()
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
+		response, err := http.Get(location)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(response.Body)
+		response.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(body), expected) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("review page did not show %q", expected)
+}
+
 func TestInteractionBrowserExactChoiceAndOriginalOperationOnce(t *testing.T) {
 	ctx := context.Background()
 	s := interactionTestStore(t)
@@ -63,10 +83,19 @@ func TestInteractionBrowserExactChoiceAndOriginalOperationOnce(t *testing.T) {
 	browser := NewBrowserChoices(s, nil)
 	defer browser.Close()
 	input := BrowserChoiceInput{Name: "galaxy_local_archive_configure", Input: args, Message: "保存所选会话 selected-session，不上传。<script>untrusted()</script>", Scope: scope}
-	calls := 0
-	run := func(scope *ChoiceScope) (any, error) { calls++; return s.configureArchive(ctx, args, scope) }
-	first := interactionChoice(t, browser, input, run)
-	if first["state"] != "user-choice-needs-browser" || calls != 0 {
+	var calls atomic.Int64
+	run := func(ctx context.Context, scope *ChoiceScope) (any, error) {
+		calls.Add(1)
+		return s.configureArchive(ctx, args, scope)
+	}
+	requestCtx, endRequest := context.WithCancel(ctx)
+	value, err := browser.Review(requestCtx, input, run)
+	endRequest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := initializationMap(value)
+	if first["state"] != "user-choice-needs-browser" || calls.Load() != 0 {
 		t.Fatal(first)
 	}
 	again := interactionChoice(t, browser, input, run)
@@ -106,15 +135,13 @@ func TestInteractionBrowserExactChoiceAndOriginalOperationOnce(t *testing.T) {
 	if status := interactionPost(t, raw, origin, "action=allow", nil); status != 200 {
 		t.Fatal(status)
 	}
-	if calls != 0 {
-		t.Fatal("HTTP handler executed business operation")
-	}
+	waitForInteractionResult(t, raw, "已处理，可以回到原聊天。")
 	saved := interactionChoice(t, browser, input, run)
-	if saved["settings"] == nil || calls != 1 {
-		t.Fatal(saved, calls)
+	if saved["settings"] == nil || calls.Load() != 1 {
+		t.Fatal(saved, calls.Load())
 	}
 	same(t, saved, interactionChoice(t, browser, input, run))
-	if calls != 1 {
+	if calls.Load() != 1 {
 		t.Fatal("original operation ran again")
 	}
 	actual, e := s.ArchiveSettings(ctx)
@@ -139,7 +166,10 @@ func TestInteractionBrowserCancellationExpiryAndScopeCannotApprove(t *testing.T)
 	defer browser.Close()
 	input := BrowserChoiceInput{Name: "galaxy_native_connect", Input: map[string]any{}, Message: "仅连接当前设备", Scope: scope}
 	calls := 0
-	run := func(*ChoiceScope) (any, error) { calls++; return map[string]any{"connected": true}, nil }
+	run := func(_ context.Context, _ *ChoiceScope) (any, error) {
+		calls++
+		return map[string]any{"connected": true}, nil
+	}
 	first := interactionChoice(t, browser, input, run)
 	raw := text(first["url"])
 	parsed, _ := url.Parse(raw)
@@ -204,35 +234,35 @@ func TestInteractionBrowserActualIsolatedHeadlessChoiceAndWindowClose(t *testing
 	scope, _ := store.ChoiceScope(ctx)
 	browser := NewBrowserChoices(store, nil)
 	defer browser.Close()
-	calls := 0
+	var calls atomic.Int64
 	for _, action := range []string{"allow", "decline", "window-close"} {
 		t.Run(action, func(t *testing.T) {
 			enabled := true
 			selection := ArchiveInput{Enabled: &enabled, Sessions: []ArchiveSession{{Host: "opencode", SessionID: action}}}
 			input := BrowserChoiceInput{Name: "galaxy_local_archive_configure", Input: selection, Message: "仅保存在这台设备：" + action, Scope: scope}
-			run := func(scope *ChoiceScope) (any, error) { calls++; return store.configureArchive(ctx, selection, scope) }
+			run := func(ctx context.Context, scope *ChoiceScope) (any, error) {
+				calls.Add(1)
+				return store.configureArchive(ctx, selection, scope)
+			}
 			pending := interactionChoice(t, browser, input, run)
-			before := calls
-			script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const context=await browser.newContext();const page=await context.newPage();await page.goto(process.argv[1]);const action=process.argv[2];if(action==='window-close'){await page.close();}else{await page.getByRole('button',{name:action==='allow'?'允许本次操作':'取消',exact:true}).click();const text=await page.textContent('body');if(!text.includes(action==='allow'?'已允许':'已取消'))throw Error('actual form response mismatch');}await context.close();console.log(JSON.stringify({isolatedHeadless:true,action}));}finally{await browser.close();}`
+			before := calls.Load()
+			script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const context=await browser.newContext();const page=await context.newPage();await page.goto(process.argv[1]);const action=process.argv[2];if(action==='window-close'){await page.close();}else{await page.getByRole('button',{name:action==='allow'?'允许本次操作':'取消',exact:true}).click();await page.getByText(action==='allow'?'已处理，可以回到原聊天。':'已取消，本次操作没有获得授权。',{exact:true}).waitFor();}await context.close();console.log(JSON.stringify({isolatedHeadless:true,action}));}finally{await browser.close();}`
 			result := initializationNode(t, script, text(pending["url"]), action)
 			if result["isolatedHeadless"] != true {
 				t.Fatal(result)
 			}
-			if calls != before {
-				t.Fatal("browser executed operation without original MCP continuation")
-			}
 			next := interactionChoice(t, browser, input, run)
 			switch action {
 			case "allow":
-				if calls != before+1 || next["settings"] == nil {
+				if calls.Load() != before+1 || next["settings"] == nil {
 					t.Fatal(next)
 				}
 			case "decline":
-				if calls != before || next["state"] != "declined" {
+				if calls.Load() != before || next["state"] != "declined" {
 					t.Fatal(next)
 				}
 			case "window-close":
-				if calls != before || next["state"] != "user-choice-needs-browser" || next["url"] != pending["url"] {
+				if calls.Load() != before || next["state"] != "user-choice-needs-browser" || next["url"] != pending["url"] {
 					t.Fatal("closing the window granted approval", next)
 				}
 			}

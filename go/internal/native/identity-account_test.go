@@ -2,11 +2,13 @@ package native
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accountlinks"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/portal"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/testsupport"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -37,7 +39,7 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 	}
 	oidc.Now = now
 	redirect := meta.Configuration.Endpoint + "/v1/identity/callback/forum-fixture"
-	login, e := portal.NewLogin(pool, oidc, portal.LoginOptions{ID: "forum-fixture", Name: "Isolated real OIDC fixture", RedirectURI: redirect, Namespace: "isolated-native-account"})
+	login, e := portal.NewLogin(pool, oidc, portal.LoginOptions{ID: "forum-fixture", Name: "Isolated real OIDC fixture", RedirectURI: redirect, Namespace: "isolated-native-account", IncludeProfile: true})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -48,8 +50,17 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	links.NativeIssuer = issuer
 	original, _ := url.Parse(meta.Origin)
-	server := httptest.NewServer(accountlinks.Handler{Links: links, Next: httputil.NewSingleHostReverseProxy(original)})
+	routes := accountlinks.Handler{Links: links, Next: httputil.NewSingleHostReverseProxy(original)}
+	// The fixture serves the production handler on loopback instead of using
+	// the configured HTTPS name; preserve the expected browser Origin.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Header.Get("Origin") == "http://"+req.Host {
+			req.Header.Set("Origin", meta.Configuration.Endpoint)
+		}
+		routes.ServeHTTP(w, req)
+	}))
 	defer server.Close()
 	transport.origin, _ = url.Parse(server.URL)
 	rt, e := NewRuntime(store, meta.Configuration, ConnectionOptions{HTTPClient: &http.Client{Transport: transport}, Now: now})
@@ -130,6 +141,9 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 	if e != nil || uploadObject(recovered)["state"] != "linked" || confirms.Load() != 1 {
 		t.Fatalf("old binding result unavailable: %v", e)
 	}
+	for range 40 {
+		client.previews[uuid.NewString()] = &nativeAccountPreview{state: "completed", expiresAt: meta.Now*1000 + 300000, lease: client.previews[previewID].lease}
+	}
 	prepared, e = client.Prepare(ctx, "unlink", id)
 	if e != nil {
 		t.Fatal(e)
@@ -146,5 +160,76 @@ func TestNativeAccountSignedIntentAndOriginalJournal(t *testing.T) {
 	if uploadObject(pending)["originalOperationRetained"] != true {
 		t.Fatal("terminal original operation was not retained", pending)
 	}
+
+	t.Run("first-use-in-browser", func(t *testing.T) {
+		config := meta.Configuration
+		config.DataDirectory = t.TempDir()
+		local, err := NewStore(config.DataDirectory, config.Endpoint)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = local.Initialize(ctx, InitializationInput{SubjectType: "person"}, true, nil); err != nil {
+			t.Fatal(err)
+		}
+		subject, err := local.Owner(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		runtime, err := NewRuntime(local, config, ConnectionOptions{HTTPClient: &http.Client{Transport: transport}, Now: now})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer runtime.Close()
+		browser := NewBrowserChoices(local, now)
+		defer browser.Close()
+		plan, err := runtime.PrepareConnect(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		attempt := &nativeAccountConnect{runtime: runtime, accounts: NewNativeIdentityAccounts(runtime), pending: map[ChoiceScope]*nativeAccountLogin{}}
+		first, err := attempt.review(ctx, browser, plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var login *nativeAccountLogin
+		for _, value := range attempt.pending {
+			login = value
+		}
+		callback := meta.Authorize(login.loginURL)
+		resp, err := http.Get(server.URL + callback)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&body)
+		resp.Body.Close()
+		if err != nil || resp.StatusCode != 200 || body["state"] != "awaiting-native-approval" {
+			t.Fatalf("login callback: %d %v %v", resp.StatusCode, body, err)
+		}
+		var exists bool
+		if err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bindings WHERE subject_id=$1)", subject).Scan(&exists); err != nil || exists {
+			t.Fatalf("login created a binding before confirmation: %v %v", exists, err)
+		}
+		script := `import {chromium} from 'playwright';
+            const browser=await chromium.launch({headless:true});try {
+            const page=await browser.newPage();await page.goto(process.argv[1]);
+            await page.getByRole('link',{name:'登录银河账户'}).waitFor();
+            const review=await browser.newPage();await review.goto(process.argv[2]);
+            await review.getByText('fixture-account@example.invalid',{exact:true}).waitFor();
+            await review.getByText(process.argv[3],{exact:true}).waitFor();
+            await review.getByRole('button',{name:'确认关联',exact:true}).click();
+            await page.getByText('已处理，可以回到原聊天。',{exact:true}).waitFor({timeout:15000});
+            console.log(JSON.stringify({confirmed:true}));} finally { await browser.close(); }`
+		if initializationNode(t, script, text(uploadObject(first)["url"]), server.URL+text(body["reviewPath"]), subject)["confirmed"] != true {
+			t.Fatal("browser did not finish")
+		}
+		if err := pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM community_account_links WHERE subject_id=$1)", subject).Scan(&exists); err != nil || !exists {
+			t.Fatalf("browser did not link the current ID: %v %v", exists, err)
+		}
+		connected, err := runtime.Status(ctx, RuntimeStatusOptions{RestoreSelected: true})
+		if err != nil || connected["connected"] != true || connected["identity"] != subject {
+			t.Fatalf("original runtime identity not connected: %v", err)
+		}
+	})
 
 }

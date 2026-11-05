@@ -162,7 +162,9 @@ func registerRemoteSummaryDomainTools(server *mcp.Server, tools *toolRuntime, ru
 				if e != nil {
 					return toolError(e)
 				}
-				return tools.review(ctx, request, normalized, "本人确认所示收件箱静音或阻止范围。不会撤销原公开事实，不标记本人已读，也不启动系统提醒或模型。\n"+string(raw), func(scope *ChoiceScope) (any, error) { return remoteSummaryCall(ctx, runtime, name, normalized, scope) })
+				return tools.review(ctx, request, normalized, "本人确认所示收件箱静音或阻止范围。不会撤销原公开事实，不标记本人已读，也不启动系统提醒或模型。\n"+string(raw), func(ctx context.Context, scope *ChoiceScope) (any, error) {
+					return remoteSummaryCall(ctx, runtime, name, normalized, scope)
+				})
 			}
 			value, e := remoteSummaryCall(ctx, runtime, name, input, nil)
 			if e != nil {

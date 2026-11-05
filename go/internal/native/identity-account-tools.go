@@ -64,7 +64,9 @@ func registerNativeIdentityAccountTools(server *mcp.Server, tools *toolRuntime, 
 			action = "解除关联"
 		}
 		message := fmt.Sprintf("%s银河账户\n银河ID：%s\n账户标识：%s\n账户服务：%s\n\n仅办理上述账户与本机身份的%s，不增加数据上传或其他操作权限。", action, text(content["subjectId"]), text(target["externalSubject"]), text(target["issuer"]), action)
-		return tools.review(ctx, req, preview, message, func(scope *ChoiceScope) (any, error) { return accounts.ExecuteReviewed(ctx, input.PreviewID, scope) })
+		return tools.review(ctx, req, preview, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
+			return accounts.ExecuteReviewed(ctx, input.PreviewID, scope)
+		})
 	})
 	addNativeTool(server, &mcp.Tool{Name: "galaxy_identity_account_recover", InputSchema: objectSchema(map[string]any{"id": id}), Description: "Recover this local identity’s original already approved account operation. Omit id to list retained unfinished operations. Read the server’s durable association first; retry only the exact saved signed bytes on the same current binding, without a new login, ID or signature. Keys, bearers and signed packets are not returned.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}}, "native_account_link_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input struct {

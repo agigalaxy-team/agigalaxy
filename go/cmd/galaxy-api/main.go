@@ -423,7 +423,7 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 		return e
 	}
 	var loginProviders []accountlinks.LoginProvider
-	identityHandler, e := identityLinksHandler(ctx, links, budgetPolicy, privateHandler, func(providers []accountlinks.LoginProvider) { loginProviders = providers })
+	identityHandler, e := identityLinksHandler(ctx, links, budgetPolicy, privateHandler, gateway.Config.AccountIssuer, func(providers []accountlinks.LoginProvider) { loginProviders = providers })
 	if e != nil {
 		return e
 	}

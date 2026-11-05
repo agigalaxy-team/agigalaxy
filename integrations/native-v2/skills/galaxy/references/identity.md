@@ -6,13 +6,13 @@
 
 需要在本机创建银河 ID 时，没有本机身份先用 `galaxy_native_initialize_preview` 核对本机准备，再由 `galaxy_native_initialize` 的真实用户选择创建；已有本机 ID 则沿用。通过账户 Token 使用账户已关联的 ID 属于选择已有身份，不需要初始化本机。插件提供身份、数据与工具接入，模型由用户自己的 AI 宿主配置。
 
-`galaxy_native_connect` 单独处理所选服务的连接。工具返回本机确认链接时，把该链接交给用户在运行银河客户端的电脑上打开。用户在页面确认后，回到原会话再次调用同一工具完成连接，再读取连接状态。如果旧客户端只返回 `declined` 而用户没看到表单，说明本次连接未完成，不能据此判断用户拒绝。官网身份设置不能代替本机连接确认。
+`galaxy_native_connect` 沿用当前本机 ID。连接银河官方服务时，打开工具返回的页面，让本人登录官网并确认所显示的账户与本机 ID；客户端接着登记设备、关联账户并显示结果，无需在聊天中再次发起。连接其他服务时，按该服务的本机确认流程办理。回到原聊天只读取实际状态，不重建 ID，不把浏览器未弹出理解为用户拒绝。
 
 初始化预览和执行使用同一组实际选择：`initializationPath`、`profile`、`subjectType`、`modules` 和 `uploadPrivacy` 均按当前 schema 与本人选择填写；不需要的字段可采用工具实际默认。初始化只准备本机，连接所选服务、官网账户关联和材料上传分别处理。缺少工具或宿主接入时，可使用当前包提供的安装、修复入口及其实际帮助，保留原身份和资料目录。
 
-## 从本机关联银河官方账户
+## 手动管理已有账户关联
 
-只有实际工具列表包含 `galaxy_identity_account_read`、`galaxy_identity_account_prepare`、`galaxy_identity_account_execute` 时才使用此流程。查询已有绑定用 read 的 `action: 'query'`；返回条目的 `id` 是绑定记录编号，`externalSubject` 才是发行服务中的账户标识，二者与本机 GUID 分开。新登录时先用 read 的 `action: 'providers'` 取得当前服务真实的账户入口，再用 `action: 'begin'` 和实际 providerId 准备登录。把返回的授权网址交给用户；登录本身不会关联 ID。
+官方首次接入使用上述统一流程。需要单独管理账户关联且实际工具列表包含 `galaxy_identity_account_read`、`galaxy_identity_account_prepare`、`galaxy_identity_account_execute` 时，才使用下列操作。查询已有绑定用 read 的 `action: 'query'`；返回条目的 `id` 是绑定记录编号，`externalSubject` 才是发行服务中的账户标识，二者与本机 GUID 分开。新登录时先用 read 的 `action: 'providers'` 取得当前服务真实的账户入口，再用 `action: 'begin'` 和实际 providerId 准备登录。把返回的授权网址交给用户；登录本身不会关联 ID。
 
 用 read 的 `action: 'status'` 与原 loginId 核对结果。状态为 `awaiting-local-signature` 后，用 prepare 的 `action: 'link'` 与该 id 取得完整预览，再调用 execute 并传原 previewId，让用户在宿主表单或临时本机审阅页明确允许。核对刚才实际登录的账户与当前 ID；不要用模型填写的 confirmed 代替选择，也不要拿普通网页接续证明当账户关联签名。
 

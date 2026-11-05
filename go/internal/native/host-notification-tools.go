@@ -57,7 +57,7 @@ func registerNativeHostNotificationTools(server *mcp.Server, tools *toolRuntime,
 				if name == "galaxy_host_notifications_permission" {
 					message = "请本人选择是否询问已配置macOS应用的系统提醒权限；这次选择不启用提醒、不显示通知，也不改变银河已读。"
 				}
-				return tools.review(operation, request, value, message+"\n"+hostJSONString(value), func(scope *ChoiceScope) (any, error) {
+				return tools.review(operation, request, value, message+"\n"+hostJSONString(value), func(operation context.Context, scope *ChoiceScope) (any, error) {
 					if name == "galaxy_host_notifications_enable" {
 						return host.EnableReviewed(operation, l, scope, epoch)
 					}

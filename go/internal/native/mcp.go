@@ -199,7 +199,7 @@ func newToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArti
 			return nil, notificationError
 		}
 		if len(artifacts) == 1 {
-			reviewer := func(ctx context.Context, req *mcp.CallToolRequest, name string, input any, message string, run func(*ChoiceScope) (any, error)) (*mcp.CallToolResult, error) {
+			reviewer := func(ctx context.Context, req *mcp.CallToolRequest, name string, input any, message string, run choiceAction) (*mcp.CallToolResult, error) {
 				copyRequest := *req
 				copyParams := *req.Params
 				copyParams.Name = name
@@ -331,7 +331,7 @@ func (r *toolRuntime) configure(ctx context.Context, req *mcp.CallToolRequest) (
 	if e != nil {
 		return toolError(e)
 	}
-	return r.review(ctx, req, x, message, func(scope *ChoiceScope) (any, error) {
+	return r.review(ctx, req, x, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 		x.GalaxyID = scope.Owner
 		return r.store.configureArchive(ctx, x, scope)
 	})

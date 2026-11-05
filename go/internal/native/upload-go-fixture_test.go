@@ -138,7 +138,7 @@ func nativeGoUploadFixtureWithPool(t *testing.T, pool *pgxpool.Pool, peer bool) 
 				return
 			}
 			h, _ := json.Marshal(map[string]any{"alg": "RS256", "kid": "fixture", "typ": "JWT"})
-			c, _ := json.Marshal(map[string]any{"iss": issuer, "sub": externalSubject, "aud": "fixture-account-links", "iat": base.Now, "exp": base.Now + 600, "nonce": nonce, "email_verified": true})
+			c, _ := json.Marshal(map[string]any{"iss": issuer, "sub": externalSubject, "aud": "fixture-account-links", "iat": base.Now, "exp": base.Now + 600, "nonce": nonce, "email_verified": true, "email": "fixture-account@example.invalid"})
 			input := base64.RawURLEncoding.EncodeToString(h) + "." + base64.RawURLEncoding.EncodeToString(c)
 			digest := sha256.Sum256([]byte(input))
 			signature, _ := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, digest[:])

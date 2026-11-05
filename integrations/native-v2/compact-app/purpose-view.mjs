@@ -4,7 +4,7 @@ import {nativeChoiceUrl} from './browser-choice.mjs';
 
 export function mountCompactPanel(root,{call,displayMode,handoff,supportsHandoff=()=>!!handoff,supportsDisplayMode=()=>!!displayMode,openLink,supportsOpenLink=()=>false}={}){
  const doc=root.ownerDocument,win=doc.defaultView,editors=new Map();
- let current=null,navigationId=null,busy=false,destroyed=false,generation=0,intent=0,editorOwner=null,pendingId=null,pendingAction=null,choiceTimer,choiceUrl=null,replyTimer,updateTimer,replySave=Promise.resolve();
+ let current=null,navigationId=null,busy=false,destroyed=false,generation=0,intent=0,editorOwner=null,submitted=null,pendingAction=null,choiceTimer,choiceUrl=null,replyTimer,updateTimer,replySave=Promise.resolve();
  const el=(tag,text,cls)=>{const n=doc.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
  root.className='galaxy-compact';
  const header=el('header'),returnButton=button('继续原工作',finish);returnButton.dataset.return='true';header.append(el('strong','✧ 银河'),returnButton);
@@ -22,34 +22,50 @@ export function mountCompactPanel(root,{call,displayMode,handoff,supportsHandoff
  function setBusy(value){busy=value;root.setAttribute('aria-busy',String(value));root.querySelectorAll('button').forEach(b=>b.disabled=b.dataset.unavailable==='true'||b.dataset.waiting==='true'||value&&b.dataset.return!=='true');}
  function showError(e){if(destroyed)return;const code=e?.code??e?.message;
   clearTimeout(choiceTimer);pendingAction=null;choiceUrl=null;
-  status.textContent=['panel_identity_changed','panel_connection_changed','receipt_status_authority_changed'].includes(code)?'连接发生变化，请重新打开当前内容。':code==='chat_agent_not_authorized'?'回复授权已变化，可以在完整对话中继续。':code==='panel_draft_conflict'?'另一处也修改了这份草稿。当前输入仍保留，请在原工作中核对。':'暂时未能完成。输入已保留，可以再试一次。';
-  if(['panel_identity_changed','panel_connection_changed','receipt_status_authority_changed'].includes(code)){source.replaceChildren();helps.replaceChildren();responses.replaceChildren();review.replaceChildren();messages.replaceChildren();composer.hidden=true;}
+  status.textContent=['panel_identity_changed','panel_connection_changed','receipt_status_authority_changed'].includes(code)?'连接发生变化，请重新打开当前内容。':code==='chat_agent_not_authorized'?'回复授权已变化，可以在完整对话中继续。':code==='panel_draft_conflict'?'另一处也修改了这份草稿。当前输入仍保留，请在原工作中核对。':'暂时未能完成。';
+  if(['panel_identity_changed','panel_connection_changed','receipt_status_authority_changed'].includes(code)){clearTimeout(updateTimer);submitted=null;source.replaceChildren();helps.replaceChildren();responses.replaceChildren();review.replaceChildren();messages.replaceChildren();composer.hidden=true;}
   if(!current){source.replaceChildren(el('h2','当前内容暂不可用'),el('p','可以回到原工作，重新取得当前允许的内容。'));conversation.hidden=true;notes.hidden=true;status.textContent='暂时未能打开当前内容。';}
  }
  async function invoke(name,args={},silent=false){if(!current)throw Error('panel_not_ready');const stamp=generation,startedIntent=intent,viewId=current.viewId,background=silent&&['galaxy_panel_refresh','galaxy_panel_return'].includes(name);if(!background)setBusy(true);if(!silent)status.textContent='正在处理…';
   try{const response=await call(name,{viewId,...args});if(destroyed||stamp!==generation||background&&(startedIntent!==intent||busy))return null;if(response?.isError)throw Error(response.structuredContent?.error??'panel_operation_failed');
    if(response?.resultType==='input_required'){status.textContent='请在宿主中完成这次范围选择。';for(const button of root.querySelectorAll('[data-action-submit]'))if(button.dataset.actionSubmit===pendingAction?.args.operationId){button.dataset.waiting='true';button.textContent='等待你的选择';}return null;}return componentResult(response);
-  }catch(e){if(!destroyed&&stamp===generation&&!(background&&(startedIntent!==intent||busy))){showError(e);if(['galaxy_panel_refresh','galaxy_panel_return'].includes(name)&&!['panel_identity_changed','panel_connection_changed','receipt_status_authority_changed'].includes(e?.code??e?.message)){status.textContent='暂时无法更新，仍显示上次读取的内容；输入已保留。';composer.hidden=true;for(const control of [...helps.querySelectorAll('button'),...responses.querySelectorAll('button'),...review.querySelectorAll('button')])control.dataset.unavailable='true';if(!actions.querySelector('[data-refresh]')){const retry=button('重试',()=>refresh(),'secondary');retry.dataset.refresh='true';actions.append(retry);}}}return null;
+  }catch(e){if(!destroyed&&stamp===generation&&!(background&&(startedIntent!==intent||busy))){showError(e);if(['galaxy_panel_refresh','galaxy_panel_return'].includes(name)&&!['panel_identity_changed','panel_connection_changed','receipt_status_authority_changed'].includes(e?.code??e?.message)){status.textContent='暂时无法更新。';for(const control of [...helps.querySelectorAll('button'),...responses.querySelectorAll('button'),...review.querySelectorAll('button')])control.dataset.unavailable='true';if(!actions.querySelector('[data-refresh]')){const retry=button('重试',()=>refresh(),'secondary');retry.dataset.refresh='true';actions.append(retry);}}}return null;
   }finally{if(!destroyed&&!background)setBusy(false);}
  }
- async function refresh({automatic=false}={}){if(busy||destroyed||!current)return;const r=await invoke(navigationId?'galaxy_panel_return':'galaxy_panel_refresh',navigationId?{navigationId}:{},automatic);if(r)receive(r);}
+ async function refresh({automatic=false}={}){if(destroyed||!current)return;if(busy){if(automatic&&submitted)queueReplyCheck();return;}const r=await invoke(navigationId?'galaxy_panel_return':'galaxy_panel_refresh',navigationId?{navigationId}:{},automatic);if(r)receive(r);else if(automatic&&submitted)queueReplyCheck();}
  async function saveReply(){clearTimeout(replyTimer);if(!current||destroyed||current.object?.kind!=='room')return;
   const viewId=current.viewId,scope=current.ownerScope,text=reply.value;
   if(!text.trim())replyStatus.textContent='';
   replySave=replySave.catch(()=>{}).then(async()=>{if(destroyed||current?.viewId!==viewId||current?.ownerScope!==scope||text===current.replyDraft?.text)return;
    const r=await call('galaxy_panel_reply_draft_save',{viewId,expectedRevision:current.replyDraft?.revision??0,draft:text});if(destroyed||current?.viewId!==viewId||current?.ownerScope!==scope)return;
-   if(r?.isError)throw Error(r.structuredContent?.error??'panel_draft_conflict');current.replyDraft=componentResult(r).replyDraft;replyStatus.textContent=reply.value.trim()?'草稿已保存在本机。':'';});return replySave;
+   if(r?.isError)throw Error(r.structuredContent?.error??'panel_draft_conflict');current.replyDraft=componentResult(r).replyDraft;if(reply.value.trim())replyStatus.textContent='草稿已保存在本机。';});return replySave;
  }
- async function sendReply(){if(busy||destroyed||!reply.value.trim()||!current?.source?.conversation?.canReply)return;const text=reply.value.trim();await saveReply();pendingId??=win.crypto.randomUUID();
-  const r=await invoke('galaxy_panel_message_send',{clientMessageId:pendingId,text});if(r){const accepted=r.messageResult?.state==='accepted';if(accepted&&reply.value.trim()===text){reply.value='';pendingId=null;}receive(r);if(accepted){replyStatus.textContent='已发送。';await saveReply();reply.focus();}}
+ let sendingReply=false;
+ async function sendReply(){
+  if(busy||sendingReply||submitted||destroyed||!reply.value.trim()||!current?.source?.conversation?.canReply||current.sourceError)return;
+  const viewId=current.viewId,ownerScope=current.ownerScope,text=reply.value.trim();
+  sendingReply=true;
+  try{
+   await saveReply();
+   if(destroyed||viewId!==current?.viewId||ownerScope!==current.ownerScope)return;
+   submitted={id:win.crypto.randomUUID(),text};
+   send.dataset.waiting='true';
+   const r=await invoke('galaxy_panel_message_send',{clientMessageId:submitted.id,text});
+   if(r)receive(r);
+   else if(!destroyed&&viewId===current?.viewId&&ownerScope===current.ownerScope)queueReplyCheck();
+  }finally{sendingReply=false;}
+ }
+ function queueReplyCheck(){
+  clearTimeout(updateTimer);
+  if(!destroyed&&submitted)updateTimer=setTimeout(()=>void refresh({automatic:true}),3000);
  }
  function content(container,value){const rows=readableContent(value);for(const row of rows){if(row.label!=='内容')container.append(el('h3',row.label));container.append(el('p',row.text,'authored-content'));}return rows.length;}
  function receive(response){if(destroyed)return;if(response?.isError){showError(Error(response.structuredContent?.error??'panel_operation_failed'));return;}const next=componentResult(response);if(next?.schemaVersion!==1||!next.viewId)return;
   if(pendingAction&&(pendingAction.viewId!==next.viewId||pendingAction.ownerScope!==next.ownerScope)){clearTimeout(choiceTimer);pendingAction=null;choiceUrl=null;}
-  const scope=next.ownerScope??null,sameOwner=!!scope&&editorOwner===scope;if(!sameOwner)editors.clear();else if(current?.ownerScope===scope){editors.set(current.viewId,{note:draft.value,reply:reply.value,pending:pendingId});if(editors.size>64)editors.delete(editors.keys().next().value);}
+  const scope=next.ownerScope??null,sameOwner=!!scope&&editorOwner===scope;if(!sameOwner)editors.clear();else if(current?.ownerScope===scope){editors.set(current.viewId,{note:draft.value,reply:reply.value,submitted});if(editors.size>64)editors.delete(editors.keys().next().value);}
   const same=current?.viewId===next.viewId&&current?.ownerScope===next.ownerScope,saved=editors.get(next.viewId),oldNote=draft.value,oldReply=reply.value,focused=doc.activeElement,scroll=messages.scrollTop;
   const previousSource=current?.source,oldMessages=previousSource?.conversation?.messages??[],atEnd=messages.scrollHeight-messages.clientHeight-messages.scrollTop<28;
-  current=same&&next.sourceError&&previousSource?{...next,source:previousSource}:next;editorOwner=scope;notes.hidden=false;generation++;if(!same){navigationId=next.navigationId??null;pendingId=saved?.pending??next.messageResult?.clientMessageId??null;}
+  current=same&&next.sourceError&&previousSource?{...next,source:previousSource}:next;editorOwner=scope;notes.hidden=false;generation++;if(!same){navigationId=next.navigationId??null;submitted=saved?.submitted??null;}
   draft.value=same?oldNote:saved?.note??next.draft?.text??'';reply.value=same?oldReply:saved?.reply??next.replyDraft?.text??'';returnButton.dataset.unavailable=String(!next.help&&!supportsHandoff());
   if(!(same&&next.sourceError&&previousSource)){source.replaceChildren(el('h2',next.source?.title??(next.object?'当前内容':'接着手上的事情做')));if(next.sourceError)source.append(el('p','这份内容暂时无法读取。输入仍然保留。'));else if(next.source?.summary)source.append(el('p',next.source.summary,'authored-content'));}
   const method=next.source?.method;if(method&&!next.sourceError){
@@ -66,8 +82,24 @@ export function mountCompactPanel(root,{call,displayMode,handoff,supportsHandoff
     const row=el('article',undefined,'message'+(m.mine?' mine':''));row.append(el('span',m.authorLabel??'成员','message-author'),el('p',m.text??'这条消息已撤回。','authored-content'));
     if(m.sentAt){const stamp=new Date(m.sentAt);if(!Number.isNaN(stamp.getTime())){const time=el('time',stamp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));time.dateTime=stamp.toISOString();row.append(time);}}for(const f of m.attachments??[])row.append(el('p',f.filename??f.name??'附件','attachment'));messages.append(row);
    }if(!chat.complete)messages.prepend(el('p','此处显示已读取的消息。完整对话可以继续读取其余内容。','muted'));if(chat.earlierMessagesAvailable)messages.prepend(button('打开完整对话查看更早消息',()=>open()));messages.scrollTop=!same||atEnd?messages.scrollHeight:scroll;}
-   composer.hidden=!!next.sourceError||!chat.canReply;if(!next.sourceError&&!chat.canReply&&!messages.querySelector('[data-web-reply]')){const b=button('打开完整对话回复',()=>open());b.dataset.webReply='true';messages.append(b);}
-   if(next.messageResult){const state=next.messageResult.state;replyStatus.textContent=state==='accepted'?'已发送。':state==='conflict'?'发送的内容发生变化。请在完整对话中核对。':state==='absent'?'发送未完成，可以再试一次。':'正在确认这条消息…';pendingId=state==='accepted'?null:next.messageResult.clientMessageId;}
+   composer.hidden=!chat.canReply;send.dataset.unavailable=String(!!next.sourceError);if(!next.sourceError&&!chat.canReply&&!messages.querySelector('[data-web-reply]')){const b=button('打开完整对话回复',()=>open());b.dataset.webReply='true';messages.append(b);}
+   if(next.messageResult){
+    const {clientMessageId:id,state}=next.messageResult;
+    if(state==='accepted'||state==='absent'||state==='conflict'){
+     if(state==='accepted'&&submitted?.id===id&&reply.value.trim()===submitted.text){
+      reply.value='';
+      void saveReply().catch(showError);
+     }
+     if(submitted?.id===id)submitted=null;
+     replyStatus.textContent=state==='accepted'?'已发送。':state==='absent'?'上一条消息未发送。':'上一条消息需要核对。';
+    }else{
+     if(!submitted)submitted={id,text:null};
+     replyStatus.textContent='正在确认上一条消息…';
+    }
+   }else if(submitted&&!next.sourceError){
+    submitted=null;
+   }
+   send.dataset.waiting=String(!!submitted);
    if(same&&focused===reply&&!composer.hidden)reply.focus({preventScroll:true});
   }
   if(!(same&&next.helpError)){helps.replaceChildren();const offers=next.help?.offers??[],selected=new Set(next.help?.selectedHelpIds??[]);if(offers.length)helps.append(el('h2','可以从这里继续'));else if(next.help&&!next.source&&!next.preview&&!next.help.actionOperations?.length)helps.append(el('p',next.helpError?'帮助暂时无法读取，请继续原工作或稍后重试。':'还没有找到具体帮助。可以在原聊天继续说明当前目标。','empty-content'));
@@ -85,7 +117,7 @@ export function mountCompactPanel(root,{call,displayMode,handoff,supportsHandoff
   if(next.actionResult)review.append(el('p',operationLabel(next.actionResult.state),'receipt'));
   actions.replaceChildren(button(next.object?.kind==='room'?'打开完整对话':'打开完整网页',()=>open()));if(next.sourceError||next.helpError||['unknown','absent','conflict'].includes(next.messageResult?.state))actions.append(button('重试',()=>refresh(),'secondary'));if(displayMode&&supportsDisplayMode())actions.append(button('展开',()=>displayMode(),'secondary'));
   status.textContent=next.sourceError||next.helpError?'部分内容暂不可更新，仍显示上次读取的内容。':next.messageResult?.state==='unknown'?'正在确认发送结果…':'';setBusy(busy);clearTimeout(updateTimer);
-  if(pendingAction?.url)scheduleChoice();else if(['unknown','pending'].includes(next.messageResult?.state)||next.help?.actionOperations?.some(o=>['unknown','submitting'].includes(o.state)))updateTimer=setTimeout(()=>void refresh({automatic:true}),3000);
+  if(pendingAction?.url)scheduleChoice();else if(submitted)queueReplyCheck();else if(next.help?.actionOperations?.some(o=>['unknown','submitting'].includes(o.state)))updateTimer=setTimeout(()=>void refresh({automatic:true}),3000);
  }
  async function executeAction(preview,{continuing=false}={}){if(!current||busy||destroyed)return;
   if(!continuing)pendingAction={viewId:current.viewId,ownerScope:current.ownerScope,expiresAt:Date.now()+300000,args:{operationId:preview.operationId,payloadHash:preview.payloadHash,...(preview.authorizationRequestId?{authorizationRequestId:preview.authorizationRequestId}:{}),confirmed:true}};

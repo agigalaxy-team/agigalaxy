@@ -405,7 +405,7 @@ func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *Na
 				if op == nil || op.hash != input["previewHash"] {
 					return failure(connectionFailure("a2a_preview_changed_or_expired"))
 				}
-				if e = h.check(ctx, op.lease); e != nil {
+				if e := h.check(ctx, op.lease); e != nil {
 					return failure(e)
 				}
 				h.mu.Lock()
@@ -416,11 +416,11 @@ func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *Na
 					return render(retained), nil
 				}
 				review := map[string]any{"handle": input["handle"], "previewHash": input["previewHash"], "expiresAt": op.expires, "preview": op.review}
-				result, reviewError := tools.review(ctx, req, review, "请本人核对当前工作、所选外部服务、精确内容和接收范围；未知操作只核对原关联，不重新派发。\n"+hostJSONString(review), func(scope *ChoiceScope) (any, error) {
+				result, reviewError := tools.review(ctx, req, review, "请本人核对当前工作、所选外部服务、精确内容和接收范围；未知操作只核对原关联，不重新派发。\n"+hostJSONString(review), func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					if scope == nil || *scope != op.lease.scope {
 						return nil, connectionFailure("a2a_connection_changed")
 					}
-					if e = h.check(ctx, op.lease); e != nil {
+					if e := h.check(ctx, op.lease); e != nil {
 						return nil, e
 					}
 					h.mu.Lock()
@@ -462,7 +462,7 @@ func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *Na
 				if op == nil {
 					return failure(connectionFailure("a2a_preview_unavailable"))
 				}
-				if e = h.check(ctx, op.lease); e != nil {
+				if e := h.check(ctx, op.lease); e != nil {
 					return failure(e)
 				}
 				h.mu.Lock()

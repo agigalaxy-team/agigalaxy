@@ -142,7 +142,7 @@ func (p *NativePanel) executeTool(ctx context.Context, req *mcp.CallToolRequest,
 		return nil, panelError("help_authorization_preview_changed")
 	}
 	input := panelPick(x, "operationId", "payloadHash", "authorizationRequestId")
-	run := func(scope *ChoiceScope) (any, error) {
+	run := func(ctx context.Context, scope *ChoiceScope) (any, error) {
 		if scope != nil && *scope != l.scope {
 			return nil, panelError("panel_identity_changed")
 		}
@@ -186,7 +186,7 @@ func (p *NativePanel) executeTool(ctx context.Context, req *mcp.CallToolRequest,
 			return result, nil
 		}
 	} else {
-		value, e := run(nil)
+		value, e := run(ctx, nil)
 		if e != nil {
 			return nil, e
 		}

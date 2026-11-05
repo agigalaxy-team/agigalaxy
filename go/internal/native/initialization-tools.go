@@ -43,7 +43,9 @@ func registerInitializationTools(server *mcp.Server, tools *toolRuntime) {
 			return toolError(e)
 		}
 		message := initializationReviewMessage(preview)
-		return tools.review(ctx, req, input, message, func(scope *ChoiceScope) (any, error) { return tools.store.Initialize(ctx, input, true, scope) })
+		return tools.review(ctx, req, input, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
+			return tools.store.Initialize(ctx, input, true, scope)
+		})
 	})
 }
 

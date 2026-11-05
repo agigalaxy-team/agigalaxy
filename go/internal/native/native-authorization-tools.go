@@ -2,7 +2,6 @@ package native
 
 import (
 	"context"
-	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -32,10 +31,12 @@ func registerNativeAuthorizationTool(server *mcp.Server, tools *toolRuntime, run
 			}
 			return toolResult(value)
 		}
-		raw, e := protocol.Encode(normalized)
+		payload, e := connectionObject([]byte(text(normalized["payloadJson"])))
 		if e != nil {
 			return toolError(e)
 		}
-		return tools.review(ctx, request, normalized, fmt.Sprintf("本人确认仅授权所示准确材料、对象、动作、接收范围和期限。\n%s\n保留原requestId与payloadJson字节；不自动执行业务发布。未知结果先查询原同意回执，不新编号或重签。", raw), func(scope *ChoiceScope) (any, error) { return runtime.AuthorizeReviewed(ctx, normalized, scope) })
+		return tools.review(ctx, request, normalized, authorizationChoiceMessage(normalized, payload), func(ctx context.Context, scope *ChoiceScope) (any, error) {
+			return runtime.AuthorizeReviewed(ctx, normalized, scope)
+		})
 	})
 }

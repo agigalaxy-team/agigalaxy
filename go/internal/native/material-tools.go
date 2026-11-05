@@ -151,7 +151,7 @@ func registerLocalMaterialTools(server *mcp.Server, rt *toolRuntime) {
 		}
 		preview, _ := protocol.Encode(selected)
 		message := "银河：删除所选本机履历。\n删除下列会话的本人本机工作事实、摘要、环境及其待上传本机正文；不删除宿主原件、独立原会话归档或云副本。\n" + string(preview)
-		return rt.review(ctx, req, x, message, func(scope *ChoiceScope) (any, error) { return rt.store.deleteWork(ctx, x, scope) })
+		return rt.review(ctx, req, x, message, func(ctx context.Context, scope *ChoiceScope) (any, error) { return rt.store.deleteWork(ctx, x, scope) })
 	})
 	addNativeTool(server, &mcp.Tool{Name: "galaxy_local_archive_delete", Description: "Delete the selected private local archive and stop capturing that session. Clears its queued local snapshot bodies; does not delete host originals, ordinary work facts or an independent cloud replica.", InputSchema: objectSchema(map[string]any{"galaxyId": localMaterialIdentitySchema(), "archiveSessionId": materialUUID()}, "archiveSessionId"), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}}, "local_archive_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var x ArchiveQuery
@@ -175,6 +175,8 @@ func registerLocalMaterialTools(server *mcp.Server, rt *toolRuntime) {
 		}
 		preview, _ := protocol.Encode(selected)
 		message := "银河：删除所选本机原文。\n删除下列会话的本人本机原文及其待上传本机快照，并停止该会话后续采集；不删除宿主原件、普通工作事实或云副本。\n" + string(preview)
-		return rt.review(ctx, req, x, message, func(scope *ChoiceScope) (any, error) { return rt.store.archiveDelete(ctx, x, scope) })
+		return rt.review(ctx, req, x, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
+			return rt.store.archiveDelete(ctx, x, scope)
+		})
 	})
 }

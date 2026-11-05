@@ -48,9 +48,13 @@ type pendingLink struct {
 	preview                                     portal.Preview
 	intent                                      linkIntent
 	verifiedEmail                               bool
+	nativeProof                                 string
+	nativeReview                                string
+	verified                                    VerifiedIdentity
 }
 type Links struct {
 	Registry      *Service
+	NativeIssuer  string
 	Budget        resourcebudget.Policy
 	mu            sync.Mutex
 	pending       map[string]*pendingLink
@@ -128,61 +132,57 @@ func (l *Links) Begin(ctx context.Context, actor deviceauth.Actor, raw []byte) (
 	if provider == nil {
 		return nil, fault.New("identity_provider_unavailable", 404)
 	}
-	l.purge(ctx)
-	id := ""
-	var created *pendingLink
-	out, e := postgres.InTx(ctx, l.Registry.Pool, func(tx pgx.Tx) (Object, error) {
+	return postgres.InTx(ctx, l.Registry.Pool, func(tx pgx.Tx) (Object, error) {
 		if e := l.Registry.authorize(ctx, tx, actor); e != nil {
 			return nil, e
 		}
-		l.mu.Lock()
-		count := 0
-		for _, p := range l.pending {
-			if p.subject == actor.SubjectID {
-				count++
-			}
-		}
-		if len(l.pending) >= 2048 || count >= 4 {
-			l.mu.Unlock()
-			return nil, fault.New("identity_login_limit", 429)
-		}
-		id = uuid.NewString()
-		created = &pendingLink{provider: provider, subject: actor.SubjectID, binding: actor.BindingID, state: "preparing", expires: l.Registry.now().Unix() + 300}
-		l.pending[id] = created
-		l.mu.Unlock()
-		preview, e := provider.Begin(ctx)
-		if e != nil {
-			return nil, e
-		}
-		u, e := url.Parse(preview.AuthorizationURL)
-		if e != nil || u.Query().Get("state") == "" {
-			return nil, loginUnavailable()
-		}
-		l.mu.Lock()
-		created.preview = preview
-		created.stateHash = identity.Digest([]byte(u.Query().Get("state")))
-		created.expires = preview.ExpiresAt
-		created.state = "awaiting-login"
-		l.mu.Unlock()
-		b, _ := json.Marshal(preview)
-		var result Object
-		json.Unmarshal(b, &result)
-		result["loginId"] = id
-		result["subjectId"] = actor.SubjectID
-		result["bindingId"] = actor.BindingID
-		result["endpoint"] = l.Registry.Endpoint
-		result["galaxyAuthorization"] = false
-		return result, nil
+		return l.start(ctx, provider, actor.SubjectID, actor.BindingID, "")
 	})
-	if e != nil && id != "" {
+}
+func (l *Links) start(ctx context.Context, provider LoginProvider, subject, binding, proof string) (out Object, err error) {
+	l.purge(ctx)
+	l.mu.Lock()
+	count := 0
+	for _, p := range l.pending {
+		if p.subject == subject && p.nativeProof == "" {
+			count++
+		}
+	}
+	if len(l.pending) >= 2048 || (proof == "" && count >= 4) {
+		l.mu.Unlock()
+		return nil, fault.New("identity_login_limit", 429)
+	}
+	id := uuid.NewString()
+	p := &pendingLink{provider: provider, subject: subject, binding: binding, nativeProof: proof, state: "preparing", expires: l.Registry.now().Unix() + 300}
+	l.pending[id] = p
+	l.mu.Unlock()
+	preview, err := provider.Begin(ctx)
+	defer func() {
+		if err == nil {
+			return
+		}
 		l.mu.Lock()
 		delete(l.pending, id)
 		l.mu.Unlock()
-		if created != nil && created.preview.AuthorizationURL != "" {
-			_ = provider.Cancel(context.WithoutCancel(ctx), created.preview)
+		if preview.AuthorizationURL != "" {
+			_ = provider.Cancel(context.WithoutCancel(ctx), preview)
 		}
+	}()
+	if err != nil {
+		return nil, err
 	}
-	return out, e
+	u, err := url.Parse(preview.AuthorizationURL)
+	if err != nil || u.Query().Get("state") == "" {
+		return nil, loginUnavailable()
+	}
+	l.mu.Lock()
+	p.preview, p.stateHash, p.expires, p.state = preview, identity.Digest([]byte(u.Query().Get("state"))), preview.ExpiresAt, "awaiting-login"
+	l.mu.Unlock()
+	b, _ := json.Marshal(preview)
+	json.Unmarshal(b, &out)
+	out["loginId"], out["subjectId"], out["bindingId"] = id, subject, binding
+	out["endpoint"], out["galaxyAuthorization"] = l.Registry.Endpoint, false
+	return out, nil
 }
 func (l *Links) Callback(ctx context.Context, providerID, returned string) (Object, error) {
 	l.purge(ctx)
@@ -211,7 +211,7 @@ func (l *Links) Callback(ctx context.Context, providerID, returned string) (Obje
 	p.state = "exchanging"
 	l.mu.Unlock()
 	verified, e := p.provider.Complete(ctx, p.preview, returned)
-	if e == nil {
+	if e == nil && p.nativeProof == "" {
 		var active bool
 		e = l.Registry.Pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM bindings WHERE id=$1 AND subject_id=$2 AND audience=$3 AND revoked_at IS NULL AND expires_at>$4)", p.binding, p.subject, l.Registry.Endpoint, l.Registry.now()).Scan(&active)
 		if e == nil && !active {
@@ -226,11 +226,23 @@ func (l *Links) Callback(ctx context.Context, providerID, returned string) (Obje
 		}
 		return nil, fault.New("identity_login_failed", 401)
 	}
+	if p.nativeProof != "" {
+		if !verified.EmailVerified || verified.Email == "" {
+			p.state = "failed"
+			return nil, fault.New("identity_login_failed", 401)
+		}
+		p.verified, p.state, p.nativeReview = verified, "awaiting-native-approval", uuid.NewString()
+		return Object{"state": p.state, "reviewPath": "/v1/identity/native-review/" + p.nativeReview, "galaxyAuthorization": false}, nil
+	}
+	l.setIntent(id, p, verified)
+	return Object{"state": p.state, "message": "Return to your Galaxy host to review and sign the account association.", "galaxyAuthorization": false}, nil
+}
+
+func (l *Links) setIntent(id string, p *pendingLink, verified VerifiedIdentity) {
 	p.verifiedEmail = verified.EmailVerified
-	p.intent = linkIntent{1, id, "identity.link", p.subject, p.binding, l.Registry.Endpoint, providerID, verified.Issuer, verified.ExternalSubject, verified.ClientID, verified.Authentication, verified.VerifiedAt, l.Registry.now().Unix(), verified.ExpiresAt, false}
+	p.intent = linkIntent{1, id, "identity.link", p.subject, p.binding, l.Registry.Endpoint, p.provider.Describe().ID, verified.Issuer, verified.ExternalSubject, verified.ClientID, verified.Authentication, verified.VerifiedAt, l.Registry.now().Unix(), verified.ExpiresAt, false}
 	p.payload = string(encode(p.intent))
 	p.state = "awaiting-local-signature"
-	return Object{"state": p.state, "message": "Return to your Galaxy host to review and sign the account association.", "galaxyAuthorization": false}, nil
 }
 func (l *Links) Status(ctx context.Context, actor deviceauth.Actor, id string) (Object, error) {
 	if !validUUID(id) {

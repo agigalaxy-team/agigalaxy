@@ -72,7 +72,7 @@ func RegisterInteractionResource(server *mcp.Server, artifact *InteractionArtifa
 
 // Review is supplied by the same Native toolRuntime review gate. The alias
 // name identifies the original reviewed operation, not a second permission.
-type InteractionAppReviewer func(context.Context, *mcp.CallToolRequest, string, any, string, func(*ChoiceScope) (any, error)) (*mcp.CallToolResult, error)
+type InteractionAppReviewer func(context.Context, *mcp.CallToolRequest, string, any, string, choiceAction) (*mcp.CallToolResult, error)
 type InteractionAppOperations struct {
 	SaveSettings func(context.Context, json.RawMessage, *ChoiceScope) (any, error)
 }
@@ -380,7 +380,7 @@ func RegisterInteractionApps(server *mcp.Server, runtime *Runtime, artifact *Int
 	}
 	add("galaxy_local_panel", interactionPanelSchema(), "Open the existing local work/history/upload-settings panel. Actual private bodies remain component-only metadata; no connection, upload or model is started.", false, false, read)
 	add("galaxy_local_panel_read", interactionPanelSchema(), "Read this panel's selected local work or original capture. Full body remains component-only.", false, true, read)
-	reviewed := func(ctx context.Context, req *mcp.CallToolRequest, name string, input any, message, view, owner string, run func(*ChoiceScope) (any, error)) (*mcp.CallToolResult, error) {
+	reviewed := func(ctx context.Context, req *mcp.CallToolRequest, name string, input any, message, view, owner string, run choiceAction) (*mcp.CallToolResult, error) {
 		var shown any = input
 		if selection, ok := input.(InitializationInput); ok {
 			preview, e := PreviewInitialization(selection)
@@ -428,11 +428,11 @@ func RegisterInteractionApps(server *mcp.Server, runtime *Runtime, artifact *Int
 			}
 			message += "\n" + string(exact)
 		}
-		result, e := review(ctx, req, name, input, message, func(scope *ChoiceScope) (any, error) {
+		result, e := review(ctx, req, name, input, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 			if uploadScope != nil && (scope == nil || *scope != *uploadScope) {
 				return nil, connectionFailure("native_connection_selection_changed")
 			}
-			return run(scope)
+			return run(ctx, scope)
 		})
 		if e != nil {
 			return interactionPanelError(e), nil
@@ -503,7 +503,9 @@ func RegisterInteractionApps(server *mcp.Server, runtime *Runtime, artifact *Int
 			return interactionComponent(data), nil
 		}
 		selection := InitializationInput{InitializationPath: "personal-galaxy", SubjectType: input.SubjectType}
-		return reviewed(ctx, req, "galaxy_native_initialize", selection, "创建本机身份，不连接、不上传、不调用模型。主体类型："+input.SubjectType, input.View, "", func(scope *ChoiceScope) (any, error) { return runtime.store.Initialize(ctx, selection, true, scope) })
+		return reviewed(ctx, req, "galaxy_native_initialize", selection, "创建本机身份，不连接、不上传、不调用模型。主体类型："+input.SubjectType, input.View, "", func(ctx context.Context, scope *ChoiceScope) (any, error) {
+			return runtime.store.Initialize(ctx, selection, true, scope)
+		})
 	})
 	// The same reviewed domain functions enforce owner/scope inside the write lock.
 	add("galaxy_local_panel_archive_save", objectSchema(map[string]any{"galaxyId": stringSchema(), "enabled": map[string]any{"type": "boolean"}, "sessions": map[string]any{"type": "array", "maxItems": 500, "items": objectSchema(map[string]any{"host": stringSchema(), "sessionId": stringSchema()}, "host", "sessionId")}, "autoCleanAfterDays": map[string]any{"type": []string{"integer", "null"}, "minimum": 1, "maximum": 36500}}, "enabled", "sessions"), "Save exact local original capture scopes through the original person choice. No upload.", true, true, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -518,7 +520,9 @@ func RegisterInteractionApps(server *mcp.Server, runtime *Runtime, artifact *Int
 		if e != nil {
 			return interactionPanelError(e), nil
 		}
-		return reviewed(ctx, req, "galaxy_local_archive_configure", input, message, "privacy", input.GalaxyID, func(scope *ChoiceScope) (any, error) { return runtime.store.configureArchive(ctx, input, scope) })
+		return reviewed(ctx, req, "galaxy_local_archive_configure", input, message, "privacy", input.GalaxyID, func(ctx context.Context, scope *ChoiceScope) (any, error) {
+			return runtime.store.configureArchive(ctx, input, scope)
+		})
 	})
 	add("galaxy_local_panel_upload_save", objectSchema(map[string]any{"galaxyId": stringSchema(), "level": map[string]any{"type": "string", "enum": []string{"local-only", "history-overview", "work-content", "conversation-archive"}}, "includeFullConversations": map[string]any{"type": "boolean"}, "sessionIds": map[string]any{"type": "array", "maxItems": 500, "items": stringSchema()}}, "level"), "Save this panel user's exact upload selection through the original Native choice.", true, true, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input struct {
@@ -528,7 +532,7 @@ func RegisterInteractionApps(server *mcp.Server, runtime *Runtime, artifact *Int
 		if e := protocol.Decode(req.Params.Arguments, &input); e != nil {
 			return interactionPanelError(e), nil
 		}
-		return reviewed(ctx, req, "galaxy_local_upload_privacy_set", input, "仅保存允许上传的类型与范围；不上传、不改变公开查询、不限制宿主模型。", "privacy", input.GalaxyID, func(scope *ChoiceScope) (any, error) {
+		return reviewed(ctx, req, "galaxy_local_upload_privacy_set", input, "仅保存允许上传的类型与范围；不上传、不改变公开查询、不限制宿主模型。", "privacy", input.GalaxyID, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 			if input.GalaxyID != "" && input.GalaxyID != scope.Owner {
 				return nil, fault.New("local_identity_changed", 409)
 			}
@@ -554,13 +558,17 @@ func RegisterInteractionApps(server *mcp.Server, runtime *Runtime, artifact *Int
 				if e := protocol.Decode(req.Params.Arguments, &input); e != nil {
 					return interactionPanelError(e), nil
 				}
-				return reviewed(ctx, req, originalOperation, input, "删除所选本机原会话，并停止后续采集；宿主原件、普通履历和云副本分别处理。", "archive", input.GalaxyID, func(scope *ChoiceScope) (any, error) { return runtime.store.archiveDelete(ctx, input, scope) })
+				return reviewed(ctx, req, originalOperation, input, "删除所选本机原会话，并停止后续采集；宿主原件、普通履历和云副本分别处理。", "archive", input.GalaxyID, func(ctx context.Context, scope *ChoiceScope) (any, error) {
+					return runtime.store.archiveDelete(ctx, input, scope)
+				})
 			}
 			var input WorkQuery
 			if e := protocol.Decode(req.Params.Arguments, &input); e != nil {
 				return interactionPanelError(e), nil
 			}
-			return reviewed(ctx, req, originalOperation, input, "删除所选本人本机履历、摘要及待上传本机正文；不删除宿主原件、独立会话归档或云副本。", originalView, input.GalaxyID, func(scope *ChoiceScope) (any, error) { return runtime.store.deleteWork(ctx, input, scope) })
+			return reviewed(ctx, req, originalOperation, input, "删除所选本人本机履历、摘要及待上传本机正文；不删除宿主原件、独立会话归档或云副本。", originalView, input.GalaxyID, func(ctx context.Context, scope *ChoiceScope) (any, error) {
+				return runtime.store.deleteWork(ctx, input, scope)
+			})
 		})
 	}
 	if operations.SaveSettings != nil {
@@ -571,7 +579,9 @@ func RegisterInteractionApps(server *mcp.Server, runtime *Runtime, artifact *Int
 				return interactionPanelError(e), nil
 			}
 			raw := append(json.RawMessage{}, req.Params.Arguments...)
-			return reviewed(ctx, req, "galaxy_local_settings_save", input, "保存本次所选会话与上传范围，不更改其他资料；联网保存按原账户选择办理。", "privacy", text(input["galaxyId"]), func(scope *ChoiceScope) (any, error) { return operations.SaveSettings(ctx, raw, scope) })
+			return reviewed(ctx, req, "galaxy_local_settings_save", input, "保存本次所选会话与上传范围，不更改其他资料；联网保存按原账户选择办理。", "privacy", text(input["galaxyId"]), func(ctx context.Context, scope *ChoiceScope) (any, error) {
+				return operations.SaveSettings(ctx, raw, scope)
+			})
 		})
 	}
 	registerInteractionSyncApps(runtime, add, reviewed)

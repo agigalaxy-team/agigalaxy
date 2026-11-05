@@ -50,7 +50,9 @@ func (r *toolRuntime) pendingChoices() (int, time.Time) {
 	var next time.Time
 	now := time.Now()
 	for _, item := range r.choices {
-		pendingAdd(&count, &next, now, item.Expires, item.Running)
+		if item.Result == nil {
+			pendingAdd(&count, &next, now, item.Expires, item.Running)
+		}
 	}
 	return count, next
 }
@@ -67,7 +69,7 @@ func (b *BrowserChoices) pendingInteractions() (int, time.Time) {
 	var next time.Time
 	now := b.now()
 	for _, item := range b.entries {
-		if item.state != "declined-delivered" {
+		if !item.completed && (item.running || item.state == "pending" || item.state == "awaiting-account") {
 			pendingAdd(&count, &next, now, item.expires, item.running)
 		}
 	}

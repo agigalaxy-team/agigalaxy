@@ -45,7 +45,7 @@ func interactionReviewer(t *testing.T, s *Store) InteractionAppReviewer {
 	}
 	tools := &toolRuntime{store: s, key: key, choices: map[string]*choiceRecord{}, browser: NewBrowserChoices(s, nil)}
 	t.Cleanup(func() { tools.browser.Close() })
-	return func(ctx context.Context, req *mcp.CallToolRequest, name string, input any, message string, run func(*ChoiceScope) (any, error)) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest, name string, input any, message string, run choiceAction) (*mcp.CallToolResult, error) {
 		copy := *req
 		params := *req.Params
 		params.Name = name

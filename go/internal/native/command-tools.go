@@ -28,7 +28,7 @@ func registerCommandTools(server *mcp.Server, tools *toolRuntime, runtime *Runti
 			return toolError(e)
 		}
 		message := fmt.Sprintf("本人确认创建独立本机 Worker Agent 身份。\nWorker：%s\n目录：%s\n保留普通客户端ID、密钥与履历。仅在该子目录创建或恢复原身份，不启动Worker、模型、联网或云端账户。", input.WorkerID, filepath.Join(tools.store.Directory, "workers", input.WorkerID))
-		return tools.review(ctx, req, input, message, func(scope *ChoiceScope) (any, error) {
+		return tools.review(ctx, req, input, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 			return tools.store.InitializeWorkerIdentity(ctx, input.WorkerID, true, scope)
 		})
 	})

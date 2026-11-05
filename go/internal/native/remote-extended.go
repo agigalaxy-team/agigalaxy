@@ -213,7 +213,7 @@ func registerExtendedRemoteTools(server *mcp.Server, tools *toolRuntime, runtime
 				} else {
 					message += hostJSONString(value)
 				}
-				return tools.review(operation, req, value, message, func(scope *ChoiceScope) (any, error) {
+				return tools.review(operation, req, value, message, func(operation context.Context, scope *ChoiceScope) (any, error) {
 					if scope == nil || *scope != l.scope {
 						return nil, connectionFailure("native_choice_binding_changed")
 					}

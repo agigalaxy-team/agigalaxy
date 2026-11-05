@@ -54,6 +54,7 @@ type displayTicket struct {
 	expires time.Time
 }
 
+var nativeReviewPath = regexp.MustCompile(`^/v1/identity/native-review/[0-9a-f-]{36}$`)
 var returnPath = regexp.MustCompile(`(?i)^/v1/identity/return/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`)
 var callbackPath = regexp.MustCompile(`^/v1/identity/callback/([a-z0-9][a-z0-9._-]{0,63})$`)
 
@@ -282,6 +283,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if AcceptsHTML(r) {
 			state, err := h.callback(r.Context(), match[1], h.endpoint+r.URL.RequestURI())
 			success, status := false, 200
+			if err == nil && nativeReviewPath.MatchString(state) {
+				cleanRedirect(w, state)
+				return
+			}
 			if err == nil && state == "awaiting-local-signature" {
 				success = true
 			} else {

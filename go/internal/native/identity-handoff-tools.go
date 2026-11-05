@@ -30,7 +30,7 @@ func registerNativeHandoffTools(server *mcp.Server, tools *toolRuntime, runtime 
 		if e != nil {
 			return toolError(e)
 		}
-		return tools.review(ctx, req, input, fmt.Sprintf("为现有银河身份 %s 在本机创建一个新的设备公钥请求。\n原身份ID不变，原控制设备必须另行批准；不通过邮件登录，不连接服务，不恢复或上传资料。私钥只保存在本机，不出现在转移包中。", input.SubjectID), func(current *ChoiceScope) (any, error) {
+		return tools.review(ctx, req, input, fmt.Sprintf("为现有银河身份 %s 在本机创建一个新的设备公钥请求。\n原身份ID不变，原控制设备必须另行批准；不通过邮件登录，不连接服务，不恢复或上传资料。私钥只保存在本机，不出现在转移包中。", input.SubjectID), func(ctx context.Context, current *ChoiceScope) (any, error) {
 			if *current != scope {
 				return nil, connectionFailure("device_handoff_owner_changed")
 			}
@@ -53,7 +53,7 @@ func registerNativeHandoffTools(server *mcp.Server, tools *toolRuntime, runtime 
 			return toolError(e)
 		}
 		review := map[string]any{"offer": input.Offer, "preview": preview}
-		return tools.review(ctx, req, review, fmt.Sprintf("使用当前控制设备批准这里显示的准确公钥、银河身份与权限范围：\n%s\n签署的公开批准包由新设备验证并证明持有私钥后才能提交。此步骤不更换本机身份，也不连接新设备或恢复资料。", raw), func(current *ChoiceScope) (any, error) {
+		return tools.review(ctx, req, review, fmt.Sprintf("使用当前控制设备批准这里显示的准确公钥、银河身份与权限范围：\n%s\n签署的公开批准包由新设备验证并证明持有私钥后才能提交。此步骤不更换本机身份，也不连接新设备或恢复资料。", raw), func(ctx context.Context, current *ChoiceScope) (any, error) {
 			if *scope != *current {
 				return nil, connectionFailure("device_handoff_owner_changed")
 			}
@@ -76,7 +76,7 @@ func registerNativeHandoffTools(server *mcp.Server, tools *toolRuntime, runtime 
 			return toolError(e)
 		}
 		review := map[string]any{"approval": input.Approval, "preview": preview}
-		return tools.review(ctx, req, review, fmt.Sprintf("在发出请求的本机接受准确原设备批准，并证明持有这一个已保存的设备私钥：\n%s\n提交只沿原operationId和原请求。没有选中设备时才选用该原设备，连接另行选择，资料恢复单独处理；已有另一选中设备时保留该选择。", raw), func(current *ChoiceScope) (any, error) {
+		return tools.review(ctx, req, review, fmt.Sprintf("在发出请求的本机接受准确原设备批准，并证明持有这一个已保存的设备私钥：\n%s\n提交只沿原operationId和原请求。没有选中设备时才选用该原设备，连接另行选择，资料恢复单独处理；已有另一选中设备时保留该选择。", raw), func(ctx context.Context, current *ChoiceScope) (any, error) {
 			if *scope != *current {
 				return nil, connectionFailure("device_handoff_owner_changed")
 			}

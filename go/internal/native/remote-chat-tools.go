@@ -2,7 +2,6 @@ package native
 
 import (
 	"context"
-	"fmt"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -35,18 +34,17 @@ func registerRemoteChatTools(server *mcp.Server, tools *toolRuntime, runtime *Ru
 					return toolError(e)
 				}
 				preview := map[string]any{"input": normalized, "galaxyId": captured.Owner}
-				if name == "galaxy_chat_agent_grant" {
-					room, e := chat.Call(ctx, "galaxy_chat_room", map[string]any{"roomId": normalized["roomId"]}, &captured)
-					if e != nil {
+				room := map[string]any{}
+				if roomID := text(normalized["roomId"]); roomID != "" {
+					room, e = chat.Call(ctx, "galaxy_chat_room", map[string]any{"roomId": roomID}, &captured)
+					if e != nil && name == "galaxy_chat_agent_grant" {
 						return toolError(e)
 					}
-					preview["reviewRoom"] = map[string]any{"roomId": normalized["roomId"], "title": room["title"]}
+					if e == nil {
+						preview["reviewRoom"] = map[string]any{"roomId": roomID, "title": room["title"]}
+					}
 				}
-				raw, e := protocol.Encode(preview)
-				if e != nil {
-					return toolError(e)
-				}
-				return tools.review(ctx, request, preview, fmt.Sprintf("本人确认准确的聊天操作 %s。\n%s\n仅采用所示房间、对象、选择与期限；不启动宿主模型。结果不明保留原操作标识，只核对原回执。", name, raw), func(scope *ChoiceScope) (any, error) {
+				return tools.review(ctx, request, preview, chatChoiceMessage(name, normalized, room), func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					if scope == nil || *scope != captured {
 						return nil, fault.New("native_choice_binding_changed", 409)
 					}

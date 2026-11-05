@@ -59,7 +59,9 @@ func registerIdentityControlTools(server *mcp.Server, tools *toolRuntime, runtim
 		}
 		review := map[string]any{"previewId": input.PreviewID, "preview": preview, "operationId": uploadObject(preview)["operationId"]}
 		message := fmt.Sprintf("本人确认撤销准确设备。\n%s\n仅撤销此权威下目标设备的控制访问、现有绑定和凭据。保留原GUID、历史证明及恢复材料；不删除资料、不恢复资料。结果不明保留原操作核对。", raw)
-		return tools.review(ctx, req, review, message, func(scope *ChoiceScope) (any, error) { return devices.ConfirmReviewed(ctx, input.PreviewID, scope) })
+		return tools.review(ctx, req, review, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
+			return devices.ConfirmReviewed(ctx, input.PreviewID, scope)
+		})
 	})
 	addNativeTool(server, &mcp.Tool{Name: "galaxy_identity_device_native_stop_retry", InputSchema: objectSchema(map[string]any{"operationId": materialUUID()}, "operationId"), Description: "Ask the actual user to stop only local retry of this exact original device operation. Keep its unknown proof/locator for read-only reconciliation. This does not cancel the server operation, restore device access or revoke another device.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false}}, "device_management_native_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input struct {
@@ -81,7 +83,7 @@ func registerIdentityControlTools(server *mcp.Server, tools *toolRuntime, runtim
 			return identityDeviceResult(nil, e)
 		}
 		review := map[string]any{"operationId": input.OperationID, "original": original}
-		return tools.review(ctx, req, review, fmt.Sprintf("停止本机重试准确设备操作：%s\n不取消服务器操作，不恢复设备访问；原证明和操作定位保留用于只读核对。", raw), func(scope *ChoiceScope) (any, error) {
+		return tools.review(ctx, req, review, fmt.Sprintf("停止本机重试准确设备操作：%s\n不取消服务器操作，不恢复设备访问；原证明和操作定位保留用于只读核对。", raw), func(ctx context.Context, scope *ChoiceScope) (any, error) {
 			latest, e := devices.Read(ctx, "pending", "")
 			if e != nil {
 				return nil, e

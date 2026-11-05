@@ -81,7 +81,7 @@ func (l *panelLease) sendMessage(ctx context.Context, v *panelView, x panelMap) 
 				return out, e
 			}
 		} else {
-			if row != nil && isOne(text(row["state"]), "unknown", "pending", "conflict") {
+			if row != nil && isOne(text(row["state"]), "unknown", "pending") {
 				return nil, panelError("panel_message_pending")
 			}
 			payload := panelMap{"clientMessageId": x["clientMessageId"], "text": x["text"], "replyTo": x["replyTo"], "agentGrantId": grant["grantId"]}

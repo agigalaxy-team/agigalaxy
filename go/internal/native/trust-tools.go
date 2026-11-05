@@ -122,7 +122,9 @@ func registerNativeTrustTools(server *mcp.Server, tools *toolRuntime, runtime *R
 				}
 				shown["state"] = "ready"
 				review := map[string]any{"operationId": id, "action": p.action, "preview": shown}
-				return tools.review(ctx, req, review, text(contract["description"]), func(scope *ChoiceScope) (any, error) { return host.ExecuteReviewed(ctx, id, scope) })
+				return tools.review(ctx, req, review, text(contract["description"]), func(ctx context.Context, scope *ChoiceScope) (any, error) {
+					return host.ExecuteReviewed(ctx, id, scope)
+				})
 			case "galaxy_trust_native_cancel_preview":
 				out, e = host.Cancel(ctx, text(input["operationId"]))
 			case "galaxy_trust_native_import":
@@ -138,7 +140,7 @@ func registerNativeTrustTools(server *mcp.Server, tools *toolRuntime, runtime *R
 					return nativeTrustError(err)
 				}
 				shown := map[string]any{"packageId": manifest["packageId"], "credentialHash": identity.Digest([]byte(text(bundle["credential"]))), "issuerPin": input["issuerPin"], "expectedSubject": input["expectedSubject"], "audience": input["audience"]}
-				return tools.review(ctx, req, shown, text(contract["description"]), func(scope *ChoiceScope) (any, error) {
+				return tools.review(ctx, req, shown, text(contract["description"]), func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					if scope == nil || *scope != lease.scope {
 						return nil, connectionFailure("trust_identity_changed")
 					}
@@ -162,7 +164,7 @@ func registerNativeTrustTools(server *mcp.Server, tools *toolRuntime, runtime *R
 				if err != nil {
 					return nativeTrustError(err)
 				}
-				return tools.review(ctx, req, map[string]any{"packageId": manifest["packageId"], "selectedEndpoint": input["selectedEndpoint"]}, text(contract["description"]), func(scope *ChoiceScope) (any, error) {
+				return tools.review(ctx, req, map[string]any{"packageId": manifest["packageId"], "selectedEndpoint": input["selectedEndpoint"]}, text(contract["description"]), func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					return host.CheckOnline(ctx, container, text(input["selectedEndpoint"]), scope)
 				})
 			case "galaxy_trust_native_permissions":

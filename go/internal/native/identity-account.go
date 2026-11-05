@@ -131,6 +131,18 @@ func (a *NativeIdentityAccounts) Read(ctx context.Context, input NativeIdentityA
 	defer cancel()
 	return a.read(ctx, l, input)
 }
+
+// Completed results can be read back, but only live selections reserve slots.
+func (a *NativeIdentityAccounts) activePreviews() int {
+	n := 0
+	for _, p := range a.previews {
+		if p.state == "prepared" || p.state == "running" {
+			n++
+		}
+	}
+	return n
+}
+
 func (a *NativeIdentityAccounts) Prepare(ctx context.Context, action, id string) (any, error) {
 	if !isOne(action, "link", "unlink") || !controlUUID(id) {
 		return nil, connectionFailure("native_account_link_input_invalid")
@@ -143,11 +155,11 @@ func (a *NativeIdentityAccounts) Prepare(ctx context.Context, action, id string)
 	now := a.runtime.connection.now().UnixMilli()
 	a.mu.Lock()
 	for id, p := range a.previews {
-		if p.state == "prepared" && (p.expiresAt <= now || p.lease.scope != l.scope || p.lease.connection.bindingID != l.connection.bindingID) {
+		if p.state != "running" && (p.expiresAt <= now || p.lease.scope != l.scope || p.lease.connection.bindingID != l.connection.bindingID) {
 			delete(a.previews, id)
 		}
 	}
-	if len(a.previews) >= 32 {
+	if a.activePreviews() >= 32 {
 		a.mu.Unlock()
 		return nil, connectionFailure("native_account_preview_limit")
 	}
@@ -188,7 +200,7 @@ func (a *NativeIdentityAccounts) Prepare(ctx context.Context, action, id string)
 	}
 	previewID := uuid.NewString()
 	a.mu.Lock()
-	if len(a.previews) >= 32 {
+	if a.activePreviews() >= 32 {
 		a.mu.Unlock()
 		return nil, connectionFailure("native_account_preview_limit")
 	}

@@ -33,6 +33,7 @@ type VerifiedIdentity struct {
 	Issuer, ExternalSubject, ClientID, Authentication string
 	VerifiedAt, ExpiresAt                             int64
 	EmailVerified                                     bool
+	Email                                             string
 }
 type LoginProvider interface {
 	Describe() Description
@@ -64,7 +65,11 @@ func (p *OIDCProvider) Complete(ctx context.Context, preview portal.Preview, ret
 	if v.Issuer != d.Issuer || v.ClientID != d.ClientID || v.Subject == "" || v.ExpiresAt <= now {
 		return VerifiedIdentity{}, fault.New("identity_login_failed", 401)
 	}
-	return VerifiedIdentity{v.Issuer, v.Subject, v.ClientID, "oidc-authorization-code-pkce-s256-id-token-signature", now, min(v.ExpiresAt, preview.ExpiresAt), v.EmailVerified}, nil
+	email := ""
+	if v.EmailVerified && v.Email != nil {
+		email = *v.Email
+	}
+	return VerifiedIdentity{v.Issuer, v.Subject, v.ClientID, "oidc-authorization-code-pkce-s256-id-token-signature", now, min(v.ExpiresAt, preview.ExpiresAt), v.EmailVerified, email}, nil
 }
 
 type ProviderConfiguration struct {
@@ -170,7 +175,7 @@ func LoadProviders(ctx context.Context, pool *pgxpool.Pool, endpoint, path strin
 			return nil, e
 		}
 		redirect := endpoint + "/v1/identity/callback/" + c.ID
-		login, e := portal.NewLogin(pool, oidc, portal.LoginOptions{ID: c.ID, Name: c.Name, RedirectURI: redirect, Namespace: "identity:" + identity.Digest(encode([]string{endpoint, c.ID}))})
+		login, e := portal.NewLogin(pool, oidc, portal.LoginOptions{ID: c.ID, Name: c.Name, RedirectURI: redirect, Namespace: "identity:" + identity.Digest(encode([]string{endpoint, c.ID})), IncludeProfile: true})
 		if e != nil {
 			return nil, e
 		}

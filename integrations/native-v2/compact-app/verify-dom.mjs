@@ -10,7 +10,8 @@ const bundle=await build({entryPoints:['integrations/native-v2/compact-app/view.
 const browser=await chromium.launch({headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});page.on('pageerror',e=>events.push({pageError:e.message}));
 try{
- await page.setContent('<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"></head><body><main id="panel"></main></body></html>');await page.addScriptTag({content:bundle.outputFiles[0].text});
+ await page.route('http://localhost/compact-review',route=>route.fulfill({contentType:'text/html; charset=utf-8',body:'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"></head><body><main id="panel"></main></body></html>'}));
+ await page.goto('http://localhost/compact-review');await page.addScriptTag({content:bundle.outputFiles[0].text});
  await page.evaluate(()=>{const style=document.createElement('style');style.textContent=GalaxyPanel.compactCss;document.head.append(style);window.calls=[];window.sample={schemaVersion:1,viewId:'synthetic-view',ownerScope:'synthetic-owner',checkedAt:1790899200,activeEntries:[{id:'help',label:'找帮助'},{id:'participate',label:'参与协作'},{id:'chat',label:'开始交流'}],object:{kind:'task',id:'synthetic-task'},source:{title:'合成验收：改进文档解析',summary:'本机隔离面板验收，不代表真实项目与参与者。',state:'active',source:{taskId:'synthetic-task'},contacts:{responses:{applications:[],invitations:[]},suggestions:{items:[{}]}},participations:[]},paths:[{id:'consult',label:'继续讨论思路'},{id:'request',label:'整理请求'},{id:'candidate',label:'寻找协助者'},{id:'methods',label:'看看已有方法'}],draft:{revision:0,text:''},help:{sessionId:'synthetic-help',revision:0,selectedHelpIds:[],offers:[{id:'synthetic-offer',state:'current',helpDescription:'先核对解析失败的位置，再决定是否修改规则',userFacingReason:'当前合成资料只有输入与错误位置，可以先复核复现步骤；没有足够证据推荐接手人选。',interventionKinds:['diagnosis','review'],environmentDifferences:['示例运行环境与当前项目尚未逐项对齐'],conditions:['提供允许共享的最小复现输入'],basisRefs:[{id:'synthetic-source',version:1}]}],actionOperations:[{operationId:'synthetic-operation',kind:'context-grant',state:'prepared'}]}};
  window.panel=GalaxyPanel.mountCompactPanel(document.getElementById('panel'),{call:async(name,args)=>{calls.push({name,args});if(name==='galaxy_panel_select'){sample.help.selectedHelpIds=args.offerIds;sample.help.revision++;return structuredClone(sample);}if(name==='galaxy_panel_action_preview')return{...structuredClone(sample),preview:{operationId:'synthetic-operation',payloadHash:'synthetic-hash',kind:'context-grant',state:'prepared',visibility:'Private',recipientIds:['合成验收接收者'],scope:{type:'task',id:'synthetic-task'},materials:[{kind:'text',label:'最小复现片段'}],payload:{text:'仅本机审阅的合成资料',purpose:'复核解析错误'}}};if(name==='galaxy_panel_action_execute')return{resultType:'input_required',inputRequests:[]};if(name==='galaxy_panel_refresh'){sample.help.offers=[{id:'synthetic-offer',state:'changed'}];return structuredClone(sample);}if(name==='galaxy_panel_draft_save'){sample.draft={revision:1,text:args.draft};return structuredClone(sample);}return structuredClone(sample);}});panel.receive(sample);});
  await page.getByRole('button',{name:'选用这个帮助',exact:true}).click();
@@ -42,5 +43,35 @@ try{
  await page.screenshot({path:resolve(out,'after-compact-stale-mobile.png'),fullPage:true});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  events.push({check:'changed source removes old help text and choice, retains unsent draft and fits mobile',passed:true});
+ await page.evaluate(()=>{
+  panel.close();
+  const room={schemaVersion:1,viewId:'room-view',ownerScope:'same-owner',object:{kind:'room'},source:{title:'讨论室',conversation:{canReply:true,complete:true,messages:[]}},replyDraft:{revision:0,text:''}};
+  window.sent=[];
+  window.panel=GalaxyPanel.mountCompactPanel(document.getElementById('panel'),{call:async(name,args)=>{
+   if(name==='galaxy_panel_reply_draft_save')room.replyDraft={revision:room.replyDraft.revision+1,text:args.draft};
+   if(name==='galaxy_panel_message_send'){
+    sent.push({id:args.clientMessageId,text:args.text});
+    room.messageResult={clientMessageId:args.clientMessageId,state:sent.length===1?'unknown':'accepted'};
+   }
+   if(name==='galaxy_panel_refresh'&&window.firstDelivered)room.messageResult.state='accepted';
+   return structuredClone(room);
+  }});
+  panel.receive(room);
+ });
+ const reply=page.getByRole('textbox',{name:'回复'});
+ const send=page.getByRole('button',{name:'发送',exact:true});
+ await reply.fill('第一条消息');
+ await send.click();
+ await page.getByText('正在确认上一条消息…',{exact:true}).waitFor();
+ assert.equal(await send.isDisabled(),true);
+ await reply.fill('另一条消息');
+ await page.evaluate(()=>{window.firstDelivered=true;return panel.refresh();});
+ assert.equal(await reply.inputValue(),'另一条消息');
+ await send.click();
+ await page.getByText('已发送。',{exact:true}).waitFor();
+ const sent=await page.evaluate(()=>window.sent);
+ assert.deepEqual(sent.map(row=>row.text),['第一条消息','另一条消息']);
+ assert.notEqual(sent[0].id,sent[1].id);
+ events.push({check:'previous receipt does not clear or reuse the next draft',passed:true});
  assert.equal(events.filter(x=>x.pageError).length,0);
 }finally{await writeFile(resolve(out,'compact-dom-report.json'),JSON.stringify({synthetic:true,actualDom:true,mockedToolCalls:true,actualHostUi:false,events},null,2));await browser.close();}

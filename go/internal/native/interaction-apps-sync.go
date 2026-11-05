@@ -8,7 +8,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type interactionReviewed func(context.Context, *mcp.CallToolRequest, string, any, string, string, string, func(*ChoiceScope) (any, error)) (*mcp.CallToolResult, error)
+type interactionReviewed func(context.Context, *mcp.CallToolRequest, string, any, string, string, string, choiceAction) (*mcp.CallToolResult, error)
 
 func registerInteractionSyncApps(runtime *Runtime, add func(string, map[string]any, string, bool, bool, mcp.ToolHandler), reviewed interactionReviewed) {
 	work, archive := NewWorkUpload(runtime), NewArchiveUpload(runtime)
@@ -71,7 +71,7 @@ func registerInteractionSyncApps(runtime *Runtime, add func(string, map[string]a
 		if e := protocol.Decode(req.Params.Arguments, &input); e != nil {
 			return interactionPanelError(e), nil
 		}
-		return reviewed(ctx, req, "galaxy_work_sync_choice", input, "仅按本次账户与工作范围保存本人私有资料；不选择其他原内容。", "privacy", input.GalaxyID, func(scope *ChoiceScope) (any, error) {
+		return reviewed(ctx, req, "galaxy_work_sync_choice", input, "仅按本次账户与工作范围保存本人私有资料；不选择其他原内容。", "privacy", input.GalaxyID, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 			if scope.Owner != input.GalaxyID {
 				return nil, fault.New("local_identity_changed", 409)
 			}
@@ -87,7 +87,7 @@ func registerInteractionSyncApps(runtime *Runtime, add func(string, map[string]a
 		if e := protocol.Decode(req.Params.Arguments, &input); e != nil {
 			return interactionPanelError(e), nil
 		}
-		return reviewed(ctx, req, "galaxy_archive_sync_choice", input, "仅保存所选账户及明确选定且允许上传的原会话范围。", "privacy", input.GalaxyID, func(scope *ChoiceScope) (any, error) {
+		return reviewed(ctx, req, "galaxy_archive_sync_choice", input, "仅保存所选账户及明确选定且允许上传的原会话范围。", "privacy", input.GalaxyID, func(ctx context.Context, scope *ChoiceScope) (any, error) {
 			if scope.Owner != input.GalaxyID {
 				return nil, fault.New("local_identity_changed", 409)
 			}

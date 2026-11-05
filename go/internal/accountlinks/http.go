@@ -41,6 +41,10 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(Object{"error": fault.Code(e), "requestId": requestID})
 	}
+	if h.Links != nil && strings.HasPrefix(operation, "native-review/") {
+		h.Links.serveNativeReview(w, r, strings.TrimPrefix(operation, "native-review/"))
+		return
+	}
 	if h.Links == nil {
 		fail(fault.New("identity_unavailable", 503))
 		return
@@ -59,18 +63,9 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(result)
 		return
 	}
-	if r.Method != "POST" || r.URL.RawQuery != "" || (operation != "providers" && operation != "begin" && operation != "status" && operation != "cancel" && operation != "confirm" && operation != "query" && operation != "revoke") {
+	nativePublic := operation == "native-begin" || operation == "native-status"
+	if r.Method != "POST" || r.URL.RawQuery != "" || (operation != "providers" && operation != "begin" && operation != "status" && operation != "cancel" && operation != "confirm" && operation != "query" && operation != "revoke" && operation != "native-claim" && !nativePublic) {
 		fail(fault.New("not_found", 404))
-		return
-	}
-	headers := r.Header.Values("Authorization")
-	if len(headers) != 1 || !strings.HasPrefix(headers[0], "Bearer ") {
-		fail(fault.New("access_denied", 401))
-		return
-	}
-	actor, e := h.Links.Registry.Devices.Authenticate(r.Context(), strings.TrimPrefix(headers[0], "Bearer "), "binding")
-	if e != nil {
-		fail(e)
 		return
 	}
 	if r.Header.Get("Content-Type") != "application/json" || r.Header.Get("Content-Encoding") != "" {
@@ -91,8 +86,34 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(fault.New("invalid_json", 400))
 		return
 	}
+	if nativePublic {
+		var result Object
+		if operation == "native-begin" {
+			result, e = h.Links.NativeBegin(r.Context(), raw)
+		} else {
+			result, e = h.Links.NativeStatus(r.Context(), raw)
+		}
+		if e != nil {
+			fail(e)
+			return
+		}
+		json.NewEncoder(w).Encode(result)
+		return
+	}
+	headers := r.Header.Values("Authorization")
+	if len(headers) != 1 || !strings.HasPrefix(headers[0], "Bearer ") {
+		fail(fault.New("access_denied", 401))
+		return
+	}
+	actor, e := h.Links.Registry.Devices.Authenticate(r.Context(), strings.TrimPrefix(headers[0], "Bearer "), "binding")
+	if e != nil {
+		fail(e)
+		return
+	}
 	var result Object
 	switch operation {
+	case "native-claim":
+		result, e = h.Links.NativeClaim(r.Context(), actor, raw)
 	case "providers":
 		if len(fields) != 0 {
 			fail(fault.New("invalid_request", 400))

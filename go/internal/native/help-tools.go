@@ -272,7 +272,7 @@ func registerNativeHelpTools(server *mcp.Server, tools *toolRuntime, runtime *Ru
 				}
 				review := psObject(psClone(input))
 				review["preview"] = preview
-				return tools.review(ctx, req, review, text(contract["description"]), func(scope *ChoiceScope) (any, error) {
+				return tools.review(ctx, req, review, text(contract["description"]), func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					out, e := l.executeAction(ctx, id, input, scope)
 					if e != nil {
 						code := runtimeErrorCode(e)

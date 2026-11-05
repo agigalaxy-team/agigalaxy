@@ -146,11 +146,11 @@ func connectFirstIdentityInBrowser(t *testing.T, ctx context.Context, runtime *R
 	if err != nil || link == nil || link.Hostname() != "127.0.0.1" || pending["state"] != "user-choice-needs-browser" || pending["reason"] != "browser-confirmation" || pending["sideEffect"] != false {
 		t.Fatal("connection did not return a local review", pending, err)
 	}
-	script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const page=await browser.newPage();await page.goto(process.argv[1]);await page.getByRole('button',{name:'允许本次操作',exact:true}).click();if(!(await page.textContent('body')).includes('已允许'))throw Error('Connection confirmation did not complete');console.log(JSON.stringify({confirmed:true}));}finally{await browser.close();}`
-	if initializationNode(t, script, link.String())["confirmed"] != true || hostForms != 0 || transport.count() != before {
-		t.Fatal("connection ran or used a host form before continuing the original tool")
+	script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const page=await browser.newPage();await page.goto(process.argv[1]);await page.getByRole('button',{name:'允许本次操作',exact:true}).click();await page.getByText('已处理，可以回到原聊天。',{exact:true}).waitFor();console.log(JSON.stringify({confirmed:true}));}finally{await browser.close();}`
+	if initializationNode(t, script, link.String())["confirmed"] != true || hostForms != 0 || transport.count() <= before {
+		t.Fatal("the browser did not complete the original connection without a second tool call")
 	}
-	connected := call()
+	connected := uploadObject(call()["connection"])
 	if text(connected["bindingId"]) == "" || hostForms != 0 {
 		t.Fatal("confirmed connection did not complete", connected)
 	}

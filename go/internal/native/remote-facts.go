@@ -286,7 +286,7 @@ func registerRemoteBusinessTools(server *mcp.Server, tools *toolRuntime, runtime
 				if e != nil {
 					return toolError(e)
 				}
-				return tools.review(ctx, req, normalized, "本人确认保存该项目的准确发现范围偏好；全局关闭或暂停仍有效。不发布项目、不发送邀请。\n"+string(raw), func(scope *ChoiceScope) (any, error) {
+				return tools.review(ctx, req, normalized, "本人确认保存该项目的准确发现范围偏好；全局关闭或暂停仍有效。不发布项目、不发送邀请。\n"+string(raw), func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					return remoteBusinessCall(ctx, runtime, name, normalized, scope, request)
 				})
 			}
