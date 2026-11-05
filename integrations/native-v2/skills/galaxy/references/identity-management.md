@@ -4,7 +4,7 @@
 
 ## 手动管理已有账户关联
 
-官方首次接入使用上述统一流程。需要单独管理账户关联且实际工具列表包含 `galaxy_identity_account_read`、`galaxy_identity_account_prepare`、`galaxy_identity_account_execute` 时，才使用下列操作。查询已有绑定用 read 的 `action: 'query'`；返回条目的 `id` 是绑定记录编号，`externalSubject` 才是发行服务中的账户标识，二者与本机 GUID 分开。新登录时先用 read 的 `action: 'providers'` 取得当前服务真实的账户入口，再用 `action: 'begin'` 和实际 providerId 准备登录。把返回的授权网址交给用户；登录本身不会关联 ID。
+官网账户关联的常用入口见[身份与账户](identity.md)。需要单独管理账户关联且实际工具列表包含 `galaxy_identity_account_read`、`galaxy_identity_account_prepare`、`galaxy_identity_account_execute` 时，才使用下列操作。查询已有绑定用 read 的 `action: 'query'`；返回条目的 `id` 是绑定记录编号，`externalSubject` 才是发行服务中的账户标识，二者与本机 GUID 分开。新登录时先用 read 的 `action: 'providers'` 取得当前服务真实的账户入口，再用 `action: 'begin'` 和实际 providerId 准备登录。把返回的授权网址交给用户；登录本身不会关联 ID。
 
 用 read 的 `action: 'status'` 与原 loginId 核对结果。状态为 `awaiting-local-signature` 后，用 prepare 的 `action: 'link'` 与该 id 取得完整预览，再调用 execute 并传原 previewId，让用户在宿主表单或临时本机审阅页明确允许。核对刚才实际登录的账户与当前 ID；不要用模型填写的 confirmed 代替选择，也不要拿普通网页接续证明当账户关联签名。
 

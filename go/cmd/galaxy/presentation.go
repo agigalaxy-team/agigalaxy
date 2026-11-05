@@ -65,6 +65,12 @@ func printHumanValue(value any) error {
 			}
 		} else if (outputAction == "setup" || outputAction == "install" || outputAction == "repair") && result["releaseInstalled"] == true && result["hostConfigured"] == true {
 			message = "银河客户端和当前宿主的接入配置已准备。"
+			if result["serviceConnection"] == "pending" {
+				message = "银河已安装，暂未连接服务。"
+			}
+			if result["serviceConnection"] == "ready" {
+				message = "银河客户端已安装，当前身份已连接所选服务。"
+			}
 			if release, ok := result["release"].(*native.NativeRelease); ok && release.ReleaseID != "" {
 				message += " 客户端版本：" + release.ReleaseID + "。"
 			}

@@ -42,6 +42,22 @@ func TestClientResultKeepsMachineDataWithoutPrintingDiagnostics(t *testing.T) {
 	}
 }
 
+func TestClientConnectShowsServiceAndAccountSeparately(t *testing.T) {
+	result, _ := toolResult(map[string]any{
+		"connected":     true,
+		"access":        map[string]any{"kind": "service", "state": "ready"},
+		"accountAccess": map[string]any{"kind": "official-account", "state": "account-required"},
+	})
+	shown := presentNativeToolResult(result)
+	if shown.IsError || len(shown.Content) != 1 {
+		t.Fatal("connection result not displayed", shown)
+	}
+	body, ok := shown.Content[0].(*mcp.TextContent)
+	if !ok || body.Text != "已接入银河。\n\n在线账户：未关联。" {
+		t.Fatalf("incorrect service/account result: %#v", shown.Content)
+	}
+}
+
 func TestClientConfirmationKeepsChosenContentAndDoesNotInventCompletion(t *testing.T) {
 	input := map[string]any{"title": "分享工作记录", "text": `{"example":"用户原文"}`, "recipientNames": []any{"林舟"}, "operationId": "internal-operation", "payloadHash": "internal-hash"}
 	message := userChoiceMessage("galaxy_native_authorize", input, "分享下列内容。")

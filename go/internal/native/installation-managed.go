@@ -25,6 +25,7 @@ type ManagedNativeInstallationInput struct {
 	ConfigPath       string            `json:"configPath,omitempty"`
 	Endpoint         string            `json:"endpoint,omitempty"`
 	LocalOnly        bool              `json:"localOnly"`
+	PendingWebsite   string            `json:"pendingWebsite,omitempty"`
 	SubjectType      string            `json:"subjectType"`
 	NodeExecutable   string            `json:"nodeExecutable,omitempty"`
 	HostExecutable   string            `json:"hostExecutable,omitempty"`
@@ -52,6 +53,7 @@ type managedNativeRecord struct {
 	ConfigPath        string                  `json:"configPath,omitempty"`
 	Endpoint          string                  `json:"endpoint,omitempty"`
 	LocalOnly         bool                    `json:"localOnly"`
+	PendingWebsite    string                  `json:"pendingWebsite,omitempty"`
 	HostConfigPath    string                  `json:"hostConfigPath"`
 	SkillPath         string                  `json:"skillPath,omitempty"`
 	ReleaseDirectory  string                  `json:"releaseDirectory"`
@@ -100,6 +102,9 @@ func PreviewManagedNativeInstallation(ctx context.Context, input ManagedNativeIn
 	}
 	if !isOne(input.SubjectType, "person", "organization") {
 		return nil, hostConfigurationFailure("setup_subject_type_invalid")
+	}
+	if input.PendingWebsite != "" && !serviceConfigurationOrigin(input.PendingWebsite) {
+		return nil, hostConfigurationFailure("setup_website_invalid")
 	}
 	if input.LocalOnly {
 		if input.ConfigPath != "" || input.Endpoint != "" {
@@ -214,7 +219,7 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 	}
 	result := map[string]any{"release": release, "host": input.Host, "dataDirectory": input.DataDirectory, "releaseInstalled": true, "releaseReused": release.Reused, "hostConfigured": false, "hostRuntimeTested": false, "dataPreserved": true, "identity": identity}
 	launch := HostConfigurationInput{LocalOnly: input.LocalOnly, PackageDirectory: release.Directory, ConfigPath: input.ConfigPath, DataDirectory: input.DataDirectory, Endpoint: input.Endpoint}
-	next := managedNativeRecord{Version: 1, Host: input.Host, DataDirectory: input.DataDirectory, ConfigPath: input.ConfigPath, Endpoint: input.Endpoint, LocalOnly: input.LocalOnly, HostConfigPath: plan.ConfigPath, SkillPath: plan.SkillPath, ReleaseDirectory: release.Directory, ConfigFormat: input.UserMCPFormat}
+	next := managedNativeRecord{Version: 1, Host: input.Host, DataDirectory: input.DataDirectory, ConfigPath: input.ConfigPath, Endpoint: input.Endpoint, LocalOnly: input.LocalOnly, PendingWebsite: input.PendingWebsite, HostConfigPath: plan.ConfigPath, SkillPath: plan.SkillPath, ReleaseDirectory: release.Directory, ConfigFormat: input.UserMCPFormat}
 	// The journal records the intended host state before the first host write.
 	adapter := input.Host
 	if input.Host == "custom" {

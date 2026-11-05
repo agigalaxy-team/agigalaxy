@@ -4,9 +4,13 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -142,5 +146,42 @@ func TestServiceConfigurationPreservesSelection(t *testing.T) {
 	transport.status = 302
 	if _, e = InspectServiceConfiguration(context.Background(), request, options); e == nil {
 		t.Fatal("public configuration redirect accepted")
+	}
+}
+
+type serviceConfigurationFailureTransport struct{ err error }
+
+func (t serviceConfigurationFailureTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, t.err
+}
+
+func TestServiceConfigurationOfflineClassification(t *testing.T) {
+	request := ServiceConfigurationRequest{Website: "https://configuration.invalid"}
+	for _, tc := range []struct {
+		name      string
+		transport http.RoundTripper
+		want      string
+	}{
+		{"temporary network", serviceConfigurationFailureTransport{&net.DNSError{Err: "temporary", Name: "configuration.invalid", IsTimeout: true}}, "native_service_configuration_temporarily_unavailable"},
+		{"unknown domain", serviceConfigurationFailureTransport{&net.DNSError{Err: "not found", Name: "configuration.invalid", IsNotFound: true}}, "native_service_configuration_unavailable"},
+		{"deadline", serviceConfigurationFailureTransport{context.DeadlineExceeded}, "native_service_configuration_temporarily_unavailable"},
+		{"certificate", serviceConfigurationFailureTransport{&tls.CertificateVerificationError{Err: x509.UnknownAuthorityError{}}}, "native_service_configuration_unavailable"},
+		{"tls protocol", serviceConfigurationFailureTransport{tls.RecordHeaderError{}}, "native_service_configuration_unavailable"},
+		{"service unavailable", &serviceConfigurationTransport{status: 503}, "native_service_configuration_temporarily_unavailable"},
+		{"client error", &serviceConfigurationTransport{status: 404}, "native_service_configuration_unavailable"},
+		{"rate limit", &serviceConfigurationTransport{status: 429}, "native_service_configuration_unavailable"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := InspectServiceConfiguration(context.Background(), request, ServiceConfigurationOptions{HTTPClient: &http.Client{Transport: tc.transport}})
+			if fault.Code(err) != tc.want {
+				t.Fatalf("got %v, want %s", err, tc.want)
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := InspectServiceConfiguration(ctx, request, ServiceConfigurationOptions{HTTPClient: &http.Client{Transport: serviceConfigurationFailureTransport{context.Canceled}}})
+	if err != context.Canceled {
+		t.Fatalf("canceled request: %v", err)
 	}
 }

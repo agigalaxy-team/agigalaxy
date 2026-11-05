@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"net/url"
 	"testing"
 	"time"
 
@@ -138,18 +137,9 @@ func connectFirstIdentityInBrowser(t *testing.T, ctx context.Context, runtime *R
 		return payload
 	}
 	before := transport.count()
-	pending := call()
-	link, err := url.Parse(text(pending["url"]))
-	if err != nil || link == nil || link.Hostname() != "127.0.0.1" || pending["state"] != "user-choice-needs-browser" || pending["reason"] != "browser-confirmation" || pending["sideEffect"] != false {
-		t.Fatal("connection did not return a local review", pending, err)
-	}
-	script := `import {chromium} from 'playwright';const browser=await chromium.launch({headless:true});try{const page=await browser.newPage();await page.goto(process.argv[1]);await page.getByRole('button',{name:'连接银河',exact:true}).click();await page.getByText('处理结果已返回。',{exact:true}).waitFor();console.log(JSON.stringify({confirmed:true}));}finally{await browser.close();}`
-	if initializationNode(t, script, link.String())["confirmed"] != true || hostForms != 0 || transport.count() <= before {
-		t.Fatal("the browser did not complete the original connection without a second tool call")
-	}
 	connected := uploadObject(call()["connection"])
-	if text(connected["bindingId"]) == "" || hostForms != 0 {
-		t.Fatal("confirmed connection did not complete", connected)
+	if text(connected["bindingId"]) == "" || hostForms != 0 || transport.count() <= before {
+		t.Fatal("technical connection did not complete without a choice", connected)
 	}
 	return &ConnectionSnapshot{BindingID: text(connected["bindingId"]), SubjectID: text(connected["subjectId"])}
 }

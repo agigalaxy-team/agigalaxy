@@ -284,6 +284,23 @@ func Command(ctx context.Context, p Profile, input native.CommandInput) (any, er
 	return value, nil
 }
 
+// ConnectService completes the explicit installation connection in the shared runtime.
+// The caller starts the selected service under the update lock first.
+func ConnectService(ctx context.Context, p Profile) (any, error) {
+	c, _, res, err := exchange(ctx, request{Version: ProtocolVersion, Action: "connect-service", Profile: p})
+	if err != nil {
+		return nil, err
+	}
+	defer c.Close()
+	var value any
+	decoder := json.NewDecoder(strings.NewReader(string(res.Result)))
+	decoder.UseNumber()
+	if err = decoder.Decode(&value); err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
 // Stop records the pause before asking the daemon to shut down.
 func Stop(ctx context.Context) error {
 	_, _, pause, err := paths()

@@ -8,6 +8,8 @@
 
 确认需要新建本机银河 ID 时，用 `galaxy_native_initialize_preview` 和 `galaxy_native_initialize` 按同一组实际选择办理；不需要的字段使用工具实际默认。ID 默认个人，可选组织；独立 Worker 身份使用 `galaxy_local_worker_identity_create`。选择账户已关联的 ID 不等于新建本机 ID。本机初始化与材料上传不作为账户接入中的重复步骤。
 
-`galaxy_native_connect` 沿用当前本机 ID。连接官方服务时，按工具返回的页面让本人登录并确认所显示的账户与本机 ID；客户端自动接续设备登记与账户关联，不再要求本人批准内部权限清单。完成以 `access.state: ready` 及实际 `officialAccount.state: linked` 为依据；单独的 `connected: true` 只证明设备连接。账户状态未知时如实读取原进度，不宣称成功。旧核心缺少账户流程或状态时，按[接入与维护](setup.md)更新并采用新版，保留原 ID 和资料。连接其他服务按该服务的本机确认流程办理。未打开浏览器不等于用户拒绝；缺接入时参考[接入与维护](setup.md)。
+`galaxy_native_connect` 沿用当前本机 ID 完成所选服务的技术连接及必要设备登记，不要求官网账户。初始化 ID 后自动连接；用户明确选择仅本机模式时保留该选择。以 `access.kind: service` 和 `access.state: ready` 判断技术连接，`disconnected` 表示未连接。
+
+只有当前操作实际需要官网账户时，提醒用户注册或登录并关联，然后使用 `galaxy_native_account_connect` 沿原 ID 办理；本人按工具返回页面确认账户与 ID。以 `accountAccess.kind: official-account`、`accountAccess.state` 和 `officialAccount` 判断账户状态：`ready`、`account-required`、`unknown` 分别处理；技术连接成功不证明账户已关联，未知不宣称成功。旧核心缺工具时按[接入与维护](setup.md)处理并保留原资料。未打开浏览器不等于用户拒绝。
 
 单独管理已有账户关联、Personal MCP OAuth 或网页设备接续时，按需读[账户、OAuth 与网页设备管理](identity-management.md)；网页链接和原聊天返回见[网页与聊天接续](continuation.md)。

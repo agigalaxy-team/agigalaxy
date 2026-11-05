@@ -3,14 +3,17 @@ package native
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -132,9 +135,28 @@ func InspectServiceConfiguration(ctx context.Context, input ServiceConfiguration
 	request.Header.Set("Accept", "application/json")
 	response, e := client.Do(request)
 	if e != nil {
+		var certificateError *tls.CertificateVerificationError
+		var networkError net.Error
+		var dnsError *net.DNSError
+		var operationError *net.OpError
+		var recordError tls.RecordHeaderError
+		underlying := e
+		var urlError *url.Error
+		if errors.As(e, &urlError) {
+			underlying = urlError.Err
+		}
+		if ctx.Err() == context.Canceled {
+			return nil, ctx.Err()
+		}
+		if !errors.As(e, &certificateError) && !errors.As(e, &recordError) && !(errors.As(underlying, &dnsError) && dnsError.IsNotFound) && (errors.Is(underlying, context.DeadlineExceeded) || errors.As(underlying, &operationError) || errors.As(underlying, &dnsError) || errors.As(underlying, &networkError) && networkError.Timeout()) {
+			return nil, serviceConfigurationError("temporarily_unavailable")
+		}
 		return nil, serviceConfigurationError("unavailable")
 	}
 	defer response.Body.Close()
+	if response.StatusCode >= 500 && response.StatusCode <= 599 {
+		return nil, serviceConfigurationError("temporarily_unavailable")
+	}
 	if response.StatusCode != 200 || response.Body == nil || response.ContentLength > 16384 {
 		return nil, serviceConfigurationError("unavailable")
 	}

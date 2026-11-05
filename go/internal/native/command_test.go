@@ -409,7 +409,18 @@ func TestNativeAccessProjection(t *testing.T) {
 			account = map[string]any{"state": tc.account}
 		}
 		projectNativeAccess(status, account)
-		if got := uploadObject(status["access"])["state"]; got != tc.want {
+		serviceState := "disconnected"
+		if tc.connected {
+			serviceState = "ready"
+		}
+		if access := uploadObject(status["access"]); access["kind"] != "service" || access["state"] != serviceState {
+			t.Fatalf("incorrect service access: %v", access)
+		}
+		key := "access"
+		if isOfficialNativeAuthority(tc.endpoint) {
+			key = "accountAccess"
+		}
+		if got := uploadObject(status[key])["state"]; got != tc.want {
 			t.Fatalf("endpoint=%s connected=%v account=%s: got %v", tc.endpoint, tc.connected, tc.account, got)
 		}
 	}
@@ -427,7 +438,7 @@ func TestCommandConnectDoesNotAssumeOfficialAccount(t *testing.T) {
 	}
 	out := uploadObject(result)
 	status := uploadObject(out["connectionContract"])
-	if out["state"] != "unknown" || uploadObject(status["officialAccount"])["state"] != "unavailable" || status["connected"] != false {
+	if out["state"] != "disconnected" || uploadObject(status["officialAccount"])["state"] != "unavailable" || status["connected"] != false {
 		t.Fatalf("unverified account reported as connected: %v", out)
 	}
 }
@@ -451,7 +462,7 @@ func TestOfficialNativeAuthorityOrigin(t *testing.T) {
 	}
 	status := map[string]any{"endpoint": "https://OFFICIAL.AGIGALAXY.ORG:443", "connected": true}
 	projectNativeAccess(status, map[string]any{"state": "unlinked"})
-	if uploadObject(status["access"])["state"] != "account-required" {
+	if uploadObject(status["accountAccess"])["state"] != "account-required" {
 		t.Fatalf("official origin bypassed account: %v", status)
 	}
 }

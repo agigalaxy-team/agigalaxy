@@ -2,10 +2,7 @@ package native
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
-	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -32,66 +29,50 @@ func registerRuntimeTools(server *mcp.Server, tools *toolRuntime, runtime *Runti
 		}
 		return toolResult(result)
 	})
-	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_connect", Description: "Connect the existing local identity. On the official service the browser lets the user log in and confirm the account and local ID once; the browser completes the connection and association. Open the returned page. No local notes or original conversations are uploaded.", InputSchema: objectSchema(map[string]any{})}, "native_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_connect", Description: "Connect the current local identity and device to the selected service. This does not link an account or change upload choices.", InputSchema: objectSchema(map[string]any{})}, "native_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if _, e := runtime.ConnectService(ctx); e != nil {
+			return toolError(e)
+		}
+		result, e := runtime.Status(ctx, RuntimeStatusOptions{SkipAccount: true})
+		if e != nil {
+			return toolError(e)
+		}
+		return toolResult(result)
+	})
+	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_account_connect", Description: "Link the current local identity to an official Galaxy account through website login and confirmation.", InputSchema: objectSchema(map[string]any{})}, "native_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if !isOfficialNativeAuthority(runtime.config.Endpoint) {
+			return toolError(connectionFailure("native_account_link_official_service_required"))
+		}
+		if scope, err := runtime.store.ChoiceScope(ctx); err == nil {
+			if operation := tools.browser.accountProgress(ctx, scope); operation != nil {
+				switch operation["state"] {
+				case "awaiting-account", "processing", "unconfirmed":
+					return toolResult(operation)
+				}
+			}
+		}
+		if _, e := runtime.ConnectService(ctx); e != nil {
+			return toolError(e)
+		}
 		current, e := runtime.Status(ctx, RuntimeStatusOptions{})
 		if e != nil {
 			return toolError(e)
 		}
-		if isOfficialNativeAuthority(runtime.config.Endpoint) {
-			if scope, err := runtime.store.ChoiceScope(ctx); err == nil {
-				if operation := tools.browser.accountProgress(ctx, scope); operation != nil {
-					switch operation["state"] {
-					case "awaiting-account", "processing", "unconfirmed":
-						return toolResult(operation)
-					}
-				}
-			}
-		}
-		if current["connected"] == true {
-			if !isOfficialNativeAuthority(runtime.config.Endpoint) {
-				return toolResult(current)
-			}
-			status := uploadObject(current["officialAccount"])
-			if status["state"] == "linked" {
-				return toolResult(current)
-			}
-			if status["state"] == "unavailable" {
-				return toolError(connectionFailure("native_account_link_status_unavailable"))
-			}
+		switch uploadObject(current["officialAccount"])["state"] {
+		case "linked":
+			return toolResult(current)
+		case "unavailable":
+			return toolError(connectionFailure("native_account_link_status_unavailable"))
 		}
 		plan, e := runtime.PrepareConnect(ctx)
 		if e != nil {
 			return toolError(e)
 		}
-		if isOfficialNativeAuthority(runtime.config.Endpoint) {
-			value, err := accountConnect.review(ctx, tools.browser, plan)
-			if err != nil {
-				return toolError(err)
-			}
-			return toolResult(value)
+		value, e := accountConnect.review(ctx, tools.browser, plan)
+		if e != nil {
+			return toolError(e)
 		}
-		message := fmt.Sprintf("使用此银河身份连接所选服务。\n银河 ID：%s\n服务：%s", plan.GalaxyID, plan.Endpoint)
-		return tools.reviewOn(ctx, req, plan, message, true, func(ctx context.Context, scope *ChoiceScope) (any, error) {
-			connection, e := runtime.ConnectReviewed(ctx, plan, scope)
-			if e != nil {
-				return nil, e
-			}
-			b, e := protocol.Encode(connection)
-			if e != nil {
-				return nil, e
-			}
-			var result map[string]any
-			if e = json.Unmarshal(b, &result); e != nil {
-				return nil, e
-			}
-			summary, summaryError := runtime.PersonalSummaryOnBinding(ctx)
-			if summaryError != nil {
-				result["personalSummary"] = map[string]any{"state": "refresh-required", "syncChoiceInferred": false}
-			} else {
-				result["personalSummary"] = summary
-			}
-			return result, nil
-		})
+		return toolResult(value)
 	})
 	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_disconnect", Description: "Stop this runtime's connection and saved automatic reconnection. This does not revoke the remote device.", InputSchema: objectSchema(map[string]any{})}, "native_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		result, e := runtime.Disconnect(ctx)

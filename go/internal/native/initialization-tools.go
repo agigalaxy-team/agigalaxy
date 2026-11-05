@@ -9,7 +9,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func registerInitializationTools(server *mcp.Server, tools *toolRuntime) {
+func registerInitializationTools(server *mcp.Server, tools *toolRuntime, runtime *Runtime) {
 	enum := func(values ...string) any { return map[string]any{"type": "string", "enum": values} }
 	inputSchema := objectSchema(map[string]any{
 		"initializationPath": enum("personal-galaxy", "galaxy-worker", "galaxy-hub"),
@@ -33,7 +33,7 @@ func registerInitializationTools(server *mcp.Server, tools *toolRuntime) {
 		}
 		return toolResult(result)
 	})
-	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_initialize", Description: "Prepare the reviewed local identity and modules after the person's choice. Preserve an existing identity; never connect, upload or call a model.", InputSchema: inputSchema}, "local_initialization_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	addNativeTool(server, &mcp.Tool{Name: "galaxy_native_initialize", Description: "Prepare the reviewed local identity and modules after the person's choice, then connect the selected service when configured. Preserve an existing identity and upload choices.", InputSchema: inputSchema}, "local_initialization_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input InitializationInput
 		if e := protocol.Decode(req.Params.Arguments, &input); e != nil {
 			return toolError(e)
@@ -43,8 +43,29 @@ func registerInitializationTools(server *mcp.Server, tools *toolRuntime) {
 			return toolError(e)
 		}
 		message := initializationReviewMessage(preview)
+		if runtime != nil {
+			message += "\n初始化完成后将连接所选服务并登记本机设备；账户功能需要另行登录。"
+		}
 		return tools.review(ctx, req, input, message, func(ctx context.Context, scope *ChoiceScope) (any, error) {
-			return tools.store.Initialize(ctx, input, true, scope)
+			result, err := tools.store.Initialize(ctx, input, true, scope)
+			if err != nil {
+				return nil, err
+			}
+			if runtime == nil {
+				result["serviceAccess"] = map[string]any{"state": "local-only"}
+				return result, nil
+			}
+			// The local initialization result describes only its own writes; the
+			// service outcome below is the authoritative connection projection.
+			delete(result, "connectionCreated")
+			connection, err := runtime.ConnectService(ctx)
+			if err != nil {
+				result["serviceAccess"] = map[string]any{"state": "disconnected", "error": runtimeErrorCode(err)}
+				return result, nil
+			}
+			result["localOnly"] = false
+			result["serviceAccess"] = map[string]any{"state": "ready", "connection": connection}
+			return result, nil
 		})
 	})
 }
@@ -69,5 +90,5 @@ func initializationReviewMessage(preview map[string]any) string {
 	if privacy["includeFullConversations"] == true {
 		sharing += "，包含所选完整会话"
 	}
-	return fmt.Sprintf("身份类型：%s\n启用功能：\n%s\n联网后的分享范围选择：%s\n\n身份密钥保存在本机。已有身份会继续使用；本次初始化不会连接服务器、上传资料或调用模型。", subject, strings.Join(modules, "\n"), sharing)
+	return fmt.Sprintf("身份类型：%s\n启用功能：\n%s\n联网后的分享范围选择：%s\n\n身份密钥保存在本机。已有身份会继续使用；初始化不会上传资料或调用模型。", subject, strings.Join(modules, "\n"), sharing)
 }

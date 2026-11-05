@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 )
 
-type RuntimeStatusOptions struct{ RestoreSelected bool }
+type RuntimeStatusOptions struct {
+	RestoreSelected bool
+	SkipAccount     bool
+}
 
 // Status preserves the original Native projection. Restoration is optional and
 // reports its actual failure without manufacturing an initialized/connected state.
@@ -111,7 +114,9 @@ func (r *Runtime) Status(ctx context.Context, options RuntimeStatusOptions) (map
 	var account map[string]any
 	if isOfficialNativeAuthority(r.config.Endpoint) {
 		account = map[string]any{"state": "unavailable"}
-		if out["connected"] == true {
+		if options.SkipAccount {
+			account = map[string]any{"state": "unknown"}
+		} else if out["connected"] == true {
 			account = r.officialAccountStatus(ctx)
 			// The account read must still refer to the same selection and session
 			// that produced this status, even if either changes during the query.
@@ -136,28 +141,28 @@ func (r *Runtime) Status(ctx context.Context, options RuntimeStatusOptions) (map
 // are separate facts. Unknown is never interpreted as an absent association.
 func projectNativeAccess(status, account map[string]any) {
 	connected := status["connected"] == true
+	serviceState := "disconnected"
+	if connected {
+		serviceState = "ready"
+	}
+	status["access"] = map[string]any{"kind": "service", "state": serviceState}
 	if !isOfficialNativeAuthority(text(status["endpoint"])) {
-		state := "disconnected"
-		if connected {
-			state = "ready"
-		}
-		status["access"] = map[string]any{"kind": "service", "state": state}
 		return
 	}
 	if account == nil {
 		account = map[string]any{"state": "unavailable"}
 	}
 	status["officialAccount"] = account
-	state := "unknown"
+	accountState := "unknown"
 	if connected {
 		switch account["state"] {
 		case "linked":
-			state = "ready"
+			accountState = "ready"
 		case "unlinked":
-			state = "account-required"
+			accountState = "account-required"
 		}
 	}
-	status["access"] = map[string]any{"kind": "official-account", "state": state}
+	status["accountAccess"] = map[string]any{"kind": "official-account", "state": accountState}
 }
 func runtimeTruthy(v any) bool {
 	switch value := v.(type) {

@@ -10,49 +10,45 @@ test('old and structured MCP errors keep the same actual cause for the Agent', (
   ]) assert.throws(() => unwrap(result), /native_connection_selection_changed/);
 });
 
-test('a completed official connection follows the same identity without repeating connect', async () => {
-  let connected=false, pendingTick, completed=0;
+test('technical connection continues without requiring an account', async () => {
+  let connected=false, completed=0;
   const calls=[], messages=[];
-  const originalTimer=globalThis.setTimeout;
-  globalThis.setTimeout=callback=>{pendingTick=callback;return{unref(){}}};
-  try {
-    const state=()=>({identity:'existing-identity',endpoint:'https://official.agigalaxy.org',connected,
-      officialAccount:{state:connected?'linked':'unavailable'},
-      connectionChoice:{revision:connected?2:0,enabled:connected,deviceId:connected?'first-device':undefined},
-      ...(connected?{connectionOperation:{state:'finished',identity:'existing-identity',endpoint:'https://official.agigalaxy.org'}}:{})});
-    const session={version:0,owner:null,language:'zh-CN',stopMessages(){},alive(v){return v===this.version;},label(cn){return cn;},info(){},message(title,text){messages.push({title,text});},nativeTools:{
-      async call(name){calls.push(name);if(name==='galaxy_native_status')return{structuredContent:state()};
-        connected=true;return{structuredContent:{state:'user-choice-needs-browser',url:'http://127.0.0.1:56789/review/'+'a'.repeat(48)}};},
-      async openLink(){},
-    }};
-    createPurposeIdentity(session).identityChoice('galaxy_native_connect',{},()=>completed++);
-    await new Promise(setImmediate);await pendingTick();await new Promise(setImmediate);
-    assert.equal(completed,1);
-    assert.equal(calls.filter(name=>name==='galaxy_native_connect').length,1);
-    assert.deepEqual(messages,[]);
-  } finally {globalThis.setTimeout=originalTimer;}
+  const state=()=>({identity:'existing-identity',endpoint:'https://official.agigalaxy.org',connected,
+    access:{kind:'service',state:connected?'ready':'disconnected'}, accountAccess:{state:'account-required'}});
+  const session={version:0,owner:null,language:'zh-CN',stopMessages(){},alive(v){return v===this.version;},label(cn){return cn;},info(){},message(title,text){messages.push({title,text});},nativeTools:{
+    async call(name){calls.push(name);if(name==='galaxy_native_status')return{structuredContent:state()};
+      connected=true;return{structuredContent:state()};},
+  }};
+  createPurposeIdentity(session).identityChoice('galaxy_native_connect',{},()=>completed++);
+  await new Promise(setImmediate);
+  assert.equal(completed,1);
+  assert.equal(calls.filter(name=>name==='galaxy_native_connect').length,1);
+  assert.deepEqual(messages,[]);
 });
 
-
-test('an official device connection without account evidence is not treated as ready', async () => {
-  const status={identity:'existing-identity',endpoint:'https://official.agigalaxy.org',connected:true};
+test('connected identity offers optional account linking and is ready to continue', async () => {
+  const status={identity:'existing-identity',endpoint:'https://official.agigalaxy.org',connected:true,
+    access:{kind:'service',state:'ready'},accountAccess:{state:'account-required'}};
   let continued=0, options;
   const session={nativeTools:{},language:'zh-CN',onBack(){},label(cn){return cn;},native:async()=>status,
     run:async(read,done)=>done(await read()),menu(title,items){options=items;}};
-  createPurposeIdentity(session).identity(()=>continued++);
+  const purpose=createPurposeIdentity(session);
+  purpose.identity(()=>continued++);
   await new Promise(setImmediate);
-  assert.equal(continued,0);
-  assert.ok(options.some(item=>item[0]==='连接当前身份'));
+  assert.equal(continued,1);
+  purpose.identity();
+  await new Promise(setImmediate);
+  assert.ok(options.some(item=>item[0]==='关联官网账户（按需）'));
+  assert.ok(!options.some(item=>item[0]==='连接当前身份'));
 });
 
-
-test('a connected old official core requests an update without reconnecting or waiting', async () => {
-  let completed=0; const calls=[], messages=[];
-  const session={version:0,owner:null,language:'zh-CN',stopMessages(){},alive(v){return v===this.version;},label(cn){return cn;},info(){},
-    message(title,text){messages.push({title,text});},nativeTools:{async call(name){calls.push(name);return {structuredContent:{identity:'existing-identity',endpoint:'https://OFFICIAL.AGIGALAXY.ORG:443',connected:true}};}}};
-  createPurposeIdentity(session).identityChoice('galaxy_native_connect',{},()=>completed++);
+test('linked account is not offered for linking again', async () => {
+  let options;
+  const status={identity:'existing-identity',endpoint:'https://official.agigalaxy.org',connected:true,
+    access:{kind:'service',state:'ready'},accountAccess:{state:'ready'}};
+  const session={nativeTools:{},language:'zh-CN',onBack(){},label(cn){return cn;},native:async()=>status,
+    run:async(read,done)=>done(await read()),menu(title,items){options=items;}};
+  createPurposeIdentity(session).identity();
   await new Promise(setImmediate);
-  assert.equal(completed,0);
-  assert.deepEqual(calls,['galaxy_native_status']);
-  assert.match(messages[0]?.text,/更新客户端/);
+  assert.ok(!options.some(item=>item[0]==='关联官网账户（按需）'));
 });

@@ -219,24 +219,32 @@ func setupCommand(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	plan, err := native.PreviewNativeInstallation(ctx, input, native.ServiceConfigurationOptions{})
-	if err != nil {
-		return err
-	}
-	configurationPath := ""
+	// Both discovery and configuration preparation may encounter the same
+	// temporary outage. Only that specific failure uses the local install path.
+	website := ""
 	if !input.LocalOnly {
+		website, err = native.InstallationWebsiteOrigin(input.Website)
+		if err != nil {
+			return err
+		}
+	}
+	plan, discoveryError := native.PreviewNativeInstallation(ctx, input, native.ServiceConfigurationOptions{})
+	configurationPath := ""
+	if discoveryError == nil && !input.LocalOnly {
 		profile := sha256.Sum256([]byte(plan.Endpoint + "\n" + input.DataDirectory))
 		configurationPath = filepath.Join(input.Destination, "connections", fmt.Sprintf("service-%x.json", profile[:8]))
 		if _, err := os.Stat(configurationPath); os.IsNotExist(err) {
 			if err = os.MkdirAll(filepath.Dir(configurationPath), 0700); err != nil {
 				return err
 			}
-			if _, err = native.PrepareServiceConfiguration(ctx, native.ServiceConfigurationRequest{Website: plan.Website, Endpoint: plan.Endpoint, DataDirectory: input.DataDirectory, Output: configurationPath}, native.ServiceConfigurationOptions{}); err != nil {
-				return err
-			}
+			_, discoveryError = native.PrepareServiceConfiguration(ctx, native.ServiceConfigurationRequest{Website: plan.Website, Endpoint: plan.Endpoint, DataDirectory: input.DataDirectory, Output: configurationPath}, native.ServiceConfigurationOptions{})
 		} else if err != nil {
 			return err
 		}
+	}
+	pending := discoveryError != nil && fault.Code(discoveryError) == "native_service_configuration_temporarily_unavailable" && ctx.Err() == nil
+	if discoveryError != nil && !pending {
+		return discoveryError
 	}
 	environment := installationEnvironment()
 	if input.OpenCodeConfigDirectory != "" {
@@ -249,10 +257,30 @@ func setupCommand(ctx context.Context, args []string) error {
 			return err
 		}
 	}
-	managed, err := native.PreviewManagedNativeInstallation(ctx, native.ManagedNativeInstallationInput{Host: input.Host, Home: home, Environment: environment, PackageDirectory: input.PackageDirectory, InstallRoot: input.Destination, DataDirectory: input.DataDirectory, ConfigPath: configurationPath, LocalOnly: input.LocalOnly, SubjectType: input.SubjectType, NodeExecutable: node, HostExecutable: input.OpenCodePath})
+	managedInput := native.ManagedNativeInstallationInput{Host: input.Host, Home: home, Environment: environment, PackageDirectory: input.PackageDirectory, InstallRoot: input.Destination, DataDirectory: input.DataDirectory, ConfigPath: configurationPath, LocalOnly: input.LocalOnly, SubjectType: input.SubjectType, NodeExecutable: node, HostExecutable: input.OpenCodePath}
+	if pending {
+		// Preserve an existing host's configured connection. For a new host,
+		// install its local tools and keep the selected website in the record.
+		managedInput.ConfigPath = ""
+		managedInput.LocalOnly = true
+		existing, resolveErr := native.ResolveManagedNativeMaintenance(managedInput, map[string]bool{"data-dir": true, "package-dir": true})
+		if resolveErr == nil {
+			managedInput.ConfigPath, managedInput.LocalOnly, managedInput.Endpoint = existing.ConfigPath, existing.LocalOnly, existing.Endpoint
+		} else if fault.Code(resolveErr) != "setup_installation_missing" {
+			return resolveErr
+		}
+		managedInput.PendingWebsite = website
+	}
+	managed, err := native.PreviewManagedNativeInstallation(ctx, managedInput)
 	if err != nil {
 		return err
 	}
+
 	value, applyError := native.ApplyManagedNativeInstallation(ctx, managed)
-	return completeManagedInstallation(ctx, value, applyError)
+	if pending && value != nil && value["releaseInstalled"] == true && value["hostConfigured"] == true {
+		value["installed"] = true
+		value["serviceConnection"] = "pending"
+		value["pendingWebsite"] = website
+	}
+	return completeManagedInstallation(ctx, value, applyError, !input.LocalOnly && !pending, configurationPath)
 }

@@ -250,7 +250,7 @@ func (s *service) handle(ctx context.Context, c net.Conn) {
 		_ = json.NewEncoder(c).Encode(response{Info: &s.info})
 		s.cancel()
 		return
-	case "command":
+	case "command", "connect-service":
 		if !s.addLegacy() {
 			_ = json.NewEncoder(c).Encode(response{Error: "native_service_draining", Status: 409})
 			return
@@ -265,7 +265,12 @@ func (s *service) handle(ctx context.Context, c net.Conn) {
 			_ = json.NewEncoder(c).Encode(response{Error: fault.Code(e), Status: fault.Status(e)})
 			return
 		}
-		value, e := state.runtime.Command(ctx, req.Input)
+		var value any
+		if req.Action == "connect-service" {
+			value, e = state.runtime.ConnectService(ctx)
+		} else {
+			value, e = state.runtime.Command(ctx, req.Input)
+		}
 		if e != nil {
 			_ = json.NewEncoder(c).Encode(response{Error: fault.Code(e), Status: fault.Status(e)})
 			return

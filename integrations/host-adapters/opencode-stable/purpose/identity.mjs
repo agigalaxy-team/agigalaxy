@@ -11,7 +11,8 @@ const isOfficialOrigin = endpoint => {
   } catch { return false; }
 };
 const isOfficial = status => isOfficialOrigin(status.endpoint) || status.access?.kind === 'official-account' || !!status.officialAccount;
-const accessReady = status => status.connected === true && (!isOfficial(status) || status.officialAccount?.state === 'linked');
+const accessReady = status => status.access?.kind === 'service' ? status.access.state === 'ready' : status.connected === true;
+const accountReady = status => status.accountAccess?.state === 'ready' || status.officialAccount?.state === 'linked';
 
 export function createPurposeIdentity(session) {
   function identity(onReady = null, back = session.onBack) {
@@ -49,6 +50,10 @@ export function createPurposeIdentity(session) {
             ...(status.identity && !ready
               ? [[session.label('连接当前身份', 'Connect this identity'),
                   () => identityChoice('galaxy_native_connect', {}, () => identity(onReady, back), ['awaiting-account', 'processing'].includes(status.connectionOperation?.state))]]
+              : []),
+            ...(ready && isOfficial(status) && !accountReady(status)
+              ? [[session.label('关联官网账户（按需）', 'Link website account (optional)'),
+                  () => identityChoice('galaxy_native_account_connect', {}, () => identity(null, back), ['awaiting-account', 'processing'].includes(status.connectionOperation?.state))]]
               : []),
             ...(status.identity ? [[session.label('保存身份恢复码', 'Save an identity recovery code'), () => recoveryPage('set', () => identity(null, back))]] : []),
             [session.label('使用恢复码找回原身份', 'Recover an identity with its code'), () => recoveryPage('recover', () => identity(null, back))],
@@ -136,7 +141,9 @@ export function createPurposeIdentity(session) {
         ? session.label('在本机准备身份', 'Prepare this device')
         : name === 'galaxy_native_disconnect'
           ? session.label('断开本机连接', 'Disconnect this local connection')
-          : session.label('连接当前身份', 'Connect this identity');
+          : name === 'galaxy_native_account_connect'
+            ? session.label('关联官网账户', 'Link website account')
+            : session.label('连接当前身份', 'Connect this identity');
     const tick = async () => {
       if (!session.alive(v) || busy) return;
       busy = true;
@@ -152,17 +159,15 @@ export function createPurposeIdentity(session) {
           initialSubject = JSON.stringify([before.identity ?? null, before.endpoint ?? null]);
           if (session.owner !== null && session.owner !== beforeKey)
             throw Error('current_identity_changed');
-        } else if (name === 'galaxy_native_connect'
+        } else if (name === 'galaxy_native_account_connect'
           ? JSON.stringify([before.identity ?? null, before.endpoint ?? null]) !== initialSubject
           : beforeKey !== initial)
           throw Error('current_identity_changed');
-        if (name === 'galaxy_native_connect' && isOfficial(before) && before.connected === true && !before.officialAccount && !before.connectionOperation)
-          throw Object.assign(new Error('native_account_status_upgrade_required'), {code: 'native_account_status_upgrade_required'});
         // Only this explicitly selected identity transition may change the menu's
         // owner/binding. The Native server checks its original real choice before
         // executing; generic reads and writes retain the ordinary owner fence.
         let value;
-        if (name === 'galaxy_native_connect' && officialConnect && connectStarted) {
+        if (name === 'galaxy_native_account_connect' && officialConnect && connectStarted) {
           const operation = before.connectionOperation;
           if (before.connectionError === 'current_device_control_required') throw Error(before.connectionError);
           if (operation?.state === 'awaiting-account' && operation.url && !choiceUrl) {
@@ -177,7 +182,7 @@ export function createPurposeIdentity(session) {
           if (operation?.identity && operation.identity !== before.identity || operation?.endpoint && operation.endpoint !== before.endpoint) throw Error('current_identity_changed');
           if (operation?.state === 'declined') value = {state: 'declined'};
           else if (['failed', 'unconfirmed'].includes(operation?.state)) throw Error(operation.error ?? 'native_connection_unconfirmed');
-          else if ((operation?.state === 'finished' || !operation) && accessReady(before)) {
+          else if ((operation?.state === 'finished' || !operation) && accountReady(before)) {
             session.owner = fingerprint(before);
             return done();
           } else if (operation?.state === 'finished' || !operation) {
@@ -188,7 +193,7 @@ export function createPurposeIdentity(session) {
             return;
           }
         } else {
-          if (name === 'galaxy_native_connect' && officialConnect) { connectStarted = true; }
+          if (name === 'galaxy_native_account_connect' && officialConnect) { connectStarted = true; }
           value = unwrap(await session.nativeTools.call(name, input));
         }
         if (!session.alive(v)) return;
@@ -233,6 +238,7 @@ export function createPurposeIdentity(session) {
           (name === 'galaxy_native_initialize' &&
             (!after.identity || value.identity !== after.identity)) ||
           (name === 'galaxy_native_connect' && !accessReady(after)) ||
+          (name === 'galaxy_native_account_connect' && !accountReady(after)) ||
           (name === 'galaxy_native_disconnect' && after.connected === true)
         )
           throw Error('native_identity_transition_unconfirmed');
@@ -242,9 +248,7 @@ export function createPurposeIdentity(session) {
         if (session.alive(v))
           session.message(
             title,
-            error?.code === 'native_account_status_upgrade_required'
-              ? session.label('当前银河客户端无法核实账户是否已关联，请更新客户端后继续；已有身份和连接会保留。', 'This Galaxy client cannot verify the account association. Update the client to continue; your identity and connection are retained.')
-              : String(error.message).startsWith('native_configuration_')
+            String(error.message).startsWith('native_configuration_')
               ? nativeConfigurationMessage(error, session.language)
               : session.label(
                   '暂时无法确认这次操作的结果。请查看当前状态。',

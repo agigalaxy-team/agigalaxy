@@ -88,6 +88,7 @@ func ResolveManagedNativeMaintenance(input ManagedNativeInstallationInput, suppl
 		input.LocalOnly = record.LocalOnly
 		input.Endpoint = record.Endpoint
 	}
+	input.PendingWebsite = record.PendingWebsite
 	if !supplied["node"] && record.NodeExecutable != "" {
 		input.NodeExecutable = record.NodeExecutable
 	}

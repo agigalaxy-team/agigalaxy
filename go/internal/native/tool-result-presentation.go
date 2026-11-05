@@ -92,20 +92,36 @@ func nativeResultLines(data any, isError bool) []string {
 	}
 	lines := []string{}
 	if object, ok := data.(map[string]any); ok {
-		access, _ := object["access"].(map[string]any)
+		if object["initialized"] == true {
+			service := uploadObject(object["serviceAccess"])
+			switch service["state"] {
+			case "ready":
+				lines = append(lines, "本机初始化已完成，服务已连接。")
+			case "disconnected":
+				lines = append(lines, "本机已就绪，暂未连接服务。")
+			case "local-only":
+				lines = append(lines, "本机初始化已完成。")
+			}
+		}
+		service, _ := object["access"].(map[string]any)
+		if service["kind"] == "service" {
+			switch service["state"] {
+			case "ready":
+				lines = append(lines, "已接入银河。")
+			case "disconnected":
+				lines = append(lines, "暂未连接服务。")
+			}
+		}
+		access, _ := object["accountAccess"].(map[string]any)
 		accountAccess := access["kind"] == "official-account"
 		if accountAccess {
 			switch access["state"] {
 			case "ready":
-				lines = append(lines, "银河账户已关联。")
+				lines = append(lines, "在线账户：已关联。")
 			case "account-required":
-				lines = append(lines, "尚未关联银河账户。")
+				lines = append(lines, "在线账户：未关联。")
 			case "unknown":
-				if object["connected"] == true {
-					lines = append(lines, "账户关联状态暂时无法读取。")
-				} else {
-					lines = append(lines, "尚未接入银河。")
-				}
+				lines = append(lines, "在线账户：状态未知。")
 			}
 		}
 		for _, key := range []string{"state", "status"} {

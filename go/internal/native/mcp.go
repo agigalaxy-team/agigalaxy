@@ -232,7 +232,7 @@ func newToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArti
 		}
 	}
 	registerHistoryMaterial(s, store)
-	registerInitializationTools(s, rt)
+	registerInitializationTools(s, rt, runtime)
 	registerLocalMaterialTools(s, rt)
 	listProps := map[string]any{"galaxyId": localMaterialIdentitySchema(), "host": stringSchema(), "limit": integerSchema(1, 100, 20), "after": map[string]any{"type": "string", "pattern": "^[0-9]+$"}}
 	addNativeTool(s, &mcp.Tool{Name: "galaxy_local_work_list", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}, Description: "Read current identity's actual local work history without creating an identity, connecting or running a model.", InputSchema: objectSchema(listProps)}, "local_work_input_invalid", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
