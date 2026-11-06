@@ -1,6 +1,6 @@
 # 社区与稍后回看
 
-用户可以只浏览、阅读和收藏。需要按主题探索时用 `galaxy_community_topics` 取得实际主题，再用 `galaxy_community_query` 按可选主题和关键词查找；已有帖子引用时可直接用 `galaxy_community_read` 阅读所选帖子或准确版本。沿服务返回的游标继续，不把首批结果当作全部；`galaxy_community_replies` 和 `galaxy_community_versions` 只在需要时深入，本人帖子使用 `galaxy_community_owned`。
+用户可以只浏览、阅读和收藏。用 `galaxy_community_query` 按关键词或主题查找；需要选择主题时可用 `galaxy_community_topics` 读取主题；已有帖子引用时可直接用 `galaxy_community_read` 阅读所选帖子或准确版本。沿服务返回的游标继续，不把首批结果当作全部；`galaxy_community_replies` 和 `galaxy_community_versions` 只在需要时深入，本人帖子使用 `galaxy_community_owned`。
 
 向用户呈现真实标题、作者、主题、正文和当前可用动作。首次发布时间与所读版本时间分别说明，不把编辑时间说成首次发表；不展示整段工具 JSON，不猜主题或补造作者。公开读取按服务实际匿名能力执行，本人内容与收藏沿当前连接身份读取。空结果可以换主题、清除查询或结束，无需先创建任务。
 

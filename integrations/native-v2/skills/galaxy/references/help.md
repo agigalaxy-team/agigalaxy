@@ -1,35 +1,27 @@
 # 查询与原聊天帮助
 
-当前 Agent 实际尝试后仍受阻时，可自主判断是否向银河求助，并以真实目标、尝试和受阻原因组织必要上下文。也可按目的独立使用本机经验、公开资料、社区或协作；无需等待用户说“银河”，也不把它们排成固定流程。本机经验积累和复用见[本地记录与经验](records.md)。保留原工作目的、当前观察、已尝试的策略和不可外发约束。需要建议介入时，用几句说明已知什么、缺什么，以及外部资料可能改变哪一步；不用冗长自评、固定失败次数或“银河必能解决”的承诺。用户拒绝后继续原工作；恢复建议见下方暂停与返回。
+当前 Agent 实际尝试后仍受阻时，可根据真实目标、尝试和受阻原因自主寻求帮助；也可以独立查询资料、经验或参与者。直接继续、查本机或外部资料的顺序由任务决定。公开读取按实际权限使用；公开发布、联系或分享资料沿当前用户目的和原授权办理。
 
-## 按当前问题查询与解释
+## 查询与找人
 
-按当前问题给出具体方法、经验或可联系的帮助。已有路径类型留在工具数据中，不逐项展示为能力菜单或必须走完的步骤。诊断、建议、补充背景、工具、补丁、复核和验证都可能有价值；只呈现当前相关的内容、适用条件和真实意愿。没有银河历史的新参与者仍可协作。
+`galaxy_help_query` 可不建 HelpSession：在 `requests` 中按当前 schema 使用 `kind:search-v2` 查工作事实、方法和请求，或 `kind:discovery-v2` 查已有项目机会。按问题找人、组织、Agent 或服务使用 `kind:participants-v2`，`input` 包含 `query` 及可选 `functions`、`types`、`after`、`limit`；详情用 `kind:participant-v2` 和 `input:{sourceKind,id}`。每项请求提供 UUID `requestId`。按 `results[].data.nextAfter` 继续；空页仍有游标时还有未读取范围。失败和未读不等于无结果。
 
-公开查询和阅读按实际匿名能力直接使用，不以官网账户为前提。查询包与协助发布包分开。只选必要问题目标、环境、错误标识与希望获得的帮助，不自动压缩上传全聊天，不把压缩当脱敏。已有查询许可不等于公开问题、邀请收件人或分享材料的许可。
+候选保留来源及适用条件，由当前 Agent 判断；可读、愿意联系、接受本次工作和可调用是不同事实。需要保存选择与解释时，建立或沿用 HelpSession，在该 session 中查询后按需使用 `galaxy_help_compose`、`galaxy_help_select`；它们不会发布或邀请。旧 `search`、`discovery` 路径的空结果不代表新版来源为空。本机经验见[本地记录与经验](records.md)。
 
-需要保存帮助进度或准备发布时，用 `galaxy_help_start` 保存本机原工作引用；单纯查询可不创建 HelpSession。`galaxy_help_query` 用 `kind:search-v2` 读取现行工作事实、Capsule、Proof、任务及机会；用 `kind:discovery-v2` 按功能目标或已有项目发现参与机会。输入和分页以实际 schema 为准；`search`、`discovery` 是旧版兼容路径，它们的空结果不能证明新版资料不存在。各来源游标、失败和未加载部分分别处理，网络、权限或额度失败不能说全网无人帮助。
+## 发布独立求助
 
-按当前问题找人、组织、Agent 或服务时，可独立调用 `galaxy_help_query`，在 `requests` 中使用 `kind:participants-v2` 和 `input:{query, functions?, types?, after?, limit?}`；逐页使用对应 `results[].data.nextAfter`；当前页为空但仍有后续游标时继续按需读取，不能称全部无结果。查选定来源详情用 `kind:participant-v2` 和 `input:{sourceKind,id}`，每项请求使用新 UUID `requestId`，无需先建项目或 HelpSession。资料可读、愿意联系、接受本次工作和当前可调用分别判断；声明和词面匹配不是能力验证，也不是全库语义排名。需要联系或执行时沿实际授权和工具继续。
+用户同意外发后：
 
-根据当前目标组合这些能力：用户只想了解资料时可直接读取，已有清晰对象时沿真实引用继续；确需候选比较、联系或发布时再使用相应帮助和任务工具。工具返回的定位用于接续当前工作，不要求先进入菜单或创建专用任务。
+1. 用 `galaxy_help_start` 关联原工作。
+2. 用 `galaxy_help_prepare_action`，传 `kind:publish-task` 和 `request` 的 `title`、`summary`、`goal`、`currentSituation`；按需填写期望结果、意图、可见范围和截止时间。不填截止时间即持续开放。
+3. 审阅 prepare 返回的预览，沿真实用户选择调用 `galaxy_help_execute_action`。需要恢复已有操作或刷新预览时可用 `galaxy_help_action_preview`；结果未知用 `galaxy_help_reconcile_action` 查原操作，不另建请求猜测。
 
-需要保存选择与解释时，先建立或沿用 HelpSession，并在该 session 中查询以保存可引用的依据，再用 `galaxy_help_compose` 保存用户模型对帮助路径、参与主体、介入方式和依据的解释。引用本次真实返回的 `basis.key` 及参与者引用，不补造经历、意愿、可用工具或推荐理由。原始资料不自动存入选择档。未加载经历、未知意愿、截断列表如实说明；必要时继续按当前允许范围查询。
+只带本次必要信息，不自动公开完整私有工作记录。联系、正式承接、房间和 A2A 按需要另选；高级动作见[任务与受控执行](tasks.md)。
 
-根据用户目的直接给出已有明确建议或回复；需要比较或用户作决定时，在原聊天展示相关选项和核心依据，数量随情境决定；详情按需打开。分开解释服务命中事实和模型推断。使用 `galaxy_help_select` 可多选，但选择、Compose 草稿与联系清单都不是已经邀请或发布。真正准备 Task 或联系动作前读 [任务与受控执行](tasks.md)。
+## 读取回应与继续
 
-## 暂停、刷新与返回
+已发布的请求可用 `galaxy_task_v2_get({taskId})` 读取，`galaxy_comments_query({taskId,after?,limit?})` 分页读回应，必要时 `galaxy_comment_get({commentId})` 查当前评论。房间沿原引用读取消息。将实际取得的帮助带回原工作，未读、读取失败和没有新回应分别处理。
 
-`galaxy_help_review` 重新读取当前候选来源和回应；来源失效时说明哪些依据已不可用，不用旧候选证明当前可复用。不要把局部查询失败当成原任务失败。
+已有 HelpSession 可用 `galaxy_help_get`、`galaxy_help_review`、`galaxy_help_refresh` 查看与刷新，`galaxy_help_return` 接回原工作；`galaxy_help_pause` 按当前 sessionId、expectedRevision 和 `state:active|paused` 暂停或恢复本机帮助意图，用户拒绝后继续原工作；`galaxy_help_forget` 清理本机帮助记录，均不撤销远端动作。网页接续见[网页与原聊天](continuation.md)。
 
-`galaxy_help_pause` 按工具返回的 sessionId、expectedRevision 和 `state:active|paused` 暂停或恢复本机 HelpSession。它不撤回已发邀请、不取消远端 Task 或房间。用户明确拒绝后继续原工作，没有关键变化不再提示同一介入建议；恢复需用户明确要求或相关实质变化，不能因定时轮询自动复活意图。
-
-对已发布的请求，可用 `galaxy_task_v2_get({taskId})` 读取原请求，用 `galaxy_comments_query({taskId, after?, limit?})` 分页读取回应，必要时用 `galaxy_comment_get({commentId})` 读取当前评论；房间按实际发现的 MCP 工具读取消息。不以建立 HelpSession 为前提；没有新内容、未读取和读取失败分别说明。`galaxy_help_get` 查看本机帮助进度；`galaxy_help_refresh` 读取允许的真实 Task 进展；`galaxy_help_return` 回到原工作并说明实际取得的帮助、可用文件和仍需处理的内容。取得帮助、打开网页或返回聊天不自动形成“问题已解决”或成功履历。`galaxy_help_forget` 只清理本机帮助记录，不删除已提交的远端事实。
-
-详情与网页交回原工作见[网页与聊天接续](continuation.md)；关页不取消协作，缺少工具时沿当前可行路径继续。
-
-## 从实际工作整理与使用方法
-
-当前工具列表有 `galaxy_capsule_work_sources/read/prepare/application/execute/status` 时，沿其当前 v2 来源继续发布、实际应用或再次验证。先选已有工作与真实结果，唯一有效选择直接沿用；来源 ID、版本、许可和验证引用由工具读取，不让用户填 Case/Result/Proof 表单。公开发布仍需实际当前来源、许可和对应结果条件；只读旧历史不成为 v2 写入来源。
-
-阅读方法、引用到原工作、记录真实应用和再次验证是不同动作。应用保留实际采用的部分、观察、限制与环境差异；再次验证从同一既有应用和当前对应验证读取，不能凭方法打开或对端 completed 推断成功。新外发内容与范围沿真实 Native 选择，未知结果查询原事件与 hash，源失权或身份变化后不能用旧回执回填私文。
+需要从实际工作发布或验证方法时，按当前工具使用 `galaxy_capsule_work_sources/read/prepare/application/execute/status`；选择真实来源、当前许可和结果，读取、发布、应用和验证分别成立。

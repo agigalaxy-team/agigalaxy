@@ -160,7 +160,7 @@ func TestA2aWorkMCPCurrentLocalWorkContinuesOriginalSDKTaskAfterRestart(t *testi
 	}
 	preview := uploadObject(call("galaxy_a2a_work_prepare", send)["preview"])
 	payload := uploadObject(uploadObject(preview["exact"])["payload"])
-	if sends != 0 || choices != 0 || preview["caseId"] != nil || preview["attempt"] != nil || payload["attemptId"] != nil || uploadObject(payload["source"])["workId"] != workID {
+	if sends != 0 || choices != 0 || preview["caseId"] != nil || preview["attempt"] != nil || payload["attemptId"] != nil || uploadObject(payload["source"])["workId"] != workID || uploadObject(preview["exact"])["payloadJson"] != nil {
 		t.Fatal("purpose preparation sent work, fabricated a Case/Attempt or lost the real work source", preview, sends, choices)
 	}
 	execute := map[string]any{"handle": preview["handle"], "previewHash": preview["previewHash"]}
@@ -186,7 +186,7 @@ func TestA2aWorkMCPCurrentLocalWorkContinuesOriginalSDKTaskAfterRestart(t *testi
 	session, _ = connect(r)
 	selected = uploadObject(call("galaxy_a2a_work_read", readInput)["selected"])
 	link = uploadObject(selected["peer"])
-	if uploadObject(link["peer"])["taskId"] != taskID || uploadObject(link["source"])["workId"] != workID || sends != 1 || choices != 1 {
+	if uploadObject(link["peer"])["taskId"] != taskID || uploadObject(uploadObject(selected["association"])["source"])["workId"] != workID || sends != 1 || choices != 1 {
 		t.Fatal("restarted purpose reader lost the original Task/source or dispatched new work", selected, sends, choices)
 	}
 	call("galaxy_a2a_work_read", map[string]any{"action": "poll", "peerId": "peer", "associationId": associationID})
@@ -213,7 +213,25 @@ func TestA2aWorkMCPCurrentLocalWorkContinuesOriginalSDKTaskAfterRestart(t *testi
 	}
 	output := a2aObject(peerTask["output"])
 	resultMessage := a2aObject(a2aObject(output["status"])["message"])
-	if text(a2aText(resultMessage["parts"])) != "Peer reply: selected follow-up" || len(uploadRows(link["operations"])) != 3 || caseRequests != 0 {
-		t.Fatal("actual SDK output/original operations were lost or formal Case routes were used", selected, caseRequests)
+	if text(a2aText(resultMessage["parts"])) != "Peer reply: selected follow-up" || link["operations"] != nil || caseRequests != 0 {
+		t.Fatal("purpose read lost current result or included journal history", selected, caseRequests)
 	}
+	full, e := session.CallTool(ctx, &mcp.CallToolParams{Name: "galaxy_a2a_read", Arguments: map[string]any{"action": "get", "peerId": "peer", "associationId": associationID}})
+	if e != nil || full == nil || full.IsError {
+		t.Fatalf("full original journal unavailable: %v", e)
+	}
+	journal := uploadObject(full.StructuredContent)
+	if journal == nil && len(full.Content) > 0 {
+		content, ok := full.Content[0].(*mcp.TextContent)
+		if !ok {
+			t.Fatal("unexpected journal content type")
+		}
+		if e = protocol.Decode([]byte(content.Text), &journal); e != nil {
+			t.Fatalf("journal decoding failed: %v", e)
+		}
+	}
+	if len(uploadRows(journal["operations"])) != 3 {
+		t.Fatal("original operation history changed")
+	}
+
 }

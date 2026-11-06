@@ -17,14 +17,14 @@ func (l *helpLease) participantSource(ctx context.Context, request map[string]an
 	if psInt(page["schemaVersion"]) != 2 || page["capabilityVerified"] != false {
 		return nil, nil, helpError("help_source_invalid")
 	}
+	rows, ok := page["items"].([]any)
 	if request["kind"] == "participant-v2" {
 		candidate := psObject(page["participant"])
 		if candidate == nil || candidate["sourceKind"] != input["sourceKind"] || candidate["id"] != input["id"] {
 			return nil, nil, helpError("help_source_invalid")
 		}
-		page["items"] = []any{candidate}
+		rows, ok = []any{candidate}, true
 	}
-	rows, ok := page["items"].([]any)
 	if !ok || len(rows) > 20 {
 		return nil, nil, helpError("help_source_invalid")
 	}

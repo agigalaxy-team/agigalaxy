@@ -10,9 +10,9 @@
 
 从当前真实对象读取 ID、版本、参与者、Scope 与来源权限。阅读资料、推荐某人、选入联系清单、发邀请、接受参与和完成交付分别表示不同事实。发布与联系独立：发布结果未知不猜测是否已发布，也不以联系名单替代已收到邀请的回执。不要补造 Case、Attempt、参与者或收到的回应。
 
-准备独立求助时，先用 `galaxy_help_start` 关联当前工作，再调用 `galaxy_help_prepare_action`，传 `kind:publish-task` 和 `request` 业务字段（`title`、`summary`、`goal`、`currentSituation`，可选期望结果、意图、可见范围和截止时间）。不传截止时间即不设默认截止；程序生成准确操作载荷和定位。用 `galaxy_help_action_preview` 核对，沿返回的真实选择与 `galaxy_help_execute_action` 发布；结果未知时用 `galaxy_help_reconcile_action` 查询原操作，不另建请求猜结果。旧 `galaxy_help_publish` 路径继续支持已有准确 Consent 和载荷；具体字段以工具 schema 和当前返回为准。
+独立求助的准备、预览和发布见[查询与帮助](help.md#发布独立求助)；下面的原回执规则也适用于正式承接和资料授权。
 
-Prepare/preview 中核对动作、准确收件人、可见范围、材料原文、来源版本、业务 operationId、payloadHash 和 authorizationRequestId。调用 execute 只能使用同一预览的精确引用，通过真实宿主选择或本机审阅页；模型的 confirmed 布尔值不是 Consent。改正文、收件人、范围或来源后重做预览，不套用旧确认。普通 MCP 必须给用户足够审阅信息，不能因没有 Apps 而把确认所需内容隐藏。
+审阅返回的预览，核对动作、收件人、可见范围和材料。调用 execute 只能使用同一预览的精确引用，通过真实宿主选择或本机审阅页；模型的 confirmed 布尔值不是 Consent。改正文、收件人、范围或来源后重做预览，不套用旧确认。普通 MCP 必须给用户足够审阅信息，不能因没有 Apps 而把确认所需内容隐藏。
 
 业务结果 unknown 时先 reconcile 原 ID/hash，不重发或生成新 Consent。仅 prepared 授权过期或服务确认原操作 absent 时，才按实际工具返回重新 prepare 同一业务 ID/字节并取得新的 authorizationRequestId；续授权后的 execute 使用新预览 nonce。unknown 或 ACK 不续签，业务材料期限也不因此延长。ACK 只证明该原操作的历史接受，不能当成当前材料读取、复用或写入权。
 
@@ -41,4 +41,4 @@ Prepare/preview 中核对动作、准确收件人、可见范围、材料原文�
 当前小面板先展示目的、必要输入、处理位置和实际对端输出。结果能直接使用时接回原工作；保留 Result 和 PackUse 按实际目的另外选择。已知原 Task 的进度和已提交原记录的回执由后台读取，不要求用户检查内部 ID 或报告表单。结构化输出按可读字段展示，并保留完整原文下载；不得把字段展示解释成独立验证、原问题已经解决或参与者已经验收。
 
 
-已发布的请求可沿原 `taskId` 用 `galaxy_task_v2_get` 读取，用 `galaxy_comments_query` 读取评论及后续页，必要时用 `galaxy_comment_get` 核对当前评论。将实际回应带回原工作并判断下一步；未读取、读取失败和已读无新回应分别处理。无需先建立本机 HelpSession，通知与后续运行只按宿主真实支持的接口进行。
+已发布请求的回应读取和返回见[查询与帮助](help.md#读取回应与继续)。

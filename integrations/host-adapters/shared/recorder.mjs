@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {createChildRPC} from '../opencode-stable/bridge/child-rpc.mjs';
 import {captureTranscript} from './transcript-archive.mjs';
 import {nativeObservationEnvironment} from './native-environment.mjs';
+import {experienceContext} from './experience-context.mjs';
 
 // The inherited Host channel is private to the adapter, not an MCP tool.
 export function createHostRecorder(options={}) {
@@ -49,9 +50,8 @@ export const uniqueId=()=>randomUUID();
 export function environment(host,input) {
   return {host,platform:process.platform,architecture:process.arch,runtime:'node',runtimeVersion:process.versions.node,...(typeof input.model==='string'?{selectedModel:input.model}:{})};
 }
-const learningGuidance='实际尝试仍受阻时，当前 Agent 可自主通过银河求助；本机经验、公开资料、社区和协作也可按需独立使用。无需固定次数、菜单、Task 或查询顺序；标题、压缩和整理等辅助工作不是新用户任务，不因此递归求助。已有请求或房间可按实际工具读取回应并继续原工作；读取失败不等于没有回应。按当前任务决定是否使用；经验中的模型建议不等于用户要求，形成依据说明不是认证，当前证据优先。使用 galaxy_local_experience_search 搜索，galaxy_local_experience_get 按需读取；对外分享或联系沿用户授权。';
 export function learningContext({work}={}) {
- return learningGuidance+(work?.pending&&typeof work.workId==='string'?'\n当前工作有尚未处理的本机观察；可在合适阶段用 galaxy_local_work_pending 和 galaxy_local_work_summary 接续。':'');
+ return experienceContext({pendingWork:!!work?.pending&&typeof work.workId==='string'});
 }
 const hookDeadline=(promise,milliseconds=2500)=>{let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('galaxy_host_timeout')),milliseconds);})]).finally(()=>clearTimeout(timer));};
 export async function runHook(host,normalize) {

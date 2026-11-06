@@ -95,34 +95,32 @@ func (h *NativeA2aWork) read(ctx context.Context, l *nativeIdentityLease, peer, 
 	return v, e
 }
 func (h *NativeA2aWork) readable(ctx context.Context, l *nativeIdentityLease, peer, id string, poll bool) (map[string]any, error) {
-	value, e := h.read(ctx, l, peer, "get", id)
+	if e := h.check(ctx, l); e != nil {
+		return nil, e
+	}
+	link, current, e := h.host.readCurrent(ctx, peer, id)
+	if changed := h.check(ctx, l); changed != nil {
+		return nil, changed
+	}
 	if e != nil {
 		return nil, e
 	}
-	link := uploadObject(value)
 	var receipt map[string]any
 	if imp := uploadObject(link["resultImportV2"]); imp != nil && imp["state"] != "acknowledged" {
-		value, e = h.read(ctx, l, peer, "reconcile-result", id)
-		if e != nil {
-			return nil, e
+		value, err := h.read(ctx, l, peer, "reconcile-result", id)
+		if err != nil {
+			return nil, err
 		}
 		receipt = uploadObject(value)
-		value, e = h.read(ctx, l, peer, "get", id)
-		if e != nil {
-			return nil, e
-		}
-		link = uploadObject(value)
-	}
-	var current map[string]any
-	if link["source"] != nil {
-		current, _, e = h.host.sourceAccess(ctx, l, nil, uploadObject(link["source"]))
-	} else {
-		current, _, e = a2aReaders(l).resolve(ctx, text(link["caseId"]), text(link["attemptId"]), l.scope.Owner, nil, uploadObject(link["factContext"]))
-	}
-	if e != nil {
+		link, current, e = h.host.readCurrent(ctx, peer, id)
 		if changed := h.check(ctx, l); changed != nil {
 			return nil, changed
 		}
+		if e != nil {
+			return nil, e
+		}
+	}
+	if link["sourceUnavailable"] == true {
 		out := map[string]any{"association": map[string]any{"associationId": id, "peerId": peer, "purpose": "原来的工作"}, "sourceUnavailable": true, "originalOperationRetained": true}
 		if receipt["state"] == "acknowledged" {
 			out["resultReceipt"] = receipt
@@ -131,9 +129,9 @@ func (h *NativeA2aWork) readable(ctx context.Context, l *nativeIdentityLease, pe
 	}
 	observed := uploadObject(link["peer"])
 	if poll && text(observed["taskId"]) != "" && !a2aTerminal(text(observed["state"])) {
-		value, e = h.read(ctx, l, peer, "poll", id)
-		if e != nil {
-			return nil, e
+		value, err := h.read(ctx, l, peer, "poll", id)
+		if err != nil {
+			return nil, err
 		}
 		link = uploadObject(value)
 	}
@@ -147,7 +145,7 @@ func (h *NativeA2aWork) readable(ctx context.Context, l *nativeIdentityLease, pe
 		}
 	}
 	facts := uploadObject(link["factContext"])
-	out := map[string]any{"association": map[string]any{"associationId": id, "peerId": peer, "purpose": title, "source": link["source"], "caseId": link["caseId"], "attempt": facts["attemptRef"], "taskId": facts["taskId"]}, "peer": link, "peerName": name, "goalCompletion": "unconfirmed", "protocolTaskTerminal": a2aTerminal(text(uploadObject(link["peer"])["state"]))}
+	out := map[string]any{"association": map[string]any{"associationId": id, "peerId": peer, "purpose": title, "source": link["source"], "caseId": link["caseId"], "attempt": facts["attemptRef"], "taskId": facts["taskId"]}, "peer": a2aWorkCurrentPeer(link), "peerName": name, "goalCompletion": "unconfirmed", "protocolTaskTerminal": a2aTerminal(text(uploadObject(link["peer"])["state"]))}
 	if receipt != nil {
 		out["resultReceipt"] = receipt
 	}
@@ -307,7 +305,7 @@ func (h *NativeA2aWork) Prepare(ctx context.Context, l *nativeIdentityLease, inp
 		visibility = authorization["visibility"]
 		recipients = authorization["viewers"]
 	}
-	exact := map[string]any{"payloadJson": payloadJSON, "payload": payload}
+	exact := map[string]any{"payload": payload}
 	if action == "result" {
 		exact["source"] = draft["source"]
 	} else {
@@ -362,7 +360,7 @@ func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *Na
 			}
 			input, e := connectionObject(req.Params.Arguments)
 			if e != nil {
-				return toolError(e)
+				return a2aFailure(e, runtimeErrorCode(e), false), nil
 			}
 			if name == "galaxy_a2a_work_prepare" {
 				input, e = a2aNormalize("galaxy_a2a_prepare", input)
@@ -371,11 +369,11 @@ func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *Na
 				e = remoteChatValidate(uploadObject(c["schema"]), input)
 			}
 			if e != nil {
-				return toolError(e)
+				return a2aFailure(e, runtimeErrorCode(e), false), nil
 			}
 			ctx, cancel, l, e := host.runtime.identityLease(ctx, false)
 			if e != nil {
-				return toolError(e)
+				return a2aFailure(e, runtimeErrorCode(e), false), nil
 			}
 			defer cancel()
 			failure := func(e error) (*mcp.CallToolResult, error) {
@@ -384,7 +382,9 @@ func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *Na
 				if changed {
 					code = "a2a_connection_changed"
 				}
-				return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "当前内容暂不可用。原工作和原操作仍保留。"}}, StructuredContent: map[string]any{"error": code, "originalOperationRetained": true, "privateResultWithheld": changed}}, nil
+				result := a2aFailure(e, code, changed)
+				uploadObject(result.StructuredContent)["privateResultWithheld"] = changed
+				return result, nil
 			}
 			if l.connection.bindingID == "" {
 				return failure(connectionFailure("a2a_connection_changed"))
@@ -423,6 +423,7 @@ func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *Na
 				if state != "prepared" {
 					return render(retained), nil
 				}
+				var actionError error
 				review := map[string]any{"handle": input["handle"], "previewHash": input["previewHash"], "expiresAt": op.expires, "preview": op.review}
 				result, reviewError := tools.review(ctx, req, review, "将所选工作与材料交给下列外部服务处理。", func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					if scope == nil || *scope != op.lease.scope {
@@ -453,13 +454,31 @@ func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *Na
 					out := h.retained(l, op)
 					h.mu.Unlock()
 					if e != nil {
+						actionError = e
 						return nil, e
 					}
-					return out, h.check(ctx, l)
+					actionError = h.check(ctx, l)
+					return out, actionError
 				})
 				if reviewError == nil && result != nil && !result.IsError {
 					if panel := uploadObject(result.StructuredContent); panel["kind"] == "galaxy-a2a-panel" {
 						return render(panel), nil
+					}
+				}
+				if reviewError != nil {
+					return failure(reviewError)
+				}
+				if result != nil && result.IsError {
+					if actionError != nil {
+						return failure(actionError)
+					}
+					if len(result.Content) > 0 {
+						if content, ok := result.Content[0].(*mcp.TextContent); ok {
+							var raw map[string]any
+							if protocol.Decode([]byte(content.Text), &raw) == nil && text(raw["error"]) != "" {
+								return a2aFailure(connectionFailure(text(raw["error"])), text(raw["error"]), false), nil
+							}
+						}
 					}
 				}
 				return result, reviewError
@@ -495,4 +514,22 @@ func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *Na
 		})
 	}
 	return h.Close
+}
+
+// Keep the current peer observation and saved result needed by both purpose
+// renderers; complete operation history remains available through low-level get.
+func a2aWorkCurrentPeer(link map[string]any) map[string]any {
+	out := map[string]any{"peer": link["peer"], "status": link["status"]}
+	if saved := uploadObject(link["resultImportV2"]); saved != nil {
+		projected := map[string]any{"state": saved["state"]}
+		if draft := uploadObject(saved["draft"]); draft != nil {
+			projected["draft"] = map[string]any{"event": draft["event"], "source": draft["source"]}
+		}
+		out["resultImportV2"] = projected
+	}
+	if ops := uploadRows(link["operations"]); len(ops) > 0 {
+		last := uploadObject(ops[len(ops)-1])
+		out["operation"] = map[string]any{"id": last["id"], "kind": last["kind"], "outcome": last["outcome"]}
+	}
+	return out
 }

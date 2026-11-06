@@ -14,7 +14,7 @@ func materialString(min, max int) any {
 	return map[string]any{"type": "string", "minLength": min, "maxLength": max}
 }
 func localMaterialIdentitySchema() any {
-	return map[string]any{"type": "string", "minLength": 1, "maxLength": 512, "description": "Optional current local Galaxy identity ID. Omit this field to use the currently selected identity. If supplied, use the exact ID returned by galaxy_identity_status; do not use an account ID, UID, work ID or an empty string."}
+	return map[string]any{"type": "string", "minLength": 1, "maxLength": 512, "description": "Optional Galaxy identity ID; omit to use the current selection. When supplied, use the exact returned Galaxy ID, not an account ID, UID or work ID."}
 }
 func materialSequence() any {
 	return map[string]any{"type": "integer", "minimum": 0, "maximum": int64(9007199254740991)}

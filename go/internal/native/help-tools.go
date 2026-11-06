@@ -144,12 +144,15 @@ func helpDefaults(schema map[string]any, value any) {
 func helpToolError(e error) (*mcp.CallToolResult, error) {
 	code := runtimeErrorCode(e)
 	recovery := psObject(helpContracts()["recovery"])
-	message := recovery[code]
-	if message == nil {
-		code = "help_operation_failed"
-		message = "reread-local-session-and-original-receipt-before-retrying-writes"
+	recoveryValue := recovery[code]
+	if recoveryValue == nil {
+		recoveryValue = "reread-local-session-and-original-receipt-before-retrying-writes"
 	}
-	result, encoding := toolResult(map[string]any{"error": code, "recovery": message, "automaticRetryAuthorized": false, "remoteOperationsCanceled": false})
+	value := map[string]any{"error": code, "recovery": recoveryValue, "automaticRetryAuthorized": false, "remoteOperationsCanceled": false}
+	if message := helpErrorMessages[code]; message != "" {
+		value["message"] = message
+	}
+	result, encoding := toolResult(value)
 	if result != nil {
 		result.IsError = true
 	}
@@ -302,7 +305,7 @@ func registerNativeHelpTools(server *mcp.Server, tools *toolRuntime, runtime *Ru
 					if e != nil {
 						return helpToolError(e)
 					}
-					return toolResult(out)
+					return toolResult(helpMCPView(name, out))
 				}
 				auth := input["authorizationRequestId"]
 				if auth == nil {
@@ -339,24 +342,23 @@ func registerNativeHelpTools(server *mcp.Server, tools *toolRuntime, runtime *Ru
 				}
 				review := psObject(psClone(input))
 				review["preview"] = preview
-				return tools.review(ctx, req, review, text(contract["description"]), func(ctx context.Context, scope *ChoiceScope) (any, error) {
+				result, reviewErr := tools.review(ctx, req, review, text(contract["description"]), func(ctx context.Context, scope *ChoiceScope) (any, error) {
 					out, e := l.executeAction(ctx, id, input, scope)
 					if e != nil {
-						code := runtimeErrorCode(e)
-						recovery := psObject(helpContracts()["recovery"])
-						if recovery[code] == nil {
-							code = "help_operation_failed"
-						}
-						return nil, helpError(code)
+						return nil, e
 					}
-					return out, nil
+					return helpMCPView(name, out), nil
 				})
+				if reviewErr != nil {
+					return helpToolError(reviewErr)
+				}
+				return helpProjectReviewResult(name, result)
 			}
 			out, e := host.Call(ctx, name, input)
 			if e != nil {
 				return helpToolError(e)
 			}
-			return toolResult(out)
+			return toolResult(helpMCPView(name, out))
 		})
 	}
 	return host.Close

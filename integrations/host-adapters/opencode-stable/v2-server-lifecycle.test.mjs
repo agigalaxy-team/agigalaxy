@@ -39,3 +39,22 @@ test('close waits for late ready claim and releases exactly once without model o
  preparing.resolve({status:'ready',reviewId:'review',galaxyId:'owner'});await closing;await turn();
  assert.equal(released,1);assert.equal(applied,0);assert.equal(closed,true);delete globalThis.__galaxyLifecycleClient;
 });
+
+test('cached experience context stays concise and preserves complete source material',async()=>{
+ const fixture=host();let searches=0;
+ const candidate=Object.freeze({id:'experience-entry',revision:4,title:'处理证书链问题',
+  conditions:'使用自建服务时。'.repeat(100),limitations:'仅适用于当前环境。'.repeat(100),basis:'模型提出后由用户实际尝试。'.repeat(100),
+  sourceWorkId:'source-work-private-reference',sourceWorkIds:['source-work-private-reference'],throughSequence:918,updatedAt:'2026-11-01',method:'完整的方法仍按需读取'});
+ const original=JSON.stringify(candidate);
+ globalThis.__galaxyLifecycleClient={history:{experience:{search:async()=>{searches++;return {items:[candidate]};}},review:{}},close:async()=>{}};
+ const {createNativeGalaxyServerPluginV2}=await loadPlugin();const close=await createNativeGalaxyServerPluginV2().setup(fixture.context);
+ try{
+  fixture.hooks.get('prompt')({sessionID:'session',messageID:'user',prompt:{text:'certificate chain failure'}});
+  const event={sessionID:'session',model:{providerID:'test',id:'model'},system:[]};
+  await fixture.hooks.get('context')(event);await fixture.hooks.get('context')(event);
+  assert.equal(searches,1);assert.equal(event.system.length,1);const text=event.system[0].text;
+  assert.ok(text.includes(candidate.id));assert.ok(text.includes(candidate.title));assert.ok(text.includes('conditionsExcerpt'));
+  assert.ok(!text.includes(candidate.sourceWorkId));assert.ok(!text.includes('throughSequence'));assert.ok(!text.includes(candidate.method));
+  assert.ok(text.length<original.length/2);assert.equal(JSON.stringify(candidate),original);
+ }finally{await close();delete globalThis.__galaxyLifecycleClient;}
+});

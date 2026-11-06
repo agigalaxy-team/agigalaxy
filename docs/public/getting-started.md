@@ -1,67 +1,53 @@
 # 开始使用与下载
 
-[文档目录](README.md) · [在自己的 Agent 中使用](client-entry.md) · [网络功能](network.md) · [数据与隐私](privacy.md)
+[在自己的 Agent 中使用](client-entry.md) · [网络功能](network.md) · [数据与隐私](privacy.md) · [文档目录](README.md)
 
-当前客户端统一使用 Go Native 核心，通过 MCP、Skill 和适用的宿主适配接入自己的 Agent。npm 引导、原生包和容器承载同一个核心；JavaScript／TypeScript 用于安装引导、宿主 SDK 和界面适配。
+银河接入你现有的 Agent。你可以继续原任务，按需查询经验、资料或寻求帮助；接入方式包括原生包、npm 引导和适用容器。
 
 ## 客户端安装
 
-让 Agent 自行安装时，把 [Agent 初始化入口](https://agigalaxy.org/agent.md) 交给它。入口会引导它找到适用的 Skill、正式发行与对应安装说明。
+让 Agent 安装时，把 [Agent 初始化入口](https://agigalaxy.org/agent.md) 交给它；它会发现当前环境与已有安装，核验所选发行，并为当前宿主接入 MCP、Skill 和适用适配。已有 ID 和资料继续使用；只选择本机模式时不连接服务，私有同步另行选择。
 
-[官网下载页](https://agigalaxy.org/downloads/) 提供当前正式版及 Windows、Linux、macOS 的 x64 与 ARM64 完整安装包。按系统和架构点击对应的下载链接。其中 `darwin` 是 macOS，`amd64` 适用于 x64 处理器。安装包、校验资料和 Skill 均可直接从官网获取。
+也可从[官网下载页](https://agigalaxy.org/downloads/)下载当前正式版的系统与架构安装包。解压到新目录后运行：
 
-从[官网下载核验资料](https://agigalaxy.org/downloads/verification/#release-files)获取 SHA-256 清单。要检查银河发行签名，把平台包、同名 `.jws`、`.report.json` 以及 `verify-native-client-download.mjs` 放在同一目录，用 Node.js 运行以下命令，将 `PACKAGE.tgz` 换成下载的文件名。
+```sh
+./galaxy setup https://agigalaxy.org
+```
+
+Windows PowerShell 使用 `.\galaxy.exe setup https://agigalaxy.org`。无法自动识别宿主时，加 `--host opencode`、`--host codex` 或实际宿主 ID；只在本机使用时运行 `galaxy setup --local-only`。接入后回到原聊天继续工作。
+
+公开阅读不要求初始化或官网账户。官网普通参与可直接注册或登录；只有需要账户与本机 ID 的关联功能时才办理关联。模型及其他插件保持原配置。
+
+## 按环境选择
+
+| 方式 | 适用情况 |
+|---|---|
+| 原生整版包 | 直接运行对应系统和架构的客户端 |
+| npm 引导 | 已有 Node.js，希望通过 npm 接入对应平台程序 |
+| 容器 | 已有容器或远程工作环境，宿主连接方式适用 |
+
+三种方式使用同一核心；具体宿主适配可能需要 Node.js 或 Python。切换方式时沿用所选身份和资料。容器地址与桌面地址分别归属，浏览器返回、宿主事件和通知按所在环境接线。
+
+## 核验与其他安装方式
+
+[官网下载页](https://agigalaxy.org/downloads/)提供 Windows、Linux、macOS 的 x64 与 ARM64 包；`darwin` 指 macOS，`amd64` 指 x64。正式发行的签名和内容可用[官网核验资料](https://agigalaxy.org/downloads/verification/#release-files)核对。手动核验时，把平台包、同名 `.jws`、`.report.json` 和 `verify-native-client-download.mjs` 放在同一目录，再运行：
 
 ```sh
 node verify-native-client-download.mjs . PACKAGE.tgz
 ```
 
-首次安装时，把平台包解压到新目录，在其中运行 `./galaxy setup https://agigalaxy.org`。Windows PowerShell 使用 `.\galaxy.exe setup https://agigalaxy.org`。宿主无法自动识别时，可加 `--host opencode`、`--host codex` 或其他实际宿主 ID。仅在本机使用时，运行 `./galaxy setup --local-only`。已有安装见[升级步骤](#升级退出与移除)。
+将 `PACKAGE.tgz` 换成实际文件名。源码构建按工程说明核对来源及依赖。
 
-已有 Node.js 的用户也可从[官网其他安装包](https://agigalaxy.org/downloads/verification/#additional-packages)下载 npm 安装包。进入准备放置启动器的目录，用 `npm install --offline --ignore-scripts <匹配的平台 npm 包.tgz> <启动器 npm 包.tgz>` 安装，再通过 `npx --offline galaxy setup https://agigalaxy.org` 接入。容器构建材料和使用说明随 Linux amd64 容器上下文提供。
-
-可以把本页交给正在使用的 Agent：
-
-> 请把统一 Go 银河客户端接入我正在使用的 Agent。发现实际环境，复用已有 ID 和资料，为当前宿主配置 MCP、Skill 及适用的适配，保留我的模型和其他插件。按真实可取得的源码或发行材料安装；初始化后连接所选服务，暂不开启云同步。
-
-Agent 配合安装工具发现当前宿主、运行环境和已有配置，选择可用交付方式。首次只接入当前宿主的当前系统用户范围，以后其他宿主继续复用同一核心和已选资料。发行包的 `galaxy install`、`update`、`repair`、`uninstall` 提供维护入口，准确参数见包内说明。
-
-已有 ID 和资料直接沿用，没有时再办理本机初始化并自动完成所选服务的技术连接；明确选择仅本机模式时不连接服务。官网普通参与可直接注册或登录在线账户；只有实际需要账户与本机 ID 的关联功能时才确认关联。接入后，在原聊天直接提出需要，由当前 Agent 组合完整 MCP 能力。官网身份接续与回原聊天见[客户端使用路径](client-entry.md#沿用身份按需进入官网)。
-
-Galaxy Skill 使用一个入口和按用途加载的功能模块。当前 Agent 根据你的任务选读，已有身份、资料及原聊天继续沿用；不要求每次先初始化或重新连接。模块说明见[Agent 入口](ai-reading.md#按需使用-skill)。
-
-## 按环境选择交付方式
-
-| 方式 | 适用环境 | 同一核心怎样使用 |
-|---|---|---|
-| npm 引导 | 已有适用 Node.js，希望通过包管理器选择目标平台程序 | 引导到对应 Go 程序及同版资源，安装后使用明确版本的稳定入口 |
-| 原生整版包 | 直接使用对应系统与架构程序 | 一起安装 Go 程序、Skill、面板与宿主资源；具体宿主适配按需使用 Node.js 或 Python |
-| 容器 | 已有容器或远程工作环境，宿主连接方式实际适用 | 运行同一 Linux 核心，使用专用持久资料目录；多个连接复用同一个服务 |
-
-Skill 配合当前 Agent 根据环境选择和修复，不为普通桌面额外引入 Docker。切换交付方式继续沿用所选身份与资料。容器地址与桌面本机地址分别归属，浏览器返回、宿主事件和通知按所在环境接线。
-
-客户端连接所选服务；认证、数据库、聊天和存储由服务运营者维护。下载、依赖准备或读取所选服务的公开配置可能联网，与注册账户、建立业务连接和上传资料分别处理。
-
-## 给安装 Agent 的说明
-
-发现系统、架构、宿主配置及资料位置，优先复用已有身份和可用安装。按所选正式发行的完整材料办理，同版程序与资源一起采用。Node.js 的需要由 npm 引导或具体宿主适配决定，不作为 Go 业务核心的统一依赖。
-
-正式发行使用已固定的发行公钥核验签名和内容；源码构建按工程说明核对来源及依赖。保留 ID、密钥、原资料、其他插件和模型配置，凭据与恢复材料留在宿主或安全存储。
-
-接入后说明当前任务实际可用的范围，包括 MCP 加载、Skill 发现，以及需要的会话记录与模型调用。官网接续链接由Agent用MCP读取，在原聊天处理资料。遇到配置未采用、缺运行时、网络或版本问题，按实际原因修复。宿主差异见[使用入口](client-entry.md#宿主有什么差异)。
+已有 Node.js 的用户也可从[其他安装包](https://agigalaxy.org/downloads/verification/#additional-packages)下载匹配的平台 npm 包和启动器包，在准备放置启动器的目录运行 `npm install --offline --ignore-scripts <平台包.tgz> <启动器包.tgz>`，再用 `npx --offline galaxy setup https://agigalaxy.org` 接入。Linux amd64 容器构建材料和说明随容器上下文提供。
 
 ## 升级、退出与移除
 
-运行 `galaxy update --host codex`。其他宿主替换为实际宿主 ID。客户端从官网检查、下载和校验新版，沿用已有 ID、资料目录及银河配置，并核对新服务的实际运行版本。`--dry-run` 只查看版本。已经是当前版本时，同版配置刷新使用 `galaxy repair`。
+运行 `galaxy update --host codex`，其他宿主替换为实际宿主 ID。更新会检查、下载和校验新版并沿用原资料；`--dry-run` 只查看版本，同版配置刷新使用 `galaxy repair`。待切换时完成在办确认后重试；旧服务不支持交接时，结束在办任务并关闭旧宿主连接，再使用 `galaxy update --host codex --restart-legacy`。
 
-更新显示待切换时，完成在办确认后再次运行更新。旧服务提示不支持交接时，先结束正在使用银河的任务并关闭旧的宿主连接，再执行 `galaxy update --host codex --restart-legacy`。宿主需要重载 MCP 时，按原方式回到当前聊天。
+如果原版的 `update` 只会重配旧包，可使用[一次性迁移脚本](https://agigalaxy.org/downloads/galaxy-update.mjs)，在有 Node.js 22 或更高版本和 `tar` 的机器上运行 `node galaxy-update.mjs --host codex`。
 
-如果原版的 `update` 只会重配旧包，从官网下载[一次性迁移脚本](https://agigalaxy.org/downloads/galaxy-update.mjs)。在有 Node.js 22 或更高版本和 `tar` 的机器上运行 `node galaxy-update.mjs --host codex`。脚本会自动下载并核验当前正式版，升级现有安装。以后可直接用 `galaxy update`。
+共用服务按需启动，关闭单个 Agent 不关闭服务；用户可主动退出。移除宿主连接、停止服务、停止同步、删除资料和撤销设备分别处理。[帮助与反馈](site-files/SUPPORT.md)可提供版本、宿主和最小复现。
 
-共用服务按需启动，关闭单个 Agent 只结束其连接，用户可以主动退出并再次启动；不设置开机自启，容器生命周期由所选环境管理。
+### 历史材料
 
-移除宿主连接、停止服务、停止同步、删除资料和撤销设备分别处理。反馈提供版本、宿主和最小复现即可，见[帮助与反馈](site-files/SUPPORT.md)。
-
-## 历史材料
-
-仅用于核对既有安装和发行来源：2026-10-27 的下载页观察记录为 0.1.16，另存 0.1.19 开发候选。相应指南保留[0.1.16](native-client/0.1.16/installation.md)与[0.1.19](native-client/0.1.19/installation.md)各自的版本行为，不构成现行客户端的另一条安装或开发路线；旧签名包保持原字节。
+旧签名包的版本行为分别见[0.1.16](native-client/0.1.16/installation.md)和[0.1.19](native-client/0.1.19/installation.md)，不作为现行安装路线。

@@ -10,7 +10,46 @@ import (
 
 // Confirmation text describes the person's choice. The original input remains
 // with the operation and is never reconstructed from this presentation.
-func userChoiceTitle(name string) string {
+func userChoiceTitle(name string, inputs ...any) string {
+	if name == "galaxy_help_execute_action" && len(inputs) > 0 {
+		input := psObject(inputs[0])
+		preview := psObject(input["preview"])
+		switch text(preview["kind"]) {
+		case "publish-task":
+			return "发布求助"
+		case "task-event":
+			event := psObject(psObject(preview["payload"])["event"])
+			switch text(event["kind"]) {
+			case "apply":
+				return "发送协助意向"
+			case "invite":
+				return "发送邀请"
+			case "invitation-reply":
+				return "回应邀请"
+			case "revoke-invitation":
+				return "撤回邀请"
+			case "withdraw-application":
+				return "撤回协助意向"
+			case "stop-enrollment":
+				return "停止接受回应"
+			case "extend-enrollment":
+				return "调整回应期限"
+			case "cancel":
+				return "取消求助"
+			case "close":
+				return "终止求助"
+			}
+			return "更新求助"
+		case "participation-propose":
+			return "提出协作安排"
+		case "participation-event":
+			return "更新协作安排"
+		case "context-grant":
+			return "分享材料"
+		case "context-event":
+			return "更新材料授权"
+		}
+	}
 	titles := map[string]string{
 		"galaxy_native_initialize": "创建银河身份", "galaxy_native_connect": "连接银河", "galaxy_native_account_connect": "登录银河",
 		"galaxy_native_disconnect": "断开连接", "galaxy_native_authorize": "分享所选内容",
@@ -24,7 +63,7 @@ func userChoiceTitle(name string) string {
 		"galaxy_summary_sync_choice": "设置笔记同步", "galaxy_summary_sync_resolve": "保存合并后的笔记", "galaxy_summary_cloud_delete": "删除云端笔记",
 		"galaxy_host_notifications_enable": "开启消息提醒", "galaxy_host_notifications_permission": "允许系统通知",
 		"galaxy_native_notification_enable": "开启消息提醒", "galaxy_native_notification_permission": "允许系统通知",
-		"galaxy_panel_action_execute": "确认所选操作", "galaxy_help_action_execute": "确认所选操作",
+		"galaxy_panel_action_execute": "确认所选操作", "galaxy_help_execute_action": "确认所选操作",
 		"galaxy_watch_start": "关注这段对话", "galaxy_watch_resume": "恢复关注", "galaxy_watch_pause": "暂停关注",
 		"galaxy_local_worker_identity_create": "创建工作身份",
 	}
@@ -43,7 +82,7 @@ func userChoiceMessage(name string, input any, message string) string {
 	// Agent-facing English descriptions are not a person's confirmation text.
 	hasChinese := strings.ContainsFunc(message, func(r rune) bool { return unicode.Is(unicode.Han, r) })
 	if !hasChinese {
-		message = userChoiceTitle(name)
+		message = userChoiceTitle(name, input)
 	}
 	var value any
 	if raw, err := protocol.Encode(input); err == nil {

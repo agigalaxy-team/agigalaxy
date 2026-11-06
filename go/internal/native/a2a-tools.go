@@ -25,21 +25,15 @@ func registerNativeA2aTools(server *mcp.Server, tools *toolRuntime, host *Native
 	sort.Strings(names)
 	failed := func(e error) (*mcp.CallToolResult, error) {
 		code := "a2a_operation_incomplete"
-		body := map[string]any{"error": code, "reason": e.Error(), "originalOperationRetained": true}
 		var operation *A2aOperationError
 		if errors.As(e, &operation) {
-			body["associationId"] = operation.AssociationID
 			if operation.Reason != "" {
-				body["error"] = operation.Reason
+				code = operation.Reason
 			} else {
-				body["error"] = "A2A_OUTCOME_UNKNOWN"
+				code = "A2A_OUTCOME_UNKNOWN"
 			}
 		}
-		result, encode := toolResult(body)
-		if result != nil {
-			result.IsError = true
-		}
-		return result, encode
+		return a2aFailure(e, code, false), nil
 	}
 	for _, name := range names {
 		contract := uploadObject(contracts[name])

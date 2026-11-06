@@ -516,8 +516,18 @@ type interactionChoiceView struct {
 }
 
 func interactionBrowserView(input BrowserChoiceInput) interactionChoiceView {
-	title := userChoiceTitle(input.Name)
-	return interactionChoiceView{Title: title, Note: "关闭页面不会确认。", Rows: []interactionChoiceRow{{"本次内容与范围", input.Message}}, Sections: []interactionChoiceRow{}}
+	title := userChoiceTitle(input.Name, input.Input)
+	content := strings.TrimSpace(input.Message)
+	if content == title {
+		content = ""
+	} else {
+		content = strings.TrimPrefix(content, title+"\n")
+	}
+	view := interactionChoiceView{Title: title}
+	if content != "" {
+		view.Rows = []interactionChoiceRow{{"内容", content}}
+	}
+	return view
 }
 
 var interactionReviewTemplate = template.Must(template.New("review").Parse(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>银河 · {{.View.Title}}</title><style>body{font:16px/1.65 system-ui;max-width:680px;margin:28px auto;padding:0 20px 48px;background:#fff;color:#25252c}header{color:#686471;font-size:14px}h1{font-size:26px;margin:20px 0}h2{font-size:14px;color:#686471;margin:0 0 5px}section{margin:22px 0}.content{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}dl{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:12px 18px}dl div{padding:7px 0}dt{color:#686471;font-size:14px}dd{margin:0;overflow-wrap:anywhere}button{font:inherit;padding:11px 22px;margin:8px 10px 8px 0;border:1px solid #e5e7eb;border-radius:9px;background:white;cursor:pointer}.primary{background:#9d496a;color:white;border-color:#9d496a}button:focus-visible,a:focus-visible,button:focus-visible{outline:3px solid #d8a9be;outline-offset:3px}.muted{font-size:14px;color:#686471}.ref{font-size:14px;color:#686471}.ref{overflow-wrap:anywhere}a{color:#9d496a}.login{display:inline-block;padding:10px 18px;border:1px solid #9d496a;border-radius:9px;text-decoration:none}</style><header>AGI Galaxy</header><h1>{{.View.Title}}</h1>{{range .View.Rows}}<section><h2>{{.Label}}</h2><p class="content">{{.Text}}</p></section>{{end}}{{if .View.Sections}}<dl>{{range .View.Sections}}<div><dt>{{.Label}}</dt><dd>{{.Text}}</dd></div>{{end}}</dl>{{end}}<p class="muted">{{.View.Note}}有效至 {{.Until}}。</p>{{if eq .State "awaiting-account"}}{{if .LoginURL}}<a class="login" href="{{.LoginURL}}" target="_blank" rel="noopener noreferrer">登录银河账户</a>{{end}}{{else if eq .State "pending"}}<form method="post" action="{{.Path}}"><button class="primary" type="submit" name="action" value="allow">{{.View.Title}}</button><button type="submit" name="action" value="decline">取消</button></form>{{else}}<p id="outcome">{{.Outcome}}</p>{{end}}{{if eq .State "awaiting-account"}}<p id="outcome">{{.Outcome}}</p>{{end}}<details><summary>查看操作详情</summary><a href="{{.Path}}?download=1" download="galaxy-operation.json">下载本次操作</a></details>{{if or (eq .State "processing") (eq .State "awaiting-account")}}<script>const output=document.getElementById('outcome'); async function poll(){try{const r=await fetch(location.pathname+'?status=1',{cache:'no-store'});if(!r.ok)return;const data=await r.json();output.textContent=data.message;if(data.state==='processing'||data.state==='awaiting-account')setTimeout(poll,2000);}catch(e){setTimeout(poll,3000)}}setTimeout(poll,2000);</script>{{end}}</html>`))

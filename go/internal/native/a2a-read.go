@@ -22,6 +22,10 @@ func (h *NativeA2a) Read(ctx context.Context, input any) (any, error) {
 	if action == "poll" {
 		return h.Poll(ctx, peerID, id)
 	}
+	if action == "get" {
+		link, _, err := h.readCurrent(ctx, peerID, id)
+		return link, err
+	}
 	ctx, cancel, p, l, j, e := h.adapter(ctx, peerID)
 	if e != nil {
 		return nil, e
@@ -42,25 +46,6 @@ func (h *NativeA2a) Read(ctx context.Context, input any) (any, error) {
 	link, e := j.get(ctx, id)
 	if e != nil {
 		return nil, e
-	}
-	if action == "get" {
-		if link["source"] != nil {
-			_, _, e = h.sourceAccess(ctx, l, nil, uploadObject(link["source"]))
-		} else {
-			_, _, e = a2aReaders(l).resolve(ctx, text(link["caseId"]), text(link["attemptId"]), l.scope.Owner, nil, uploadObject(link["factContext"]))
-		}
-		if e != nil {
-			if changed := l.check(ctx); changed != nil {
-				return nil, changed
-			}
-			refs := []any{}
-			for _, row := range uploadRows(link["operations"]) {
-				op := uploadObject(row)
-				refs = append(refs, map[string]any{"id": op["id"], "kind": op["kind"], "requestHash": op["requestHash"], "outcome": op["outcome"]})
-			}
-			return map[string]any{"id": link["id"], "caseId": link["caseId"], "attemptId": link["attemptId"], "factContext": link["factContext"], "source": link["source"], "revision": link["revision"], "status": link["status"], "operations": refs, "sourceUnavailable": true, "originalOperationRetained": true}, nil
-		}
-		return link, l.check(ctx)
 	}
 	if action == "reconcile-result" {
 		return h.reconcileResult(ctx, l, j, id)
@@ -152,4 +137,39 @@ func (h *NativeA2a) Read(ctx context.Context, input any) (any, error) {
 		return nil, e
 	}
 	return map[string]any{"state": "observed", "association": association, "originalOperationRetained": true, "remoteResent": false}, nil
+}
+
+// readCurrent opens the same peer-scoped journal as the public get and checks
+// its original source once. The caller must still check its own outer lease.
+func (h *NativeA2a) readCurrent(ctx context.Context, peerID, id string) (map[string]any, map[string]any, error) {
+	ctx, cancel, _, l, j, e := h.adapter(ctx, peerID)
+	if e != nil {
+		return nil, nil, e
+	}
+	defer cancel()
+	link, e := j.get(ctx, id)
+	if e != nil {
+		return nil, nil, e
+	}
+	var current map[string]any
+	if link["source"] != nil {
+		current, _, e = h.sourceAccess(ctx, l, nil, uploadObject(link["source"]))
+	} else {
+		current, _, e = a2aReaders(l).resolve(ctx, text(link["caseId"]), text(link["attemptId"]), l.scope.Owner, nil, uploadObject(link["factContext"]))
+	}
+	if e != nil {
+		if changed := l.check(ctx); changed != nil {
+			return nil, nil, changed
+		}
+		refs := []any{}
+		for _, row := range uploadRows(link["operations"]) {
+			op := uploadObject(row)
+			refs = append(refs, map[string]any{"id": op["id"], "kind": op["kind"], "requestHash": op["requestHash"], "outcome": op["outcome"]})
+		}
+		return map[string]any{"id": link["id"], "caseId": link["caseId"], "attemptId": link["attemptId"], "factContext": link["factContext"], "source": link["source"], "revision": link["revision"], "status": link["status"], "operations": refs, "sourceUnavailable": true, "originalOperationRetained": true}, nil, nil
+	}
+	if e = l.check(ctx); e != nil {
+		return nil, nil, e
+	}
+	return link, current, nil
 }
