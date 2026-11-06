@@ -101,7 +101,7 @@ func (s *AssessmentService) ReadMaterials(ctx context.Context, taskID, after str
 			// Missing or withdrawn material remains a gap. Cached manifest
 			// titles are not returned as a substitute for a current source.
 			if material == nil {
-				items = append(items, Object{"sourceKey": source.Key, "sourceRevision": source.Revision, "availability": "unavailable"})
+				items = append(items, Object{"sourceKey": source.Kind + ":" + source.ID, "sourceRevision": source.Revision, "availability": "unavailable"})
 				continue
 			}
 			version := str(material, "version")
@@ -111,7 +111,9 @@ func (s *AssessmentService) ReadMaterials(ctx context.Context, taskID, after str
 			if _, e = tx.Exec(ctx, `UPDATE community_assessment_materials_v1 SET read_version=$4,read_at=$5 WHERE endpoint=$1 AND task_id=$2 AND source_key=$3`, s.Endpoint, taskID, source.Key, version, s.now()); e != nil {
 				return nil, e
 			}
-			items = append(items, Object{"sourceKey": source.Key, "sourceKind": source.Kind, "sourceId": source.ID, "sourceRevision": source.Revision,
+			// The tool reference is plain text, not the internal JSON tuple. It
+			// also works for manifests created before this representation change.
+			items = append(items, Object{"sourceKey": source.Kind + ":" + source.ID, "sourceKind": source.Kind, "sourceId": source.ID, "sourceRevision": source.Revision,
 				"sourceVersion": version, "availability": "available", "source": source.Snapshot, "material": material})
 		}
 		var count int
