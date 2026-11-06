@@ -29,6 +29,12 @@ func followMethod(path string) string {
 func accountChat(path string) bool {
 	return match(`^/v2/chat/(?:rooms/(?:create|query|directory)|invitations/query|export/owned|accounts/query)$`, path) || match(`^/v2/chat/rooms/`+id+`/(?:read|history|decisions|propose|vote|accept|leave|dismiss|send|receipt|operation-receipt|cursor|join-preview|join)$`, path) || match(`^/v2/chat/rooms/`+id+`/messages/`+id+`/(?:edit|retract|hide|context)$`, path) || match(`^/v2/chat/attachments/(?:config|prepare|read|query|revoke)$`, path)
 }
+
+// Account comment endpoints share the portal session, but only these exact
+// routes support that authority. Their handlers still check session and CSRF.
+func accountComment(path string) bool {
+	return match(`^/v2/account-comments/(?:events|query|receipt|get)$`, path) || match(`^/v2/account-comment-governance/(?:events|query|receipt)$`, path)
+}
 func accountBinary(path string) bool {
 	return match(`^/v2/chat/attachments/`+id+`/(?:upload|content|export-content)$`, path) || match(`^/v2/community/attachments/`+id+`/(?:upload|content)$`, path) || match(`^/v1/account/feedback/attachments/`+id+`/upload$`, path) || match(`^/v1/account/data/feedback/exports/`+id+`/attachments/`+id+`/content$`, path)
 }
@@ -59,7 +65,7 @@ func WebsiteQuotaCredential(r *http.Request, path string) string {
 	if _, ok := r.Header["Authorization"]; ok {
 		return ""
 	}
-	if path == "/v1/account/login" || path == "/v1/account/callback" || !match(`^/(?:v1/(?:account|discovery)|v2/(?:community|chat))(?:/|$)`, path) {
+	if path == "/v1/account/login" || path == "/v1/account/callback" || !(match(`^/(?:v1/(?:account|discovery)|v2/(?:community|chat))(?:/|$)`, path) || r.Method == "POST" && accountComment(path)) {
 		return ""
 	}
 	raw := header(r, "Cookie")
@@ -88,6 +94,12 @@ func Category(method, path string, credential, website bool) string {
 			return "query"
 		}
 		return "anonymous"
+	}
+	if method == "POST" && accountComment(path) {
+		if strings.HasSuffix(path, "/events") {
+			return "submission"
+		}
+		return query()
 	}
 	if method == "POST" && has([]string{"status", "query", "receipt", "public-query"}, followMethod(path)) {
 		return query()
@@ -177,7 +189,7 @@ func ApplyBrowserPolicy(r *http.Request, w http.ResponseWriter, origins []string
 		method = header(r, "Access-Control-Request-Method")
 	}
 	accountData := method == "POST" && match(`^/v1/account/data/feedback/(?:export|delete)$`, path) || method == "GET" && match(`(?i)^/v1/account/data/feedback/(?:operations|exports)/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, path) || method == "POST" && match(`(?i)^/v1/account/data/feedback/exports/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/attachments/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/content$`, path)
-	account := path == "/v1/web-events" || match(`^/v1/account/(session|logout|settings|type-change|archives|work|external-credentials|bookmarks|chat-reports)(?:/|\?|$)`, raw) || accountData || method == "POST" && followMethod(path) != "" || path == "/v1/account/feedback" || method == "GET" && feedbackOperation(path) || match(`^/v1/account/feedback/attachments/(?:config|prepare|read|revoke)$`, path) || match(`^/v1/account/notifications/notices(?:/`+id+`/read)?$`, path) || strings.HasPrefix(raw, "/v2/community/") || accountChat(path) || accountBinary(path)
+	account := path == "/v1/web-events" || match(`^/v1/account/(session|logout|settings|type-change|archives|work|external-credentials|bookmarks|chat-reports)(?:/|\?|$)`, raw) || accountData || method == "POST" && followMethod(path) != "" || path == "/v1/account/feedback" || method == "GET" && feedbackOperation(path) || match(`^/v1/account/feedback/attachments/(?:config|prepare|read|revoke)$`, path) || match(`^/v1/account/notifications/notices(?:/`+id+`/read)?$`, path) || strings.HasPrefix(raw, "/v2/community/") || accountChat(path) || accountBinary(path) || method == "POST" && accountComment(path)
 	if account || operations || discovery {
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 	}
