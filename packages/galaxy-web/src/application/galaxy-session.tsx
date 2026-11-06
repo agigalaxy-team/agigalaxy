@@ -98,7 +98,7 @@ function useSessionState(){
   useEffect(()=>{
     if(!endpoint)return;
     const events=createGalaxyEventClient({scope:{endpoint,identity:'anonymous',surface:'web'},queryClient,
-      topics:['forum','tasks','projects','capsules','builders','information','choice-sync','ci','site-content']});
+      topics:['forum','reactions','growth','public-follows','tasks','projects','capsules','builders','information','choice-sync','ci','site-content']});
     events.start();return()=>events.stop();
   },[endpoint,queryClient]);
   useEffect(()=>{

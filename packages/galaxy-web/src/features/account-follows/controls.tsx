@@ -59,11 +59,11 @@ export function AccountFollowControl({targetAccountId,endpoint,initialRelationsh
   return()=>{active=false;read.current=null;working.current=false;tasks.cancel();window.removeEventListener('online',online);};
  },[client,targetAccountId,available,initialRelationship,initialCanFollow,tasks,model.session]);
  const currentValue=value?.accountId===client?.ownerId?value:null;
- const change=useCallback(async()=>{
+ const change=useCallback(async(visibility?:'public'|'private')=>{
   if(!client||!available||working.current||!currentValue)return;const focused=document.activeElement===button.current,current=()=>latestGeneration.current===ownerGeneration;working.current=true;setBusy(true);setError('');tasks.cancel();
   try{
    if(client.pending(targetAccountId))await client.recover(targetAccountId);
-   else await client.change(targetAccountId,!currentValue.relationship.following);
+   else await client.change(targetAccountId,visibility?true:!currentValue.relationship.following,visibility);
    client.current();void query.invalidateQueries({queryKey:galaxyQueryKey(scope,'follows')});const status=await client.status(targetAccountId);client.current();if(!current())return;setValue(status);setPending(!!client.pending(targetAccountId));
    if(!client.pending(targetAccountId))changed.current?.(status.relationship.following,focused&&document.activeElement===button.current);
   }catch(problem){if(!current())return;setError(accountFollowMessage(problem));
@@ -78,6 +78,7 @@ export function AccountFollowControl({targetAccountId,endpoint,initialRelationsh
    disabled={busy||pending||!currentValue||!currentValue.canFollow&&!currentValue.relationship.following} onClick={()=>void change()}>
    {busy?'正在保存…':currentValue?.relationship.following?'取消关注':'关注'}
   </Button>
+  {currentValue?.relationship.following&&<label className="account-follow-message">可见范围 <select aria-label="关注可见范围" disabled={busy||pending} value={currentValue.relationship.visibility??'private'} onChange={event=>void change(event.target.value as 'public'|'private')}><option value="public">公开</option><option value="private">私人</option></select></label>}
   {pending&&<output className="account-follow-message">{client?.pending(targetAccountId)?.command.following===false?'正在取消关注…':'正在保存关注…'}</output>}
   {showDirectoryLink&&currentValue&&<a className="text-link" href="/app/account?section=following">我的关注</a>}
   {error&&<output className="account-follow-message" >{error} <button type="button" className="text-link" disabled={busy} onClick={()=>read.current?.()}>重试读取</button></output>}

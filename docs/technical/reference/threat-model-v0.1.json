@@ -63,7 +63,7 @@
       "id": "T05",
       "name": "恶意证据URL",
       "attack": "重定向、DNS混合地址或内网地址导致SSRF",
-      "current_control": "当前公网读取及A2A请求由Go实现；URL与公网地址检查、受约束解析与拨号、重定向/大小/超时及取消处理按实际传输执行。旧Node public-fetch与其专用测试退出当前实现入口。",
+      "current_control": "当前公网读取及A2A请求由Go实现；URL与公网地址检查、受约束解析与拨号、重定向/大小/超时及取消处理按实际传输执行。",
       "gap": "来源注册、所选服务信任、实际TLS部署和宿主运行仍各自核对；源码引用更新不等于本轮重新执行传输测试或完成威胁验收。",
       "tasks": "C00-04",
       "source": "go/internal/publicfetch/public.go",

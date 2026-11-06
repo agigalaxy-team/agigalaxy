@@ -183,6 +183,9 @@ func AllowedQuery(method, path, raw, preflightMethod string) bool {
 	if rule(get && match(`^/v1/account/public/`+id+`/posts$`, path), 600, "after", "limit") && optionalMatch(q, "after", `^fp1\.[A-Za-z0-9_-]+$`) && protocol.TextLength(one(q, "after")) <= 512 && optionalMatch(q, "limit", `^(?:[1-9]|[1-4][0-9]|50)$`) {
 		return true
 	}
+	if rule(read && match(`^/v2/community/growth/(?:accounts/`+id+`|me)/(?:contributions|legacy-honors)$`, path), 1024, "after", "limit") && optionalMatch(q, "after", `^[A-Za-z0-9_-]+$`) && protocol.TextLength(one(q, "after")) <= 768 && optionalMatch(q, "limit", `^(?:[1-9]|[1-9][0-9]|100)$`) {
+		return true
+	}
 	if rule(read && has([]string{"/v1/web-events", "/v1/operations/web-events"}, path), 4096, "cursor", "topics", "stream") && optionalMatch(q, "cursor", `^(0|[1-9][0-9]{0,18})$`) && optionalMatch(q, "stream", `^(true|false)$`) {
 		topics := one(q, "topics")
 		valid := protocol.TextLength(topics) <= 1024 && len(strings.Split(topics, ",")) <= 32

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 type Gorse struct{ nativeClient }
@@ -49,6 +50,23 @@ func (g *Gorse) Feedback(ctx context.Context, event Object) error {
 		return e
 	}
 	_, e := g.call(ctx, "/api/feedback", http.MethodPut, []Object{{"FeedbackType": kind, "UserId": event["profileId"], "ItemId": key, "Timestamp": event["occurredAt"], "Value": 1}}, false)
+	return e
+}
+
+// SyncFeedback applies exactly one user's real interaction. Deletion includes
+// its type so cancelling a like cannot remove a click or other feedback.
+func (g *Gorse) SyncFeedback(ctx context.Context, state FeedbackState) error {
+	if !validFeedbackKey(state.ProfileID, state.ItemKey, state.Type) || state.OccurredAt.IsZero() {
+		return invalid()
+	}
+	if !state.Active {
+		_, e := g.call(ctx, "/api/feedback/"+url.PathEscape(state.Type)+"/"+url.PathEscape(state.ProfileID)+"/"+url.PathEscape(state.ItemKey), http.MethodDelete, nil, false)
+		return e
+	}
+	if _, e := g.call(ctx, "/api/user", http.MethodPost, Object{"UserId": state.ProfileID, "Labels": []string{}, "Comment": ""}, false); e != nil {
+		return e
+	}
+	_, e := g.call(ctx, "/api/feedback", http.MethodPut, []Object{{"FeedbackType": state.Type, "UserId": state.ProfileID, "ItemId": state.ItemKey, "Timestamp": state.OccurredAt.UTC().Format(time.RFC3339Nano), "Value": 1}}, false)
 	return e
 }
 

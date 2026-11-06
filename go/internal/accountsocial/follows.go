@@ -14,12 +14,12 @@ import (
 
 func relationship(target string, r Object) Object {
 	if r == nil {
-		return Object{"id": nil, "targetAccountId": target, "following": false, "revision": 0, "followedAt": nil, "updatedAt": nil}
+		return Object{"id": nil, "targetAccountId": target, "following": false, "revision": 0, "followedAt": nil, "updatedAt": nil, "visibility": nil}
 	}
-	return Object{"id": r["id"], "targetAccountId": target, "following": r["following"], "revision": r["revision"], "followedAt": date(r["followed_at"]), "updatedAt": date(r["updated_at"])}
+	return Object{"id": r["id"], "targetAccountId": target, "following": r["following"], "revision": r["revision"], "followedAt": date(r["followed_at"]), "updatedAt": date(r["updated_at"]), "visibility": r["visibility"]}
 }
 func followStatus(ctx context.Context, tx pgx.Tx, owner, target string) (Object, error) {
-	r, e := row(ctx, tx, `SELECT id,following,revision,followed_at,updated_at FROM account_follows_v1 WHERE account_id=$1 AND target_account_id=$2`, owner, target)
+	r, e := row(ctx, tx, `SELECT id,following,revision,followed_at,updated_at,visibility FROM account_follows_v1 WHERE account_id=$1 AND target_account_id=$2`, owner, target)
 	if e != nil {
 		return nil, e
 	}
@@ -83,8 +83,11 @@ func (s *Service) Follow(ctx context.Context, a Actor, method string, raw []byte
 		case "query":
 			return s.followQuery(ctx, tx, owner, p)
 		case "command":
-			cmd := followCommand{str(p, "operationId"), target, p["following"].(bool), num(p, "expectedRevision")}
-			hash := identity.Digest(encode(cmd))
+			cmd := followCommand{OperationID:str(p, "operationId"), TargetID:target, Following:p["following"].(bool), ExpectedRevision:num(p, "expectedRevision")}
+            var visibilityInput *string
+            if v, ok := p["visibility"].(string); ok { visibilityInput = &v }
+            var hash string
+            if visibilityInput == nil { hash = identity.Digest(encode(cmd)) } else { hash = identity.Digest(encode(struct { followCommand; Visibility string `json:"visibility"` }{cmd,*visibilityInput})) }
 			if _, e := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,839191))`, owner+":"+cmd.OperationID); e != nil {
 				return nil, e
 			}
@@ -101,14 +104,14 @@ func (s *Service) Follow(ctx context.Context, a Actor, method string, raw []byte
 			if _, e = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,839192))`, owner+":"+target); e != nil {
 				return nil, e
 			}
-			r, e := row(ctx, tx, `SELECT id,following,revision,followed_at,updated_at FROM account_follows_v1 WHERE account_id=$1 AND target_account_id=$2 FOR UPDATE`, owner, target)
+			r, e := row(ctx, tx, `SELECT id,following,revision,followed_at,updated_at,visibility FROM account_follows_v1 WHERE account_id=$1 AND target_account_id=$2 FOR UPDATE`, owner, target)
 			if e != nil {
 				return nil, e
 			}
 			if num(r, "revision") != cmd.ExpectedRevision {
 				return nil, fault.New("account_follow_changed", 409)
 			}
-			if cmd.Following {
+			if cmd.Following && (r == nil || r["following"] != true) {
 				profile, e := s.target(ctx, tx, target, true)
 				if e != nil {
 					return nil, e
@@ -121,12 +124,15 @@ func (s *Service) Follow(ctx context.Context, a Actor, method string, raw []byte
 			if r != nil {
 				old = r["following"] == true
 			}
-			if old != cmd.Following {
+			visibility := "public"
+            if r != nil { visibility = str(r, "visibility") }
+            if visibilityInput != nil { visibility = *visibilityInput }
+            if old != cmd.Following || (r != nil && visibilityInput != nil && visibility != str(r,"visibility")) {
 				id := uuid.NewString()
 				if r != nil {
 					id = str(r, "id")
 				}
-				_, e = tx.Exec(ctx, `INSERT INTO account_follows_v1(id,account_id,target_account_id,following,revision,created_at,followed_at,updated_at) VALUES($1,$2,$3,$4,1,$5,$5,$5) ON CONFLICT(account_id,target_account_id) DO UPDATE SET following=$4,revision=account_follows_v1.revision+1,followed_at=CASE WHEN $4 THEN $5 ELSE account_follows_v1.followed_at END,updated_at=$5`, id, owner, target, cmd.Following, s.now())
+				_, e = tx.Exec(ctx, `INSERT INTO account_follows_v1(id,account_id,target_account_id,following,revision,created_at,followed_at,updated_at,visibility) VALUES($1,$2,$3,$4,1,$5,$5,$5,$6) ON CONFLICT(account_id,target_account_id) DO UPDATE SET following=$4,visibility=$6,revision=account_follows_v1.revision+1,followed_at=CASE WHEN $4 AND NOT account_follows_v1.following THEN $5 ELSE account_follows_v1.followed_at END,updated_at=$5`, id, owner, target, cmd.Following, s.now(), visibility)
 				if e != nil {
 					return nil, e
 				}
@@ -167,7 +173,7 @@ func (s *Service) followQuery(ctx context.Context, tx pgx.Tx, owner string, p Ob
 		id = c.ID
 	}
 	limit := num(p, "limit")
-	rr, e := rows(ctx, tx, `SELECT id,target_account_id,following,revision,followed_at,updated_at FROM account_follows_v1 WHERE account_id=$1 AND following=true AND ($2::timestamptz IS NULL OR (followed_at,id)<($2::timestamptz,$3::uuid)) ORDER BY followed_at DESC,id DESC LIMIT $4`, owner, at, id, limit+1)
+	rr, e := rows(ctx, tx, `SELECT id,target_account_id,following,revision,followed_at,updated_at,visibility FROM account_follows_v1 WHERE account_id=$1 AND following=true AND ($2::timestamptz IS NULL OR (followed_at,id)<($2::timestamptz,$3::uuid)) ORDER BY followed_at DESC,id DESC LIMIT $4`, owner, at, id, limit+1)
 	if e != nil {
 		return nil, e
 	}

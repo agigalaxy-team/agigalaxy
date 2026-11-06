@@ -401,7 +401,7 @@ func (h Handler) recommendationHTTP(r *http.Request, id string) (Object, error) 
 	} else if part == "history" {
 		keys = []string{"after", "limit"}
 	}
-	valid := r.Method == "GET" && (part == "overview" || part == "history" || operation != nil) || write && (part == "policy" || part == "themes")
+	valid := r.Method == "GET" && (part == "overview" || part == "history" || part == "community-signals" || operation != nil) || write && (part == "policy" || part == "themes" || part == "community-signals")
 	if !valid {
 		return nil, qualityFailure("not_found", 404)
 	}
@@ -429,10 +429,16 @@ func (h Handler) recommendationHTTP(r *http.Request, id string) (Object, error) 
 		if e != nil {
 			return nil, e
 		}
+		if part == "community-signals" {
+			return h.Recommendations.SaveCommunitySignals(r.Context(), actor, input)
+		}
 		if part == "themes" {
 			return h.Recommendations.SaveTheme(r.Context(), actor, input)
 		}
 		return h.Recommendations.SavePolicy(r.Context(), actor, input, nil)
+	}
+	if part == "community-signals" {
+		return h.Recommendations.ReadCommunitySignals(r.Context(), actor)
 	}
 	if operation != nil {
 		return h.Recommendations.CommandResult(r.Context(), actor, operation[1])

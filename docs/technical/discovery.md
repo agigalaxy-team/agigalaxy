@@ -20,7 +20,7 @@ Builder 的 A2A 协议探测只观察协议表现，不验证对端工作能力�
 
 发行线tag不等immutable digest，目标pull须取实际RepoDigest并作为部署override。compose/gorse.toml/ClickHouse配置为非秘密源，runtime.env.example只列名字；各自独立key/password/卷，不借业务数据库或别人的Redis。默认主机loopback端口Meili17700、Gorse guard18088、OpenPanel18001，启动前核可用；native Gorse network internal且不发布原生API/dashboard，共享Docker网络允许所需loopback binding。
 
-Gorse多candidate不支持ranker.type=none；模板采用单native协同候选及neighbor/latest。v0.5.11 Redis cache适配要求RediSearch，所以当前cache用独立Gorse PG、galaxy_cache_前缀与btree_gin，旧Redis卷仅legacy-cache profile保留；OpenPanel自己的普通Redis队列独立。原生Gorse AuthFilter可能把拒绝key写日志，guard以constant-time验证并在闭合路由转固定native key；不暴露原生端口、不向它发故意错误key。
+Gorse多candidate不支持ranker.type=none；模板采用单native协同候选及neighbor/latest。v0.5.11 Redis cache适配要求RediSearch，所以当前cache用独立Gorse PG、galaxy_cache_前缀与btree_gin；OpenPanel自己的普通Redis队列独立。原生Gorse AuthFilter可能把拒绝key写日志，guard以constant-time验证并在闭合路由转固定native key；不暴露原生端口、不向它发故意错误key。
 
 OpenPanel API执行自己的migration。首次healthy后在API容器运行 `node /opt/galaxy/bootstrap-openpanel.mjs`，加载实际TS Prisma client `packages/db/src/generated/prisma/client.ts` 及原scrypt（不是未生成的默认@prisma/client）。仅创建配置的org/project、非登录service-owner membership、独立project-bound读写client；org:admin会员关系防上游hourly orphan删除，不伪造User/Account/Session/Invite或订阅。已有owner/credential漂移拒绝，控制器更新不能重跑初装/bootstrap。
 
@@ -45,10 +45,23 @@ collector把实际路由映射成home/community/find/account/help/download闭合
 | not-interested | 本人明确偏好 | 本地立即排除及native反馈 |
 | content-bookmark | 当前匿名可读forum post的保存已ack | bookmark |
 | content-participate | 账户post/next version/reply发布已ack | participate |
+| 帖子／回复点赞及取消 | 账户真实互动关系与原操作回执 | 一条 `like` 反馈；取消按类型、账户、内容精确删除 |
 
 bookmark/publication以原operationId作稳定eventId，并核原账户fresh session及准确版本/revision；按钮、未知写入、取消收藏、状态刷新不记成功。现有收藏collector不含单reply、私聊及其他kind。采集失败不改变业务已ack结果。新增page/event从真实动作扩展，不把当前六类固化为永久产品范围。
 
 内容事件带精确kind/id/version并通过当前匿名reader；私聊、案件/举报/证据、通知、邮件正文及打开/点击/派生标签无此schema，不进入推荐。敏感页面若需基础usage须另设metadata-only page key。Meili只返回candidate ID/revision，Galaxy按当前source返回正文，不能用引擎旧snippet/totals；revision含公开curation。Gorse不合格item连feedback删除，IsHidden不等训练移除，返回前再核negative preference；cold-start/latest显式标其依据。
+
+## 社区互动、关系与推荐信号
+
+帖子和回复的互动状态、批量读取、办理及原回执由 `community` 服务负责。每个账户对同一对象只有一条当前点赞关系，计数是真实人数；取消沿原关系修订办理。`accountsocial` 复用原关注及回执：旧关系迁移为私人，首次新建关系默认公开，可直接修改可见性。公开关注／粉丝分页只读取公开关系和当前可公开查询的人物，本人原列表继续包含私人关系。旧操作回执保持原样，不能把新字段追写进已保存回执。
+
+点赞事实与推荐反馈分开保存。用户命令在同一事务保存关系、原回执和期望反馈；后台按关系串行同步 Gorse，一次互动只对应一条真实反馈。关系修订和反馈投递代次分别记录：内容、许可、治理或到期变化沿既有发现来源队列触发重核，当前不再公开时按 `like` 类型、账户与对象精确删除反馈；恢复公开后可按仍有效的点赞关系重新投递。读取来源发生错误时重试，不将错误视为撤权；迟到投递按代次核对，不能覆盖更新后的期望状态。该机制依赖相关来源事件、Worker 和引擎实际运行，不能仅凭代码存在认定远端已经同步。
+
+推荐策略的社区信号由获授权管理者配置，默认关闭；配置与原推荐策略共用版本及操作回执。启用时只处理个性化候选：当前资格、主题与负反馈裁剪之后，以候选原顺序为匹配基础，融合收到的真实点赞和作者对应领域的已采用权重，再执行原有重复及集中控制，返回前重核当前内容。显式最新和搜索排序不受此配置改变。
+
+首版采用排名融合，同值并列、同分保持原顺序；匹配权重须大于两项辅助权重之和。初始参数为匹配 1、内容认可 0.1、作者影响 0.1、平滑参数 20，均可在允许范围内调整。内容认可依据实际点赞，评价者缺少有效权重时按中性参考；作者缺少有效权重同样按中性参考。两项辅助贡献取较大值，避免共同来源无条件叠加。线上读取已保存且依据仍有效的权重结果，不在网页请求中调用模型；实际反馈数量不因权重复制。内部请求记录保存采用的结果版本，公共响应不暴露数值、计算依据或隐藏系数。
+
+互动、成长和关系变更通过现有事件流通知相关页面局部更新；公开事件不包含点赞者、私人关注对象或 AI 权重。事件是重读提示，不授予新访问资格；失去公开资格的内容仍由当前读取规则处理。旧 GUID 荣誉及尚无明确账户归属的来源，继续按[社区成长设计](community-growth-and-reputation.md)中的资格与承接边界处理，不据关联猜测归属。模型材料、权重更新及推荐的实际效果仍需按该设计验证，部署和开启状态以目标环境为准。
 
 ## HTTP与原生分析
 
@@ -61,6 +74,7 @@ bookmark/publication以原operationId作稳定eventId，并核原账户fresh ses
 | /v1/discovery/search | GET q/topic/数字after/limit，匿名当前source |
 | /v1/discovery/recommendations | GET mode/topic/limit，official或visitor身份 |
 | /v1/operations/discovery/analytics | GET kind/days/scope/accountId，以analytics.read在native前后核验 |
+| /v1/operations/recommendation/community-signals | GET读取、POST保存社区信号配置；沿原推荐权限、版本及操作回执 |
 
 拒未知/重复query及未知event字段，CORS只准所配Origin和准确headers，Bearer宿主凭据不作为analytics账户。overview/retention/paths/account用public2.x native Insights读client；business用相同client的GET /export/charts、ChartEngine、用途filter及reading/searching/bookmarking/participating四序列。计数是event occurrence，不是人数/session；取等长不重叠秒级[from,to)，不使用会把边界截成日期的event export totalCount。
 

@@ -46,7 +46,19 @@ type Governance interface {
 	Hidden(context.Context, pgx.Tx, Object) (bool, error)
 }
 type IdentityProvider struct{ Issuer, ClientID string }
+type ContentChange struct {
+ AccountID, Kind, ID, PostID, Action string
+}
+
+type ReactionChange struct {
+ AccountID, Kind, ID, AuthorAccountID, PostID string
+ Liked bool
+ Revision int64
+}
+
 type Service struct {
+ OnReactionWithin func(context.Context, pgx.Tx, ReactionChange) error
+ OnContentWithin func(context.Context, pgx.Tx, ContentChange) error
 	Pool                       *pgxpool.Pool
 	Endpoint                   string
 	Authority                  Authorization

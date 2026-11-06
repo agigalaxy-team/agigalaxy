@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "read-ai-delegation", "assess-task", "reconcile-task-operations", "inspect-operations"}
+var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "read-ai-delegation", "assess-task", "reconcile-task-operations", "inspect-operations", "read-community-assessment-material", "save-community-assessment-result"}
 
 func parseTool(input Object) (Object, error) {
 	if !closed(input, []string{"taskId", "callId", "tool", "arguments"}, []string{"nativeRunId", "nativeAttemptId", "validationFailure"}) || !schemaUUID.MatchString(str(input["taskId"])) || !schemaUUID.MatchString(str(input["callId"])) || !has(toolNames, str(input["tool"])) || obj(input["arguments"]) == nil {
@@ -19,7 +19,7 @@ func parseTool(input Object) (Object, error) {
 	}
 	if v, ok := input["validationFailure"]; ok {
 		f := obj(v)
-		if !has([]string{"query-operations", "read-operation-object", "read-ai-delegation"}, str(input["tool"])) || !closed(f, []string{"ambiguous"}, nil) {
+		if !has([]string{"query-operations", "read-operation-object", "read-ai-delegation", "read-community-assessment-material"}, str(input["tool"])) || !closed(f, []string{"ambiguous"}, nil) {
 			return nil, invalid()
 		}
 		if _, ok := f["ambiguous"].(bool); !ok {
@@ -123,7 +123,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 			args := obj(x["arguments"])
 			safe := Object{}
 			ambiguous := obj(x["validationFailure"])["ambiguous"] == true
-			if x["tool"] != "read-ai-delegation" {
+			if x["tool"] != "read-ai-delegation" && x["tool"] != "read-community-assessment-material" {
 				scope := operationsquerycontract.QueryCoverageScope(str(x["tool"]), args)
 				for _, key := range []string{"module", "view", "kind", "id"} {
 					if scope[key] != nil {
@@ -217,6 +217,12 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 	result, e := func() (Object, error) {
 		row, actor, operationID := binding.row, binding.actor, binding.operationID
 		tool, args := str(x["tool"]), obj(x["arguments"])
+		if tool == "read-community-assessment-material" || tool == "save-community-assessment-result" {
+			if s.CommunityAssessmentTool == nil {
+				return nil, fault.New("operations_autonomy_tool_not_configured", 503)
+			}
+			return s.CommunityAssessmentTool(ctx, actor, str(row["id"]), tool, args)
+		}
 		if tool == "assess-task" {
 			return Object{"availability": "available"}, nil
 		}

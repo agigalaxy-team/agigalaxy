@@ -41,6 +41,7 @@ const (
 	Denied SourceDecision = iota
 	Allowed
 	Reset
+	Recheck
 )
 
 type Event struct {
@@ -232,6 +233,7 @@ func (s *Service) Read(ctx context.Context, c *Connection, cursor *string) ([]Fr
 		}
 	}
 	resets := []string{}
+	rechecks := []string{}
 	addReset := func(m string) {
 		if slices.Contains(c.Modules, m) && !slices.Contains(resets, m) {
 			resets = append(resets, m)
@@ -265,6 +267,12 @@ func (s *Service) Read(ctx context.Context, c *Connection, cursor *string) ([]Fr
 		if e != nil {
 			return nil, e
 		}
+		if decision == Recheck {
+			if !slices.Contains(rechecks, event.Module) {
+				rechecks = append(rechecks, event.Module)
+			}
+			continue
+		}
 		if decision == Reset || decision == Allowed && str(event.Ref, "_operation") == "DELETE" {
 			// A missing or deleted source row has no trustworthy current locator.
 			// Request a snapshot without disclosing its former ID. Module and
@@ -279,6 +287,15 @@ func (s *Service) Read(ctx context.Context, c *Connection, cursor *string) ([]Fr
 		if decision == Allowed {
 			f := Frame{Type: "change", Cursor: event.Cursor, Module: event.Module, OperationID: event.OperationID, Version: event.Ref["_version"]}
 			f.ObjectID = objectID(event)
+			if event.SourceTable == "forum_reactions_v1" && event.Module == "reactions" {
+				f.Entity = str(event.Ref, "object_kind")
+				f.Version = nil
+				f.OperationID = nil
+			}
+			if event.Module == "growth" || event.Module == "public-follows" {
+				f.OperationID = nil
+				f.Version = nil
+			}
 			if c.Principal.Surface == "admin" && event.Module == "agentos" {
 				entity := agentOSEntity(event.SourceTable)
 				if entity == "" {
@@ -302,6 +319,9 @@ func (s *Service) Read(ctx context.Context, c *Connection, cursor *string) ([]Fr
 			}
 			frames = append(frames, f)
 		}
+	}
+	if len(rechecks) > 0 {
+		frames = append(frames, Frame{Type: "reset", Cursor: high, Modules: rechecks, Reason: "recheck"})
 	}
 	if len(resets) > 0 {
 		frames = append(frames, Frame{Type: "reset", Cursor: high, Modules: resets, Reason: "access-changed"})
@@ -401,6 +421,12 @@ func str(ref map[string]any, key string) string { v, _ := ref[key].(string); ret
 func objectID(e Event) string {
 	keys := []string{"message_id", "id", "work_id", "room_id", "task_id", "project_id"}
 	switch e.Module {
+	case "growth", "public-follows":
+		keys = []string{"account_id"}
+	case "forum", "reactions":
+		if e.SourceTable == "forum_reactions_v1" {
+			keys = []string{"object_id"}
+		}
 	case "builders":
 		keys = []string{"builder_id"}
 		if e.SourceTable == "builders" {

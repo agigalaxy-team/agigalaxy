@@ -98,6 +98,17 @@ func TestOriginalSocialLedgersHTTPCurrentSourcesAndLifecycle(t *testing.T) {
 		return o
 	}
 	initial := socialGolden(t, "read-initial")
+	extendFollowVisibility := func(page Object) {
+		for _, v := range page["items"].([]any) {
+			relationship := v.(map[string]any)["relationship"].(map[string]any)
+			visibility := "public"
+			if relationship["targetAccountId"] == f.Target {
+				visibility = "private"
+			}
+			relationship["visibility"] = visibility
+		}
+	}
+	extendFollowVisibility(initial["follows"].(map[string]any))
 	original := initial
 	same(t, call(request("/v1/account/follows/query", Object{}, true), 200), original["follows"])
 	same(t, call(request("/v1/account/bookmarks/query", Object{}, true), 200), original["bookmarks"])
@@ -116,8 +127,49 @@ func TestOriginalSocialLedgersHTTPCurrentSourcesAndLifecycle(t *testing.T) {
 	save := Object{"operationId": uuid.NewSHA1(uuid.NameSpaceOID, []byte("social-save-third")).String(), "reference": f.Posts[2], "saved": true, "expectedRevision": 0}
 	ack := call(request("/v1/account/bookmarks/command", save, true), 200)
 	original = socialGolden(t, "read-after")
+	extendFollowVisibility(original["follows"].(map[string]any))
 	compareAfter(t, call(request("/v1/account/bookmarks/query", Object{}, true), 200), original["bookmarks"].(map[string]any), initial["bookmarks"].(map[string]any), "bookmarks")
 	compareAfter(t, call(request("/v1/account/follows/query", Object{}, true), 200), original["follows"].(map[string]any), initial["follows"].(map[string]any), "follows")
+	// The old relationship remains private, newly created relationships are
+	// public, and changing visibility directly updates both public directions.
+	if _, e = owner.Exec(ctx, `UPDATE official_account_profiles_v1 SET query_enabled=true WHERE account_id=$1`, f.Owner); e != nil {
+		t.Fatal(e)
+	}
+	publicPage := func(account, direction string) Object {
+		return call(request("/v1/account/follows/public-query", Object{"accountId": account, "direction": direction}, false), 200)
+	}
+	if count := publicPage(f.Owner, "following")["count"]; count != float64(2) {
+		t.Fatalf("new public follows count %v", count)
+	}
+	if count := publicPage(f.Target, "followers")["count"]; count != float64(0) {
+		t.Fatalf("old private follow visible %v", count)
+	}
+	visibility := Object{"operationId": uuid.NewString(), "targetAccountId": f.Target, "following": true, "expectedRevision": 1, "visibility": "public"}
+	changed := call(request("/v1/account/follows/command", visibility, true), 200)
+	state := changed["relationship"].(map[string]any)
+	if state["visibility"] != "public" || state["revision"] != float64(2) {
+		t.Fatalf("public visibility transition %v", state)
+	}
+	if count := publicPage(f.Owner, "following")["count"]; count != float64(3) {
+		t.Fatalf("public following count %v", count)
+	}
+	if count := publicPage(f.Target, "followers")["count"]; count != float64(1) {
+		t.Fatalf("public follower count %v", count)
+	}
+	visibility["operationId"] = uuid.NewString()
+	visibility["expectedRevision"] = 2
+	visibility["visibility"] = "private"
+	changed = call(request("/v1/account/follows/command", visibility, true), 200)
+	state = changed["relationship"].(map[string]any)
+	if state["visibility"] != "private" || state["revision"] != float64(3) {
+		t.Fatalf("private visibility transition %v", state)
+	}
+	if count := publicPage(f.Owner, "following")["count"]; count != float64(2) {
+		t.Fatalf("private following count %v", count)
+	}
+	if count := publicPage(f.Target, "followers")["count"]; count != float64(0) {
+		t.Fatalf("private follower count %v", count)
+	}
 	// Same original UUID + hash recovers the committed operation after lost ACK.
 	receipt := call(request("/v1/account/bookmarks/receipt", Object{"operationId": save["operationId"], "payloadHash": ack["payloadHash"]}, true), 200)
 	same(t, receipt, ack)
@@ -157,7 +209,7 @@ func TestOriginalSocialLedgersHTTPCurrentSourcesAndLifecycle(t *testing.T) {
 	unfollow := clone(f.Follow)
 	unfollow["operationId"] = uuid.NewString()
 	unfollow["following"] = false
-	unfollow["expectedRevision"] = 1
+	unfollow["expectedRevision"] = 3
 	call(request("/v1/account/follows/command", unfollow, true), 200)
 	same(t, call(request("/v1/account/follows/command", f.Follow, true), 200), f.FollowReceipt)
 	if call(request("/v1/account/follows/status", Object{"targetAccountId": f.Target}, true), 200)["canFollow"] != false {

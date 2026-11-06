@@ -109,6 +109,7 @@ func parse(raw []byte, method string, follow, account bool) (Object, error) {
 	case "command":
 		if follow {
 			required = []string{"operationId", "targetAccountId", "following", "expectedRevision"}
+            optional = []string{"visibility"}
 		} else {
 			required = []string{"operationId", "reference", "saved", "expectedRevision"}
 		}
@@ -147,6 +148,7 @@ func parse(raw []byte, method string, follow, account bool) (Object, error) {
 		}
 	}
 	if method == "command" {
+        if v, ok := p["visibility"]; follow && ok && !one(v, "public", "private") { return fail() }
 		key := "saved"
 		max := int64(2147483646)
 		if follow {

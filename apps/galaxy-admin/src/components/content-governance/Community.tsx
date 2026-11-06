@@ -13,8 +13,9 @@ import type {OperationsList} from "../operations-business-types";
 import {untilLabel} from "../operations-business-types";
 import {timeLabel} from "../business-types";
 import {PublicContent} from './PublicContent';
+import {CommunityGrowth,type GrowthPermissions} from '../community-growth/CommunityGrowth';
 import type {PublicContentProps} from './public-content-types';
-type Props={tab:'sections'|'posts'|'reports';selected:string;after:string;state:string;category:string;csrfToken:string;canManage:boolean;publicContent?:Pick<PublicContentProps,'selectedKind'|'contentTab'|'filters'>};
+type Props={tab:'sections'|'posts'|'reports'|'growth';selected:string;after:string;state:string;category:string;csrfToken:string;operatorId:string;canManage:boolean;growthPermissions:GrowthPermissions;publicContent?:Pick<PublicContentProps,'selectedKind'|'contentTab'|'filters'>};
 const errors={forum_section_version_conflict:'版块已有更新，请按当前记录继续。',forum_report_version_conflict:'举报已有新记录，请按当前内容继续。',operations_source_changed:'来源已有更新，请按当前内容继续。',operations_visibility_changed:'显示状态已更新，请按当前记录继续。',forum_independent_handler_required:'此案不能由当前管理身份处理。',forum_hide_expiry:'来源或处理期限已变化，请读取后继续。',operations_hide_expiry:'所选处理时间已失效，请重新选择。'};
 const pageLink=(tab:Props['tab'],values:Record<string,string>={})=>'/admin/operations/community?'+new URLSearchParams({tab,...values});
 function Source({value}:{value:ForumSource|undefined}){return value?.availability==='available'&&value.content?<div><h3>{value.content.title||'回复内容'}</h3><p className="galaxy-operational-body">{value.content.body}</p>{value.content.links.map(link=><p key={link}><a href={link} target="_blank" rel="noreferrer">{link}</a></p>)}<p><a href={'https://agigalaxy.org/app/community?post='+value.locator.postId} target="_blank" rel="noreferrer">打开原帖</a></p></div>:<p>来源当前非公开或不可读。</p>;}
@@ -94,6 +95,7 @@ function Reports({selected,after,state,csrfToken,canManage}:Props){
   </>;
 }
 export function Community(props:Props){
+  if(props.tab==='growth')return <CommunityGrowth csrfToken={props.csrfToken} operatorId={props.operatorId} permissions={props.growthPermissions}/>;
   if(props.tab==='posts')return <PublicContent selected={props.selected} selectedKind={props.publicContent?.selectedKind??'post'} contentTab={props.publicContent?.contentTab??'content'} filters={props.publicContent?.filters??{query:'',kind:'',topic:'',visibility:'',pinned:'',featured:'',days:'all',after:props.after}} csrfToken={props.csrfToken} canManage={props.canManage}/>;
   return <section className="galaxy-business-users"><header><h1>{props.tab==='reports'?'举报与申诉':'版块与分类'}</h1></header>{props.tab==='sections'?<Sections {...props}/>:<Reports {...props}/>}</section>;
 }

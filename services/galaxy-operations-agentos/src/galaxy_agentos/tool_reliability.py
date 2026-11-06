@@ -21,9 +21,9 @@ from .business_tools import is_preparation_tool
 
 PREPARED_CARD_MESSAGE = "请确认操作。"
 
-EFFECT_TOOLS = frozenset({"run_authorized_work", "execute_operation", "manage_ai_role", "manage_ai_prompt"})
+EFFECT_TOOLS = frozenset({"run_authorized_work", "execute_operation", "manage_ai_role", "manage_ai_prompt", "save_community_assessment_result"})
 
-READ_TOOLS = frozenset({"current_summary", "query_operations", "read_operation_object", "list_authorized_work", "inspect_operations", "read_task_operation", "read_dispatched_task"})
+READ_TOOLS = frozenset({"current_summary", "query_operations", "read_operation_object", "list_authorized_work", "inspect_operations", "read_task_operation", "read_dispatched_task", "read_community_assessment_material"})
 
 
 def _closed_failure(name, error):

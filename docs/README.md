@@ -11,6 +11,7 @@
 | 本机、宿主事件、自己的AI和持续工作 | [客户端](product/client.md) |
 | 数据用途、保存、文件中转与退出 | [数据与文件](product/data-and-files.md) |
 | 社区、搜索、画像与推荐调控 | [发现与推荐](product/discovery-and-recommendation.md) |
+| 社区成长、信誉与AI权重（实施与运行边界） | [社区机制开发设计](technical/community-growth-and-reputation.md) |
 | 后台模块、治理、人员与AI权限 | [后台管理](product/admin.md) |
 | 规则、AI、人工、策略与自动运行 | [后台自动运行](product/admin-automation.md) |
 | 公告、站内信、系统邮件与官方身份 | [官方消息](product/messaging.md) |

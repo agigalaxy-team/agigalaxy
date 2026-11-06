@@ -18,6 +18,8 @@ def with_duty_completion(model, gateway, progress, round_seconds):
         updates = progress[:]
         progress.clear()
         disposition = completion.get("disposition")
+        if disposition == "continue" and completion.get("continuationKind") == "current-task-work":
+            return TaskDecision(state="continue", reason=str(completion.get("reasonCode") or ""))
         states = {"waiting-human": "waiting-human", "unknown": "waiting-result", "failed": "failed", "continue": "waiting-result"}
         if disposition in states:
             return TaskDecision(state=states[disposition], reason=str(completion.get("reasonCode") or ""))

@@ -18,7 +18,7 @@ auto_insert_item = false
 cache_size = 100
 context_size = 100
 [recommend.data_source]
-positive_feedback_types = ["bookmark", "participate", "click"]
+positive_feedback_types = ["bookmark", "participate", "click", "like"]
 read_feedback_types = ["view"]
 [[recommend.item-to-item]]
 name = "neighbors"

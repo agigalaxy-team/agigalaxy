@@ -12,6 +12,7 @@ import (
 )
 
 type Recommendations struct {
+	CommunitySignals  func(context.Context, []CommunityCandidate) (map[string]CommunitySignal, error)
 	Pool              *pgxpool.Pool
 	Endpoint          string
 	Authority         *operationspermissions.BusinessAuthority
@@ -121,14 +122,14 @@ func (s *Recommendations) PublicPlan(ctx context.Context, profile string) (Recom
 func (s *Recommendations) issue(ctx context.Context, profile, mode string, candidates []recommendationCandidate, plan RecommendationPlan) (Object, error) {
 	id := uuid.NewString()
 	var version any
-	if mode == "personalized" && plan.Policy["enabled"] == true {
+	if mode == "personalized" && (plan.Policy["enabled"] == true || object(plan.Policy["communitySignals"])["enabled"] == true) {
 		version = plan.Policy["version"]
 	}
 	placement := "home-public-recommendations"
 	items := []Object{}
 	for i, candidate := range candidates {
 		document := candidate.Document
-		items = append(items, Object{"key": document.ID, "kind": document.Kind, "id": document.SourceID, "sourceVersion": document.Version, "position": i + 1, "candidateSource": candidate.Candidate["source"], "themeKeys": themeKeys(plan.Themes, document)})
+		items = append(items, Object{"key": document.ID, "kind": document.Kind, "id": document.SourceID, "sourceVersion": document.Version, "position": i + 1, "candidateSource": candidate.Candidate["source"], "themeKeys": themeKeys(plan.Themes, document), "communityResultIds": candidate.ResultIDs})
 	}
 	_, e := s.Pool.Exec(ctx, "INSERT INTO discovery_recommendation_requests_v1(endpoint,id,profile_id,policy_version,mode,placement,items,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", s.Endpoint, id, profile, version, mode, placement, jsonString(items), s.now())
 	if e != nil {

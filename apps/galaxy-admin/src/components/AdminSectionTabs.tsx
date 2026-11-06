@@ -24,6 +24,7 @@ const sectionItems:Partial<Record<AdminArea,readonly AdminTabItem[]>>={
   content:[
     {id:'sections',label:'版块与分类',href:'/admin/operations/community'},
     {id:'posts',label:'公开内容',href:'/admin/operations/community?tab=posts'},
+    {id:'growth',label:'社区成长',href:'/admin/operations/community?tab=growth'},
     {id:'recommendation',label:'推荐运营',href:'/admin/operations/recommendation'},
     {id:'search-quality',label:'搜索质量',href:'/admin/operations/search-quality'},
   ],
@@ -67,7 +68,7 @@ export function AdminSectionTabs(){
   const items=system?systemSettingsTabs.map(item=>({...item,href:systemSettingsHref(system,{tab:item.id})})):maintenance?maintenanceTabs.map(item=>({...item,href:maintenanceHref(maintenance,{tab:item.id})})):sectionItems[area];
   if(!items)return null;
   const active=system?system.tab:area==='users'?(pathname.startsWith('/admin/operations/ai-work-accounts')?'ai-accounts':pathname.startsWith('/admin/operations/management-accounts')?'management-accounts':'users')
-    :area==='content'?(pathname.startsWith('/admin/operations/search-quality')?'search-quality':pathname.startsWith('/admin/operations/recommendation')?'recommendation':search.get('tab')==='posts'?'posts':'sections')
+    :area==='content'?(pathname.startsWith('/admin/operations/search-quality')?'search-quality':pathname.startsWith('/admin/operations/recommendation')?'recommendation':search.get('tab')==='posts'?'posts':search.get('tab')==='growth'?'growth':'sections')
     :area==='governance'?(pathname.startsWith('/admin/operations/community')?'reports':pathname.split('/').at(-1)??'reports')
     :area==='messages'?pathname.split('/').at(-1)??'messaging'
     :area==='strategy'?(pathname==='/admin/operations/autonomy'?'autonomy':pathname.startsWith('/admin/operations/rules')?'rules':pathname==='/admin/operations/models'?'models':pathname==='/admin/operations/strategy'?'strategy':'ai-runs')

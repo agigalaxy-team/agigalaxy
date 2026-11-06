@@ -5,7 +5,7 @@ export type AccountSettingsDraftSource={accountId:string;revision:number;display
 export type AccountSettingsDraftValues={displayName:string;avatarKey:string|null;bio:string;publicQuery:PublicQuery;retention:string};
 export type AccountSettingsDraftDirty={displayName:boolean;avatarKey:boolean;bio:boolean;publicQuery:boolean;retention:boolean};
 export type AccountSettingsDraftLease={client:object;accountId:string;csrfToken:string};
-export type AccountFollowIntent={command:{operationId:string;targetAccountId:string;following:boolean;expectedRevision:number};payloadHash:string};
+export type AccountFollowIntent={command:{operationId:string;targetAccountId:string;following:boolean;expectedRevision:number;visibility?:'public'|'private'};payloadHash:string};
 type AccountType='person'|'organization'|'agent'|null;
 export type AccountTypeCorrectionSource={accountId:string;revision:number;subjectType:AccountType};
 export type AccountTypeCorrectionValues={nextType:AccountType;reason:string;basis:string};
@@ -31,8 +31,8 @@ const followId=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a
 const followCursor=(value:unknown):value is string=>typeof value==='string'&&value.length<=512&&/^af1\.[A-Za-z0-9_-]+$/.test(value);
 function followIntent(value:AccountFollowIntent):AccountFollowIntent|null{
  const command=value?.command;
- if(!command||Object.keys(command).sort().join(',')!=='expectedRevision,following,operationId,targetAccountId'||!followId(command.operationId)||!followId(command.targetAccountId)||typeof command.following!=='boolean'||!Number.isSafeInteger(command.expectedRevision)||command.expectedRevision<0||typeof value.payloadHash!=='string'||!/^[a-f0-9]{64}$/.test(value.payloadHash))return null;
- return {command:{operationId:command.operationId,targetAccountId:command.targetAccountId,following:command.following,expectedRevision:command.expectedRevision},payloadHash:value.payloadHash};
+ if(!command||!['expectedRevision,following,operationId,targetAccountId','expectedRevision,following,operationId,targetAccountId,visibility'].includes(Object.keys(command).sort().join(','))||command.visibility!==undefined&&!['public','private'].includes(command.visibility)||!followId(command.operationId)||!followId(command.targetAccountId)||typeof command.following!=='boolean'||!Number.isSafeInteger(command.expectedRevision)||command.expectedRevision<0||typeof value.payloadHash!=='string'||!/^[a-f0-9]{64}$/.test(value.payloadHash))return null;
+ return {command:{operationId:command.operationId,targetAccountId:command.targetAccountId,following:command.following,expectedRevision:command.expectedRevision,...(command.visibility?{visibility:command.visibility}:{})},payloadHash:value.payloadHash};
 }
 function correctionSource(value:AccountTypeCorrectionSource):AccountTypeCorrectionSource|null{
  if(!value||typeof value.accountId!=='string'||!value.accountId||!Number.isSafeInteger(value.revision)||value.revision<0||!accountType(value.subjectType))return null;

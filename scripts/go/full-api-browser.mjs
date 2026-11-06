@@ -18,11 +18,11 @@ assert.equal(api.protocol,'http:');assert.equal(api.hostname,'127.0.0.1');
 assert.equal(cms.protocol,'postgres:');assert.equal(cms.hostname,'127.0.0.1');assert.match(cms.pathname,/^\/galaxy_go_test_[a-z0-9_]+$/);
 for(const [origin,hostname] of [[website,'web.galaxy.localhost'],[admin,'admin.galaxy.localhost'],[endpoint,'api.galaxy.localhost']]){assert.equal(origin.protocol,'https:');assert.equal(origin.hostname,hostname);assert.equal(Number(origin.port||443),d.proxyPort);}
 assert.equal(new Set([website.host,admin.host,endpoint.host]).size,3);
-assert(d.browserScope===undefined||d.browserScope==='admin'||d.browserScope==='full');const adminOnly=d.browserScope==='admin';
+assert(d.browserScope===undefined||d.browserScope==='admin'||d.browserScope==='full'||d.browserScope==='community');const adminOnly=d.browserScope==='admin',communityOnly=d.browserScope==='community';
 const adminMode=d.adminMode??process.env.GALAXY_GO_BROWSER_ADMIN_MODE??'standalone';assert(['standalone','development'].includes(adminMode));const adminDevelopment=adminMode==='development';
-assert(d.expiresAt>Math.floor(Date.now()/1000));assert(d.feedbackId);if(!adminOnly){assert.equal(d.forum.published,false);assert.equal(d.chat.messageDeliverySeeded,false);}
+assert(d.expiresAt>Math.floor(Date.now()/1000));if(!communityOnly)assert(d.feedbackId);if(!adminOnly){assert.equal(d.forum.published,false);assert.equal(d.chat.messageDeliverySeeded,false);}
 const directory=await mkdtemp(join(tmpdir(),'galaxy-full-api-browser-')),children=[],logs=[],ownedProcesses=[];
-let proxy,browser,hmrUpgrades=0;const pages=[],errors=[],consoleErrors=[],chatFailures=[],pageFailures=new Map(),upgradeSockets=new Set();
+let proxy,browser,hmrUpgrades=0;const pages=[],errors=[],consoleErrors=[],chatFailures=[],communityInspectionErrors=[],pageFailures=new Map(),upgradeSockets=new Set();
 const diagnosticText=value=>String(value).replace(/https?:\/\/[^\s"'<>]+/g,text=>{try{const url=new URL(text);return url.origin+url.pathname;}catch{return '[url]';}});
 function observePage(page){
  const failures=[];pageFailures.set(page,failures);
@@ -104,6 +104,11 @@ try{
  const context=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:1366,height:900}});
  await context.route('**/*',route=>{const url=new URL(route.request().url());return ['data:','blob:'].includes(url.protocol)||upstream.has(url.host)?route.continue():route.abort('blockedbyclient');});
  await context.addCookies([{...d.people[0].cookie,url:endpoint.origin,httpOnly:true,secure:true,sameSite:'Lax'},{...d.operator.cookie,url:admin.origin,httpOnly:true,secure:true,sameSite:'Lax'}]);
+ if(communityOnly){
+  const {runCommunityBrowser}=await import('./community-browser.mjs');
+  await runCommunityBrowser({browser,context,d,website,admin,endpoint,upstream,pages,observePage,jsonCall,inspectionErrors:communityInspectionErrors});
+  assert.deepEqual(errors,[]);console.log(JSON.stringify({browserScope:'community',independentHeadless:true,fullGoAPI:true,actualNextPayload:true}));
+ }else {
  if(!adminOnly){
  const page=await context.newPage();pages.push(page);observePage(page);
  page.on('response',response=>{if(new URL(response.url()).host===endpoint.host&&response.url().includes('/chat/')&&response.status()>=400)chatFailures.push({status:response.status(),path:new URL(response.url()).pathname});});
@@ -135,6 +140,7 @@ try{
  await operations.goto(admin.origin+'/admin/operations/feedback?days=all',{waitUntil:'domcontentloaded'});await operations.goto(feedbackURL,{waitUntil:'domcontentloaded'});await status.waitFor();await operations.waitForFunction(()=>document.querySelector('.galaxy-feedback-editor-fields > label:nth-child(3) select')?.value==='processing',{},{timeout:20000});assert.equal(await status.inputValue(),'processing');
  if(adminDevelopment)assert(hmrUpgrades>0,'actual Next development HMR upgrade required');
  assert.deepEqual(errors,[]);console.log(JSON.stringify({browserScope:adminOnly?'admin':'full',adminMode:adminDevelopment?'development':'standalone',developmentHMRConnected:adminDevelopment&&hmrUpgrades>0,independentHeadless:true,fullGoAPI:true,actualNextPayload:true,publicRead:!adminOnly,forumPublishedAndRead:!adminOnly,chatTransportUnavailable:!adminOnly,chatDraftRestored:!adminOnly,feedbackSavedAndReturned:true}));
+ }
 }catch(error){
  // Do not print the descriptor, cookies or CSRF material. Keep real runtime
  // diagnostics in the disposable fixture directory for the parent failure.
@@ -152,7 +158,7 @@ try{
   try{return {...result,...await page.evaluate(()=>({pathname:location.pathname,readyState:document.readyState,bodyChildCount:document.body?.childElementCount??0,scripts:Array.from(document.scripts).filter(script=>script.src).map(script=>new URL(script.src).pathname)}))};}
   catch{return {...result,stateUnavailable:true};}
  }));
- await writeFile(join(directory,'failure.json'),JSON.stringify({errors,consoleErrors,pages:pageStates},null,2)+'\n',{mode:0o600}).catch(()=>{});
+ await writeFile(join(directory,'failure.json'),JSON.stringify({errors,consoleErrors,communityInspectionErrors,pages:pageStates},null,2)+'\n',{mode:0o600}).catch(()=>{});
  console.error('Full API browser cohort failed; Next logs: '+directory);throw error;
 }finally{
  await browser?.close();

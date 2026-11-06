@@ -7,13 +7,13 @@ const recommendationAlgorithm = "galaxy-opportunity-v1"
 var recommendationConstraints = Object{"personalNeeds": true, "supply": true, "negativeFeedback": true}
 
 func defaultPolicy() Object {
-	return Object{"version": int64(0), "enabled": false, "directions": []Object{}, "controls": Object{"avoidRepetition": false, "avoidConcentration": false}, "fixedConstraints": recommendationConstraints, "updatedAt": nil, "algorithm": recommendationAlgorithm}
+	return Object{"version": int64(0), "enabled": false, "directions": []Object{}, "controls": Object{"avoidRepetition": false, "avoidConcentration": false}, "fixedConstraints": recommendationConstraints, "updatedAt": nil, "algorithm": recommendationAlgorithm, "communitySignals": defaultCommunitySignals()}
 }
 func policyView(row Object) Object {
 	if row == nil {
 		return defaultPolicy()
 	}
-	return Object{"version": row["revision"], "enabled": row["enabled"], "directions": row["directions"], "controls": row["controls"], "fixedConstraints": recommendationConstraints, "updatedAt": stamp(row["updated_at"]), "algorithm": recommendationAlgorithm}
+	return Object{"version": row["revision"], "enabled": row["enabled"], "directions": row["directions"], "controls": row["controls"], "fixedConstraints": recommendationConstraints, "updatedAt": stamp(row["updated_at"]), "algorithm": recommendationAlgorithm, "communitySignals": communitySignalsView(object(row["community_signals"]))}
 }
 func themeView(row Object) Object {
 	return Object{"key": "theme:" + str(row, "id"), "id": row["id"], "label": row["label"], "kind": "theme", "version": row["revision"], "enabled": row["enabled"], "mapping": row["mapping"], "source": "operator-mapping"}
@@ -64,6 +64,7 @@ type recommendationCandidate struct {
 	Mode      string
 	Themes    []string
 	Direction int
+	ResultIDs []string
 }
 
 func objects(value any) []Object {

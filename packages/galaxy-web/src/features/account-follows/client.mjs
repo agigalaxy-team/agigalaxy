@@ -26,7 +26,7 @@ export function createAccountFollowsClient({client,lease,memory,getCurrent}){
  function verifyReceipt(value,record){
   const result=verifyOwner(accountFollowReceiptSchema.parse(value));
   if(result.operationId!==record.command.operationId||result.payloadHash!==record.payloadHash||result.state==='acknowledged'&&
-   (result.relationship.targetAccountId!==record.command.targetAccountId||result.relationship.following!==record.command.following||
+   (result.relationship.targetAccountId!==record.command.targetAccountId||result.relationship.following!==record.command.following||record.command.visibility&&result.relationship.visibility!==record.command.visibility||
     result.relationship.revision<record.command.expectedRevision||result.relationship.revision>record.command.expectedRevision+1))fail('account_follow_response_invalid');
   return result;
  }
@@ -52,12 +52,12 @@ export function createAccountFollowsClient({client,lease,memory,getCurrent}){
    }
    return page;
   },
-  async change(targetAccountId,following){
+  async change(targetAccountId,following,visibility){
    current.assertCurrent();if(pending(targetAccountId)){await recover(targetAccountId);return {state:'recovered',pending:!!pending(targetAccountId)};}
    const previous=await status(targetAccountId);
-   if(previous.relationship.following===following)return {state:'unchanged',pending:false};
-   if(following&&!previous.canFollow)fail('account_follow_target_unavailable');
-   const command=accountFollowCommandSchema.parse({operationId:crypto.randomUUID(),targetAccountId,following,expectedRevision:previous.relationship.revision}),
+   if(previous.relationship.following===following&&(!visibility||previous.relationship.visibility===visibility))return {state:'unchanged',pending:false};
+   if(following&&!previous.relationship.following&&!previous.canFollow)fail('account_follow_target_unavailable');
+   const command=accountFollowCommandSchema.parse({operationId:crypto.randomUUID(),targetAccountId,following,expectedRevision:previous.relationship.revision,...(visibility?{visibility}:{})}),
     record={command,payloadHash:await sha256Hex(JSON.stringify(command))};
    current.assertCurrent();if(!memory.writeFollowIntent(lease,record))fail('account_follow_pending');
    try{

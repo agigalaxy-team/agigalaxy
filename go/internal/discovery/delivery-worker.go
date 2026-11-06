@@ -8,11 +8,20 @@ import (
 
 func (w *Worker) DeliverOne(ctx context.Context) (Object, error) {
 	r := w.Runtime
+	// Both queues get one bounded opportunity per tick, even while the other
+	// queue is continuously busy or its engine returns a retryable failure.
+	feedback, e := w.deliverFeedbackState(ctx)
+	if e != nil {
+		return nil, e
+	}
 	claim, e := r.Store.ClaimDelivery(ctx)
 	if e != nil {
 		return nil, e
 	}
 	if claim == nil {
+		if str(feedback, "state") != "idle" && str(feedback, "state") != "not-connected" {
+			return feedback, nil
+		}
 		return Object{"state": "idle"}, nil
 	}
 	settle := func(state string, code *string) error {

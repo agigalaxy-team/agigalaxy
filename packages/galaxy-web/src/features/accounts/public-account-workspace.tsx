@@ -5,7 +5,7 @@ import {createOfficialAccountClient} from './official-account-client.mjs';
 import {loadWebConfiguration} from "../../runtime.mjs";
 import {availableForumContent,type ForumPostView} from "../community-forum/community-forum-view-types";
 import {forumVersionPath} from "../community-forum/community-forum-origin.mjs";
-import {PublicLinkedIds,PublicExternalCredentials} from './public-account-relations';
+import {PublicLinkedIds,PublicExternalCredentials,PublicSocialRelations,PublicCommunityGrowth} from './public-account-relations';
 import {publicAccountReturn,profileReturnLabel} from "../profiles/profile-navigation.mjs";
 import './online-account-settings.css';
 import {AccountFollowControl} from "../account-follows/controls";
@@ -65,6 +65,7 @@ export function PublicAccountWorkspace({accountId,endpoint,navigate,onReturn}:{a
   {value&&<>
    <header className="public-online-account-heading"><AccountProfileAvatar name={value.displayName} avatarKey={value.avatarKey} subjectType={value.subjectType} seed={value.accountId} size={60}/><div><h1>{value.displayName||'银河账户'}</h1>{value.uid&&<p className="account-uid"><span>UID</span> <code>{value.uid}</code></p>}<p>{({person:'个人账户',organization:'组织账户',agent:'Agent 账户'} as Record<string,string>)[value.subjectType??'']??'主体类型尚未记录'} · {value.typeSource==='operator-recorded-statement'?'运营更正记录':'账户持有者声明'}</p></div></header>
    <AccountFollowControl endpoint={endpoint} targetAccountId={value.accountId}/>{value.bio&&<p className="galaxy-profile-bio">{value.bio}</p>}
+   <PublicCommunityGrowth accountId={accountId} endpoint={endpoint} navigate={navigate}/><PublicSocialRelations accountId={accountId} endpoint={endpoint} navigate={navigate}/>
    {value.publicQuery?.showLinkedIds&&<PublicLinkedIds key={'ids:'+accountId} accountId={accountId} endpoint={endpoint} navigate={navigate}/>}
    {value.publicQuery?.showExternalCredentials&&<PublicExternalCredentials key={'credentials:'+accountId} accountId={accountId} endpoint={endpoint}/>}
    {value.posts&&<section><h2>公开发表的内容</h2>{value.posts.items.filter(item=>availableForumContent(item,now)).map(item=>{const path=forumVersionPath(item.locator.postId,item.locator.versionId??item.currentVersionId)??'/app/community';return <article key={item.locator.postId} className="public-account-post"><h3><a href={path} onClick={event=>{if(event.button===0&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();navigate(path);}}}>{item.payload?.title}</a></h3><p>{item.payload?.body.slice(0,220)}</p></article>;})}{!value.posts.items.some(item=>availableForumContent(item,now))&&(value.posts.nextAfter?<output>正在加载可公开的帖子…</output>:<p>当前没有可展示的公开帖子。</p>)}<div ref={more}>{value.posts.nextAfter&&<Button variant="ghost" disabled={busy} onClick={()=>void request.current?.(true)}>{busy?'正在加载…':'更多帖子'}</Button>}</div></section>}

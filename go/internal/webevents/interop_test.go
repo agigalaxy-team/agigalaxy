@@ -71,16 +71,65 @@ func TestCurrentSchemaInteropAndHTTP(t *testing.T) {
 	if e = json.Unmarshal(fixture, &originalCatalog); e != nil {
 		t.Fatal(e)
 	}
-	// The current catalog must preserve the captured browser wire mapping.
-	// Autonomy is an additive producer/consumer contract after the Node capture.
-	expected := originalCatalog.(map[string]any)
-	for _, table := range []string{"operations_autonomy_tasks_v1", "operations_autonomy_configs_v1", "operations_autonomy_dispatches_v1"} {
-		expected["sources"].(map[string]any)[table] = "autonomy"
+	// Preserve every captured mapping while permitting explicit later additions.
+	actual := normalize(t, catalog).(map[string]any)
+	captured := originalCatalog.(map[string]any)
+	contains := func(values []any, want any) bool {
+		for _, v := range values {
+			if reflect.DeepEqual(v, want) {
+				return true
+			}
+		}
+		return false
 	}
-	expected["permissions"].(map[string]any)["autonomy"] = "autonomy.read"
-	expected["admin"] = append(expected["admin"].([]any), "autonomy")
-	if !reflect.DeepEqual(normalize(t, catalog), originalCatalog) {
-		t.Fatal("Go catalog differs from captured topics")
+	for _, section := range []string{"sources", "permissions"} {
+		for key, want := range captured[section].(map[string]any) {
+			if !reflect.DeepEqual(actual[section].(map[string]any)[key], want) {
+				t.Fatalf("captured %s/%s changed", section, key)
+			}
+		}
+	}
+	for _, section := range []string{"aliases", "dependencies"} {
+		for key, values := range captured[section].(map[string]any) {
+			got, ok := actual[section].(map[string]any)[key].([]any)
+			if !ok {
+				t.Fatalf("missing %s/%s", section, key)
+			}
+			for _, v := range values.([]any) {
+				if !contains(got, v) {
+					t.Fatalf("captured %s/%s lost %v", section, key, v)
+				}
+			}
+		}
+	}
+	for _, section := range []string{"web", "admin", "authority"} {
+		got := actual[section].([]any)
+		for _, v := range captured[section].([]any) {
+			if !contains(got, v) {
+				t.Fatalf("captured %s lost %v", section, v)
+			}
+		}
+	}
+	for table, module := range map[string]string{"forum_reactions_v1": "reactions", "community_growth_sources_v1": "growth", "community_growth_recognitions_v1": "growth", "community_growth_rules_v1": "growth", "community_growth_levels_v1": "growth", "community_growth_definitions_v1": "community", "community_assessment_results_v1": "community", "community_assessment_scopes_v1": "community", "community_assessment_config_v1": "rules", "operations_autonomy_tasks_v1": "autonomy", "operations_autonomy_configs_v1": "autonomy", "operations_autonomy_dispatches_v1": "autonomy"} {
+		if actual["sources"].(map[string]any)[table] != module {
+			t.Fatalf("new source %s missing", table)
+		}
+	}
+	for _, topic := range []string{"reactions", "growth", "public-follows"} {
+		if !contains(actual["web"].([]any), topic) {
+			t.Fatalf("new web topic %s missing", topic)
+		}
+	}
+	if actual["permissions"].(map[string]any)["autonomy"] != "autonomy.read" || !contains(actual["admin"].([]any), "autonomy") {
+		t.Fatal("autonomy catalog missing")
+	}
+	for table, topics := range map[string][]string{"account_follows_v1": {"public-follows"}, "community_account_links": {"growth", "public-follows"}, "external_identity_links": {"growth", "public-follows"}, "official_account_profiles_v1": {"growth", "public-follows"}, "community_growth_rules_v1": {"rules"}, "community_growth_levels_v1": {"rules"}, "community_growth_definitions_v1": {"growth"}, "community_growth_recognitions_v1": {"community"}} {
+		got := actual["aliases"].(map[string]any)[table].([]any)
+		for _, topic := range topics {
+			if !contains(got, topic) {
+				t.Fatalf("new alias %s/%s missing", table, topic)
+			}
+		}
 	}
 	auth := &fixtureAuthority{}
 	s := &Service{Pool: pool, Endpoint: "https://events.invalid", Authority: auth}

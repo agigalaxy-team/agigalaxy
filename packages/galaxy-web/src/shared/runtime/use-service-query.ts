@@ -1,12 +1,13 @@
 import {QueryObserver,useQueryClient} from '@tanstack/react-query';
 import {useEffect,useMemo,useRef} from 'react';
 import {galaxyQueryKey,type GalaxyQueryScope} from './query-client';
+import {queryKeyHasObject} from './event-dispatcher';
 import {sourceReadDeadline} from '../../application/query-reads';
 const noPublicMethods:readonly string[]=[];
 
 /** Server values and in-flight reads live only in Query. The callback updates
  * the existing UI projection after a matching source hint, never on focus. */
-export function useServiceQuery(scope:GalaxyQueryScope,module:string,onInvalidate:(reset:boolean)=>void){
+export function useServiceQuery(scope:GalaxyQueryScope,module:string,onInvalidate:(reset:boolean)=>void,objectId?:string){
  const query=useQueryClient(),latest=useRef(onInvalidate);latest.current=onInvalidate;
  const {endpoint,identity,surface}=scope;
  const prefix=useMemo(()=>galaxyQueryKey({endpoint,identity,surface},module),[endpoint,identity,surface,module]);
@@ -22,13 +23,14 @@ export function useServiceQuery(scope:GalaxyQueryScope,module:string,onInvalidat
   document.addEventListener('visibilitychange',visible);
   const unsubscribe=query.getQueryCache().subscribe(event=>{
    if(event.type!=='updated'||!prefix.every((part,index)=>event.query.queryKey[index]===part))return;
+   if(objectId&&!queryKeyHasObject(event.query.queryKey.slice(prefix.length),objectId))return;
    const reset=event.action.type==='setState'&&event.query.state.data===undefined;
    if(event.action.type!=='invalidate'&&!reset)return;
    resetPending=resetPending||reset;if(queued)return;queued=true;
    queueMicrotask(deliver);
   });
   return()=>{active=false;unsubscribe();document.removeEventListener('visibilitychange',visible);for(const value of observers.values()){value.stop();value.observer.destroy();}observers.clear();};
- },[query,prefix,observers]);
+ },[query,prefix,observers,objectId]);
  return useMemo(()=>({
   async read<T>(key:readonly unknown[],load:()=>Promise<T>,{fresh=false,publicRead=false}:{fresh?:boolean;publicRead?:boolean}={}){
    if(identity==='unavailable')throw new Error('query_identity_unavailable');

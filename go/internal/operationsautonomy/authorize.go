@@ -18,6 +18,15 @@ func (s *Service) toolsWithin(ctx context.Context, tx pgx.Tx, row Object, actor 
 	if e != nil {
 		return nil, e
 	}
+	if obj(obj(row["configuration"])["communityAssessment"]) != nil {
+		if s.CommunityAssessmentAllowedWithin == nil || s.CommunityAssessmentTool == nil {
+			return nil, assessmentUnavailable()
+		}
+		if e := s.CommunityAssessmentAllowedWithin(ctx, tx, row, actor); e != nil {
+			return nil, e
+		}
+		return []string{"read-community-assessment-material", "save-community-assessment-result", "assess-task"}, nil
+	}
 	caps := operationsai.Capabilities(str(row["domain"]), role.Permissions)
 	tools := []string{"assess-task", "reconcile-task-operations"}
 	if len(texts(caps["queryPermissions"])) > 0 {
@@ -107,6 +116,9 @@ func (s *Service) Authorize(ctx context.Context, input Object) (Object, error) {
 		}
 		task := Object{"completion": completion, "taskId": row["id"], "operationId": row["id"], "planId": row["config_id"], "planVersion": row["plan_version"], "promptVersion": row["prompt_version"], "delegationVersion": row["delegation_version"], "domain": row["domain"], "aiAccountId": row["ai_account_id"], "mode": row["mode"], "source": row["source"], "purpose": cfg["purpose"], "sessionId": row["session_id"], "roleVersion": roleVersion, "scopeVersion": row["plan_version"], "state": row["state"], "businessState": row["business_state"], "effectiveCheck": row["effective_check"], "roundSeconds": round, "continuation": continuation, "prompt": Object{"boundary": BoundaryPrompt, "role": cfg["prompt"], "context": Object{"title": row["title"], "source": row["source"], "sourceTargets": sources["sourceTargets"], "sourceCoverage": sources["sourceCoverage"], "sourceBasis": sources["basis"], "goal": cfg["goal"]}}, "plan": plan, "scope": Object{"actions": plan["actions"], "resourceIds": plan["resourceIds"]}, "modelBinding": Object{"domain": row["domain"], "source": "current-manual-model-settings"}, "tools": tools}
 		context := obj(obj(task["prompt"])["context"])
+		if assessment := obj(cfg["communityAssessment"]); assessment != nil {
+			context["communityAssessment"] = assessment
+		}
 		unit := executionContext(row, cfg)
 		context["assignment"], context["execution"], context["scheduler"] = unit["assignment"], unit["execution"], unit["scheduler"]
 		context["goal"] = obj(unit["execution"])["objective"]

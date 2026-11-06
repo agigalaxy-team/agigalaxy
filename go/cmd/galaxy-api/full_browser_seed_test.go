@@ -26,7 +26,7 @@ import (
 
 // seedFullBrowser operates only on the disposable database and temporary files
 // created by TestFullEntryBrowserFlow. Publication remains a real HTTP write.
-func seedFullBrowser(t *testing.T, ctx context.Context, pool *pgxpool.Pool, dir, descriptorFile string, files accessfixture.Files, config access.Config, website, admin string) map[string]any {
+func seedFullBrowser(t *testing.T, ctx context.Context, pool *pgxpool.Pool, dir, descriptorFile string, files accessfixture.Files, config access.Config, website, admin, browserScope string) map[string]any {
 	t.Helper()
 	now := time.Now().Unix()
 	at := time.Unix(now, 0).UTC()
@@ -56,7 +56,7 @@ func seedFullBrowser(t *testing.T, ctx context.Context, pool *pgxpool.Pool, dir,
 		if _, e = accountService.EnsureProfileWithin(ctx, tx, account.ID, &person); e != nil {
 			t.Fatal(e)
 		}
-		if _, e = tx.Exec(ctx, "UPDATE official_account_profiles_v1 SET display_name=$2 WHERE account_id=$1", account.ID, name); e != nil {
+		if _, e = tx.Exec(ctx, "UPDATE official_account_profiles_v1 SET display_name=$2, query_enabled=$3 WHERE account_id=$1", account.ID, name, browserScope == "community"); e != nil {
 			t.Fatal(e)
 		}
 		value, csrf := token(), token()
@@ -73,6 +73,13 @@ func seedFullBrowser(t *testing.T, ctx context.Context, pool *pgxpool.Pool, dir,
 	operatorSubject := "fixture-root"
 	if _, e = tx.Exec(ctx, `INSERT INTO operations_operator_principals_v1(operator_id,endpoint,issuer,external_subject,display_name,created_at,updated_at) VALUES($1,$2,$3,$4,'隔离网页处理员',$5,$5) ON CONFLICT DO NOTHING`, files.RootID, files.Endpoint, operatorIssuer, operatorSubject, at); e != nil {
 		t.Fatal(e)
+	}
+	if browserScope == "community" {
+		for _, domain := range []string{"overview", "governance", "messaging", "discovery", "maintenance"} {
+			if _, e = tx.Exec(ctx, `INSERT INTO operations_ai_work_accounts_v1(id,endpoint,domain,name,description,enabled,version,authorization_version,created_at,updated_at) VALUES($1,$2,$3,$4,'隔离环境的岗位配置',false,1,1,$5,$5)`, uuid.NewString(), files.Endpoint, domain, "隔离岗位 "+domain, at); e != nil {
+				t.Fatal(e)
+			}
+		}
 	}
 	operatorToken, operatorCSRF := token(), token()
 	if _, e = tx.Exec(ctx, `INSERT INTO operations_operator_sessions_v1(endpoint,configuration_id,token_hash,operator_id,issuer,external_subject,display_name,role,csrf_token,expires_at) VALUES($1,$2,$3,$4,$5,$6,'隔离网页处理员','administrator',$7,$8)`, files.Endpoint, config.OperatorConfiguration, hash(operatorToken), files.RootID, operatorIssuer, operatorSubject, operatorCSRF, at.Add(time.Hour)); e != nil {

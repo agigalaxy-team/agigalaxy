@@ -16,8 +16,10 @@ import (
 	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/communitygrowth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/runtimeconfig"
@@ -111,7 +113,15 @@ func product(pool *pgxpool.Pool, endpoint string, getenv func(string) string) (*
 	if e != nil {
 		return nil, e
 	}
-	return &subjectlifecycle.ProductDeletion{Forum: &community.Service{Pool: pool, Endpoint: endpoint, Policy: policy}, TaskSnapshots: subjectlifecycle.TaskRedactors{Task: taskmaterials.RedactTaskSnapshot, Participation: taskmaterials.RedactParticipationSnapshot}}, nil
+	forum := &community.Service{Pool: pool, Endpoint: endpoint, Policy: policy}
+	growth := &communitygrowth.Service{Pool: pool, Endpoint: endpoint, Forum: forum}
+	assessment := &communitygrowth.AssessmentService{Service: growth}
+	growth.OnSourceWithin = assessment.SourceChangedWithin
+	autonomy := &operationsautonomy.Service{Pool: pool, Endpoint: endpoint}
+	prepare := func(ctx context.Context, tx pgx.Tx, subject string) (map[string]any, error) {
+		return growth.EraseSubjectSourcesWithTasksWithin(ctx, tx, subject, autonomy.MinimizeCommunityAssessmentTasksWithin)
+	}
+	return &subjectlifecycle.ProductDeletion{Forum: forum, GrowthPrepareWithin: prepare, TaskSnapshots: subjectlifecycle.TaskRedactors{Task: taskmaterials.RedactTaskSnapshot, Participation: taskmaterials.RedactParticipationSnapshot}}, nil
 }
 func commandJSON(raw []byte) ([]byte, error) {
 	value, e := protocol.DecodeOrdered(raw)

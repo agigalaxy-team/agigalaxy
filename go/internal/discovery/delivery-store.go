@@ -90,5 +90,24 @@ func (s *Store) Status(ctx context.Context) (Object, error) {
 	if e != nil {
 		return nil, e
 	}
-	return Object{"deliveries": deliveries, "index": index, "checkedAt": s.now().Unix()}, nil
+	feedback := []Object{}
+	rows, e = s.Pool.Query(ctx, `SELECT CASE WHEN delivery_generation=applied_generation THEN 'applied' WHEN last_error IS NOT NULL THEN 'failed' ELSE 'pending' END,count(*)::int FROM discovery_feedback_state_v1 WHERE endpoint=$1 GROUP BY 1`, s.Endpoint)
+	if e != nil {
+		return nil, e
+	}
+	for rows.Next() {
+		var state string
+		var count int
+		if e = rows.Scan(&state, &count); e != nil {
+			rows.Close()
+			return nil, e
+		}
+		feedback = append(feedback, Object{"state": state, "count": count})
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	return Object{"deliveries": deliveries, "index": index, "feedbackStates": feedback, "checkedAt": s.now().Unix()}, nil
 }
