@@ -17,6 +17,7 @@ func TestRuntimeReadOnlyStatusMatchesOriginalWithoutCreatingData(t *testing.T) {
 	// access fact for these disconnected third-party fixture states.
 	for _, state := range fixture {
 		uploadObject(state)["access"] = map[string]any{"kind": "service", "state": "disconnected"}
+		delete(uploadObject(state), "backgroundModel")
 	}
 	ctx := context.Background()
 	dir := filepath.Join(t.TempDir(), "absent")

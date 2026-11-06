@@ -127,6 +127,7 @@ func TestLocalMaterialLegacySQLiteAndProjection(t *testing.T) {
 	if e = json.Unmarshal(fixtureBytes, &expected); e != nil {
 		t.Fatal(e)
 	}
+	expectReviewPositions(expected, 4)
 	duplicate, e := s.CaptureArchiveMessage(ctx, capture)
 	if e != nil {
 		t.Fatal(e)

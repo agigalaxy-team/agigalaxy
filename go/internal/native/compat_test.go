@@ -51,11 +51,33 @@ func fixture(t *testing.T) (*Store, map[string]any) {
 	get := expected["get"].(map[string]any)
 	pending := expected["pending"].(map[string]any)
 	get["summaryInput"] = map[string]any{"galaxyId": pending["galaxyId"], "workId": pending["workId"], "expectedRevision": pending["expectedRevision"], "throughSequence": pending["throughSequence"]}
+	expectReviewPositions(expected, 2)
 	s, e := NewStore(dir, "https://galaxy.invalid")
 	if e != nil {
 		t.Fatal(e)
 	}
 	return s, expected
+}
+
+// Keep the original fixture bytes and assert the two positions now exposed by
+// the current reader. These fixtures have a summary but no model review cursor.
+func expectReviewPositions(value any, summarizedThrough int64) {
+	switch v := value.(type) {
+	case map[string]any:
+		_, work := v["lastSequence"]
+		_, pending := v["afterSequence"]
+		if v["workId"] != nil && (work || pending) {
+			v["summaryThroughSequence"] = summarizedThrough
+			v["reviewedThroughSequence"] = int64(0)
+		}
+		for _, child := range v {
+			expectReviewPositions(child, summarizedThrough)
+		}
+	case []any:
+		for _, child := range v {
+			expectReviewPositions(child, summarizedThrough)
+		}
+	}
 }
 func same(t *testing.T, want, got any) {
 	t.Helper()

@@ -72,6 +72,7 @@ func TestInteractionAppsOriginalSnapshotAndPrivateResultProjection(t *testing.T)
 				t.Fatal(e)
 			}
 			want := readNativeContractFixture(t, fmt.Sprintf("interaction-%d.json", index))
+			expectReviewPositions(want, 2)
 			if index == 1 {
 				want["selectedWork"].(map[string]any)["summaryInput"] = work["summaryInput"]
 			}
