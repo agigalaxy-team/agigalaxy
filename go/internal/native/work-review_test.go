@@ -2,6 +2,7 @@ package native
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -10,6 +11,86 @@ import (
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 )
+
+func TestExperienceBasisPreservesLegacyDataAndRevisionContext(t *testing.T) {
+	ctx := context.Background()
+	store, expected := fixture(t)
+	work := text(uploadObject(uploadObject(expected["get"])["work"])["workId"])
+	id := "8bea6000-0f13-4000-8000-000000000001"
+	legacy := map[string]any{"id": id, "revision": 1, "title": "可选的迁移方案", "conditions": "比较迁移方案", "method": "考虑离线迁移", "limitations": "尚未执行"}
+	if err := store.historyWrite(ctx, "", nil, func(db *sql.DB, owner string) error {
+		// The installed 0.1.13 schema has no basis column. Preserve that record
+		// and its revision when a newer writer adds context.
+		ddl := strings.Replace(workLearningDDL, ",basis TEXT NOT NULL DEFAULT ''", "", 1)
+		if _, err := db.ExecContext(ctx, ddl); err != nil {
+			return err
+		}
+		if _, err := db.ExecContext(ctx, "INSERT INTO work_experience(id,owner_id,revision,title,conditions,method,limitations,outcome,source_work_id,through_sequence,updated_at) VALUES(?,?,1,?,?,?,'尚未执行','',?,2,?)", id, owner, legacy["title"], legacy["conditions"], legacy["method"], work, localNow()); err != nil {
+			return err
+		}
+		_, err := db.ExecContext(ctx, "INSERT INTO work_experience_revision(id,revision,owner_id,source_work_id,through_sequence,value_json,created_at) VALUES(?,1,?,?,2,?,?)", id, owner, work, jsJSON(legacy), localNow())
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	old, err := store.GetWorkExperience(ctx, WorkExperienceQuery{ID: id})
+	if err != nil || uploadObject(old)["basis"] != "" {
+		t.Fatal("legacy record was annotated without evidence", old, err)
+	}
+	basis := "模型提出的可选方案，用户尚未采纳；未执行迁移。"
+	revision := int64(1)
+	input := WorkExperienceInput{ID: id, ExpectedRevision: &revision, WorkID: work, Title: "可选的迁移方案", Conditions: "比较迁移方案", Method: "可考虑离线迁移", Basis: &basis}
+	if _, err = store.UpsertWorkExperience(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	found, err := store.SearchWorkExperience(ctx, WorkExperienceQuery{Query: "迁移方案"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := uploadRows(uploadObject(found)["items"])
+	if len(items) != 1 || uploadObject(items[0])["basis"] != basis || uploadObject(items[0])["method"] != nil {
+		t.Fatal("candidate lost context or eagerly exposed the method", found)
+	}
+	revision = 2
+	input.Basis = nil // An unchanged older-client round trip keeps its context.
+	if _, err = store.UpsertWorkExperience(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	current, err := store.GetWorkExperience(ctx, WorkExperienceQuery{ID: id})
+	if err != nil || uploadObject(current)["basis"] != basis || integer(uploadObject(current)["revision"]) != 3 {
+		t.Fatal(current, err)
+	}
+	revision = 3
+	input.Method = "考虑另外一种尚未选择的迁移方式"
+	if _, err = store.UpsertWorkExperience(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	current, err = store.GetWorkExperience(ctx, WorkExperienceQuery{ID: id})
+	if err != nil || uploadObject(current)["basis"] != "" {
+		t.Fatal("old context endorsed changed content", current, err)
+	}
+	if err = store.history(ctx, "", func(db *sql.DB, owner string) error {
+		row, e := oneMap(ctx, db, "SELECT value_json FROM work_experience_revision WHERE id=? AND revision=1", id)
+		if e == nil && text(row["value_json"]) != jsJSON(legacy) {
+			t.Fatal("old revision was rewritten")
+		}
+		return e
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.DeleteWork(ctx, WorkQuery{WorkID: work}); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.history(ctx, "", func(db *sql.DB, owner string) error {
+		row, e := oneMap(ctx, db, "SELECT basis FROM work_experience WHERE id=?", id)
+		if e == nil && text(row["basis"]) != "" {
+			t.Fatal("deleted source retained private context")
+		}
+		return e
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestWorkReviewLeaseAndExperienceLifecycle(t *testing.T) {
 	ctx := context.Background()

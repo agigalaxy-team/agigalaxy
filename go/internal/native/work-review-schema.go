@@ -8,7 +8,7 @@ import (
 const workLearningDDL = `CREATE TABLE IF NOT EXISTS work_review_cursor(work_id TEXT PRIMARY KEY,through_sequence INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS work_review_lease(work_id TEXT PRIMARY KEY,review_id TEXT NOT NULL,owner_id TEXT NOT NULL,after_sequence INTEGER NOT NULL,through_sequence INTEGER NOT NULL,expected_revision INTEGER NOT NULL,expires_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS work_review_experience(review_id TEXT NOT NULL,owner_id TEXT NOT NULL,experience_id TEXT NOT NULL,revision INTEGER NOT NULL,PRIMARY KEY(review_id,experience_id));
-CREATE TABLE IF NOT EXISTS work_experience(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL,revision INTEGER NOT NULL,title TEXT NOT NULL,conditions TEXT NOT NULL,method TEXT NOT NULL,limitations TEXT NOT NULL,outcome TEXT NOT NULL,source_work_id TEXT NOT NULL,through_sequence INTEGER NOT NULL,updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS work_experience(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL,revision INTEGER NOT NULL,title TEXT NOT NULL,conditions TEXT NOT NULL,method TEXT NOT NULL,limitations TEXT NOT NULL,outcome TEXT NOT NULL,basis TEXT NOT NULL DEFAULT '',source_work_id TEXT NOT NULL,through_sequence INTEGER NOT NULL,updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS work_experience_revision(id TEXT NOT NULL,revision INTEGER NOT NULL,owner_id TEXT NOT NULL,source_work_id TEXT NOT NULL,through_sequence INTEGER NOT NULL,value_json TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(id,revision));
 CREATE VIRTUAL TABLE IF NOT EXISTS work_experience_search USING fts5(id UNINDEXED,owner_id UNINDEXED,title,conditions,method,limitations,tokenize='trigram');
 CREATE TABLE IF NOT EXISTS work_experience_sources(id TEXT NOT NULL,revision INTEGER NOT NULL,owner_id TEXT NOT NULL,work_id TEXT NOT NULL,PRIMARY KEY(id,revision,work_id));
@@ -16,6 +16,14 @@ CREATE TABLE IF NOT EXISTS work_experience_retired(id TEXT PRIMARY KEY,owner_id 
 
 func ensureWorkLearning(ctx context.Context, db *sql.DB) error {
 	_, err := db.ExecContext(ctx, workLearningDDL)
+	if err != nil {
+		return err
+	}
+	column, err := oneMap(ctx, db, "SELECT name FROM pragma_table_info('work_experience') WHERE name='basis'")
+	if err != nil || column != nil {
+		return err
+	}
+	_, err = db.ExecContext(ctx, "ALTER TABLE work_experience ADD COLUMN basis TEXT NOT NULL DEFAULT ''")
 	return err
 }
 
@@ -27,6 +35,9 @@ func deleteWorkLearningWithin(ctx context.Context, db *sql.DB, owner, workID str
 	if table == nil {
 		return nil
 	}
+	if err = ensureWorkLearning(ctx, db); err != nil {
+		return err
+	}
 	// Keep independently sourced revisions, but never restore one as current.
 	_, err = db.ExecContext(ctx, "INSERT OR IGNORE INTO work_experience_retired(id,owner_id) SELECT e.id,e.owner_id FROM work_experience e JOIN work_experience_sources s ON s.id=e.id AND s.revision=e.revision AND s.owner_id=e.owner_id WHERE s.owner_id=? AND s.work_id=?", owner, workID)
 	if err != nil {
@@ -36,7 +47,7 @@ func deleteWorkLearningWithin(ctx context.Context, db *sql.DB, owner, workID str
 	if err != nil {
 		return err
 	}
-	_, err = db.ExecContext(ctx, "UPDATE work_experience SET title='',conditions='',method='',limitations='',outcome='',source_work_id='',through_sequence=0 WHERE owner_id=? AND id IN (SELECT id FROM work_experience_retired WHERE owner_id=?)", owner, owner)
+	_, err = db.ExecContext(ctx, "UPDATE work_experience SET title='',conditions='',method='',limitations='',outcome='',basis='',source_work_id='',through_sequence=0 WHERE owner_id=? AND id IN (SELECT id FROM work_experience_retired WHERE owner_id=?)", owner, owner)
 	if err != nil {
 		return err
 	}

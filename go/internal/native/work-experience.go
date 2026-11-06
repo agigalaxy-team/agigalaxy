@@ -14,15 +14,16 @@ import (
 )
 
 type WorkExperienceInput struct {
-	ID               string `json:"id,omitempty"`
-	ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
-	Title            string `json:"title"`
-	Conditions       string `json:"conditions"`
-	Method           string `json:"method"`
-	Limitations      string `json:"limitations,omitempty"`
-	Outcome          string `json:"outcome,omitempty"`
-	WorkID           string `json:"workId,omitempty"`
-	GalaxyID         string `json:"galaxyId,omitempty"`
+	ID               string  `json:"id,omitempty"`
+	ExpectedRevision *int64  `json:"expectedRevision,omitempty"`
+	Title            string  `json:"title"`
+	Conditions       string  `json:"conditions"`
+	Method           string  `json:"method"`
+	Limitations      string  `json:"limitations,omitempty"`
+	Outcome          string  `json:"outcome,omitempty"`
+	Basis            *string `json:"basis,omitempty"`
+	WorkID           string  `json:"workId,omitempty"`
+	GalaxyID         string  `json:"galaxyId,omitempty"`
 }
 type WorkExperienceQuery struct {
 	GalaxyID   string `json:"galaxyId,omitempty"`
@@ -33,7 +34,7 @@ type WorkExperienceQuery struct {
 }
 
 func experienceView(row map[string]any, full bool) map[string]any {
-	v := map[string]any{"id": row["id"], "revision": row["revision"], "title": row["title"], "conditions": row["conditions"], "limitations": row["limitations"], "outcome": row["outcome"], "sourceWorkId": row["source_work_id"], "throughSequence": row["through_sequence"], "updatedAt": row["updated_at"]}
+	v := map[string]any{"id": row["id"], "revision": row["revision"], "title": row["title"], "conditions": row["conditions"], "limitations": row["limitations"], "outcome": row["outcome"], "basis": text(row["basis"]), "sourceWorkId": row["source_work_id"], "throughSequence": row["through_sequence"], "updatedAt": row["updated_at"]}
 	if full {
 		v["method"] = row["method"]
 	}
@@ -53,11 +54,12 @@ func experienceViewWithin(ctx context.Context, db *sql.DB, row map[string]any, f
 	return value, nil
 }
 func upsertExperienceWithin(ctx context.Context, db *sql.DB, owner, workID string, through int64, x WorkExperienceInput) (any, error) {
-	if !optionalID(x.ID) || x.Title == "" || len(x.Title) > 720 || x.Conditions == "" || len(x.Conditions) > 16000 || x.Method == "" || len(x.Method) > 32000 || len(x.Limitations) > 16000 || len(x.Outcome) > 1000 {
+	if !optionalID(x.ID) || x.Title == "" || len(x.Title) > 720 || x.Conditions == "" || len(x.Conditions) > 16000 || x.Method == "" || len(x.Method) > 32000 || len(x.Limitations) > 16000 || len(x.Outcome) > 1000 || x.Basis != nil && len(*x.Basis) > 4000 {
 		return nil, workInvalid()
 	}
 	id := x.ID
 	revision := int64(1)
+	basis := ""
 	if id == "" {
 		if x.ExpectedRevision != nil {
 			return nil, workInvalid()
@@ -67,7 +69,7 @@ func upsertExperienceWithin(ctx context.Context, db *sql.DB, owner, workID strin
 		if x.ExpectedRevision == nil {
 			return nil, workInvalid()
 		}
-		row, e := oneMap(ctx, db, "SELECT revision FROM work_experience WHERE id=? AND owner_id=? AND id NOT IN (SELECT id FROM work_experience_retired WHERE owner_id=?)", id, owner, owner)
+		row, e := oneMap(ctx, db, "SELECT revision,basis,title,conditions,method,limitations,outcome FROM work_experience WHERE id=? AND owner_id=? AND id NOT IN (SELECT id FROM work_experience_retired WHERE owner_id=?)", id, owner, owner)
 		if e != nil {
 			return nil, e
 		}
@@ -75,10 +77,18 @@ func upsertExperienceWithin(ctx context.Context, db *sql.DB, owner, workID strin
 			return nil, fault.New("local_experience_revision_conflict", 409)
 		}
 		revision = integer(row["revision"]) + 1
+		// An old annotation must not endorse a changed method. Older clients
+		// may preserve it for identical content, otherwise the new basis is unknown.
+		if text(row["title"]) == x.Title && text(row["conditions"]) == x.Conditions && text(row["method"]) == x.Method && text(row["limitations"]) == x.Limitations && text(row["outcome"]) == x.Outcome {
+			basis = text(row["basis"])
+		}
+	}
+	if x.Basis != nil {
+		basis = *x.Basis
 	}
 	now := localNow()
-	value := map[string]any{"id": id, "revision": revision, "title": x.Title, "conditions": x.Conditions, "method": x.Method, "limitations": x.Limitations, "outcome": x.Outcome, "sourceWorkId": workID, "throughSequence": through, "updatedAt": now}
-	_, e := db.ExecContext(ctx, "INSERT INTO work_experience(id,owner_id,revision,title,conditions,method,limitations,outcome,source_work_id,through_sequence,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,title=excluded.title,conditions=excluded.conditions,method=excluded.method,limitations=excluded.limitations,outcome=excluded.outcome,source_work_id=excluded.source_work_id,through_sequence=excluded.through_sequence,updated_at=excluded.updated_at", id, owner, revision, x.Title, x.Conditions, x.Method, x.Limitations, x.Outcome, workID, through, now)
+	value := map[string]any{"id": id, "revision": revision, "title": x.Title, "conditions": x.Conditions, "method": x.Method, "limitations": x.Limitations, "outcome": x.Outcome, "basis": basis, "sourceWorkId": workID, "throughSequence": through, "updatedAt": now}
+	_, e := db.ExecContext(ctx, "INSERT INTO work_experience(id,owner_id,revision,title,conditions,method,limitations,outcome,basis,source_work_id,through_sequence,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,title=excluded.title,conditions=excluded.conditions,method=excluded.method,limitations=excluded.limitations,outcome=excluded.outcome,basis=excluded.basis,source_work_id=excluded.source_work_id,through_sequence=excluded.through_sequence,updated_at=excluded.updated_at", id, owner, revision, x.Title, x.Conditions, x.Method, x.Limitations, x.Outcome, basis, workID, through, now)
 	if e != nil {
 		return nil, e
 	}
