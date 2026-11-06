@@ -135,10 +135,24 @@
     130,
     131,
     132,
-    133
+    133,
+    134,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145,
+    146,
+    147
   ],
   "serviceVersion": "0.1.0",
-  "schema": 133,
+  "schema": 147,
   "endpointPolicy": "Paths are relative to an explicitly configured isolated service; no production base URL, OAuth credential or runnable public server is supplied.",
   "entries": [
     {
@@ -1566,6 +1580,202 @@
       "documentation": "docs/technical/interfaces.md"
     },
     {
+      "method": "GET",
+      "path": "/v2/community/growth/accounts/{accountId}",
+      "authentication": "none",
+      "meaning": "Public account growth and eligible contributions, or publicly linked identity honors; paginated endpoints accept limit and after. Current profile and source visibility apply.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v2/community/growth/accounts/{accountId}/contributions",
+      "authentication": "none",
+      "meaning": "Public account growth and eligible contributions, or publicly linked identity honors; paginated endpoints accept limit and after. Current profile and source visibility apply.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v2/community/growth/accounts/{accountId}/legacy-honors",
+      "authentication": "none",
+      "meaning": "Public account growth and eligible contributions, or publicly linked identity honors; paginated endpoints accept limit and after. Current profile and source visibility apply.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v2/community/growth/me",
+      "authentication": "official-account-cookie",
+      "meaning": "Current account growth or contributions; linked identity honors still require the association to be public. Paginated endpoints accept limit and after.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v2/community/growth/me/contributions",
+      "authentication": "official-account-cookie",
+      "meaning": "Current account growth or contributions; linked identity honors still require the association to be public. Paginated endpoints accept limit and after.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v2/community/growth/me/legacy-honors",
+      "authentication": "official-account-cookie",
+      "meaning": "Current account growth or contributions; linked identity honors still require the association to be public. Paginated endpoints accept limit and after.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v2/community/growth/recognitions/status",
+      "authentication": "official-account-cookie",
+      "meaning": "Current section maintainer scoped recognition; command checks the actual content and scope, receipt reads the original operation.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v2/community/growth/recognitions/query",
+      "authentication": "official-account-cookie",
+      "meaning": "Current section maintainer scoped recognition; command checks the actual content and scope, receipt reads the original operation.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v2/community/growth/recognitions/command",
+      "authentication": "official-account-cookie",
+      "meaning": "Current section maintainer scoped recognition; command checks the actual content and scope, receipt reads the original operation.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v2/community/growth/recognitions/receipt",
+      "authentication": "official-account-cookie",
+      "meaning": "Current section maintainer scoped recognition; command checks the actual content and scope, receipt reads the original operation.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/operations/community-growth/query",
+      "authentication": "operations-cookie",
+      "meaning": "Management growth rules, recognition or private assessment. Domain permissions are checked within the transaction; writes retain the original operation receipt.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/operations/community-growth/command",
+      "authentication": "operations-cookie",
+      "meaning": "Management growth rules, recognition or private assessment. Domain permissions are checked within the transaction; writes retain the original operation receipt.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/operations/community-growth/receipt",
+      "authentication": "operations-cookie",
+      "meaning": "Management growth rules, recognition or private assessment. Domain permissions are checked within the transaction; writes retain the original operation receipt.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/operations/community-growth/assessment-config",
+      "authentication": "operations-cookie",
+      "meaning": "Management growth rules, recognition or private assessment. Domain permissions are checked within the transaction; writes retain the original operation receipt.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/operations/community-growth/assessment-config-command",
+      "authentication": "operations-cookie",
+      "meaning": "Management growth rules, recognition or private assessment. Domain permissions are checked within the transaction; writes retain the original operation receipt.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/operations/community-growth/assessment-config-receipt",
+      "authentication": "operations-cookie",
+      "meaning": "Management growth rules, recognition or private assessment. Domain permissions are checked within the transaction; writes retain the original operation receipt.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/operations/community-growth/weights",
+      "authentication": "operations-cookie",
+      "meaning": "Management growth rules, recognition or private assessment. Domain permissions are checked within the transaction; writes retain the original operation receipt.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v2/community/reactions/status",
+      "authentication": "source-specific-optional-account",
+      "meaning": "Real post/reply likes and cancellation; status checks source visibility, command and receipt use the original account operation.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v2/community/reactions/command",
+      "authentication": "official-account-cookie-or-galaxy-session",
+      "meaning": "Real post/reply likes and cancellation; status checks source visibility, command and receipt use the original account operation.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v2/community/reactions/receipt",
+      "authentication": "official-account-cookie-or-galaxy-session",
+      "meaning": "Real post/reply likes and cancellation; status checks source visibility, command and receipt use the original account operation.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/follows/status",
+      "authentication": "official-account-cookie",
+      "meaning": "Account follow state, visibility and original operation receipt; new relationships default public and existing private relationships stay private.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/follows/query",
+      "authentication": "official-account-cookie",
+      "meaning": "Account follow state, visibility and original operation receipt; new relationships default public and existing private relationships stay private.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/follows/command",
+      "authentication": "official-account-cookie",
+      "meaning": "Account follow state, visibility and original operation receipt; new relationships default public and existing private relationships stay private.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/follows/receipt",
+      "authentication": "official-account-cookie",
+      "meaning": "Account follow state, visibility and original operation receipt; new relationships default public and existing private relationships stay private.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/follows/public-query",
+      "authentication": "none",
+      "meaning": "Current public following or followers for an eligible public profile; private relationships are excluded.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/operations/recommendation/community-signals",
+      "authentication": "operations-cookie",
+      "meaning": "Read the current community recommendation settings with recommendations.read.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/operations/recommendation/community-signals",
+      "authentication": "operations-cookie",
+      "meaning": "Save community recommendation settings with recommendations.configure and original operation ID.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/operations/recommendation/operations/{operationId}",
+      "authentication": "operations-cookie",
+      "meaning": "Read the original recommendation operation receipt with recommendations.read.",
+      "documentation": "docs/technical/community-growth-and-reputation.md"
+    },
+    {
       "method": "POST",
       "path": "/v1/account/bookmarks/status",
       "authentication": "official-account-cookie",
@@ -1765,6 +1975,7 @@
     }
   ],
   "sources": [
+    "go/cmd/galaxy-api/agentos-actions.go",
     "go/cmd/galaxy-api/agentos-execution.go",
     "go/cmd/galaxy-api/agentos-summary.go",
     "go/cmd/galaxy-api/agentos-workbench.go",
@@ -1792,9 +2003,14 @@
     "go/cmd/galaxy-migrate/main.go",
     "go/cmd/galaxy-publisher/main.go",
     "go/cmd/galaxy-worker/main.go",
+    "go/cmd/galaxy/client.go",
+    "go/cmd/galaxy/ingress.go",
     "go/cmd/galaxy/install.go",
     "go/cmd/galaxy/local.go",
     "go/cmd/galaxy/main.go",
+    "go/cmd/galaxy/service.go",
+    "go/cmd/galaxy/update-download.go",
+    "go/cmd/galaxy/update.go",
     "go/internal/access/account-login.go",
     "go/internal/access/account-store.go",
     "go/internal/access/configuration.go",
@@ -1823,6 +2039,7 @@
     "go/internal/accountlinks/controller_source.go",
     "go/internal/accountlinks/http.go",
     "go/internal/accountlinks/links.go",
+    "go/internal/accountlinks/native.go",
     "go/internal/accountlinks/operations_party.go",
     "go/internal/accountlinks/providers.go",
     "go/internal/accountlinks/query.go",
@@ -1840,6 +2057,7 @@
     "go/internal/accountsocial/input.go",
     "go/internal/accountsocial/lifecycle.go",
     "go/internal/accountsocial/profile_source.go",
+    "go/internal/accountsocial/public_follows.go",
     "go/internal/accountsocial/service.go",
     "go/internal/attachments/attachments.go",
     "go/internal/attachments/clamav.go",
@@ -1893,6 +2111,25 @@
     "go/internal/civ2/worker.go",
     "go/internal/community/events.go",
     "go/internal/community/service.go",
+    "go/internal/communitygrowth/assessment-management.go",
+    "go/internal/communitygrowth/assessment-materials.go",
+    "go/internal/communitygrowth/assessment-results.go",
+    "go/internal/communitygrowth/assessment.go",
+    "go/internal/communitygrowth/backfill.go",
+    "go/internal/communitygrowth/events.go",
+    "go/internal/communitygrowth/http.go",
+    "go/internal/communitygrowth/legacy_honors.go",
+    "go/internal/communitygrowth/lifecycle.go",
+    "go/internal/communitygrowth/management.go",
+    "go/internal/communitygrowth/moderation.go",
+    "go/internal/communitygrowth/owner.go",
+    "go/internal/communitygrowth/projection.go",
+    "go/internal/communitygrowth/public.go",
+    "go/internal/communitygrowth/ranking.go",
+    "go/internal/communitygrowth/recognition.go",
+    "go/internal/communitygrowth/rule_commands.go",
+    "go/internal/communitygrowth/service.go",
+    "go/internal/communitygrowth/worker.go",
     "go/internal/configurations/grant_author.go",
     "go/internal/configurations/http.go",
     "go/internal/configurations/input.go",
@@ -1924,6 +2161,7 @@
     "go/internal/deviceauth/status.go",
     "go/internal/deviceauth/trust-identity.go",
     "go/internal/deviceauth/watch-authority.go",
+    "go/internal/discovery/feedback-state.go",
     "go/internal/discovery/legacy-http.go",
     "go/internal/discovery/legacy-search.go",
     "go/internal/discovery/model.go",
@@ -1945,6 +2183,7 @@
     "go/internal/feedback/http.go",
     "go/internal/feedback/input.go",
     "go/internal/feedback/operations.go",
+    "go/internal/feedback/original-ai-receipt.go",
     "go/internal/feedback/owner_data.go",
     "go/internal/feedback/owner_data_content.go",
     "go/internal/feedback/owner_data_http.go",
@@ -2024,6 +2263,7 @@
     "go/internal/messaging/transport.go",
     "go/internal/native/archive-material.go",
     "go/internal/native/archive.go",
+    "go/internal/native/chat-message-journal.go",
     "go/internal/native/choice-scope.go",
     "go/internal/native/choice.go",
     "go/internal/native/command-local.go",
@@ -2033,10 +2273,15 @@
     "go/internal/native/history-material.go",
     "go/internal/native/history-tools.go",
     "go/internal/native/history.go",
+    "go/internal/native/host-command.go",
+    "go/internal/native/host-summary-ingress.go",
+    "go/internal/native/host-summary-source.go",
+    "go/internal/native/host-transcript-lock.go",
     "go/internal/native/host.go",
     "go/internal/native/identity-group-remote.go",
     "go/internal/native/identity-recovery-browser.go",
     "go/internal/native/initialization.go",
+    "go/internal/native/installation-identity.go",
     "go/internal/native/interaction-apps-sync.go",
     "go/internal/native/interaction-apps.go",
     "go/internal/native/interaction-browser.go",
@@ -2061,17 +2306,30 @@
     "go/internal/native/remote-summary.go",
     "go/internal/native/remote-watch.go",
     "go/internal/native/store.go",
+    "go/internal/native/work-experience.go",
+    "go/internal/native/work-review.go",
     "go/internal/native/work-write.go",
+    "go/internal/nativebridge/bridge.go",
+    "go/internal/nativebridge/client.go",
+    "go/internal/nativebridge/drain-client.go",
+    "go/internal/nativebridge/drain-service.go",
+    "go/internal/nativebridge/release.go",
+    "go/internal/nativebridge/service.go",
     "go/internal/operationalmetrics/configuration.go",
     "go/internal/operationsai/authority.go",
+    "go/internal/operationsautonomy/ai_original_receipt.go",
     "go/internal/operationsautonomy/code.go",
+    "go/internal/operationsautonomy/community_assessment.go",
     "go/internal/operationsautonomy/configuration.go",
     "go/internal/operationsautonomy/control.go",
+    "go/internal/operationsautonomy/dispatch.go",
+    "go/internal/operationsautonomy/duty-strategy-artifacts.go",
     "go/internal/operationsautonomy/duty-tools.go",
     "go/internal/operationsautonomy/duty.go",
     "go/internal/operationsautonomy/events.go",
     "go/internal/operationsautonomy/http.go",
     "go/internal/operationsautonomy/model.go",
+    "go/internal/operationsautonomy/native-attempt.go",
     "go/internal/operationsautonomy/native.go",
     "go/internal/operationsautonomy/operation-authority.go",
     "go/internal/operationsautonomy/options.go",

@@ -16,6 +16,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/cases"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/civ2"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/communitygrowth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/deviceauth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/discovery"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/discoveryconfig"
@@ -145,6 +146,9 @@ type Runtime struct {
 	Probes                 *builders.ProbeWorker
 	discoverySeedComplete  bool
 	nextDiscoveryReconcile time.Time
+	Growth                 *communitygrowth.Worker
+	Assessment             *communitygrowth.AssessmentWorker
+	nextGrowthReconcile    time.Time
 	Registered             *registeredusers.Directory
 	nextRegisteredSync     time.Time
 	nextRetentionCheck     time.Time
@@ -359,6 +363,7 @@ func assemble(ctx context.Context, pool *pgxpool.Pool, c Config) (*Runtime, erro
 	runtime := &Runtime{Pool: pool, Queue: queue, Consumers: consumers, Evidence: evidenceService, CI: ciService, Messaging: messages, Autonomy: autonomy, LegacyIndex: legacyIndex, Probes: probes, Forum: c.Forum, Retention: retention}
 	runtime.adoptScheduler(queue, c, stored)
 	runtime.adoptAutonomy(queue)
+	runtime.adoptCommunityGrowth()
 	runtime.adoptRegistered(c)
 	runtime.Discovery, e = discoveryWorker(ctx, pool, c)
 	if e != nil {
@@ -409,6 +414,7 @@ func (r *Runtime) Run(ctx context.Context) error {
 		case <-discoveryTick.C:
 			r.sourceMaintenance(ctx)
 			r.discoveryMaintenance(ctx)
+			r.communityGrowthMaintenance(ctx)
 		}
 	}
 	shutdown, cancel := context.WithTimeout(context.Background(), 30*time.Second)

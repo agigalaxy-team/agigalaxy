@@ -6,6 +6,21 @@ const accountId=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][
 const accountUid=value=>typeof value==='string'&&/^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{6,16}$/.test(value);
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 
+// Public projections are constructed before query caching; management-only fields never enter it.
+const growthDeadline=value=>{if(value===null)return null;if(!Number.isSafeInteger(value)||value<0)fail('official_account_response_invalid');return value;};
+export function publicGrowth(value,id){
+ const level=x=>{if(!x||!Number.isSafeInteger(x.level)||!Number.isSafeInteger(x.minimum)||typeof x.label!=='string')fail('official_account_response_invalid');return{level:x.level,minimum:x.minimum,label:x.label};};
+ if(!value||value.accountId!==id||!Number.isSafeInteger(value.experience)||!Array.isArray(value.domains)||!Array.isArray(value.honors))fail('official_account_response_invalid');
+ return {accountId:id,readExpiresAt:growthDeadline(value.readExpiresAt),experience:value.experience,level:level(value.level),nextLevel:value.nextLevel===null?null:level(value.nextLevel),domains:value.domains.map(x=>{if(typeof x?.domain!=='string'||!Number.isSafeInteger(x.experience))fail('official_account_response_invalid');return{domain:x.domain,experience:x.experience};}),honors:value.honors.map(x=>{if(typeof x?.id!=='string'||typeof x.name!=='string'||typeof x.description!=='string')fail('official_account_response_invalid');return{id:x.id,name:x.name,description:x.description};})};
+}
+export function publicContributions(value,id){
+ if(!value||value.accountId!==id||!Array.isArray(value.items)||value.nextAfter!==null&&typeof value.nextAfter!=='string')fail('official_account_response_invalid');
+ return {accountId:id,readExpiresAt:growthDeadline(value.readExpiresAt),nextAfter:value.nextAfter,items:value.items.map(x=>{if(!x||typeof x.sourceKind!=='string'||typeof x.sourceId!=='string'||typeof x.title!=='string'||typeof x.objectKind!=='string'||typeof x.objectId!=='string'||!Number.isSafeInteger(x.experience))fail('official_account_response_invalid');return{sourceKind:x.sourceKind,sourceId:x.sourceId,title:x.title,objectKind:x.objectKind,objectId:x.objectId,experience:x.experience};})};
+}
+export function publicLegacyHonors(value,id){
+ if(!value||value.accountId!==id||!Array.isArray(value.items)||value.nextAfter!==null&&typeof value.nextAfter!=='string'||!Number.isSafeInteger(value.checkedAt))fail('official_account_response_invalid');
+ return {accountId:id,nextAfter:value.nextAfter,checkedAt:value.checkedAt,items:value.items.map(item=>{const card=item?.card;if(!guid(item?.subjectId)||typeof card?.id!=='string'||card.status!=='active'||typeof card.rule?.title!=='string')fail('official_account_response_invalid');return{subjectId:item.subjectId,card:{id:card.id,title:card.rule.title}};})};
+}
 function returnPath(value,website){
  if(typeof value!=='string'||value.length>2048||!value.startsWith('/app')||value.startsWith('//')||value.includes('\\')||Array.from(value).some(character=>character.charCodeAt(0)<32||character.charCodeAt(0)===127))return '/app/account';
  try{const url=new URL(value,website);url.searchParams.delete('accountLogin');return url.origin===website&&(url.pathname==='/app'||url.pathname.startsWith('/app/'))?url.pathname+url.search+url.hash:'/app/account';}catch{return '/app/account';}
@@ -48,6 +63,10 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
  }
  return Object.freeze({
    async session({after,signal}={}){if(after!==undefined&&!guid(after))fail('official_account_cursor_invalid');const value=readSession(await request('/v1/account/session'+(after?'?after='+encodeURIComponent(after):''),{signal}));currentSession=value.state==='signed-in'?value:null;return value;},
+   async publicFollows(id,direction,{after,signal}={}){if(!accountId(id)||!['following','followers'].includes(direction))fail('official_account_request_invalid');return request('/v1/account/follows/public-query',{method:'POST',anonymous:true,signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({accountId:id,direction,...(after?{after}:{})})});},
+   async communityLegacyHonors(id,{after,signal}={}){if(!accountId(id))fail('official_account_request_invalid');const query=new URLSearchParams({limit:'1',...(after?{after}:{})});return publicLegacyHonors(await request('/v2/community/growth/accounts/'+id+'/legacy-honors?'+query,{method:'GET',anonymous:true,signal}),id);},
+   async communityGrowth(id,{signal}={}){if(!accountId(id))fail('official_account_request_invalid');return publicGrowth(await request('/v2/community/growth/accounts/'+id,{method:'GET',anonymous:true,signal}),id);},
+   async communityContributions(id,{after,signal}={}){if(!accountId(id))fail('official_account_request_invalid');return publicContributions(await request('/v2/community/growth/accounts/'+id+'/contributions'+(after?'?'+new URLSearchParams({after}):''),{method:'GET',anonymous:true,signal}),id);},
    async publicAccount(id,{signal}={}){if(!accountId(id))fail('official_account_request_invalid');return request('/v1/account/public/'+id,{method:'GET',anonymous:true,signal});},
    async publicAccountByUid(uid,{signal}={}){if(!accountUid(uid))fail('official_account_request_invalid');return request('/v1/account/public/by-uid/'+encodeURIComponent(uid.toUpperCase()),{method:'GET',anonymous:true,signal});},
     /** @param {string} id @param {{after?:string,limit?:number,signal?:AbortSignal}} [page] */
@@ -76,7 +95,7 @@ export function createOfficialAccountClient({endpoint,website=globalThis.locatio
    const allowed=accountComment||method==='POST'&&path===route&&!!accountFollowMethod(route)||feedbackDataWrite||feedbackSubmissionOperation||feedbackDataOperation||feedbackDataExport||/^\/v1\/account\/chat-reports\/(?:config|source|query|report|event|receipt|get)$/.test(route)||isAccountChatJsonPath(route)||isAccountBookmarkPath(route)||/^\/v2\/community\/[a-z0-9/-]+$/.test(route)||/^\/v1\/account\/(?:settings|type-change|archives(?:\/(?:create|chunk|complete|export|delete|cleanup|status))?|work\/(?:get|list|status|delete))$/.test(route)
     ||/^\/v1\/account\/external-credentials(?:\/[0-9a-f-]{36}(?:\/recheck)?)?$/.test(route)||noticeList&&method==='GET'||noticeRead&&method==='POST'||path==='/v1/account/feedback'&&method==='POST'
     ||path===route&&/^\/v1\/account\/feedback\/attachments\/(?:config|prepare|read|revoke)$/.test(route)&&method==='POST';
-   const queryKeys=noticeList?['after','limit','unreadOnly']:feedbackDataExport||route==='/v1/account/archives'?['after','limit']:route==='/v1/account/external-credentials'?['after']:route==='/v2/community/quotas'?['postId','replyId','sectionId']:[];
+   const queryKeys=noticeList?['after','limit','unreadOnly']:feedbackDataExport||route==='/v1/account/archives'?['after','limit']:route==='/v1/account/external-credentials'?['after']:route==='/v2/community/quotas'?['postId','replyId','sectionId']:['/v2/community/growth/me/contributions','/v2/community/growth/me/legacy-honors'].includes(route)?['after','limit']:[];
    if(parsed.origin!==endpoint||!allowed||[...parsed.searchParams.keys()].some(key=>!queryKeys.includes(key)||parsed.searchParams.getAll(key).length!==1)||parsed.search&&method!=='GET'
     ||method==='DELETE'&&!/^\/v1\/account\/external-credentials\/[0-9a-f-]{36}$/.test(route))fail('official_account_request_invalid');
    if(noticeList){

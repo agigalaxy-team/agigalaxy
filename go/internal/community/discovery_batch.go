@@ -12,6 +12,15 @@ type DiscoveryReference struct{ Kind, ID string }
 // information needed by discovery, without version history or attachments.
 // The caller supplies a repeatable-read transaction for the entire snapshot.
 func (s *Service) ReadPublicDiscoveryBatchWithin(ctx context.Context, tx pgx.Tx, refs []DiscoveryReference) ([]Object, error) {
+	return s.readPublicDiscoveryBatchWithin(ctx, tx, refs, false)
+}
+
+// ReadPublicDiscoverySummaryBatchWithin preserves discovery eligibility while
+// transferring only the content title and topic required for growth views.
+func (s *Service) ReadPublicDiscoverySummaryBatchWithin(ctx context.Context, tx pgx.Tx, refs []DiscoveryReference) ([]Object, error) {
+	return s.readPublicDiscoveryBatchWithin(ctx, tx, refs, true)
+}
+func (s *Service) readPublicDiscoveryBatchWithin(ctx context.Context, tx pgx.Tx, refs []DiscoveryReference, summary bool) ([]Object, error) {
 	if s == nil || s.Endpoint == "" {
 		return nil, fail("forum_service_unavailable", 503)
 	}
@@ -44,7 +53,11 @@ func (s *Service) ReadPublicDiscoveryBatchWithin(ctx context.Context, tx pgx.Tx,
 		postMap[str(head, "id")] = head
 		versionIDs = append(versionIDs, str(head, "current_version_id"))
 	}
-	replyRows, e := rows(ctx, tx, `SELECT to_jsonb(r)||jsonb_build_object('payload_text',ev.payload_text,'event_erased',ev.erased_at) FROM forum_replies_v1 r LEFT JOIN forum_events_v1 ev ON ev.id=r.publication_event_id WHERE r.id=ANY($1::uuid[])`, batchIDs(replies...))
+	payloadColumn := "ev.payload_text"
+	if summary {
+		payloadColumn = "public.galaxy_forum_public_payload_summary_v1(ev.payload_text)"
+	}
+	replyRows, e := rows(ctx, tx, `SELECT to_jsonb(r)||jsonb_build_object('payload_text',`+payloadColumn+`,'event_erased',ev.erased_at) FROM forum_replies_v1 r LEFT JOIN forum_events_v1 ev ON ev.id=r.publication_event_id WHERE r.id=ANY($1::uuid[])`, batchIDs(replies...))
 	if e != nil {
 		return nil, e
 	}
@@ -53,7 +66,7 @@ func (s *Service) ReadPublicDiscoveryBatchWithin(ctx context.Context, tx pgx.Tx,
 		versionIDs = append(versionIDs, str(reply, "post_version_id"))
 		posts = append(posts, str(reply, "post_id"))
 	}
-	versions, e := rows(ctx, tx, `SELECT to_jsonb(v)||jsonb_build_object('payload_text',ev.payload_text,'event_erased',ev.erased_at,'post_state',p.state,'head_version',p.head_version,'current_version_id',p.current_version_id,'post_created_at',p.created_at,'post_updated_at',p.updated_at) FROM forum_versions_v1 v JOIN forum_posts_v1 p ON p.id=v.post_id LEFT JOIN forum_events_v1 ev ON ev.id=v.publication_event_id WHERE v.id=ANY($1::uuid[])`, batchIDs(versionIDs...))
+	versions, e := rows(ctx, tx, `SELECT to_jsonb(v)||jsonb_build_object('payload_text',`+payloadColumn+`,'event_erased',ev.erased_at,'post_state',p.state,'head_version',p.head_version,'current_version_id',p.current_version_id,'post_created_at',p.created_at,'post_updated_at',p.updated_at) FROM forum_versions_v1 v JOIN forum_posts_v1 p ON p.id=v.post_id LEFT JOIN forum_events_v1 ev ON ev.id=v.publication_event_id WHERE v.id=ANY($1::uuid[])`, batchIDs(versionIDs...))
 	if e != nil {
 		return nil, e
 	}
@@ -135,6 +148,23 @@ func (s *Service) ReadPublicDiscoveryBatchWithin(ctx context.Context, tx pgx.Tx,
 		}
 		return true, nil
 	}
+	// A deadline is derived from real publication/consent fields only. Consent
+	// binding expiration is deliberately excluded: the normal public permission
+	// rules preserve certain accepted authorizations after binding expiry.
+	deadline := func(source Object) int64 {
+		f := facts.permissions[str(source, "permission_id")]
+		candidates := []int64{seconds(source["published_until"]), seconds(f.permission["published_until"])}
+		if str(f.permission, "authorization_kind") != "official-account" {
+			candidates = append(candidates, num(obj(f.evidence, "intent"), "expiresAt"))
+		}
+		var earliest int64
+		for _, n := range candidates {
+			if n > 0 && (earliest == 0 || n < earliest) {
+				earliest = n
+			}
+		}
+		return earliest
+	}
 	versionView := func(version Object) (Object, error) {
 		if version == nil || str(version, "state") == "withdrawn" || str(version, "post_state") == "withdrawn" {
 			return nil, nil
@@ -168,7 +198,13 @@ func (s *Service) ReadPublicDiscoveryBatchWithin(ctx context.Context, tx pgx.Tx,
 		if topic == "" {
 			topic = "unclassified"
 		}
-		return Object{"availability": "available", "currentVersionId": version["current_version_id"], "payload": payload, "topic": topic, "operatorCuration": curated, "authorAccountId": version["account_id"], "createdAt": seconds(version["post_created_at"]), "publishedUntil": seconds(version["published_until"])}, nil
+		out := Object{"availability": "available", "currentVersionId": version["current_version_id"], "payload": payload, "topic": topic, "operatorCuration": curated, "authorAccountId": version["account_id"], "createdAt": seconds(version["post_created_at"]), "publishedUntil": seconds(version["published_until"])}
+		if summary {
+			if until := deadline(version); until > 0 {
+				out["readExpiresAt"] = until
+			}
+		}
+		return out, nil
 	}
 	out := make([]Object, len(refs))
 	for i, ref := range refs {
@@ -248,6 +284,16 @@ func (s *Service) ReadPublicDiscoveryBatchWithin(ctx context.Context, tx pgx.Tx,
 			continue
 		}
 		out[i] = Object{"availability": "available", "parentAvailability": "available", "revision": r["revision"], "locator": Object{"postId": r["post_id"]}, "payload": payload, "topic": topic, "operatorCuration": curated, "authorAccountId": r["account_id"], "createdAt": seconds(r["created_at"]), "publishedUntil": seconds(r["published_until"])}
+		if summary {
+			until := deadline(r)
+			parentUntil := num(parentView, "readExpiresAt")
+			if parentUntil > 0 && (until == 0 || parentUntil < until) {
+				until = parentUntil
+			}
+			if until > 0 {
+				out[i]["readExpiresAt"] = until
+			}
+		}
 	}
 	return out, nil
 }

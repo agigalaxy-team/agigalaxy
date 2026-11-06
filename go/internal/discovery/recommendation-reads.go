@@ -335,7 +335,10 @@ func (s *Recommendations) CommandResult(ctx context.Context, actor Actor, id str
 	var kind, result any
 	receipt := object(row["receipt"])
 	revision := number(row, "revision")
-	if revision > 0 && revision <= 9007199254740991 && number(receipt, "version") == revision && themeKey(str(row, "theme_key")) {
+	if revision > 0 && revision <= 9007199254740991 && number(receipt, "version") == revision && str(row, "kind") == "policy-updated" && str(row, "theme_key") == "community-signals" {
+		kind = "community-signals"
+		result = Object{"version": receipt["version"]}
+	} else if revision > 0 && revision <= 9007199254740991 && number(receipt, "version") == revision && themeKey(str(row, "theme_key")) {
 		if str(row, "kind") == "policy-updated" {
 			kind = "policy"
 			result = Object{"version": receipt["version"], "themeKey": row["theme_key"]}

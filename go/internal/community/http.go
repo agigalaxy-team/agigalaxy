@@ -52,7 +52,7 @@ func route(r *http.Request) bool {
 	}
 	if r.Method == "POST" {
 		switch strings.Join(p, "/") {
-		case "posts", "replies", "posts/query", "posts/owned", "replies/query", "receipt", "posts/withdraw", "versions/withdraw", "replies/withdraw", "sections", "sections/query", "notifications/query", "notifications/read", "reports", "reports/withdraw", "reports/config", "reports/query", "affected-events/query", "accounts/query":
+		case "reactions/status", "reactions/command", "reactions/receipt", "posts", "replies", "posts/query", "posts/owned", "replies/query", "receipt", "posts/withdraw", "versions/withdraw", "replies/withdraw", "sections", "sections/query", "notifications/query", "notifications/read", "reports", "reports/withdraw", "reports/config", "reports/query", "affected-events/query", "accounts/query":
 			return true
 		}
 		return len(p) == 3 && validID(p[1]) && (p[0] == "posts" && p[2] == "versions" || p[0] == "sections" && p[2] == "classification" || p[0] == "reports" && (p[2] == "events" || p[2] == "appeal"))
@@ -103,7 +103,7 @@ func (h Handler) dispatch(r *http.Request, requestID string) (Object, error) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v2/community/"), "/")
 	path := strings.Join(parts, "/")
 	write := r.Method == "POST" && (path == "posts" || path == "replies" || path == "sections" || path == "reports" || strings.HasSuffix(path, "/withdraw") || len(parts) == 3 && ((parts[0] == "reports" && (parts[2] == "events" || parts[2] == "appeal")) || parts[0] == "sections" && parts[2] == "classification"))
-	required := write || path == "receipt" || path == "quotas" || strings.HasPrefix(path, "reports/") || strings.HasPrefix(path, "permissions/") || path == "affected-events/query" || strings.HasPrefix(path, "notifications/") || path == "posts/owned" || strings.HasSuffix(path, "/owned")
+	required := write || path == "reactions/command" || path == "reactions/receipt" || path == "receipt" || path == "quotas" || strings.HasPrefix(path, "reports/") || strings.HasPrefix(path, "permissions/") || path == "affected-events/query" || strings.HasPrefix(path, "notifications/") || path == "posts/owned" || strings.HasSuffix(path, "/owned")
 	account := ""
 	var e error
 	if r.Header.Get("Authorization") != "" {
@@ -313,6 +313,8 @@ func (h Handler) dispatch(r *http.Request, requestID string) (Object, error) {
 		return s.Withdraw(r.Context(), account, kind, *envelope.PayloadJSON)
 	}
 	switch path {
+ case "reactions/status", "reactions/command", "reactions/receipt":
+  return s.Reactions(r.Context(), account, strings.TrimPrefix(path, "reactions/"), raw)
 	case "accounts/query":
 		return s.AccountChoices(r.Context(), account, raw)
 	case "reports/config":

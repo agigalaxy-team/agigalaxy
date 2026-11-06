@@ -347,6 +347,14 @@ func (s *Service) taskConfigWithin(ctx context.Context, tx pgx.Tx, task Object, 
 	if e != nil {
 		return nil, e
 	}
+	if owner := obj(obj(task["configuration"])["taskOwner"]); owner != nil {
+		resolve := s.TaskOwners[str(owner["kind"])]
+		if resolve == nil {
+			return nil, fault.New("operations_autonomy_task_owner_unavailable", 503)
+		}
+		cfg["enabled"], e = resolve(ctx, tx, task)
+		return cfg, e
+	}
 	dispatch := obj(obj(task["configuration"])["dispatch"])
 	if dispatch == nil {
 		return cfg, nil

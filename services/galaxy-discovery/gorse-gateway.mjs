@@ -16,6 +16,7 @@ function allowed(method,url){
  if(method==='GET'&&p==='/api/health/ready')return !url.search;
  if(method==='POST'&&['/api/user','/api/items'].includes(p)||method==='PUT'&&p==='/api/feedback')return !url.search;
  if(method==='DELETE'&&/^\/api\/item\/(post|reply)_[0-9a-f-]{36}$/.test(p))return !url.search;
+ if(method==='DELETE'&&/^\/api\/feedback\/(view|click|bookmark|participate|not-interested|like)\/(account|visitor)%3A[0-9a-f-]{36}\/(post|reply)_[0-9a-f-]{36}$/i.test(p))return !url.search;
  if(method==='GET'&&(p==='/api/latest'||/^\/api\/recommend\/(account|visitor)%3A[0-9a-f-]{36}$/i.test(p))){
   const parameters=[...url.searchParams];
   if(new Set(parameters.map(([key])=>key)).size!==parameters.length)return false;
@@ -24,6 +25,30 @@ function allowed(method,url){
    ||key==='category'&&/^(technology|arts|learning|life|galaxy|unclassified)$/.test(value));
  }
  return false;
+}
+// A caller can time out before the native request finishes. Keep later changes
+// to the same real feedback behind that native request, even if its caller has
+// disconnected. This also orders ordinary event feedback of the same type.
+const feedbackTails=new Map();
+function feedbackKeys(method,url,body){
+ if(method==='DELETE'&&url.pathname.startsWith('/api/feedback/')){
+  const [, , ,type,user,item]=url.pathname.split('/');
+  return [JSON.stringify([decodeURIComponent(type),decodeURIComponent(user),decodeURIComponent(item)])];
+ }
+ if(method==='PUT'&&url.pathname==='/api/feedback'){
+  const values=JSON.parse(body.toString('utf8'));
+  if(!Array.isArray(values)||values.some(value=>!value||['FeedbackType','UserId','ItemId'].some(key=>typeof value[key]!=='string')))throw new Error('Invalid feedback');
+  return [...new Set(values.map(value=>JSON.stringify([value.FeedbackType,value.UserId,value.ItemId])))];
+ }
+ return [];
+}
+async function serializeFeedback(keys,action){
+ if(!keys.length)return action();
+ const prior=keys.map(key=>feedbackTails.get(key)).filter(Boolean);
+ let release;const tail=new Promise(resolve=>{release=resolve;});
+ for(const key of keys)feedbackTails.set(key,tail);
+ await Promise.all(prior);
+ try{return await action();}finally{release();for(const key of keys)if(feedbackTails.get(key)===tail)feedbackTails.delete(key);}
 }
 const server=http.createServer(async(req,res)=>{
  res.setHeader('Cache-Control','no-store');
@@ -39,9 +64,18 @@ const server=http.createServer(async(req,res)=>{
    if(req.headers['content-type']?.split(';')[0]!=='application/json')return fail(415,'gorse_gateway_json_required');
    const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>1024*1024)return fail(413,'gorse_gateway_request_too_large');chunks.push(chunk);}body=Buffer.concat(chunks);
   }
-  const response=await fetch(new URL(url.pathname+url.search,upstream),{method:req.method,headers:{'X-API-Key':nativeKey,...(body?{'Content-Type':'application/json'}:{})},body,redirect:'error',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(15000)])});
-  if(!response.ok)return fail(response.status>=500?503:502,'gorse_native_request_failed');
-  res.writeHead(response.status,{'Content-Type':'application/json'});for await(const chunk of response.body??[])res.write(chunk);res.end();
+  let keys;try{keys=feedbackKeys(req.method,url,body);}catch{return fail(400,'gorse_gateway_feedback_invalid');}
+  await serializeFeedback(keys,async()=>{
+   if(controller.signal.aborted)return;
+   const signal=keys.length?AbortSignal.timeout(15000):AbortSignal.any([controller.signal,AbortSignal.timeout(15000)]);
+   const response=await fetch(new URL(url.pathname+url.search,upstream),{method:req.method,headers:{'X-API-Key':nativeKey,...(body?{'Content-Type':'application/json'}:{})},body,redirect:'error',signal});
+   // Drain the original native response before releasing the relation, even
+   // when there is no caller left to receive it.
+   if(!response.ok){await response.arrayBuffer();return fail(response.status>=500?503:502,'gorse_native_request_failed');}
+   if(!res.destroyed)res.writeHead(response.status,{'Content-Type':'application/json'});
+   for await(const chunk of response.body??[])if(!res.destroyed)res.write(chunk);
+   if(!res.destroyed)res.end();
+  });
  }catch{fail(503,'gorse_native_unavailable');}
 });
 server.listen(Number(process.env.PORT??8080),'0.0.0.0',()=>console.info('Galaxy Gorse gateway listening; private upstream; closed routes'));

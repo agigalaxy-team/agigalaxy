@@ -10,10 +10,13 @@ import {settingsOperatorId} from '../lib/settings-draft-memory';
 export type AdminAgentOSChange={kind:'conversation-operation'|'conversation-card'|'conversation-context'|'conversation-tool'|'configuration';objectId?:string;parentId?:string;turnId?:string};
 export type AdminAgentOSResync={reason:'replay-gap'|'unknown-change'};
 const eventId=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+function isAgentOSKind(value:GalaxyWebEvent['entity']):value is AdminAgentOSChange['kind'] {
+ return value==='conversation-operation'||value==='conversation-card'||value==='conversation-context'||value==='conversation-tool'||value==='configuration';
+}
 function agentOSChange(event:GalaxyWebEvent){
  if(event.module!=='agentos')return;
  const kind=event.entity;
- if(!kind||!['conversation-operation','conversation-card','conversation-context','conversation-tool','configuration'].includes(kind)
+ if(!isAgentOSKind(kind)
   ||kind!=='configuration'&&(!eventId(event.objectId)||!eventId(event.parentId))
   ||(kind==='conversation-operation'||kind==='conversation-card'||kind==='conversation-tool')&&!eventId(event.turnId)){
   window.dispatchEvent(new CustomEvent<AdminAgentOSResync>('galaxy:admin-agentos-resync',{detail:{reason:'unknown-change'}}));return;

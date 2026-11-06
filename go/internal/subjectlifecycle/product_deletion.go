@@ -17,8 +17,9 @@ import (
 type TaskSnapshotRedactor func(*protocol.OrderedObject, map[string]bool, string) (*protocol.OrderedObject, error)
 type TaskRedactors struct{ Task, Participation TaskSnapshotRedactor }
 type ProductDeletion struct {
-	Forum         *community.Service
-	TaskSnapshots TaskRedactors
+	Forum               *community.Service
+	GrowthPrepareWithin func(context.Context, pgx.Tx, string) (Object, error)
+	TaskSnapshots       TaskRedactors
 }
 
 func recordErasure(ctx context.Context, tx pgx.Tx, table, key, subject string, hash any, info DeletionInfo, reason string) error {
@@ -181,6 +182,13 @@ func (p *ProductDeletion) PrepareWithin(ctx context.Context, tx pgx.Tx, info Del
 	if _, e = tx.Exec(ctx, `UPDATE task_materials_v1 SET body_text='',erased_at=COALESCE(erased_at,$2) WHERE subject_id=$1`, subject, at); e != nil {
 		return nil, e
 	}
+	if p.GrowthPrepareWithin == nil {
+		return nil, errors.New("community growth deletion consumer unavailable")
+	}
+	growth, e := p.GrowthPrepareWithin(ctx, tx, subject)
+	if e != nil {
+		return nil, e
+	}
 	if _, e = p.Forum.PrepareDeletionWithin(ctx, tx, forumInfo(info)); e != nil {
 		return nil, e
 	}
@@ -245,6 +253,7 @@ func (p *ProductDeletion) PrepareWithin(ctx context.Context, tx pgx.Tx, info Del
 			return nil, e
 		}
 	}
+	out["communityGrowth"] = growth
 	out["originWorkBodiesErased"] = work.RowsAffected()
 	out["originArchiveDeletionMarkers"] = archives.RowsAffected()
 	out["originUploadReceipts"] = "retained-to-prevent-replay"

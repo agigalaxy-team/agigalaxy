@@ -342,7 +342,40 @@ export function createCommunityForumClient(runtime, { subjectId = null, context 
     }
   }
 
+  const reactionStorageKey = `forum-reactions:${endpoint}:${account?.id ?? 'visitor'}`;
+  const reactionKey = value => `${value.kind}:${value.id}`;
+  const reactionPending = value => { try { return JSON.parse(localStorage.getItem(reactionStorageKey+':'+reactionKey(value)) || 'null'); } catch { return null; } };
+  const saveReactionPending = (value, record) => { const key=reactionStorageKey+':'+reactionKey(value); if(record)localStorage.setItem(key,JSON.stringify(record));else if(reactionPending(value)?.command?.operationId===value.operationId)localStorage.removeItem(key); };
+  async function recoverReaction(record) {
+    if (await sha256Hex(JSON.stringify(record.command)) !== record.payloadHash) fail('forum_reaction_original_changed', '原操作无法核对。');
+    const result = await privateCall('/v2/community/reactions/receipt', {operationId:record.command.operationId,payloadHash:record.payloadHash});
+    if (result.accountId !== account?.id || result.operationId !== record.command.operationId || result.payloadHash !== record.payloadHash || !['acknowledged','absent'].includes(result.state) || result.state==='acknowledged' && (result.reaction?.kind!==record.command.kind || result.reaction?.id!==record.command.id || result.reaction?.liked!==record.command.liked)) fail('forum_reaction_response_invalid', '互动状态暂时无法读取。');
+    if (result.state === 'acknowledged') saveReactionPending(record.command,null);
+    return result;
+  }
   return Object.freeze({
+    scopedRecognition: (method,input) => privateCall('/v2/community/growth/recognitions/'+method,input),
+    reactions: async objects => {
+      if (account) for (const object of objects) { const record = reactionPending(object); if (record) { try { await recoverReaction(record); } catch { check(); } } }
+      const result = await readerCall('/v2/community/reactions/status', {objects});
+      if (!Array.isArray(result.items) || result.items.length !== objects.length || result.items.some((item,index) => item.kind !== objects[index].kind || item.id !== objects[index].id || !Number.isSafeInteger(item.count) || item.count < 0 || !Number.isSafeInteger(item.revision) || item.revision < 0 || typeof item.liked !== 'boolean')) fail('forum_reaction_response_invalid', '互动状态暂时无法读取。');
+      return result.items.map(item => ({...item,pending:!!reactionPending(item)}));
+    },
+    react: async (value, liked) => {
+      writeCheck(); const existing = reactionPending(value);
+      if (existing) { const receipt=await recoverReaction(existing); if(receipt.state==='absent') { try { const retried=await privateCall('/v2/community/reactions/command',existing.command); if(retried.state!=='acknowledged'||retried.accountId!==account?.id||retried.operationId!==existing.command.operationId||retried.payloadHash!==existing.payloadHash||retried.reaction?.kind!==existing.command.kind||retried.reaction?.id!==existing.command.id||retried.reaction?.liked!==existing.command.liked)fail('forum_reaction_response_invalid','互动状态暂时无法读取。'); saveReactionPending(existing.command,null); } catch(error) { if(error?.outcome==='rejected'&&error.status>=400&&error.status<500)saveReactionPending(existing.command,null); throw error; } } return; }
+      const command = {operationId:crypto.randomUUID(),kind:value.kind,id:value.id,liked,expectedRevision:value.revision};
+      const record = {command,payloadHash:await sha256Hex(JSON.stringify(command))};
+      saveReactionPending(command,record);
+      try {
+        const result = await privateCall('/v2/community/reactions/command', command);
+        if (result.state !== 'acknowledged' || result.accountId !== account?.id || result.operationId !== command.operationId || result.payloadHash !== record.payloadHash || result.reaction?.kind !== command.kind || result.reaction?.id !== command.id || result.reaction?.liked !== command.liked) fail('forum_reaction_response_invalid', '互动状态暂时无法读取。');
+        saveReactionPending(command,null);
+      } catch (error) {
+        if (error?.outcome === 'rejected' && error.status >= 400 && error.status < 500) saveReactionPending(command,null);
+        throw error;
+      }
+    },
     check, draft, attachments, close() { closed = true; readAbort.abort(); },
     topics: () => recoverRead(()=>publicCall('/v2/community/topics', null, 'GET',readAbort.signal)),
     posts: input => readerCall('/v2/community/posts/query', input ?? {}),

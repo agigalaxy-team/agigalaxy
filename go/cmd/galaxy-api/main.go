@@ -606,9 +606,15 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 		return e
 	}
 	actualConnections := discoveryconfig.ActualConnections(discoveryRuntime, discoveryConfiguration, agentClient, files)
+	publicGrowthLinks := &accounts.PublicQueries{Service: accountService, CurrentProviders: func() []accounts.Provider { return gateway.Config.IdentityProviders }}
+	businessHTTP, communityGrowth, communityAssessment := communityGrowthHandler(forum, accountService, publicGrowthLinks, honors, accountIdentity, &operationspermissions.BusinessAuthority{Human: gateway, Duty: autonomy}, discoveryRuntime, businessHTTP)
+	eventAuthority.Public.Consumers.Growth = communityGrowth.PublicEventRead
+	eventAuthority.Public.Consumers.PublicFollows = communityGrowth.PublicEventRead
+	autonomy.ConnectCommunityAssessments(communityAssessment)
 	executionDiscovery = discoveryRuntime
 	accountAnalytics.Runtime = discoveryRuntime
 	if discoveryRuntime != nil {
+		discoveryRuntime.Recommendations.CommunitySignals = communityGrowth.RankingSignals
 		queries.Analytics, queries.Recommendations, queries.Search = discoveryRuntime, discoveryRuntime.Recommendations, discoveryRuntime.SearchQuality
 		businessActions.SearchQuality, businessActions.Recommendations = discoveryRuntime.SearchQuality, discoveryRuntime.Recommendations
 	}

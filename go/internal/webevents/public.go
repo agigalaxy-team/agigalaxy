@@ -17,6 +17,7 @@ import (
 type PublicRead func(context.Context, Principal, string, string) (map[string]any, error)
 type PublicConsumers struct {
 	Builder, BuilderManage, Information, Choice, ChoicePreferences   PublicRead
+	Growth, PublicFollows                                            PublicRead
 	CIProof, CIRequest, Capsule, ForumPost, ForumReply, ForumVersion PublicRead
 	Chat, Task, PublicTask, Project                                  PublicRead
 	Inbox                                                            func(context.Context, Principal, string) error
@@ -208,10 +209,56 @@ func (s *PublicSources) source(ctx context.Context, p Principal, e Event) (Sourc
 			return Denied, nil
 		}
 		return Reset, s.Consumers.Inbox(ctx, p, "")
-	case "forum":
+	case "growth", "public-follows":
+		if ref["_scope_reset"] == true {
+			return Recheck, nil
+		}
+		if e.Module == "growth" && (e.SourceTable == "community_growth_rules_v1" || e.SourceTable == "community_growth_levels_v1" || e.SourceTable == "community_growth_definitions_v1") {
+			return Allowed, nil
+		}
+		id := str(ref, "account_id")
+		if id == "" {
+			return Denied, nil
+		}
+		fn := s.Consumers.Growth
+		if e.Module == "public-follows" {
+			fn = s.Consumers.PublicFollows
+		}
+		parent := ""
+		if e.Module == "growth" {
+			if ref["_inactive"] == true {
+				return Recheck, nil
+			}
+			kind, sourceID := str(ref, "object_kind"), str(ref, "object_id")
+			if (kind != "post" && kind != "reply") || sourceID == "" {
+				return Recheck, nil
+			}
+			parent = kind + ":" + sourceID
+		}
+		view, err := read(ctx, fn, anonymous(p), id, parent)
+		if authorizationFailure(err) {
+			return Recheck, nil
+		}
+		if err != nil {
+			return Denied, err
+		}
+		if e.Module == "growth" && view["eligible"] != true {
+			return Recheck, nil
+		}
+		return Allowed, nil
+	case "forum", "reactions":
 		var fn PublicRead
 		id, parent := str(ref, "id"), ""
 		switch e.SourceTable {
+		case "forum_reactions_v1":
+			id = str(ref, "object_id")
+			if str(ref, "object_kind") == "post" {
+				fn = s.Consumers.ForumPost
+			} else if str(ref, "object_kind") == "reply" {
+				fn = s.Consumers.ForumReply
+			} else {
+				return Denied, nil
+			}
 		case "forum_posts_v1":
 			fn = s.Consumers.ForumPost
 		case "forum_replies_v1":

@@ -2,7 +2,12 @@ import type { QueryClient } from '@tanstack/react-query';
 import { galaxyQueryKey, type GalaxyQueryScope } from './query-client';
 
 export type GalaxyWebEvent = { type: 'change' | 'reset' | 'snapshot'; cursor: string;
-  modules?: string[]; module?: string; operationId?: string | null; objectId?: string; parentId?: string; turnId?: string; entity?: 'conversation-operation'|'conversation-card'|'conversation-context'|'conversation-tool'|'configuration'; version?: string | number; reason?: 'replay-gap' | 'access-changed' };
+  modules?: string[]; module?: string; operationId?: string | null; objectId?: string; parentId?: string; turnId?: string; entity?: 'conversation-operation'|'conversation-card'|'conversation-context'|'conversation-tool'|'configuration'|'post'|'reply'; version?: string | number; reason?: 'replay-gap' | 'access-changed' | 'recheck' };
+export function queryKeyHasObject(value:unknown,id:string):boolean {
+  if(value===id)return true;
+  if(Array.isArray(value))return value.some(item=>queryKeyHasObject(item,id));
+  return !!value&&typeof value==='object'&&Object.values(value).some(item=>queryKeyHasObject(item,id));
+}
 export type GalaxyEventCallbacks={onChange?:(event:GalaxyWebEvent)=>void;onResync?:(modules:string[])=>void};
 
 export function createGalaxyEventDispatcher(queryClient: QueryClient, scope: GalaxyQueryScope,
@@ -26,7 +31,7 @@ export function createGalaxyEventDispatcher(queryClient: QueryClient, scope: Gal
         // A missing replay window means fetch a current snapshot; it does not
         // revoke the material already on screen. Explicit authority resets and
         // older servers without a reason retain the conservative clear path.
-        if(event.reason==='replay-gap'){
+        if(event.reason==='replay-gap'||event.reason==='recheck'){
           callbacks.onResync?.(modules);
           for(const module of modules)void invalidate(module).catch(()=>{});
           return;
@@ -38,7 +43,13 @@ export function createGalaxyEventDispatcher(queryClient: QueryClient, scope: Gal
         }
         onReset?.(modules); return;
       }
-      if (event.module) {callbacks.onChange?.(event);void invalidate(event.module).catch(()=>{});}
+      if (event.module) {
+        callbacks.onChange?.(event);
+        if((event.module==='growth'||event.module==='public-follows'||event.module==='reactions')&&event.objectId){
+          const prefix=galaxyQueryKey(scope,event.module),id=event.objectId;
+          void queryClient.invalidateQueries({predicate:q=>prefix.every((part,index)=>q.queryKey[index]===part)&&queryKeyHasObject(q.queryKey.slice(prefix.length),id),refetchType:'active'}).catch(()=>{});
+        } else void invalidate(event.module).catch(()=>{});
+      }
     },
   };
 }

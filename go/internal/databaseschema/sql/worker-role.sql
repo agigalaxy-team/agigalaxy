@@ -265,3 +265,31 @@ GRANT EXECUTE ON FUNCTION public.galaxy_autonomy_workbench_card_states_v1(text,u
 GRANT EXECUTE ON FUNCTION public.galaxy_autonomy_workbench_observations_v1(text,uuid) TO galaxy_evidence_worker;
 
 GRANT SELECT,INSERT,UPDATE ON operations_autonomy_dispatches_v1 TO galaxy_evidence_worker;
+
+-- Community147: source projection and recommendation delivery, no human rule/config mutation.
+GRANT SELECT ON forum_reactions_v1 TO galaxy_evidence_worker;
+-- PostgreSQL row locks require UPDATE on a column. Reconciliation locks the
+-- original identity while deriving its projection; content fields stay read-only.
+GRANT UPDATE(id) ON forum_posts_v1,forum_replies_v1 TO galaxy_evidence_worker;
+GRANT SELECT,UPDATE ON discovery_feedback_state_v1 TO galaxy_evidence_worker;
+GRANT SELECT ON community_growth_rules_v1 TO galaxy_evidence_worker;
+GRANT SELECT ON community_growth_levels_v1 TO galaxy_evidence_worker;
+GRANT SELECT ON community_growth_definitions_v1 TO galaxy_evidence_worker;
+GRANT SELECT ON community_growth_recognitions_v1 TO galaxy_evidence_worker;
+GRANT SELECT ON community_assessment_config_history_v1 TO galaxy_evidence_worker;
+GRANT SELECT ON community_assessment_results_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT,UPDATE,DELETE ON community_growth_sources_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT,UPDATE,DELETE ON community_growth_reconcile_state_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT,UPDATE,DELETE ON community_growth_dirty_objects_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT,UPDATE,DELETE ON community_assessment_source_revisions_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT,UPDATE,DELETE ON community_assessment_scopes_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT,UPDATE,DELETE ON community_assessment_tasks_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT,UPDATE,DELETE ON community_assessment_materials_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT ON community_growth_initialized_v1,community_assessment_config_v1 TO galaxy_evidence_worker;
+
+-- First-use defaults only; existing human rule values cannot be updated by workers.
+GRANT INSERT ON community_growth_rules_v1,community_growth_levels_v1,community_growth_rule_history_v1,community_growth_levels_history_v1 TO galaxy_evidence_worker;
+
+GRANT EXECUTE ON FUNCTION galaxy_forum_public_payload_summary_v1(text) TO galaxy_evidence_worker;
+
+GRANT EXECUTE ON FUNCTION galaxy_community_assessment_arguments_minimized_v1(text,uuid,text,jsonb),galaxy_community_assessment_analysis_minimized_v1(jsonb,text,uuid),galaxy_community_assessment_view_minimized_v1(jsonb) TO galaxy_evidence_worker;

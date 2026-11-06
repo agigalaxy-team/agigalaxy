@@ -9,6 +9,7 @@ import {LoadingFeedback,ReadFailure} from "../../shared/feedback/interaction-fee
 import {useReadTasks} from "../../shared/reading/use-read-task";
 import {definitiveReadFailure} from '../../shared/reading/read-failure';
 import {AccountProfileAvatar} from './account-profile-avatar';
+import {PublicCommunityGrowth,PublicSocialRelations} from './public-account-relations';
 import "../../profile-settings.css";
 import './selected-account.css';
 
@@ -75,13 +76,14 @@ function AccountLayout({path,search,endpoint,navigate,children}:LayoutProps){
 }
 
 type AccountProps={endpoint?:string;navigate:Go};
-export function AccountOverview(props:AccountProps){return <AccountSessionScope endpoint={props.endpoint}><AccountOverviewContent navigate={props.navigate}/></AccountSessionScope>;}
-function AccountOverviewContent({navigate}:{navigate:Go}){
+export function AccountOverview(props:AccountProps){return <AccountSessionScope endpoint={props.endpoint}><AccountOverviewContent navigate={props.navigate} endpoint={props.endpoint}/></AccountSessionScope>;}
+function AccountOverviewContent({navigate,endpoint}:{navigate:Go;endpoint?:string}){
  const model=useAccountSessionModel();
  if(!model.session?.account.id||!['signed-in','offline','unavailable'].includes(model.phase))return <AccountEntryPage navigate={navigate}/>;
  const account=model.session.account,label=account.displayName||account.email||'我的账户';
  return <section className="profile-overview selected-account"><header className="profile-heading"><h1 className="small">我的内容</h1></header>
   <section className="account-person"><AccountProfileAvatar className="account-person-avatar" name={account.displayName} avatarKey={account.avatarKey} subjectType={account.subjectType} seed={account.id} size={64}/><div><h2>{label}</h2>{account.uid&&<p className="account-uid"><span>UID</span> <code>{account.uid}</code></p>}{account.displayName&&account.email&&<p>{account.email}</p>}<div className="account-person-actions"><NavLink to="/app/account?section=settings" navigate={navigate}>编辑资料</NavLink><button type="button" disabled={model.busy||model.phase!=='signed-in'} onClick={()=>void model.logout()}>退出账户</button></div></div></section>
+  <PublicCommunityGrowth key={account.id} accountId={account.id!} endpoint={endpoint} navigate={navigate} ownerOnly/><PublicSocialRelations accountId={account.id!} endpoint={endpoint} navigate={navigate}/>
   <div className="account-overview-grid"><AccountRecentPosts key={account.id+':'+model.session.csrfToken} model={model} navigate={navigate}/><section className="account-content-index"><h2>继续阅读</h2><nav aria-label="我的内容"><NavLink to="/app/bookmarks" navigate={navigate}><Bookmark size={21}/><span>我的收藏</span></NavLink><NavLink to="/app/account?section=following" navigate={navigate}><UserRound size={21}/><span>我的关注</span></NavLink><NavLink to="/app/work" navigate={navigate}><BriefcaseBusiness size={21}/><span>我的工作</span></NavLink><NavLink to="/app/account?section=settings&view=archives" navigate={navigate}><FileText size={21}/><span>私有会话</span></NavLink></nav></section></div>
  </section>;
 }

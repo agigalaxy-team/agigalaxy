@@ -87,7 +87,7 @@ func (s *Service) SaveConfig(ctx context.Context, a Actor, domain string, input 
 	})
 }
 func (s *Service) pauseForConfigWithin(ctx context.Context, tx pgx.Tx, id string) error {
-	_, e := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='paused',native_continuable=false,lease_until=NULL,revision=revision+1,code='plan-disabled',updated_at=$3 WHERE endpoint=$1 AND config_id=$2 AND source<>'workbench' AND NOT (configuration ? 'dispatch') AND state IN ('queued','running')`, s.Endpoint, id, s.now())
+	_, e := tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET state='paused',native_continuable=false,lease_until=NULL,revision=revision+1,code='plan-disabled',updated_at=$3 WHERE endpoint=$1 AND config_id=$2 AND source<>'workbench' AND NOT (configuration ? 'dispatch') AND NOT (configuration ? 'taskOwner') AND state IN ('queued','running')`, s.Endpoint, id, s.now())
 	return e
 }
 func parseEnable(input Object) (Object, error) {

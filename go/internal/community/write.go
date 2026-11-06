@@ -146,8 +146,14 @@ func (s *Service) write(ctx context.Context, account, kind, raw string) (Object,
 			return nil, e
 		}
 		if control {
-			return s.withdraw(ctx, tx, account, kind, raw, p)
-		}
+            result, err := s.withdraw(ctx, tx, account, kind, raw, p)
+            if err != nil { return nil, err }
+            change := ContentChange{AccountID:account, Kind:"post", ID:str(p,"postId"), PostID:str(p,"postId"), Action:"withdrawn"}
+            if kind == "withdraw-version" { change.Action = "changed" }
+            if kind == "withdraw-reply" { change.Kind="reply"; change.ID=str(p,"replyId"); r, err := s.reply(ctx,tx,change.ID); if err != nil {return nil,err}; change.PostID=str(r,"post_id") }
+            if s.OnContentWithin != nil { if err := s.OnContentWithin(ctx,tx,change); err != nil {return nil,err} }
+            return result,nil
+        }
 		if e = assertIDs(kind, s.actorKey(account), p); e != nil {
 			return nil, e
 		}
@@ -178,7 +184,12 @@ func (s *Service) write(ctx context.Context, account, kind, raw string) (Object,
 		if e != nil {
 			return nil, e
 		}
-		if e = s.complete(ctx, tx, account, raw, category, p, locator, result); e != nil {
+		if s.OnContentWithin != nil {
+            change := ContentChange{AccountID:account, Kind:"post", ID:str(p,"postId"), PostID:str(p,"postId"), Action:"published"}
+            if kind == "create-reply" { change.Kind="reply"; change.ID=str(p,"replyId") }
+            if e = s.OnContentWithin(ctx,tx,change); e != nil {return nil,e}
+        }
+        if e = s.complete(ctx, tx, account, raw, category, p, locator, result); e != nil {
 			return nil, e
 		}
 		quota, e = s.finishBudget(ctx, tx, account, before, quota)

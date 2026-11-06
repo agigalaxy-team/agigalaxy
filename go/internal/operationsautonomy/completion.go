@@ -139,5 +139,15 @@ func (s *Service) completionWithin(ctx context.Context, tx pgx.Tx, row Object, _
 			business = "unknown"
 		}
 	}
-	return Object{"modelAssessment": assessment, "businessState": business, "pendingHuman": human || row["human_decision"] != nil, "pendingWrite": unknown, "eligibleToComplete": disposition == "completed", "disposition": disposition, "reasonCode": reason, "nextAction": next}, nil
+	out := Object{"modelAssessment": assessment, "businessState": business, "pendingHuman": human || row["human_decision"] != nil, "pendingWrite": unknown, "eligibleToComplete": disposition == "completed", "disposition": disposition, "reasonCode": reason, "nextAction": next}
+	if obj(obj(row["configuration"])["communityAssessment"]) != nil && s.CommunityAssessmentCompletionWithin != nil && disposition == "completed" {
+		business, e := s.CommunityAssessmentCompletionWithin(ctx, tx, row)
+		if e != nil {
+			return nil, e
+		}
+		for key, value := range business {
+			out[key] = value
+		}
+	}
+	return out, nil
 }

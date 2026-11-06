@@ -53,8 +53,8 @@ func TestFullEntryBrowserFlow(t *testing.T) {
 	if browserScope == "" {
 		browserScope = "full"
 	}
-	if browserScope != "full" && browserScope != "admin" {
-		t.Fatal("browser scope must be full or admin")
+	if browserScope != "full" && browserScope != "admin" && browserScope != "community" {
+		t.Fatal("browser scope must be full, admin or community")
 	}
 	script := os.Getenv("GALAXY_GO_FULL_ENTRY_BROWSER_SCRIPT")
 	pool, dsn := testsupport.PostgreSQL(t)
@@ -121,7 +121,7 @@ func TestFullEntryBrowserFlow(t *testing.T) {
 	}
 	files := map[string]any{"endpoint": portalFiles.Endpoint, "accountFile": portalFiles.AccountFile, "operationsFile": portalFiles.OperationsFile, "identityFile": portalFiles.IdentityFile, "rootID": portalFiles.RootID, "accountScope": gateway.Config.AccountScope, "operatorConfiguration": gateway.Config.OperatorConfiguration}
 	descriptorFile := filepath.Join(directory, "browser.json")
-	seedFullBrowser(t, ctx, pool, directory, descriptorFile, portalFiles, gateway.Config, options["websiteOrigin"].(string), options["adminOrigin"].(string))
+	seedFullBrowser(t, ctx, pool, directory, descriptorFile, portalFiles, gateway.Config, options["websiteOrigin"].(string), options["adminOrigin"].(string), browserScope)
 	raw, e := os.ReadFile(descriptorFile)
 	if e != nil {
 		t.Fatal(e)
@@ -290,36 +290,41 @@ func TestFullEntryBrowserFlow(t *testing.T) {
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	// Seed the editor target through the complete real account HTTP consumer.
-	people := descriptor["people"].([]any)
-	person := people[0].(map[string]any)
-	cookie := person["cookie"].(map[string]any)
-	body, _ := json.Marshal(map[string]any{"operationId": uuid.NewString(), "body": "网页连续流程的真实反馈，等待后台处理。", "module": "community"})
-	request, _ := http.NewRequestWithContext(ctx, "POST", api+"/v1/account/feedback", strings.NewReader(string(body)))
-	publicAPI, _ := url.Parse(files["endpoint"].(string))
-	request.Host = publicAPI.Host
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Origin", options["websiteOrigin"].(string))
-	request.Header.Set("X-Galaxy-Account-ID", person["accountId"].(string))
-	request.Header.Set("X-Galaxy-Account-CSRF", person["csrf"].(string))
-	request.AddCookie(&http.Cookie{Name: cookie["name"].(string), Value: cookie["value"].(string)})
-	response, e := client.Do(request)
-	if e != nil {
-		t.Fatal(e)
-	}
-	raw, e = io.ReadAll(io.LimitReader(response.Body, 65536))
-	response.Body.Close()
-	if e != nil {
-		t.Fatal(e)
-	}
-	if response.StatusCode != 201 {
-		t.Fatalf("full entry feedback submit %d %s", response.StatusCode, raw)
-	}
 	var feedback map[string]any
-	if e = json.Unmarshal(raw, &feedback); e != nil {
-		t.Fatal(e)
+	if browserScope != "community" {
+		// Seed the editor target through the complete real account HTTP consumer.
+		people := descriptor["people"].([]any)
+		person := people[0].(map[string]any)
+		cookie := person["cookie"].(map[string]any)
+		body, _ := json.Marshal(map[string]any{"operationId": uuid.NewString(), "body": "网页连续流程的真实反馈，等待后台处理。", "module": "community"})
+		request, _ := http.NewRequestWithContext(ctx, "POST", api+"/v1/account/feedback", strings.NewReader(string(body)))
+		publicAPI, _ := url.Parse(files["endpoint"].(string))
+		request.Host = publicAPI.Host
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Origin", options["websiteOrigin"].(string))
+		request.Header.Set("X-Galaxy-Account-ID", person["accountId"].(string))
+		request.Header.Set("X-Galaxy-Account-CSRF", person["csrf"].(string))
+		request.AddCookie(&http.Cookie{Name: cookie["name"].(string), Value: cookie["value"].(string)})
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, e = io.ReadAll(io.LimitReader(response.Body, 65536))
+		response.Body.Close()
+		if e != nil {
+			t.Fatal(e)
+		}
+		if response.StatusCode != 201 {
+			t.Fatalf("full entry feedback submit %d %s", response.StatusCode, raw)
+		}
+		if e = json.Unmarshal(raw, &feedback); e != nil {
+			t.Fatal(e)
+		}
 	}
-	descriptor["feedbackId"], descriptor["apiLoopback"], descriptor["cmsDatabaseURL"], descriptor["sourceRoot"] = feedback["feedbackId"], api, cms.String(), root
+	descriptor["apiLoopback"], descriptor["cmsDatabaseURL"], descriptor["sourceRoot"] = api, cms.String(), root
+	if feedback != nil {
+		descriptor["feedbackId"] = feedback["feedbackId"]
+	}
 	descriptor["tlsCert"], descriptor["tlsKey"], descriptor["proxyPort"] = certFile, keyFile, proxyPort
 	descriptor["currentDirectorySource"] = "controlled-loopback-protocol; not Keycloak"
 	descriptor["browserScope"] = browserScope
@@ -357,6 +362,46 @@ try{
 	t.Log(string(output))
 	if directoryReads.Load() == 0 {
 		t.Fatal("browser did not exercise current management directory")
+	}
+	if browserScope == "community" {
+		var liked bool
+		var reactionRevision int
+		if e = pool.QueryRow(ctx, `SELECT liked,revision FROM forum_reactions_v1 WHERE account_id=$1 AND kind='post' AND object_id=$2`, descriptor["people"].([]any)[1].(map[string]any)["accountId"], descriptor["forum"].(map[string]any)["postId"]).Scan(&liked, &reactionRevision); e != nil {
+			t.Fatal(e)
+		}
+		if liked || reactionRevision != 2 {
+			t.Fatalf("reaction not cancelled: liked=%v revision=%d", liked, reactionRevision)
+		}
+		var visibility string
+		var following bool
+		if e = pool.QueryRow(ctx, `SELECT following,visibility FROM account_follows_v1 WHERE account_id=$1 AND target_account_id=$2`, descriptor["people"].([]any)[1].(map[string]any)["accountId"], descriptor["people"].([]any)[0].(map[string]any)["accountId"]).Scan(&following, &visibility); e != nil {
+			t.Fatal(e)
+		}
+		if !following || visibility != "private" {
+			t.Fatalf("follow state incorrect: %v %s", following, visibility)
+		}
+		var ruleVersion, ruleExperience, definitions, history int
+		if e = pool.QueryRow(ctx, `SELECT version,experience FROM community_growth_rules_v1 WHERE endpoint=$1 AND rule_key='post'`, files["endpoint"]).Scan(&ruleVersion, &ruleExperience); e != nil {
+			t.Fatal(e)
+		}
+		if e = pool.QueryRow(ctx, `SELECT count(*) FROM community_growth_definitions_v1 WHERE endpoint=$1 AND name='隔离社区荣誉'`, files["endpoint"]).Scan(&definitions); e != nil {
+			t.Fatal(e)
+		}
+		if e = pool.QueryRow(ctx, `SELECT count(*) FROM community_growth_recognition_history_v1 h JOIN community_growth_recognitions_v1 r ON r.endpoint=h.endpoint AND r.id=h.recognition_id WHERE r.endpoint=$1 AND r.object_id=$2 AND r.active=false`, files["endpoint"], descriptor["forum"].(map[string]any)["postId"]).Scan(&history); e != nil {
+			t.Fatal(e)
+		}
+		if ruleVersion < 2 || ruleExperience != 6 || definitions != 1 || history < 3 {
+			t.Fatalf("community ledger missing: rule=%d experience=%d definitions=%d recognition revisions=%d", ruleVersion, ruleExperience, definitions, history)
+		}
+		var recognizedAccount, recognitionReason string
+		var recognitionRevision int
+		if e = pool.QueryRow(ctx, `SELECT account_id::text,reason,revision FROM community_growth_recognitions_v1 WHERE endpoint=$1 AND object_id=$2 AND kind='content' AND active=false`, files["endpoint"], descriptor["forum"].(map[string]any)["postId"]).Scan(&recognizedAccount, &recognitionReason, &recognitionRevision); e != nil {
+			t.Fatal(e)
+		}
+		if recognizedAccount != descriptor["people"].([]any)[0].(map[string]any)["accountId"].(string) || recognitionReason != "隔离社区认可更正记录" || recognitionRevision != 3 {
+			t.Fatalf("recognition ledger differs from the submitted changes")
+		}
+		return
 	}
 	var state string
 	var revision int

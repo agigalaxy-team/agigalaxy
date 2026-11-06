@@ -53,8 +53,8 @@ const agentOsWritePath=new RegExp('^/v1/operations/agentos/(?:executions(?:/'+uu
 const agentOsConversationEventsPath=new RegExp('^/v1/operations/agentos/'+agentOsConversationRoot+'/operations/'+uuid+'/events$','i');
 export const isAgentOsConversationEventsPath=pathname=>agentOsConversationEventsPath.test(pathname);
 const discoveryAnalyticsPath='/v1/operations/discovery/analytics';
-const recommendationReadPath=new RegExp('^/v1/operations/recommendation/(?:overview|history|operations/'+uuid+')$','i');
-const recommendationWritePath=/^\/v1\/operations\/recommendation\/(?:policy|themes)$/;
+const recommendationReadPath=new RegExp('^/v1/operations/recommendation/(?:overview|history|community-signals|operations/'+uuid+')$','i');
+const recommendationWritePath=/^\/v1\/operations\/recommendation\/(?:policy|themes|community-signals)$/;
 const searchQualityReadPath=new RegExp('^/v1/operations/search-quality/(?:overview|history|operations/'+uuid+')$','i');
 const searchQualityWritePath=/^\/v1\/operations\/search-quality\/(?:draft|apply|restore)$/;
 const ruleSettingsKey='(?:resource-budget|community-quota|forum-quota|business-controls)';
@@ -254,7 +254,8 @@ export function operationsProxyPolicy({url,method,headers,publicOrigin}){
   const taskRead=new RegExp('^/v1/operations/(?:jobs(?:/(?:'+queues+')/'+uuid+')?|search/failures(?:/'+uuid+')?)$','i');
   const taskWrite=new RegExp('^/v1/operations/(?:jobs/(?:'+queues+')/'+uuid+'/(?:cancel|retry)|search/failures/'+uuid+'/retry)$','i');
   const read=method==='GET'&&(path==='/v1/operations/web-events'||(governanceOperationReadPath.test(path)||productChatOperationReadPath.test(path))||fileAccessReadPath.test(path)||fileCleanupReadPath.test(path)||strategiesReadPath.test(path)||ruleSettingsReadPath.test(path)||modelSettingsReadPath.test(path)||maintenanceReadPath.test(path)||searchQualityReadPath.test(path)||recommendationReadPath.test(path)||path===discoveryAnalyticsPath||agentOsReadPath.test(path)||messagingReadPath.test(path)||smtpReadPath.test(path)||permissionsReadPath.test(path)||path==='/v1/operations/session'||publicationPath.test(path)||userReadPath.test(path)||reportRead.test(path)||taskRead.test(path)||businessReads.some(pattern=>pattern.test(path)));
-  const write=method==='POST'&&(fileAccessWritePath.test(path)||fileCleanupWritePath.test(path)||strategiesWritePath.test(path)||ruleSettingsWritePath.test(path)||modelSettingsWritePath.test(path)||maintenanceWritePath.test(path)||searchQualityWritePath.test(path)||recommendationWritePath.test(path)||agentOsWritePath.test(path)||messagingWritePath.test(path)||smtpWritePath.test(path)||permissionsWritePath.test(path)||path==='/v1/operations/logout'||path==='/v1/operations/content/publications'||reportWrite.test(path)||taskWrite.test(path)||businessWrites.some(pattern=>pattern.test(path))||new RegExp('^/v1/operations/users/'+uuid+'/(?:restriction(?:/release)?|type-change)$','i').test(path));
+  const growthWrite=method==='POST'&&/^\/v1\/operations\/community-growth\/(?:query|command|receipt|assessment-config|assessment-config-command|assessment-config-receipt|weights)$/.test(path)&&!requestUrl.search;
+  const write=method==='POST'&&(growthWrite||fileAccessWritePath.test(path)||fileCleanupWritePath.test(path)||strategiesWritePath.test(path)||ruleSettingsWritePath.test(path)||modelSettingsWritePath.test(path)||maintenanceWritePath.test(path)||searchQualityWritePath.test(path)||recommendationWritePath.test(path)||agentOsWritePath.test(path)||messagingWritePath.test(path)||smtpWritePath.test(path)||permissionsWritePath.test(path)||path==='/v1/operations/logout'||path==='/v1/operations/content/publications'||reportWrite.test(path)||taskWrite.test(path)||businessWrites.some(pattern=>pattern.test(path))||new RegExp('^/v1/operations/users/'+uuid+'/(?:restriction(?:/release)?|type-change)$','i').test(path));
   const registeredRead=method==='GET'&&registeredUsersReadPath.test(path);
   const registeredWrite=method==='POST'&&registeredUsersWritePath.test(path);
   const managementRead=method==='GET'&&managementAccountsReadPath.test(path);

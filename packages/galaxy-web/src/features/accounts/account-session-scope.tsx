@@ -25,7 +25,7 @@ function OwnedAccountSession({endpoint,children}:{endpoint?:string;children:Reac
  useLayoutEffect(()=>()=>{if(id&&endpoint)query.removeQueries({queryKey:['galaxy',endpoint.replace(/\/$/,''),'web',id]});},[query,id,endpoint]);
  useEffect(()=>{
   if(!queryScope||!csrf)return;
-  const events=createGalaxyEventClient({scope:queryScope,queryClient:query,topics:['account','account-work','bookmarks','follows','forum','chat','tasks','projects','contacts'],headers:{'X-Galaxy-Account-ID':queryScope.identity},onReset:modules=>{if(modules.includes('account'))void latest.current.refresh();}});
+  const events=createGalaxyEventClient({scope:queryScope,queryClient:query,topics:['account','account-work','bookmarks','follows','forum','reactions','growth','public-follows','chat','tasks','projects','contacts'],headers:{'X-Galaxy-Account-ID':queryScope.identity},onReset:modules=>{if(modules.includes('account'))void latest.current.refresh();}});
   events.start();return()=>events.stop();
  },[query,queryScope,csrf]);
  const latest=useRef(model);latest.current=model;

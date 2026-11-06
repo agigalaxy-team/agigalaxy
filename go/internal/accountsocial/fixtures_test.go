@@ -48,6 +48,22 @@ func setupSocial(t *testing.T, pool *pgxpool.Pool) socialFixture {
 		Rows    map[string]json.RawMessage `json:"rows"`
 	}
 	captured(t, "captured-setup", &data)
+	// The original snapshot predates the visibility column. Restoring whole
+	// records bypasses PostgreSQL defaults, so model the migration backfill.
+	var follows []map[string]any
+	if err := json.Unmarshal(data.Rows["account_follows_v1"], &follows); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range follows {
+		if _, exists := row["visibility"]; !exists {
+			row["visibility"] = "private"
+		}
+	}
+	followRows, err := json.Marshal(follows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data.Rows["account_follows_v1"] = followRows
 	// Posts and versions have a circular FK. Insert posts without the current
 	// version, then restore the exact captured head once its version exists.
 	var posts []map[string]any

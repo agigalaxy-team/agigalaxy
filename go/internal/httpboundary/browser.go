@@ -20,7 +20,7 @@ func match(pattern, value string) bool {
 	return actual.(*regexp.Regexp).MatchString(value)
 }
 func followMethod(path string) string {
-	m := regexp.MustCompile(`^/v1/account/follows/(status|query|command|receipt)$`).FindStringSubmatch(path)
+	m := regexp.MustCompile(`^/v1/account/follows/(status|query|command|receipt|public-query)$`).FindStringSubmatch(path)
 	if m == nil {
 		return ""
 	}
@@ -89,7 +89,7 @@ func Category(method, path string, credential, website bool) string {
 		}
 		return "anonymous"
 	}
-	if method == "POST" && has([]string{"status", "query", "receipt"}, followMethod(path)) {
+	if method == "POST" && has([]string{"status", "query", "receipt", "public-query"}, followMethod(path)) {
 		return query()
 	}
 	if strings.HasPrefix(path, "/v2/community/") {

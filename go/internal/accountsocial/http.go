@@ -26,7 +26,7 @@ type Handler struct {
 	Next              http.Handler
 }
 
-var socialPath = regexp.MustCompile(`^/(v1/account/follows|v1/account/bookmarks|v2/account-bookmarks|v2/reading-bookmarks)/(status|command|query|receipt)$`)
+var socialPath = regexp.MustCompile(`^/(v1/account/follows|v1/account/bookmarks|v2/account-bookmarks|v2/reading-bookmarks)/(status|command|query|receipt|public-query)$`)
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	match := socialPath.FindStringSubmatch(r.URL.Path)
@@ -55,14 +55,14 @@ func (h Handler) dispatch(r *http.Request, family, method, request string) (Obje
 	follow := family == "v1/account/follows"
 	portal := strings.HasPrefix(family, "v1/")
 	account := family != "v2/reading-bookmarks"
-	if follow && (h.Service == nil || h.Identity == nil) {
+	if follow && (h.Service == nil || (method != "public-query" && h.Identity == nil)) {
 		return nil, fault.New("account_follow_unavailable", 503)
 	}
 	if r.Method != "POST" || follow && r.URL.RawQuery != "" || h.Service == nil {
 		return nil, fault.New("not_found", 404)
 	}
 	a := Actor{RequestID: request}
-	if portal {
+	if portal && method != "public-query" {
 		if h.Identity == nil {
 			return nil, fault.New("access_denied", 401)
 		}
@@ -80,7 +80,7 @@ func (h Handler) dispatch(r *http.Request, family, method, request string) (Obje
 		a.Authority = authority
 		a.Official = true
 		a.Endpoint = h.Service.Endpoint
-	} else {
+	} else if !portal {
 		auth := r.Header.Get("Authorization")
 		if h.Devices == nil || !strings.HasPrefix(auth, "Bearer ") {
 			return nil, fault.New("access_denied", 401)
@@ -127,6 +127,7 @@ func (h Handler) dispatch(r *http.Request, family, method, request string) (Obje
 			}
 		}
 	}
+	if follow && method == "public-query" { return h.Service.PublicFollows(r.Context(), raw) }
 	if follow {
 		return h.Service.Follow(r.Context(), a, method, raw)
 	}

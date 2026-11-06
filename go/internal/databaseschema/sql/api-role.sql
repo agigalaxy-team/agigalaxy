@@ -409,3 +409,38 @@ GRANT EXECUTE ON FUNCTION public.galaxy_web_events_promote_v1(integer) TO galaxy
 GRANT EXECUTE ON FUNCTION public.galaxy_autonomy_workbench_card_states_v1(text,uuid) TO galaxy_api;
 
 GRANT SELECT,INSERT,UPDATE ON operations_autonomy_dispatches_v1 TO galaxy_api;
+
+-- Community147: preserve legacy follow visibility; only explicit new commands choose public.
+GRANT INSERT(visibility),UPDATE(visibility) ON account_follows_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON forum_reactions_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON forum_reaction_operations_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON discovery_feedback_state_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_growth_initialized_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_growth_rules_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_growth_levels_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_growth_sources_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_growth_definitions_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_growth_recognitions_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_growth_reconcile_state_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_growth_dirty_objects_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_assessment_config_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_assessment_source_revisions_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_assessment_scopes_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_assessment_tasks_v1 TO galaxy_api;
+GRANT SELECT,INSERT,UPDATE ON community_assessment_materials_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON community_growth_rule_history_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON community_growth_levels_history_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON community_growth_operations_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON community_growth_recognition_history_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON community_assessment_config_history_v1 TO galaxy_api;
+GRANT SELECT,INSERT ON community_assessment_results_v1 TO galaxy_api;
+GRANT DELETE ON community_growth_dirty_objects_v1,community_growth_levels_v1 TO galaxy_api;
+
+GRANT INSERT(community_signals),UPDATE(community_signals) ON operations_recommendation_policy_v1 TO galaxy_api;
+
+GRANT EXECUTE ON FUNCTION galaxy_community_assessment_model_material_v1(jsonb) TO galaxy_api;
+
+GRANT EXECUTE ON FUNCTION galaxy_forum_public_payload_summary_v1(text) TO galaxy_api;
+
+GRANT EXECUTE ON FUNCTION galaxy_community_assessment_arguments_minimized_v1(text,uuid,text,jsonb),galaxy_community_assessment_analysis_minimized_v1(jsonb,text,uuid),galaxy_community_assessment_view_minimized_v1(jsonb) TO galaxy_api;
+GRANT UPDATE(result) ON operations_autonomy_commands_v1 TO galaxy_api;

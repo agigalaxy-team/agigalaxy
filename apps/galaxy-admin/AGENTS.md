@@ -1,3 +1,5 @@
+本目录的主会话与子会话同时遵守[仓库开发规则](../../AGENTS.md)。以下为框架自动维护的补充说明。
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know

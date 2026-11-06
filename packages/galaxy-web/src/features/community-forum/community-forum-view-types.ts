@@ -51,7 +51,10 @@ export type ForumPermission={kind?:string;publishedUntil:number;originBindingExp
 export type ForumPending={operationId:string;payloadHash:string;kind:ForumKind;context:string;draftRef:ForumDraftRef|null;state:string;publishedUntil?:number;locator?:ForumLocator;originalBindingId?:string|null};
 export type ForumReceipt={status:'absent'|'acknowledged'|'none';operationId?:string;payloadHash?:string;locator?:ForumLocator};
 export type ForumPage<T>={items:T[];nextAfter:string|null;order?:'published'|'id'};
+export type ForumReaction={kind:'post'|'reply';id:string;count:number;liked:boolean;revision:number;pending:boolean};
 export type ForumClient={
+ scopedRecognition:(method:'status'|'query'|'command'|'receipt',input:Record<string,unknown>)=>Promise<any>;
+ reactions:(objects:{kind:'post'|'reply';id:string}[])=>Promise<ForumReaction[]>;react:(value:ForumReaction,liked:boolean)=>Promise<void>;
   check:()=>void;close:()=>void;attachments:ForumAttachmentClient;
  draft:{load:()=>Promise<ForumDraft|null>;save:(value:ForumDraft)=>Promise<ForumDraft>;flush:()=>Promise<void>;clear:(reference:ForumDraftRef)=>Promise<boolean>;importVisitor:(reference:ForumDraftRef)=>Promise<{status:string;draft:ForumDraft|null}>};
  posts:(input?:ForumPostsQuery)=>Promise<ForumPage<ForumPostView>>;owned:(input?:ForumPostsQuery)=>Promise<ForumPage<ForumOwnedPostSummary>>;reports:(input?:{after?:string})=>Promise<ForumPage<ForumReport>>;

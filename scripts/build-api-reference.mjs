@@ -3,6 +3,7 @@ import { fileURLToPath,pathToFileURL } from 'node:url';
 import { resolve,relative } from 'node:path';
 import { businessApiReference,specialApiReference } from './reference/http-api-entries.mjs';
 import { readMigrations } from '../go/internal/databaseschema/generate.mjs';
+import { storageReference } from './reference/storage-reference.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 async function sourceFiles(directory){const files=[];for(const entry of await readdir(directory,{withFileTypes:true})){
@@ -12,6 +13,8 @@ async function sourceFiles(directory){const files=[];for(const entry of await re
 export async function buildApiReference({check=false}={}) {
   const errors=[];
   const migrations=await readMigrations();
+  const versionContract=JSON.parse(await readFile(resolve(root,'docs/technical/reference/version-contract.json'),'utf8'));
+  versionContract.versions.databaseMigrations=migrations.map(item=>item.version);
   for(const path of await sourceFiles(resolve(root,'go'))){
     const name=relative(root,path).replaceAll('\\','/'),source=await readFile(path,'utf8');
     // A literal index only: dynamic fault helpers and route reachability are
@@ -30,7 +33,9 @@ export async function buildApiReference({check=false}={}) {
     entries,sources};
   // Exact machine reference only; the maintained interface explanation is never generated over.
   const outputs={'docs/technical/reference/development-api-reference-v1.json':JSON.stringify(catalog,null,2)+'\n',
-    'docs/technical/reference/api-error-catalog-v0.1.json':JSON.stringify({version:1,kind:'static-literal-declarations-not-exhaustive-runtime-reachability',entries:errors},null,2)+'\n'};
+    'docs/technical/reference/api-error-catalog-v0.1.json':JSON.stringify({version:1,kind:'static-literal-declarations-not-exhaustive-runtime-reachability',entries:errors},null,2)+'\n',
+    'docs/technical/reference/version-contract.json':JSON.stringify(versionContract,null,2)+'\n',
+    'docs/technical/reference/data-inventory-v0.1.json':JSON.stringify(await storageReference(migrations),null,2)+'\n'};
   for(const [name,content] of Object.entries(outputs)){
     if(check){if(await readFile(resolve(root,name),'utf8')!==content)throw new Error('Stale generated API reference: '+name);}
     else await writeFile(resolve(root,name),content);

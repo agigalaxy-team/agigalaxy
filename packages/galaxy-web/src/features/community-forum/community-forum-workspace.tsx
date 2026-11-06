@@ -3,7 +3,7 @@ import { labels, categories, states, date, publicWrite, sectionWrite, Body, Link
 import {AccountProfileAvatar} from "../accounts/account-profile-avatar";
 import { ReadingSurface } from "../../shared/reading/reading-details";
 import React, { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {MessageCircle, Search} from 'lucide-react';
+import {MessageCircle, Search, Heart} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,7 +22,9 @@ import {OfficialAccountLoginNotice,type OfficialAccountModel} from "../accounts/
 import {AccountSessionScope,useAccountSessionModel} from "../accounts/account-session-scope";
 import {clearForumLoginDraft,forumLoginDraft,rememberForumLoginDraft,forumAuthorAccountId,forumAuthorSubjectId,forumOwnsContent} from './forum-account-state.mjs';
 import {ForumAudienceEditor,ForumAudienceSummary} from './forum-audience';
+import {ForumRecognition} from './forum-recognition';
 import {useQueryReads,sourceReadDeadline} from "../../application/query-reads";
+import {useServiceQuery} from '../../shared/runtime/use-service-query';
 import {definitiveReadFailure} from '../../shared/reading/read-failure';
 import {LoadingFeedback,ReadFailure} from "../../shared/feedback/interaction-feedback";
 import {useSiteContentReadyTransition} from "../../use-site-content-transition";
@@ -33,7 +35,7 @@ import {ForumAttachmentComposer,ForumAttachmentFiles,type ForumDraftAttachment} 
 import {forumAttachmentDraft} from './forum-attachment-client.mjs';
 import type {ForumAccessOptions,ForumSection,ForumNotification,ForumAuthorFields} from './community-forum-view-types';
 import './community-forum-workspace.css';
-import {availableForumContent,forumPayload,forumCategory,forumResolution,assertForumPrepared,forumSourceTarget,forumSourceTargetFromDraft,forumTargetString,type ForumDraft,type ForumKind,type ForumDraftTarget,type ForumDraftValues,type ForumClient,type ForumCardView,type ForumContentView,type ForumPostView,type ForumReplyView,type ForumVersionEntry,type ForumOwnedPost,type ForumOwnedReply,type ForumPermission,type ForumConfig,type ForumQuota,type ForumPending,type ForumReview,type ForumReport,type ForumReceipt,type ForumLocator,type ForumPostsQuery} from './community-forum-view-types';
+import {availableForumContent,forumPayload,forumCategory,forumResolution,assertForumPrepared,forumSourceTarget,forumSourceTargetFromDraft,forumTargetString,type ForumDraft,type ForumKind,type ForumDraftTarget,type ForumDraftValues,type ForumClient,type ForumCardView,type ForumContentView,type ForumPostView,type ForumReplyView,type ForumVersionEntry,type ForumOwnedPost,type ForumOwnedReply,type ForumPermission,type ForumConfig,type ForumQuota,type ForumPending,type ForumReview,type ForumReport,type ForumReceipt,type ForumLocator,type ForumPostsQuery,type ForumReaction} from './community-forum-view-types';
 
 type Props = { runtime: ChatRuntime|null; subjectId?: string; connected: boolean; navigate: (path: string) => void;
   postId?: string; versionId?: string; replyId?: string; reportId?: string; memberSectionId?:string; section?: string; compose?: boolean; manage?: boolean;
@@ -156,6 +158,18 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
   const contentDeadline=Math.min(...[detail,parent,replyDetail,...items,...replies].flatMap(value=>value?.availability==='available'&&typeof value.publishedUntil==='number'&&value.publishedUntil>now?[value.publishedUntil]:[]),...notifications.filter(value=>noticeDeadline(value)>now).map(noticeDeadline));
   useEffect(()=>{if(!Number.isFinite(contentDeadline))return;const timer=window.setTimeout(()=>setNow(Math.floor(Date.now()/1000)),Math.min(2147483647,Math.max(0,contentDeadline*1000-Date.now()+1)));return()=>window.clearTimeout(timer);},[contentDeadline]);
   const current = useCallback(() => { if (!alive.current || !client) return false; try { client.check(); return true; } catch { return false; } },[client]);
+  const [reactionValues,setReactionValues]=useState<Record<string,ForumReaction>>({}),[reactionBusy,setReactionBusy]=useState(''),[reactionRefresh,setReactionRefresh]=useState(0),[reactionError,setReactionError]=useState('');
+  useEffect(()=>{setReactionValues({});setReactionError('');},[client]);
+  const growthEvents=useServiceQuery({endpoint:runtime?.api.endpoint??'',identity:account?.id??'anonymous',surface:'web'},'growth',()=>{});
+  const reactionEvents=useServiceQuery({endpoint:runtime?.api.endpoint??'',identity:account?.id??'anonymous',surface:'web'},'reactions',()=>setReactionRefresh(old=>old+1));
+  const reactionObjects=JSON.stringify([...new Map([...items.filter(value=>isAvailable(value)).map(value=>({kind:'post' as const,id:value.locator.postId})),...(detail&&isAvailable(detail)?[{kind:'post' as const,id:detail.locator.postId}]:[]),...replies.filter(value=>isAvailable(value)).map(value=>({kind:'reply' as const,id:value.locator.replyId})),...(replyDetail&&isAvailable(replyDetail)?[{kind:'reply' as const,id:replyDetail.locator.replyId}]:[])].map(value=>[value.kind+':'+value.id,value] as const)).values()]);
+  useEffect(()=>{let active=true;if(!client)return;const objects=JSON.parse(reactionObjects) as {kind:'post'|'reply';id:string}[];if(!objects.length){setReactionValues({});return;}
+    void (async()=>{const values:ForumReaction[]=[],removed=new Set<string>();let transient=false;
+      for(let i=0;i<objects.length;i+=100){const batch=objects.slice(i,i+100);try{values.push(...await reactionEvents.read(['status',...batch.map(value=>value.id)],()=>client.reactions(batch),{fresh:true,publicRead:true}));}
+       catch(reason){if(!definitiveReadFailure(reason)){transient=true;continue;}for(const object of batch){try{values.push(...await reactionEvents.read(['status',object.id],()=>client.reactions([object]),{fresh:true,publicRead:true}));}catch(problem){if(definitiveReadFailure(problem))removed.add(object.kind+':'+object.id);else transient=true;}}}}
+      if(active){const visible=new Set(objects.map(value=>value.kind+':'+value.id));setReactionValues(old=>{const next=Object.fromEntries(Object.entries(old).filter(([key])=>visible.has(key)&&!removed.has(key)));for(const value of values)next[value.kind+':'+value.id]=value;return next;});setReactionError(transient?'点赞状态暂时无法读取。':'');}
+    })();return()=>{active=false;};},[client,reactionObjects,reactionRefresh,reactionEvents]);
+  const reaction=(kind:'post'|'reply',id:string)=>{const key=kind+':'+id,value=reactionValues[key];if(!value)return null;return <Button type="button" variant="ghost" aria-pressed={value.liked} disabled={!!reactionBusy} onClick={()=>{if(!account){go('/app/account');return;}setReactionBusy(key);void client!.react(value,!value.liked).catch(()=>setReactionError('点赞暂时未完成，请稍后重试。')).finally(()=>{setReactionBusy('');reactionEvents.invalidate();setReactionRefresh(old=>old+1);});}}><Heart size={16} fill={value.liked?'currentColor':'none'}/>{value.liked?'已赞':'点赞'} {value.count}</Button>;};
   const hasForm=!!form;
   // Explicit actions request focus after React has committed the actual node.
   // Quiet reads never set this target, so they cannot move typing or reading.
@@ -528,14 +542,14 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       {available ? <p className="forum-excerpt">{forumBodyExcerpt(value.payload.body)}</p> : <p>{states[value.availability??''] ?? '当前没有可展示的正文。'}</p>}
       <div className="forum-meta">{author(value)}<PostTime createdAt={value.createdAt} updatedAt={available?value.versionCreatedAt:undefined}/>{available&&link(forumBrowsePath({topic:category?.id??'unclassified'}),category?.label??'未分类','forum-topic-label')}</div>
       {available&&<ForumAudienceSummary value={value.audience} options={accessOptions}/>}
-      <div className="forum-card-footer">{link(path, <><MessageCircle size={14}/>阅读与讨论</>)}{available&&value.payload.links?.length>0&&<span>{value.payload.links.length} 个相关链接</span>}</div>
+      <div className="forum-card-footer">{available&&reaction('post',locator.postId)}{link(path, <><MessageCircle size={14}/>阅读与讨论</>)}{available&&value.payload.links?.length>0&&<span>{value.payload.links.length} 个相关链接</span>}</div>
       </div>
     </article>;
   }
   const displayReply = (value: ForumReplyView) => <article ref={replyId===value.locator.replyId?primaryContent:undefined} className="forum-reply forum-discussion-reply" id={'reply-' + value.locator.replyId} key={value.locator.replyId}>
     <div className="forum-meta">{author(value)}<PostTime createdAt={value.createdAt}/>{isAvailable(value)&&<ForumAudienceSummary value={value.audience} options={accessOptions} inherited={value.audienceInherited}/>} {link(forumReplyPath(value.locator.replyId)!, '查看此条')}</div>
     {isAvailable(value) ? <>{value.payload.replyTo && <p className="reply-context">回复 {link(forumReplyPath(value.payload.replyTo.replyId)!, '先前的讨论')}</p>}<Body body={value.payload.body} code/>{client&&<ForumAttachmentFiles key={value.locator.replyId} client={client.attachments} items={value.attachments??[]} source={{replyId:value.locator.replyId}}/>}</> : <p>{states[value.availability] ?? '当前无法读取这条回复。'}</p>}
-    {isAvailable(value) && <div className="button-row">{isAvailable(selected)&&selected.canParticipate!==false&&value.canParticipate!==false && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => begin('create-reply', { postId: value.locator.postId, versionId: value.locator.postVersionId,versionNumber:selectedNumber }, { replyTo: { replyId: value.locator.replyId, contentRevision: 1 } }))}>回复此条</Button>}
+    {isAvailable(value) && <div className="button-row">{reaction('reply',value.locator.replyId)}{account&&client&&<ForumRecognition client={client} endpoint={runtime?.api.endpoint??''} accountId={account.id} kind="reply" id={value.locator.replyId} onChanged={()=>growthEvents.invalidate()}/>}{isAvailable(selected)&&selected.canParticipate!==false&&value.canParticipate!==false && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => begin('create-reply', { postId: value.locator.postId, versionId: value.locator.postVersionId,versionNumber:selectedNumber }, { replyTo: { replyId: value.locator.replyId, contentRevision: 1 } }))}>回复此条</Button>}
       {owns(value) ? <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => withdraw('withdraw-reply', value))}>撤回我的回复</Button> : <Button variant="ghost" disabled={busy || !!form} onClick={() => run(() => startReport(value))}>私有举报</Button>}</div>}
   </article>;
 
@@ -544,6 +558,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
     <OfficialAccountLoginNotice search={routeSearch}/>
     {isFeed&&<><div className="forum-heading"><div><h1 id={fieldId+'-heading'} className="small" style={{overflowWrap:'anywhere'}}>{feedTitle}</h1><p>{feedDescription}</p></div></div><SelectionRail active={section+topic} className="forum-tabs" aria-label="社区内容">{link(forumBrowsePath({topic,query}),'银河讨论',undefined,postFeed,'tabs')}{link('/app/community?section=sections','成员版块',undefined,section==='sections','tabs')}{link('/app/community?section=notifications','回复提醒',undefined,section==='notifications','tabs')}{link(communityBrowsePath({topic,query,source:'external'}),'外部精选',undefined,false,'tabs')}{section==='owned'&&link('/app/community?section=reports','内容处理记录','forum-reports-link')}{section==='reports'&&<span className="active">举报与处理</span>}</SelectionRail></>}
     {!isFeed&&link(returnPath,<>返回{returnLabel}</>,'back-link')}
+    {reactionError&&<output className="muted">{reactionError} <button type="button" className="text-link" onClick={()=>setReactionRefresh(old=>old+1)}>重试</button></output>}
     {!isFeed&&(memberSectionId?!sectionDetail:compose||reportId||replyId||!isAvailable(detail))&&<div className="forum-heading"><h1 className="small">{memberSectionId?'版块详情':compose?editorTitle:reportId?'处理记录详情':replyId?'回复详情':manage?'帖子管理':'帖子详情'}</h1></div>}
     {error && <div ref={actionError} tabIndex={-1} className="message error" role="alert">{error}<Button variant="ghost" disabled={busy} onClick={() => void refresh()}>重试</Button></div>}
     {notice && <output className="message">{notice}</output>}
@@ -575,7 +590,7 @@ function CommunityForumView({ runtime, subjectId, connected, navigate, postId, v
       {replyId&&replyDetail ? <><div className="forum-parent-link">{link(forumVersionPath(replyDetail.locator.postId, replyDetail.locator.postVersionId)!,<>{isAvailable(parent)?parent.payload.title:'查看原帖'}</>)}<LoadingFeedback active={parentReading} label="正在读取原帖…" scopeKey={detailSource.current?.key??context}/>{parentError&&<ReadFailure message={parentError} onRetry={()=>void loadParent()} retrying={parentReading}/>}{parent&&!isAvailable(parent)&&<p>原帖当前不可读取。</p>}</div>{displayReply(replyDetail)}</> : detail&&<article ref={primaryContent} className="forum-post">
         <div className="forum-meta">{author(detail)}<PostTime createdAt={detail.createdAt} updatedAt={isAvailable(detail)?detail.versionCreatedAt:undefined}/>{isAvailable(detail)&&link(forumBrowsePath({topic:detail.topic??'unclassified'}),forumTopics.find(topic=>topic.id===detail.topic)?.label??'未分类','forum-topic-label')}</div>
         {isAvailable(detail) ? <><h1>{detail.payload.title}</h1><ForumAudienceSummary value={detail.audience} options={accessOptions}/>{detail.sectionId&&<p className="forum-section-meta">{link('/app/community/sections/'+detail.sectionId,'所在成员版块')}</p>}{(earlierVersion||versions.length>1)&&<div className="forum-version-context"><p>{earlierVersion?'正在阅读较早发表的内容':detail.currentVersionId===selectedId?'正在阅读最新发表的内容':'正在阅读这次发表的内容'}{selectedNumber? ' · 第 '+selectedNumber+' 版':''}。这里的回复保留在这次发表的内容下。</p>{earlierVersion&&link(forumVersionPath(postId!,detail.currentVersionId)!,'阅读更新后的内容','text-link')}</div>}<div className="forum-post-body"><Body body={detail.payload.body} code/><Links links={detail.payload.links} titled/>{client&&selectedId&&<ForumAttachmentFiles key={selectedId} client={client.attachments} items={detail.attachments??[]} source={{postId:detail.locator.postId,versionId:selectedId}}/>}</div></> : <div className="empty-state">{states[detail.availability] ?? '暂时无法读取，请稍后重试。'}</div>}
-        {isAvailable(detail) && <div className="forum-post-actions"><Button disabled={busy || !!form || detail.canParticipate===false} onClick={() => run(() => begin('create-reply', { postId, versionId: selectedId, versionNumber: detail.locator.versionNumber }))}><MessageCircle size={16} />回复</Button>
+        {isAvailable(detail) && <div className="forum-post-actions">{reaction('post',detail.locator.postId)}{account&&client&&<ForumRecognition client={client} endpoint={runtime?.api.endpoint??''} accountId={account.id} kind="post" id={detail.locator.postId} onChanged={()=>growthEvents.invalidate()}/>}<Button disabled={busy || !!form || detail.canParticipate===false} onClick={() => run(() => begin('create-reply', { postId, versionId: selectedId, versionNumber: detail.locator.versionNumber }))}><MessageCircle size={16} />回复</Button>
           <SaveForLaterButton runtime={runtime} account={official} subjectId={localSubjectId} connected={localConnected} reference={{kind:'forum-post',postId:detail.locator.postId}} onNeedIdentity={()=>go('/app/account')}/>
           {own && <Button variant="ghost" disabled={busy || !!form} onClick={() => run(()=>startVersion())}>编辑帖子</Button>}
           <button className="forum-options-toggle" aria-haspopup="dialog" onClick={()=>setPostOptions(true)}>帖子资料</button></div>}

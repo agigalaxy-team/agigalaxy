@@ -55,8 +55,9 @@ func (r *Runtime) Recommend(ctx context.Context, identity UsageIdentity, input O
 		}
 	}
 	controlled := request.Mode == "personalized" && plan.Policy["enabled"] == true
+	communityEnabled := request.Mode == "personalized" && object(plan.Policy["communitySignals"])["enabled"] == true
 	target := request.Limit
-	if controlled {
+	if controlled || communityEnabled {
 		target = min(100, request.Limit*3)
 	}
 	accepted := []recommendationCandidate{}
@@ -132,8 +133,17 @@ func (r *Runtime) Recommend(ctx context.Context, identity UsageIdentity, input O
 		}
 	}
 	ordered := accepted
+	if communityEnabled {
+		if r.Recommendations == nil || r.Recommendations.CommunitySignals == nil {
+			return nil, fail("community_recommendation_not_connected")
+		}
+		ordered, e = r.Recommendations.rankCommunity(ctx, ordered, object(plan.Policy["communitySignals"]))
+		if e != nil {
+			return nil, e
+		}
+	}
 	if controlled {
-		ordered = applyControl(accepted, plan)
+		ordered = applyControl(ordered, plan)
 	}
 	selected := []recommendationCandidate{}
 	for _, candidate := range ordered {

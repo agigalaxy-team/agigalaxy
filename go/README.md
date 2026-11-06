@@ -1,6 +1,6 @@
 # 银河 Go 核心
 
-正式范围和迁移顺序见 [实施计划](../docs/technical/go-core-plan.md)，实际接线、检查结果和剩余限制统一见 [WORK_STATUS](../WORK_STATUS.md)。本目录提供服务器与本机 Go 核心；服务器已按本次授权切换正式 Go 产物，本机宿主安装与跨平台验收仍按其实际范围处理。正式与候选产物使用同一构建口，运行方式见 [发行接线](deploy/README.md)。
+模块与数据职责见 [架构](../docs/technical/architecture.md)，实际接线、检查结果和剩余限制统一见 [WORK_STATUS](../WORK_STATUS.md)。本目录提供服务器与本机 Go 核心；服务器已按本次授权切换正式 Go 产物，本机宿主安装与跨平台验收仍按其实际范围处理。正式与候选产物使用同一构建口，运行方式见 [发行接线](deploy/README.md)。
 
 ## 构建与定向检查
 
@@ -14,7 +14,7 @@ go build ./cmd/...
 
 仓库组件检查直接使用 `node scripts/check-go.mjs hub` 或 `node scripts/check-go.mjs native-client`，分别执行明确的 Hub 边界回归和 Native／本机资料回归；这与编译、真实宿主验收分别记录。`GALAXY_BUILD_GO` 可指定 Go 可执行文件。`test:conformance` 执行当前 Go 领域用例，缺少前置环境或跳过的检查不计通过。
 
-`internal/databaseschema/sql/` 是业务迁移与四个角色 SQL 的唯一维护来源。迁移沿原编号至 133，120 未注册；不重写历史 SQL 或从最大编号推定连续。`go generate ./internal/databaseschema` 只按 SQL 文件生成有序版本目录，`node internal/databaseschema/generate.mjs --check` 检查目录是否同步，均不连接数据库。实际升级仍须显式运行 `galaxy-migrate`。
+`internal/databaseschema/sql/` 是业务迁移与四个角色 SQL 的唯一维护来源。迁移序列由同目录 SQL 和生成目录给出，120 未注册；不重写历史 SQL 或从最大编号推定连续。`go generate ./internal/databaseschema` 只按 SQL 文件生成有序版本目录，`node internal/databaseschema/generate.mjs --check` 检查目录是否同步，均不连接数据库。实际升级仍须显式运行 `galaxy-migrate`。
 
 跨语言检查还需要现行 Node 依赖。PostgreSQL 集成检查通过 `GALAXY_GO_TEST_PG_BIN` 指定 `initdb`、`pg_ctl` 所在绝对目录；检查器只创建操作系统临时目录中的独立数据库，监听 loopback，结束后关闭。未提供时会明确跳过，不能据此报告数据库检查通过。它不读取生产 `DATABASE_URL`。
 
@@ -36,7 +36,9 @@ API与Worker日志沿用 `GALAXY_RUNTIME_LOG_*` 配置；指标沿用 `GALAXY_ME
 
 启动不迁移、不创建角色、不启动模型或接管队列；API、Worker和发布器都保留原恢复状态检查，隔离中的恢复库不能开放处理。配置设备签名时会维护原公开信任历史，不改写私钥。根管理员仍来自原受保护预配置，普通账户与管理账户分别认证；Go 域服务必须绑定真实门户身份，并在业务事务中重核当前权限。不得以请求头自报角色、伪造扫描结果或放宽权限完成联调。
 
-`galaxy-worker` 与 `galaxy-publisher` 分别使用原证据处理、内容发布数据库角色；后者使用原 `GALAXY_CONTENT_PUBLISHER_CONFIG_FILE` 和 `GALAXY_OPERATIONS_CONFIG_FILE`，不读取用户门户Cookie或刷新密钥。`galaxy-migrate` 单独提供显式技术迁移。队列必须由维护流程明确选择River后才能执行；API仅在已启用的端点装配发布生产者。周期计划存储在`galaxy_go_jobs.schedules_v1`且事务入队，原任务与周期接续通过显式维护命令办理，不自动重放未知结果。私聊与论坛附件沿原受限扫描／清理服务维护，发布暂停不冒充存储保留暂停。消息沿原`GALAXY_MESSAGING_SMTP_CREDENTIAL_FILE`受保护引用和业务目录读取；未配置时不会假成功或实际投递。旧Node消费者不会读取新门，切换前必须停止相应旧消费者，不能同时运行两套领取者。
+社区成长入口由 `galaxy-api` 的 [community-growth 装配](cmd/galaxy-api/community-growth.go)连接论坛互动、账户与管理身份、公开旧荣誉和推荐反馈；`galaxy-worker` 的 [community-growth 装配](internal/workerconfig/community-growth.go)处理来源接续与评估任务。对应业务和部署边界见[社区成长方案](../docs/technical/community-growth-and-reputation.md)。AI 评估默认关闭，需人工填写说明、选定现有 discovery 执行配置并启用；推荐社区参考也默认关闭，须单独启用。明确账户归属的旧公开帖和回复按来源承接，仅有 GUID 的旧内容保留原身份，不按后来绑定推断账户作者；可公开关联的旧 GUID 荣誉独立展示。上线需先采用完整迁移及角色授权，并验证对应配置和消费者；接口存在不证明生产已启用。
+
+`galaxy-worker` 与 `galaxy-publisher` 分别使用原证据处理、内容发布数据库角色；后者使用原 `GALAXY_CONTENT_PUBLISHER_CONFIG_FILE` 和 `GALAXY_OPERATIONS_CONFIG_FILE`，不读取用户门户Cookie或刷新密钥。`galaxy-migrate` 单独提供显式技术迁移。队列必须由维护流程明确选择River后才能执行；API仅在已启用的端点装配发布生产者。周期计划存储在`galaxy_go_jobs.schedules_v1`且事务入队，原任务与周期接续通过显式维护命令办理，不自动重放未知结果。私聊与论坛附件沿原受限扫描／清理服务维护，发布暂停不冒充存储保留暂停。消息沿原`GALAXY_MESSAGING_SMTP_CREDENTIAL_FILE`受保护引用和业务目录读取；未配置时不会假成功或实际投递。同一业务队列只由选定的领取者执行；进程替换沿原租约及回执接续。
 
 普通与管理登录已承接原OIDC回调；已保存的可续期会话只有在原密钥、Provider和配置作用域一致时才能接续。暂时认证故障与刷新结果未知返回未确认错误，不自动注销或再次交换原凭据；业务写入结果未知只查原操作。后台事件以真实Gateway当前权限核验；网站／设备来源仍分别检查当前资格及用途，不能因存在数据库行就授权。反馈字节存储与扫描使用原业务流程；启动API不表示异步消费者已接管，未配置能力不能用空数组或成功占位替代。
 

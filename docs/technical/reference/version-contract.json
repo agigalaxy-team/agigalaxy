@@ -145,7 +145,21 @@
       130,
       131,
       132,
-      133
+      133,
+      134,
+      135,
+      136,
+      137,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147
     ],
     "browserDemo": 2
   },
@@ -183,52 +197,41 @@
     "No unsupported protocol-version negotiation or fallback."
   ],
   "protocolProfiles": {
-    "reviewedAt": "2026-09-11T06:35:03.479279+08:00",
-    "source": "docs/technical/interfaces.md",
+    "source": "go/go.mod",
     "A2A": {
       "wire": "a2a/1.0",
       "transport": "JSONRPC",
-      "sdkPackage": "@a2a-js/sdk",
-      "sdkVersion": "1.1.0",
-      "publicServer": false
+      "implementation": "go/internal/native/a2a-*.go",
+      "referenceWorker": "integrations/reference-worker-pack"
     },
     "MCP": {
-      "wire": "2025-11-25",
-      "sdkPackages": [
-        "@modelcontextprotocol/node",
-        "@modelcontextprotocol/server"
+      "sdk": "github.com/modelcontextprotocol/go-sdk",
+      "sdkVersion": "v1.8.0",
+      "implementations": [
+        "go/internal/native",
+        "go/internal/personalmcp"
       ],
-      "sdkVersion": "2.0.0",
       "profiles": [
         "anonymous-docs",
         "optional-oauth-personal",
         "local-stdio"
-      ]
+      ],
+      "negotiation": "Use the selected server implementation and SDK protocol negotiation."
     },
     "OIDC_OAuth": {
-      "clientLibrary": "openid-client",
-      "clientLibraryVersion": "6.8.8",
-      "resourceToken": "RFC7662 introspection plus current Galaxy link/binding/Consent",
+      "libraries": [
+        "github.com/coreos/go-oidc/v3",
+        "golang.org/x/oauth2"
+      ],
+      "source": "go/internal/portal",
       "automaticLegacyMigration": false
     },
-    "candidateOnly": [
-      "OASF",
-      "DID",
-      "VC",
-      "OpenID4VC",
-      "AIP",
-      "AITP"
-    ],
-    "rule": "SDK and wire/profile versions are independent; installed packages do not establish other transport or optional feature compatibility"
+    "rule": "SDK, wire and optional features have separate compatibility scopes."
   },
   "documentation_scope": {
-    "reviewed_at": "2026-10-24T12:44:28.684Z",
-    "service_and_client_versions": "Package/protocol comparison values; not API deployment or Native-client release identifiers.",
-    "native_distribution_version": "0.1.19",
-    "native_node_requirement": ">=22.13.0",
-    "migration120Registered": false,
+    "service_and_client_versions": "Package/protocol comparison values, not deployment or Native distribution identifiers.",
+    "native_distribution_source": "apps/galaxy-site/release-data.json#currentNativeClient",
     "runtime_reference": "WORK_STATUS.md",
-    "protocol_profile_review": "Existing dated protocol declarations retained; this documentation update does not establish new wire compatibility.",
-    "source_schema_updated_at": "2026-10-26"
+    "migration120Registered": false
   }
 }
