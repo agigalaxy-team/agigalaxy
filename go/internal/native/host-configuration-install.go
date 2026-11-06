@@ -230,25 +230,48 @@ func PreviewOpenCodeConfiguration(ctx context.Context, directory string, input H
 				return nil, e
 			}
 			if basename == "opencode" {
-				paths := uploadObject(config["skills"])["paths"]
-				if paths == nil {
+				skillPath := []string{"skills", "paths"}
+				var paths any
+				switch value := config["skills"].(type) {
+				case nil:
+					if input.OpenCodeLayout == "v2" {
+						skillPath = []string{"skills"}
+					}
 					paths = []any{}
+				case []any:
+					skillPath = []string{"skills"}
+					paths = value
+				case map[string]any:
+					paths = value["paths"]
+					if paths == nil {
+						paths = []any{}
+					}
+				default:
+					return nil, hostConfigurationFailure("setup_opencode_config_conflict")
 				}
 				list, ok := paths.([]any)
 				if !ok {
 					return nil, hostConfigurationFailure("setup_opencode_config_conflict")
 				}
 				next := []any{}
+				inserted := false
 				for _, item := range list {
 					value, ok := item.(string)
 					if !ok {
 						return nil, hostConfigurationFailure("setup_opencode_config_conflict")
 					}
-					if value != plan.SkillsPath && value != oldSkill {
-						next = append(next, value)
+					if value == plan.SkillsPath || oldSkill != "" && value == oldSkill {
+						if !inserted {
+							next = append(next, plan.SkillsPath)
+							inserted = true
+						}
+						continue
 					}
+					next = append(next, value)
 				}
-				next = append(next, plan.SkillsPath)
+				if !inserted {
+					next = append(next, plan.SkillsPath)
+				}
 				args, environment := input.launch()
 				command := append([]string{entry}, args...)
 				mcpPath := []string{"mcp", "galaxy"}
@@ -295,9 +318,15 @@ func PreviewOpenCodeConfiguration(ctx context.Context, directory string, input H
 						}
 					}
 				}
+				var skillValue any = next
+				// A V2 array can be retained as-is there; if the user explicitly
+				// selects V1, represent the same paths in that host's object form.
+				if input.OpenCodeLayout == "v1" && len(skillPath) == 1 {
+					skillValue = map[string]any{"paths": next}
+				}
 				file.text, e = hostSetConfiguration(file.text, mcpPath, spec)
 				if e == nil {
-					file.text, e = hostSetConfiguration(file.text, []string{"skills", "paths"}, next)
+					file.text, e = hostSetConfiguration(file.text, skillPath, skillValue)
 				}
 				if e == nil && (input.OpenCodeLayout == "v2" || input.OpenCodePriorLayout == "v2") {
 					plugins := config["plugins"]

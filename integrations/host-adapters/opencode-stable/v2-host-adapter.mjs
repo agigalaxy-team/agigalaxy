@@ -36,7 +36,7 @@ export function createV2Host(context, diagnostics = undefined) {
   void pending.finally(()=>{if(generation===dialogGeneration)disposeDialog();}).catch(()=>{});
  }},DialogAlert:input=>({kind:'alert',input}),DialogPrompt:input=>({kind:'prompt',input}),DialogSelect:input=>({kind:'select',input})};
  const {route,state,event,client,v2,closeData}=createV2SessionAdapter(context);
- v2.reviewReady=input=>context.client.rpc(reviewNotificationContract).ready(input,{location:context.location?{directory:context.location.directory}:undefined});
+ v2.reviewReady=input=>{if(abort.signal.aborted)return Promise.resolve({accepted:false});return context.client.rpc(reviewNotificationContract).ready(input,{location:context.location?{directory:context.location.directory}:undefined,signal:abort.signal});};
  const lifecycle={signal:abort.signal,onDispose(fn){abort.signal.addEventListener('abort',fn,{once:true});return()=>abort.signal.removeEventListener('abort',fn);}};
  return {api:{app:context.app,renderer:context.renderer,route,state,event,keymap,ui,lifecycle,client,
   v2:{...v2,diagnostics}},

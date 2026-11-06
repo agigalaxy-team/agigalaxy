@@ -304,8 +304,10 @@ func GenerateHostConfigurations(ctx context.Context, input HostConfigurationInpu
 		} else {
 			mcp["servers"] = map[string]any{"galaxy": server}
 		}
-		config := map[string]any{"$schema": "https://opencode.ai/config.json", "mcp": mcp, "skills": map[string]any{"paths": []string{filepath.Join(input.Destination, "opencode", ".agents", "skills")}}}
+		skills := []string{filepath.Join(input.Destination, "opencode", ".agents", "skills")}
+		config := map[string]any{"$schema": "https://opencode.ai/config.json", "mcp": mcp, "skills": map[string]any{"paths": skills}}
 		if layout == "v2" {
+			config["skills"] = skills
 			config["plugins"] = []string{hostFileURL(filepath.Join(input.Destination, "opencode", "galaxy-native"))}
 		}
 		add("opencode/opencode.json", config)

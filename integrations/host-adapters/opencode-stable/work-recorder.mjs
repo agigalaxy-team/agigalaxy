@@ -138,6 +138,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive
       while(accepting&&archiveSyncRequests.has(key)) {
         const request=archiveSyncRequests.get(key);archiveSyncRequests.delete(key);
         if((await history.identity())?.id!==request.galaxyId)continue;
+        if(!accepting)return;
         try {archiveSyncState=await diagnostics.run('archive-sync',()=>onSessionComplete({galaxyId:request.galaxyId,host:request.host,sessionId:request.sessionId}),{event:'host_archive',host:'opencode',independent:true});}
         catch {archiveSyncState={state:'pending',code:'selected_archive_sync_unavailable'};}
       }
@@ -275,7 +276,7 @@ export function createOpenCodeWorkRecorder(api, {dataDirectory, history, archive
         details: {status: event.type === 'session.idle' ? 'idle' : short(event.status, 80), workOutcome: 'unknown'}});
       if (event.type === 'session.idle' || event.status === 'idle') {
         notifyArchiveReady(active.galaxyId,sessionId);
-        if(completed?.lastUserMessageId && api.v2?.reviewReady) {
+        if(accepting && completed?.lastUserMessageId && api.v2?.reviewReady) {
           diagnostics.emit({event:'host_summary',stage:'summary',outcome:'started',host:'opencode',error:Error('local_work_review_notify_started')});
           try {const result=await api.v2.reviewReady(completed);diagnostics.emit({event:'host_summary',stage:'summary',outcome:result?.accepted?'succeeded':'deferred',host:'opencode',error:Error(result?.accepted?'local_work_review_notify_accepted':'local_work_review_pending')});} catch(error) {diagnostics.emit({event:'host_summary',stage:'summary',outcome:'failed',host:'opencode',error:Object.assign(Error('local_work_review_notify_failed'),{cause:error})});}
         } else diagnostics.emit({event:'host_summary',stage:'summary',outcome:'deferred',host:'opencode',error:Error('local_work_review_no_user')});

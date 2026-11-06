@@ -88,6 +88,13 @@ func TestHostConfigurationSelectedFormatsAndOriginalAssets(t *testing.T) {
 			t.Fatal("non-Go host spec", path, e)
 		}
 	}
+	var opencode map[string]any
+	if _, e = readJSON(filepath.Join(input.Destination, "opencode", "opencode.json"), &opencode); e != nil {
+		t.Fatal(e)
+	}
+	if _, ok := opencode["skills"].([]any); !ok {
+		t.Fatalf("V2 generated skills should be an array: %#v", opencode["skills"])
+	}
 	if _, e = GenerateHostConfigurations(ctx, input); !os.IsExist(e) {
 		t.Fatal("existing output overwritten", e)
 	}
@@ -518,4 +525,95 @@ func mustReadHostTest(t *testing.T, path string) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+func TestOpenCodeV2SkillsPreserveExistingShapes(t *testing.T) {
+	ctx := context.Background()
+	for _, shape := range []string{"array", "object", "missing", "invalid-array", "invalid-paths", "v1-array"} {
+		t.Run(shape, func(t *testing.T) {
+			pkg := installationFixturePackage(t)
+			dir := filepath.Join(t.TempDir(), "config")
+			if e := os.Mkdir(dir, 0700); e != nil {
+				t.Fatal(e)
+			}
+			own := filepath.Join(pkg, "skills")
+			old := filepath.Join(t.TempDir(), "old-release", "skills")
+			config := map[string]any{"provider": map[string]any{"retained": "yes"}}
+			switch shape {
+			case "array", "v1-array":
+				config["skills"] = []any{"user-one", old, "user-two", own}
+			case "object":
+				config["skills"] = map[string]any{"paths": []any{"user-one", old, "user-two", own}, "urls": []any{"https://example.invalid/skills"}, "custom": "keep"}
+			case "invalid-array":
+				config["skills"] = []any{"user-one", false}
+			case "invalid-paths":
+				config["skills"] = map[string]any{"paths": "not-an-array", "urls": []any{"https://example.invalid/skills"}}
+			}
+			if shape == "array" || shape == "object" || shape == "v1-array" {
+				if e := writeJSON(filepath.Join(dir, "galaxy-installation.json"), map[string]any{"skillPath": old}); e != nil {
+					t.Fatal(e)
+				}
+			}
+			raw, e := hostJSON(config)
+			if e != nil {
+				t.Fatal(e)
+			}
+			path := filepath.Join(dir, "opencode.json")
+			if e = os.WriteFile(path, raw, 0600); e != nil {
+				t.Fatal(e)
+			}
+			layout := "v2"
+			if shape == "v1-array" {
+				layout = "v1"
+			}
+			input := HostConfigurationInput{LocalOnly: true, PackageDirectory: pkg, DataDirectory: filepath.Join(t.TempDir(), "data"), OpenCodeLayout: layout}
+			plan, e := PreviewOpenCodeConfiguration(ctx, dir, input)
+			if strings.HasPrefix(shape, "invalid-") {
+				if e == nil {
+					t.Fatal("invalid skill shape accepted")
+				}
+				after, _ := os.ReadFile(path)
+				if string(after) != string(raw) {
+					t.Fatal("invalid source overwritten")
+				}
+				return
+			}
+			if e != nil {
+				t.Fatal(e)
+			}
+			if _, e = InstallOpenCodeConfigurationReviewed(ctx, plan, true); e != nil {
+				t.Fatal(e)
+			}
+			plan, e = PreviewOpenCodeConfiguration(ctx, dir, input)
+			if e != nil {
+				t.Fatal(e)
+			}
+			if _, e = InstallOpenCodeConfigurationReviewed(ctx, plan, true); e != nil {
+				t.Fatal(e)
+			}
+			var actual map[string]any
+			if _, e = readJSON(path, &actual); e != nil {
+				t.Fatal(e)
+			}
+			if uploadObject(actual["provider"])["retained"] != "yes" {
+				t.Fatal(actual)
+			}
+			var paths []any
+			if shape == "object" || shape == "v1-array" {
+				object := uploadObject(actual["skills"])
+				paths, _ = object["paths"].([]any)
+				if shape == "object" && (!reflect.DeepEqual(object["urls"], []any{"https://example.invalid/skills"}) || object["custom"] != "keep") {
+					t.Fatal(object)
+				}
+			} else {
+				paths, _ = actual["skills"].([]any)
+			}
+			expected := []any{"user-one", own, "user-two"}
+			if shape == "missing" {
+				expected = []any{own}
+			}
+			if !reflect.DeepEqual(paths, expected) {
+				t.Fatalf("skills: %#v, want %#v", paths, expected)
+			}
+		})
+	}
 }

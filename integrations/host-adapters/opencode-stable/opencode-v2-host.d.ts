@@ -18,7 +18,7 @@ declare module '@opencode/plugin/tui' {
     readonly app: { readonly version: string };
     readonly renderer: { readonly width: number; readonly height: number };
     readonly location: LocationRef | undefined;
-    readonly client: { rpc(definition: unknown): { ready(input: unknown,options?: {location?: {directory?: string}}): Promise<unknown> }; readonly message: { list(input: { sessionID: string; limit?: number; cursor?: string; order?: 'asc' | 'desc' },
+    readonly client: { rpc(definition: unknown): { ready(input: unknown,options?: {location?: {directory?: string};signal?: AbortSignal}): Promise<unknown> }; readonly message: { list(input: { sessionID: string; limit?: number; cursor?: string; order?: 'asc' | 'desc' },
       options?: { signal?: AbortSignal }): Promise<{ data: Message[]; cursor: { next?: string | null } }> } };
     readonly data: {
       listen(handler: (event: { details: { type: string; data: Record<string, unknown> } }) => void): () => void;
