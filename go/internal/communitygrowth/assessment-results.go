@@ -122,11 +122,15 @@ func (s *AssessmentService) SaveResult(ctx context.Context, taskID string, resul
 			_, e = tx.Exec(ctx, `UPDATE community_assessment_tasks_v1 SET state='superseded',result_hash=$3,updated_at=$4 WHERE endpoint=$1 AND id=$2`, s.Endpoint, taskID, hash, s.now())
 			return Object{"state": "superseded", "taskId": taskID, "adopted": false, "replayed": false}, e
 		}
-		for _, ref := range result.Evidence {
+		// Resolve tool references back to the original manifest keys. Keep
+		// stored evidence and invalidation unchanged, including old receipts.
+		result.Evidence = append([]AssessmentEvidence(nil), result.Evidence...)
+		seenSources := map[string]bool{}
+		for index, ref := range result.Evidence {
 			var source AssessmentSource
 			var readVersion *string
 			e = tx.QueryRow(ctx, `SELECT source_key,source_kind,source_id,source_revision,snapshot,read_version FROM community_assessment_materials_v1
-				WHERE endpoint=$1 AND task_id=$2 AND source_key=$3`, s.Endpoint, taskID, ref.SourceKey).
+				WHERE endpoint=$1 AND task_id=$2 AND (source_key=$3 OR source_kind||':'||source_id=$3)`, s.Endpoint, taskID, ref.SourceKey).
 				Scan(&source.Key, &source.Kind, &source.ID, &source.Revision, &source.Snapshot, &readVersion)
 			if noRows(e) || e == nil && (source.Revision != ref.SourceRevision || readVersion == nil || *readVersion != ref.SourceVersion) {
 				return nil, fault.New("community_assessment_evidence_mismatch", 409)
@@ -134,6 +138,11 @@ func (s *AssessmentService) SaveResult(ctx context.Context, taskID string, resul
 			if e != nil {
 				return nil, e
 			}
+			if seenSources[source.Key] {
+				return nil, invalid()
+			}
+			seenSources[source.Key] = true
+			result.Evidence[index].SourceKey = source.Key
 			source.ObjectKind, source.ObjectID = str(source.Snapshot, "objectKind"), str(source.Snapshot, "objectId")
 			current, e := s.ReadSourceWithin(ctx, tx, source)
 			if e != nil {
