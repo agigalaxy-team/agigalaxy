@@ -268,6 +268,9 @@ GRANT SELECT,INSERT,UPDATE ON operations_autonomy_dispatches_v1 TO galaxy_eviden
 
 -- Community147: source projection and recommendation delivery, no human rule/config mutation.
 GRANT SELECT ON forum_reactions_v1 TO galaxy_evidence_worker;
+-- PostgreSQL row locks require UPDATE on a column. Reconciliation locks the
+-- original identity while deriving its projection; content fields stay read-only.
+GRANT UPDATE(id) ON forum_posts_v1,forum_replies_v1 TO galaxy_evidence_worker;
 GRANT SELECT,UPDATE ON discovery_feedback_state_v1 TO galaxy_evidence_worker;
 GRANT SELECT ON community_growth_rules_v1 TO galaxy_evidence_worker;
 GRANT SELECT ON community_growth_levels_v1 TO galaxy_evidence_worker;

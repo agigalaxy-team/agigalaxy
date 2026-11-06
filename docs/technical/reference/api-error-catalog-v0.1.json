@@ -12282,13 +12282,13 @@
       "code": "community_assessment_versions_unavailable",
       "status": 503,
       "source": "go/internal/operationsautonomy/community_assessment.go",
-      "line": 96
+      "line": 118
     },
     {
       "code": "operations_autonomy_pause_requested",
       "status": 409,
       "source": "go/internal/operationsautonomy/community_assessment.go",
-      "line": 159
+      "line": 181
     },
     {
       "code": "invalid_operations_autonomy_request",
@@ -12355,6 +12355,12 @@
       "status": 403,
       "source": "go/internal/operationsautonomy/dispatch.go",
       "line": 194
+    },
+    {
+      "code": "operations_autonomy_task_owner_unavailable",
+      "status": 503,
+      "source": "go/internal/operationsautonomy/dispatch.go",
+      "line": 353
     },
     {
       "code": "operations_autonomy_scope_denied",
@@ -12486,19 +12492,19 @@
       "code": "operations_autonomy_task_not_found",
       "status": 404,
       "source": "go/internal/operationsautonomy/model.go",
-      "line": 169
+      "line": 170
     },
     {
       "code": "invalid_operations_autonomy_request",
       "status": 400,
       "source": "go/internal/operationsautonomy/model.go",
-      "line": 175
+      "line": 176
     },
     {
       "code": "operations_autonomy_config_not_found",
       "status": 404,
       "source": "go/internal/operationsautonomy/model.go",
-      "line": 182
+      "line": 183
     },
     {
       "code": "operations_autonomy_native_attempt_mismatch",
