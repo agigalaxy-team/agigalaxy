@@ -190,7 +190,8 @@
         "scripts/hub-runtime.mjs",
         "docs/technical/go-core-plan.md",
         "scripts/reference/http-api-entries.mjs",
-        "scripts/test/api-reference.test.mjs"
+        "scripts/test/api-reference.test.mjs",
+        "scripts/reference/storage-reference.mjs"
       ],
       "buildLimit": "Local Go server candidate; no service activation, schema changes or queue adoption. Necessary integration checks are run after development batches."
     },
