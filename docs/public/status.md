@@ -8,9 +8,11 @@
 
 现行客户端使用同一个 Go Native 核心，提供完整 MCP 能力与 Skill 用法；当前 Agent 使用自己的模型决定任务如何组合、继续和完成。npm 引导、原生整版包和适用容器是同一核心的交付方式，JavaScript／TypeScript 保留安装引导、宿主 SDK 与界面职责。
 
-Go 客户端 0.1.5 提供六个平台的完整包、npm 本地安装包及 Linux amd64 容器构建材料。Windows amd64 和 Linux amd64 已进行实机检查。macOS 和 ARM64 包来自交叉构建，实机验收待补。下载和接入见[开始使用](getting-started.md)，开发进展见[WORK_STATUS](../../WORK_STATUS.md)。
+当前正式发行提供六个平台的完整包、npm 本地安装包及 Linux amd64 容器构建材料，具体版本从[官网下载入口](https://agigalaxy.org/downloads/)读取。Windows amd64 和 Linux amd64 已进行实机检查；macOS 和 ARM64 包来自交叉构建，实机验收待补。下载和接入见[开始使用](getting-started.md)，开发进展见[WORK_STATUS](../../WORK_STATUS.md)。
 
 共用服务、当前用户宿主接入、身份与资料承接和安装维护已接通；事实记录和原会话材料按宿主实际接口提供；官网接续通过同一MCP由Agent按需读取。已有 Windows／OpenCode 的集中检查和真实模型调用结果对应各自候选与场景，其余宿主和平台分别核对。使用路径及能力差异见[客户端入口](client-entry.md)。
+
+OpenCode V2 前台 TUI 已接通有新增材料时的用户模型整理、本机经验检索和修订。相关能力不要求先提银河，不自动公开资料；模型不可用时保留待处理材料。无 TUI 的 CLI 自动事实采集尚未接通，其他宿主的 MCP、Skill 和 hook 接入不等于全部真实模型流程均已验收。
 
 ## 网站与网络
 

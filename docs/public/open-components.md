@@ -11,7 +11,7 @@
 | 交付 | 当前范围 |
 |---|---|
 | 公开主源码仓库 | 官网、网页、Go Hub／Native、宿主适配、专业服务接线、构建与文档在同一仓库可查；银河自有代码采用根 Apache-2.0，第三方另依原许可；独立发行与部署验收分别处理 |
-| Native 客户端 | [现行 Go 客户端 0.1.5](getting-started.md#客户端安装) 从 GitHub Release 发行。旧版与对应指南见[历史材料](getting-started.md#历史材料)，许可按各版本的 `LICENSE`、`NOTICE` 和随版声明确定 |
+| Native 客户端 | [现行 Go 客户端](getting-started.md#客户端安装) 从官网下载，GitHub Release 同步发行。旧版与对应指南见[历史材料](getting-started.md#历史材料)，许可按各版本的 `LICENSE`、`NOTICE` 和随版声明确定 |
 | [银河所用 OpenPanel 修改版对应源码](https://agigalaxy.org/open-source/openpanel-public2-galaxy-path-memory-20261025-r1/source.tar.gz) | 2026-10-25 r1 路径计算内存优化版，78,716,905 字节；保留前版账户范围、搜索系列、概览时区修正及固定上游、原锁、AGPL 原文和构建材料。[官网源码页](https://agigalaxy.org/open-source/)同时提供本版及三个历史版本的准确源码与说明；各版独立保留原许可和发行范围 |
 | 客户端第三方依赖 | 维持各自原许可；发行内保留锁定版本、许可清单和原始声明，不因银河的许可而统一改成 Apache |
 | 自建与运行材料 | 实际源码和配置样例公开在主库；银河自有代码统一 Apache-2.0，第三方许可不变，生产配置与用户资料不公开，自建范围以实际组件、依赖和运行说明为准 |
