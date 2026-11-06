@@ -4,6 +4,7 @@ import (
 	"context"
 	contextdata "github.com/agigalaxy-team/agigalaxy/go/internal/context"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/protocol"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/taskmaterials"
 	"github.com/google/uuid"
 	"sort"
@@ -51,11 +52,7 @@ func (l *helpLease) describe(ctx context.Context, session, values map[string]any
 	if kind == "publish-task" && len(trustArray(payload["materials"])) > 0 {
 		return nil, helpError("task_material_atomic_route_required")
 	}
-	maximum := 24000
-	if strings.HasPrefix(kind, "context-") {
-		maximum = 40000
-	}
-	if len([]byte(text(values["payloadJson"]))) > maximum {
+	if protocol.TextLength(text(values["payloadJson"])) > 40000 {
 		return nil, helpError("help_action_payload_too_large")
 	}
 	recipients, e := helpRecipients(values, payload, l.scope.Owner)
@@ -263,7 +260,7 @@ func (l *helpLease) describe(ctx context.Context, session, values map[string]any
 }
 func helpActionPreview(row map[string]any) map[string]any {
 	out := map[string]any{}
-	for _, k := range []string{"operationId", "payloadHash", "kind", "taskId", "participationId", "grantId", "recipientIds", "visibility", "scope", "state"} {
+	for _, k := range []string{"operationId", "payloadHash", "kind", "taskId", "participationId", "grantId", "recipientIds", "visibility", "scope", "state", "failure"} {
 		if v, ok := row[k]; ok {
 			out[k] = v
 		}
@@ -330,6 +327,13 @@ func (l *helpLease) actionReference(ctx context.Context, id string, row map[stri
 	return e
 }
 func (l *helpLease) prepareAction(ctx context.Context, id string, input map[string]any) (any, error) {
+	if input["request"] != nil {
+		var e error
+		input, e = l.preparePublication(ctx, id, input)
+		if e != nil {
+			return nil, e
+		}
+	}
 	parsed, e := helpPayload(text(input["kind"]), text(input["payloadJson"]))
 	if e != nil {
 		return nil, e
@@ -459,7 +463,64 @@ func (l *helpLease) prepareAction(ctx context.Context, id string, input map[stri
 	}
 	return helpActionPreview(row), nil
 }
-func (l *helpLease) recordAction(ctx context.Context, id, operation, state string, receipt map[string]any) (map[string]any, error) {
+
+// Only explicitly selected business text becomes the public request. Local
+// observations, candidate lists and host history are not copied implicitly.
+func (l *helpLease) preparePublication(ctx context.Context, id string, input map[string]any) (map[string]any, error) {
+	if input["kind"] != "publish-task" || input["payloadJson"] != nil || input["taskId"] != nil {
+		return nil, helpError("help_action_target_mismatch")
+	}
+	session, e := l.get(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	r := psObject(input["request"])
+	payload := map[string]any{"operationId": uuid.NewString(), "taskId": uuid.NewString(), "caseId": session["caseId"], "title": r["title"], "summary": r["summary"], "intent": "stuck", "visibility": "Public", "collaboration": "open-assistance", "enrollmentExpiresAt": nil, "workContext": map[string]any{"goal": r["goal"], "currentSituation": r["currentSituation"], "attemptRefs": []any{}}}
+	for _, k := range []string{"intent", "visibility", "expectedOutcome", "enrollmentExpiresAt"} {
+		if v, ok := r[k]; ok {
+			payload[k] = v
+		}
+	}
+	// Repeating preparation of the same business request returns its original
+	// retained operation, including an uncertain dispatch. It never resends it.
+	for _, ref := range trustArray(session["actionOperations"]) {
+		if psObject(ref)["kind"] != "publish-task" {
+			continue
+		}
+		prior, e := l.operation(ctx, id, text(psObject(ref)["operationId"]), nil)
+		if e != nil {
+			return nil, e
+		}
+		if prior == nil || prior["payloadJson"] == nil {
+			continue
+		}
+		old, e := helpPayload("publish-task", text(prior["payloadJson"]))
+		if e != nil {
+			return nil, e
+		}
+		compare := psObject(psClone(old))
+		delete(compare, "operationId")
+		delete(compare, "taskId")
+		wanted := psObject(psClone(payload))
+		delete(wanted, "operationId")
+		delete(wanted, "taskId")
+		if connectionEqual(compare, wanted) {
+			out := psObject(psClone(input))
+			delete(out, "request")
+			out["payloadJson"] = prior["payloadJson"]
+			return out, nil
+		}
+	}
+	raw, e := protocol.EncodeJS(payload)
+	if e != nil {
+		return nil, e
+	}
+	out := psObject(psClone(input))
+	delete(out, "request")
+	out["payloadJson"] = string(raw)
+	return out, nil
+}
+func (l *helpLease) recordAction(ctx context.Context, id, operation, state string, receipt map[string]any, failures ...map[string]any) (map[string]any, error) {
 	row, e := l.operation(ctx, id, operation, func(prior map[string]any) (map[string]any, error) {
 		if prior == nil {
 			return nil, helpError("help_action_unavailable")
@@ -472,7 +533,11 @@ func (l *helpLease) recordAction(ctx context.Context, id, operation, state strin
 		if receipt != nil {
 			prior["receipt"] = receipt
 		}
+		if len(failures) > 0 {
+			prior["failure"] = failures[0]
+		}
 		if state == "acknowledged" {
+			delete(prior, "failure")
 			delete(prior, "payloadJson")
 			delete(prior, "materials")
 		}
@@ -569,12 +634,15 @@ func (l *helpLease) executeAction(ctx context.Context, id string, input map[stri
 	if e = l.actionReference(ctx, id, row); e != nil {
 		return nil, e
 	}
+	failurePhase := "authorization"
 	submission, sendErr := l.host.runtime.AuthorizeReviewed(ctx, map[string]any{"requestId": auth, "action": row["consentAction"], "objectId": operation, "payloadJson": row["payloadJson"], "visibility": row["visibility"], "viewers": row["recipientIds"], "expiresAt": row["expiresAt"]}, expected)
 	var receipt map[string]any
 	if sendErr == nil {
+		failurePhase = "local-session-check"
 		_, sendErr = l.get(ctx, id)
 	}
 	if sendErr == nil && (submission["payloadJson"] != row["payloadJson"] || !controlUUID(submission["consentId"])) {
+		failurePhase = "authorization-payload-check"
 		sendErr = helpError("help_authorization_payload_changed")
 	}
 	if sendErr == nil {
@@ -593,23 +661,29 @@ func (l *helpLease) executeAction(ctx context.Context, id string, input map[stri
 		case "context-event":
 			path = "/v2/context/" + text(row["grantId"]) + "/events"
 		}
+		failurePhase = "business-submit"
 		receipt, _, sendErr = l.call(ctx, path, map[string]any{"consentId": submission["consentId"], "payloadJson": row["payloadJson"]})
 		if sendErr == nil {
+			failurePhase = "business-receipt-check"
 			if strings.HasPrefix(text(row["kind"]), "context-") {
 				if receipt["grantId"] != row["grantId"] || receipt["eventId"] != operation || !isOne(text(receipt["state"]), "recorded-awaiting-recipient-acceptance", "accepted", "declined", "revoked", "acknowledged") {
 					sendErr = helpError("help_receipt_mismatch")
 				}
-			} else if receipt["taskId"] != row["taskId"] || receipt["eventId"] != operation || !psSafeInteger(receipt["version"]) || psInt(receipt["version"]) < 1 || row["kind"] == "publish-task" && psInt(receipt["version"]) != 1 || row["participationId"] != nil && receipt["participationId"] != row["participationId"] {
+			} else if receipt["taskId"] != row["taskId"] || receipt["eventId"] != operation || !helpSafeInteger(receipt["version"]) || psInt(receipt["version"]) < 1 || row["kind"] == "publish-task" && psInt(receipt["version"]) != 1 || row["participationId"] != nil && receipt["participationId"] != row["participationId"] {
 				sendErr = helpError("help_receipt_mismatch")
 			}
 		}
 	}
 	if sendErr != nil {
-		current, e := l.recordAction(ctx, id, operation, "unknown", nil)
+		// Keep the original failure stage/code beside its original operation.
+		// A later guarded execute must not conceal the first actual failure or
+		// turn an uncertain authorization/business write into a new dispatch.
+		failure := map[string]any{"phase": failurePhase, "code": runtimeErrorCode(sendErr)}
+		current, e := l.recordAction(ctx, id, operation, "unknown", nil, failure)
 		if e != nil {
 			return nil, e
 		}
-		return map[string]any{"operation": helpActionPreview(current), "state": "unknown", "next": "reconcile-original-operation", "automaticallyRetried": false}, nil
+		return map[string]any{"operation": helpActionPreview(current), "state": "unknown", "failure": failure, "next": "reconcile-original-operation", "automaticallyRetried": false}, nil
 	}
 	current, e := l.recordAction(ctx, id, operation, "acknowledged", receipt)
 	if e != nil {

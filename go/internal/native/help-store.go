@@ -34,7 +34,7 @@ func helpSchema(name string) map[string]any {
 }
 func helpValidate(name string, value map[string]any) error {
 	schema := helpSchema(name)
-	remoteDefaults(schema, value)
+	helpDefaults(schema, value)
 	if remoteChatValidate(schema, value) != nil {
 		return helpError("help_operation_failed")
 	}
@@ -56,6 +56,16 @@ func helpHas(v any, key string) bool {
 	return false
 }
 func helpPending(v any) bool { return isOne(text(v), "submitting", "unknown", "conflict") }
+
+// HTTP responses retain json.Number through Connection, while local Help
+// snapshots use the JavaScript number domain. Validate each representation
+// without truncating a fraction or accepting an unsafe integer.
+func helpSafeInteger(v any) bool {
+	if _, ok := v.(json.Number); ok {
+		return connectionSafeInteger(v)
+	}
+	return psSafeInteger(v) && psInt(v) <= 9007199254740991
+}
 func helpReadRecord(path string) (map[string]any, bool, error) {
 	var raw json.RawMessage
 	ok, e := readJSON(path, &raw)
@@ -76,6 +86,9 @@ func helpReadRecord(path string) (map[string]any, bool, error) {
 	return row, ok, nil
 }
 func (h *NativeHelp) begin(ctx context.Context) (*helpLease, error) {
+	return h.beginQuery(ctx, false)
+}
+func (h *NativeHelp) beginQuery(ctx context.Context, publicRead bool) (*helpLease, error) {
 	op, cancel, generation, e := h.runtime.operation(ctx, false)
 	if e != nil {
 		return nil, e
@@ -85,7 +98,7 @@ func (h *NativeHelp) begin(ctx context.Context) (*helpLease, error) {
 	if e != nil {
 		return nil, e
 	}
-	if scope.Owner == "" {
+	if scope.Owner == "" && !publicRead {
 		return nil, helpError("help_identity_changed")
 	}
 	l := &helpLease{h, scope, generation}
@@ -350,7 +363,7 @@ func (l *helpLease) call(ctx context.Context, path string, input any) (map[strin
 	if input == nil {
 		method = "GET"
 	}
-	out, e := l.host.runtime.Call(ctx, path, input, ConnectionCallOptions{ExpectedScope: &l.scope, Method: method, ResponseJSON: &raw})
+	out, e := l.host.runtime.Call(ctx, path, input, ConnectionCallOptions{ExpectedScope: &l.scope, Method: method, ResponseJSON: &raw, Unauthenticated: l.scope.Owner == ""})
 	if check := l.check(ctx); check != nil {
 		return nil, nil, check
 	}

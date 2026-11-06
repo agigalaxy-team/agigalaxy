@@ -37,7 +37,7 @@ export function TaskPublishDraftComparison({current,other,currentStates,otherSta
  const restores=writingFields.filter(([field])=>!equal(current.materialRestore[field],other?.materialRestore[field]));
  function row(title:string,left:React.ReactNode,right:React.ReactNode){return <section key={title}><h3>{title}</h3><div><div><h4>{currentLabel}</h4>{left}</div><div><h4>{otherLabel}</h4>{right}</div></div></section>;}
  function originView(draft:PublishDraft|null){return draft?.helpOrigin?<p>关联了原工作{draft.helpOrigin.attemptRefs.length?`及其中 ${draft.helpOrigin.attemptRefs.length} 条已有尝试`:'。'} <a href={`/app/tasks/${draft.helpOrigin.taskId}`} target="_blank" rel="noopener noreferrer">查看原工作</a></p>:<p>未关联其他工作。</p>;}
- function scopeView(draft:PublishDraft|null){return <><p>{draft?draft.visibility==='Public'?'公开求助':draft.visibility==='Private'?'仅自己':'其他分享范围':'未选择分享范围'}</p><p>接受新回应至：{draft?date(draft.enrollmentLocal):'尚未设置'}</p></>;}
+ function scopeView(draft:PublishDraft|null){return <><p>{draft?draft.visibility==='Public'?'公开求助':draft.visibility==='Private'?'仅自己':'其他分享范围':'未选择分享范围'}</p><p>接受新回应至：{draft?.enrollmentLocal?date(draft.enrollmentLocal):'持续开放'}</p></>;}
  return <div className="request-draft-comparison">
   {other===null&&<p>已保存的草稿已被清空，本页输入仍保留。</p>}
   {texts.map(([field,label])=>row(label,<DraftText value={current[field]} draft={current} states={currentStates} clock={clock} label={currentLabel+' · '+label}/>,<DraftText value={other?.[field]} draft={other} states={otherStates} clock={clock} label={otherLabel+' · '+label}/>))}

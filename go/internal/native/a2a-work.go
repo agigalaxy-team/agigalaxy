@@ -113,7 +113,12 @@ func (h *NativeA2aWork) readable(ctx context.Context, l *nativeIdentityLease, pe
 		}
 		link = uploadObject(value)
 	}
-	current, _, e := a2aReaders(l).resolve(ctx, text(link["caseId"]), text(link["attemptId"]), l.scope.Owner, nil, uploadObject(link["factContext"]))
+	var current map[string]any
+	if link["source"] != nil {
+		current, _, e = h.host.sourceAccess(ctx, l, nil, uploadObject(link["source"]))
+	} else {
+		current, _, e = a2aReaders(l).resolve(ctx, text(link["caseId"]), text(link["attemptId"]), l.scope.Owner, nil, uploadObject(link["factContext"]))
+	}
 	if e != nil {
 		if changed := h.check(ctx, l); changed != nil {
 			return nil, changed
@@ -132,14 +137,7 @@ func (h *NativeA2aWork) readable(ctx context.Context, l *nativeIdentityLease, pe
 		}
 		link = uploadObject(value)
 	}
-	title := "当前工作"
-	for _, v := range uploadRows(current["events"]) {
-		event := uploadObject(v)
-		if event["kind"] == "case-created" {
-			title = text(event["title"])
-			break
-		}
-	}
+	title := a2aSourceTitle(current)
 	name := peer
 	for _, v := range h.host.Peers() {
 		p := uploadObject(v)
@@ -149,7 +147,7 @@ func (h *NativeA2aWork) readable(ctx context.Context, l *nativeIdentityLease, pe
 		}
 	}
 	facts := uploadObject(link["factContext"])
-	out := map[string]any{"association": map[string]any{"associationId": id, "peerId": peer, "purpose": title, "caseId": link["caseId"], "attempt": facts["attemptRef"], "taskId": facts["taskId"]}, "peer": link, "peerName": name}
+	out := map[string]any{"association": map[string]any{"associationId": id, "peerId": peer, "purpose": title, "source": link["source"], "caseId": link["caseId"], "attempt": facts["attemptRef"], "taskId": facts["taskId"]}, "peer": link, "peerName": name, "goalCompletion": "unconfirmed", "protocolTaskTerminal": a2aTerminal(text(uploadObject(link["peer"])["state"]))}
 	if receipt != nil {
 		out["resultReceipt"] = receipt
 	}
@@ -278,18 +276,17 @@ func (h *NativeA2aWork) Prepare(ctx context.Context, l *nativeIdentityLease, inp
 	if task, ok := input["taskId"]; ok {
 		query["taskId"] = task
 	}
-	source, e := l.call(ctx, "/v2/cases/"+caseID+"/read", query, false)
+	var source map[string]any
+	if original.link["source"] != nil {
+		source, _, e = h.host.sourceAccess(ctx, l, nil, uploadObject(original.link["source"]))
+	} else {
+		source, e = l.call(ctx, "/v2/cases/"+caseID+"/read", query, false)
+	}
 	if e != nil {
+		_, _ = h.host.Abort(original)
 		return nil, e
 	}
-	purpose := "当前工作"
-	for _, v := range uploadRows(source["events"]) {
-		event := uploadObject(v)
-		if event["kind"] == "case-created" {
-			purpose = text(event["title"])
-			break
-		}
-	}
+	purpose := a2aSourceTitle(source)
 	authorization := uploadObject(value["authorization"])
 	payloadJSON := text(value["payloadJson"])
 	if action == "result" {
@@ -318,6 +315,9 @@ func (h *NativeA2aWork) Prepare(ctx context.Context, l *nativeIdentityLease, inp
 		exact["peerPrincipal"] = payload["peerPrincipal"]
 	}
 	review := map[string]any{"action": action, "associationId": value["associationId"], "peerId": peer.id, "peerName": name, "purpose": purpose, "caseId": payload["caseId"], "visibility": visibility, "recipients": recipients, "payloadHash": identity.Digest([]byte(payloadJSON)), "exact": exact}
+	if payload["source"] != nil {
+		review["source"] = payload["source"]
+	}
 	if attempt := uploadObject(payload["factContext"])["attemptRef"]; attempt != nil {
 		review["attempt"] = attempt
 	}
@@ -364,7 +364,15 @@ func registerNativeA2aWorkTools(server *mcp.Server, tools *toolRuntime, host *Na
 			if e != nil {
 				return toolError(e)
 			}
-			remoteDefaults(uploadObject(c["schema"]), input)
+			if name == "galaxy_a2a_work_prepare" {
+				input, e = a2aNormalize("galaxy_a2a_prepare", input)
+			} else {
+				remoteDefaults(uploadObject(c["schema"]), input)
+				e = remoteChatValidate(uploadObject(c["schema"]), input)
+			}
+			if e != nil {
+				return toolError(e)
+			}
 			ctx, cancel, l, e := host.runtime.identityLease(ctx, false)
 			if e != nil {
 				return toolError(e)

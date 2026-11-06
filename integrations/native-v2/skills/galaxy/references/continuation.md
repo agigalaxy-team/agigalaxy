@@ -5,3 +5,5 @@
 `galaxy_open` 打开当前支持的稳定网页对象，`origin.workRef` 只留本机。网页操作后用原 `navigationId` 调用 `galaxy_return` 刷新同一对象，并按当前权限重新读取；不将未选私人草稿或其他材料带入。来源撤回、许可变化或不可核查时保留定位并据实说明。若原聊天无法定位，在现有聊天接续并保留来源；只有宿主实际支持向原输入追加时才使用该能力。
 
 支持 MCP Apps 的宿主可使用 `galaxy_panel`、`galaxy_local_panel`；其他宿主使用同义 MCP 工具和聊天。打开页面、返回、取消或读取成功不自动提交任务、取消承诺或证明目标解决；按真实回执呈现结果，不把原始载荷作为用户界面。
+
+原请求的进展可沿 `galaxy_task_v2_get`、`galaxy_comments_query` 和 `galaxy_comment_get` 按实际 schema 读取；房间沿原引用读取消息。将实际内容用于当前工作，不能把后台通知或写回原聊天视为所有宿主已支持。

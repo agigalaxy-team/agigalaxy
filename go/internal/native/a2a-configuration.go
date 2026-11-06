@@ -1,6 +1,7 @@
 package native
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -14,12 +15,15 @@ type a2aPeer struct {
 	card                                                                    *protocol.OrderedObject
 	trustExpiresAt                                                          int64
 	hasName, hasTenant                                                      bool
+	source                                                                  map[string]any
+	owner, official                                                         string
 }
 
 // A2aOptions never reads ambient environment. ReadEnvironment is the explicitly
 // supplied child-process lookup and is used only for the chosen named peer.
 type A2aOptions struct {
 	Post            A2aPost
+	GetCard         func(context.Context, string, int, time.Duration) ([]byte, error)
 	ReadEnvironment func(string) (string, bool)
 	Now             func() time.Time
 }
@@ -78,6 +82,10 @@ func (p a2aPeer) authorize(now time.Time, environment func(string) (string, bool
 	}
 	for _, item := range interfaces {
 		v := a2aObject(item)
+		tenant := v["tenant"]
+		if tenant == nil {
+			tenant = ""
+		}
 		binding := v["protocolBinding"]
 		if binding == nil {
 			binding = v["protocol_binding"]
@@ -86,7 +94,7 @@ func (p a2aPeer) authorize(now time.Time, environment func(string) (string, bool
 		if version == nil {
 			version = v["protocol_version"]
 		}
-		if a2aJSString(v["url"]) == p.scope("", "").Endpoint && a2aJSString(v["tenant"]) == p.tenant && a2aJSString(binding) == "JSONRPC" && a2aJSString(version) == "1.0" {
+		if a2aJSString(v["url"]) == p.scope("", "").Endpoint && a2aJSString(tenant) == p.tenant && a2aJSString(binding) == "JSONRPC" && a2aJSString(version) == "1.0" {
 			matched = true
 			break
 		}

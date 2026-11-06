@@ -32,13 +32,34 @@ func (h *NativeA2a) Read(ctx context.Context, input any) (any, error) {
 		if e == nil {
 			e = l.check(ctx)
 		}
-		return rows, e
+		refs := []any{}
+		for _, row := range rows {
+			link := uploadObject(row)
+			refs = append(refs, map[string]any{"id": link["id"], "revision": link["revision"], "status": link["status"]})
+		}
+		return refs, e
 	}
 	link, e := j.get(ctx, id)
 	if e != nil {
 		return nil, e
 	}
 	if action == "get" {
+		if link["source"] != nil {
+			_, _, e = h.sourceAccess(ctx, l, nil, uploadObject(link["source"]))
+		} else {
+			_, _, e = a2aReaders(l).resolve(ctx, text(link["caseId"]), text(link["attemptId"]), l.scope.Owner, nil, uploadObject(link["factContext"]))
+		}
+		if e != nil {
+			if changed := l.check(ctx); changed != nil {
+				return nil, changed
+			}
+			refs := []any{}
+			for _, row := range uploadRows(link["operations"]) {
+				op := uploadObject(row)
+				refs = append(refs, map[string]any{"id": op["id"], "kind": op["kind"], "requestHash": op["requestHash"], "outcome": op["outcome"]})
+			}
+			return map[string]any{"id": link["id"], "caseId": link["caseId"], "attemptId": link["attemptId"], "factContext": link["factContext"], "source": link["source"], "revision": link["revision"], "status": link["status"], "operations": refs, "sourceUnavailable": true, "originalOperationRetained": true}, nil
+		}
 		return link, l.check(ctx)
 	}
 	if action == "reconcile-result" {

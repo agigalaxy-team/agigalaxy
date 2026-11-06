@@ -310,6 +310,7 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	recruitmentService := &recruitment.Service{Pool: pool, Endpoint: endpoint, Devices: devices, Projects: projectService, Opportunities: contactDiscovery, Tasks: tasks, Inbox: inbox, PublicWrites: tasks.Writes, Resources: budget}
 	contactDiscovery.RecruitmentOpportunity = recruitmentService.RequireContactOpportunityWithin
 	contactDiscovery.Pool, contactDiscovery.Devices, contactDiscovery.History, contactDiscovery.Notifications, contactDiscovery.Recruitment = pool, devices, historyCurrent, inbox, recruitmentService
+	contactDiscovery.ParticipantBuilders, contactDiscovery.ParticipantRecruitment = buildersService, recruitmentService
 	search := searchService(historyCurrent, ci, tasks, contactDiscovery)
 	search.Capsules = capsuleSource.QueryV2Wire
 	search.Legacy = legacySearch.QueryWire
@@ -356,7 +357,7 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	factHTTP = ciHandler(ci, factHTTP)
 	factHTTP = selectedFactHandler(configurations, contextMaterials, factHTTP)
 	factHTTP = profileHandler(identityProfiles, proofs, factHTTP, profileSources{Current: historyCurrent, Moderation: moderationService.CaseContextWireWithin, CapsuleUses: capsuleSource.LegacyHistoryWireWithin, Legacy: legacyHistory})
-	accountHandler := accounts.Handler{Service: accountService, Pool: pool, Identity: accountIdentity, Providers: gateway.Config.IdentityProviders, PublicPostsPage: forum.PublicForAccountWithin, PublicCredentialsPage: externalCredentials.PublicForAccountWithin, Next: socialHandler(social, accountIdentity, factHTTP)}
+	accountHandler := accounts.Handler{Service: accountService, Pool: pool, Identity: accountIdentity, Providers: gateway.Config.IdentityProviders, PublicPostsPage: forum.PublicForAccountWithin, PublicCredentialsPage: externalCredentials.PublicForAccountWithin, Next: socialHandler(social, accountIdentity, taskmaterials.AccountCommentHandler{Service: taskComments, Governance: commentGovernance, Identity: accountIdentity, Next: factHTTP})}
 	inbox.Readers.TargetGovernance = targetGovernance.NotificationReadWithin
 	inbox.Readers.Qualification = qualifications.NotificationReadWithin
 	inbox.Readers.Moderation = moderationService.NotificationReadWithin

@@ -10,7 +10,7 @@ export function taskDraft(value={},now=Math.floor(Date.now()/1000)){
  // Keep unknown legacy/local fields rather than replacing the user's draft.
  return {title:'',summary:'',goal:'',situation:'',visibility:'Public',intent:'collaboration',expectedOutcome:'',
   collaboration:'open-assistance',budgetMode:'fixed',amount:'',minimum:'',maximum:'',unit:'CNY',policyKey:'',capabilityId:'',
-  enrollmentLocal:localDateTime(now+7*86400),materials:[],materialBodies:[],materialRestore:{},...value};
+  enrollmentLocal:'',materials:[],materialBodies:[],materialRestore:{},...value};
 }
 const taskField=value=>typeof value==='string'?value.trim():structuredClone(value);
 export const taskFieldPresent=value=>hasMaterialText(value)||(typeof value==='string'?!!value.trim():isTaskText(value)&&value.segments.some(segment=>segment.kind==='literal'&&segment.text.trim()));
@@ -18,8 +18,8 @@ const fieldPresent=taskFieldPresent;
 export function formBudget(d){const unit=d.unit.trim();return d.budgetMode==='quote'?{mode:'quote',unit}:
  d.budgetMode==='range'?{mode:'range',minimum:d.minimum.trim(),maximum:d.maximum.trim(),unit}:{mode:'fixed',amount:d.amount.trim(),unit};}
 export function publicationFromDraft(d,policies,now=Math.floor(Date.now()/1000)){
- const expires=Math.floor(Date.parse(d.enrollmentLocal)/1000);
- if(!Number.isSafeInteger(expires)||expires<=now)throw Error('请设置将来的征集截止时间；这不是交付截止时间。');
+ const expires=d.enrollmentLocal?Math.floor(Date.parse(d.enrollmentLocal)/1000):null;
+ if(expires!==null&&(!Number.isSafeInteger(expires)||expires<=now))throw Error('请设置将来的征集截止时间；这不是交付截止时间。');
  const paid=d.collaboration==='basic-bounty',policy=policies.find(p=>policyKey(p)===d.policyKey&&p.collaboration==='basic-bounty'&&p.notBefore<=now&&p.notAfter>now);
  if(paid&&!policy)throw Error('请选择服务当前启用的赏金资格规则；目录为空时可以先保留本地草稿。');
  const origin=helpOriginPayload(d.helpOrigin);

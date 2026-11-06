@@ -13,6 +13,9 @@ func (h *NativeA2a) prepareResult(ctx context.Context, peer a2aPeer, l *nativeId
 	if e != nil {
 		return nil, e
 	}
+	if link["source"] != nil {
+		return nil, a2aError("read peer output in the original association; formal Result import requires an existing Case/Attempt")
+	}
 	_, current, _, e := h.access(ctx, peer, l, link, nil)
 	if e != nil {
 		return nil, e

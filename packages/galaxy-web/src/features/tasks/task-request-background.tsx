@@ -1,5 +1,8 @@
 import {ReadingDetails,ReadingSummary} from "../../shared/reading/reading-details";
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import {useQuery} from '@tanstack/react-query';
+import {galaxyQueryKey} from '../../shared/runtime/query-client';
+import {nativeQueryScope} from '../../application/query-scope';
+import React,{useMemo} from 'react';
 import {getFactClient} from "../work-records/client.mjs";
 import {MemberLink,useMemberNames} from "../../shared/people/conversation-ui";
 import type {WorkFactClient,WorkFacts,WorkAttempt} from "../work-records/contracts";
@@ -29,29 +32,16 @@ export function TaskRequestBackground({task,runtime,connected,subjectId,navigate
 }
 function BackgroundSession({task,runtime,subjectId,navigate}:Omit<Props,'runtime'|'connected'|'subjectId'>&{runtime:WorkRuntime;subjectId:string}){
  const client:WorkFactClient=useMemo(()=>getFactClient(runtime,subjectId),[runtime,subjectId]);
- const references=task.request.workContext.attemptRefs,referenceKey=JSON.stringify(references),ownerKey=connectionKey(runtime),readKey=JSON.stringify([task.taskId,task.caseId,task.version,referenceKey,ownerKey]);
- const [state,setState]=useState<{key:string;items:SelectedAttempt[];error:boolean}|null>(null),[retry,setRetry]=useState(0);
- const readEpoch=useRef(0);
- useEffect(()=>{
-  const reads=readEpoch;let active=true,inFlight=false;
-  const current=(ticket:number)=>active&&ticket===reads.current&&connectionKey(runtime)===ownerKey&&navigator.onLine&&!document.hidden;
-  const hide=()=>{reads.current++;setState(null);};
-  const read=async()=>{
-   if(!active||inFlight||!navigator.onLine||document.hidden)return;inFlight=true;const ticket=++reads.current;
-   try{const facts=await client.readCase(task);if(current(ticket))setState({key:readKey,items:selectedRequestAttempts(facts,references),error:false});}
-   catch{if(current(ticket))setState({key:readKey,items:[],error:true});}
-   finally{inFlight=false;}
-  };
-  const resume=()=>{hide();void read();};
-  void read();const timer=window.setInterval(()=>void read(),15000);
-  window.addEventListener('offline',hide);window.addEventListener('online',resume);document.addEventListener('visibilitychange',resume);
-  return()=>{active=false;reads.current++;window.clearInterval(timer);window.removeEventListener('offline',hide);window.removeEventListener('online',resume);document.removeEventListener('visibilitychange',resume);};
- },[client,runtime,ownerKey,readKey,task,references,retry]);
- const reading=state?.key===readKey?state:null,items=reading?.items??[],names=useMemberNames(runtime,subjectId,true,items.flatMap(item=>item.attempt?[item.attempt.actorId]:[]));
+ const references=task.request.workContext.attemptRefs,referenceKey=JSON.stringify(references),ownerKey=connectionKey(runtime);
+ const reading=useQuery({queryKey:galaxyQueryKey(nativeQueryScope(runtime,subjectId),'tasks','request-background',task.taskId,referenceKey,ownerKey),
+  queryFn:async()=>selectedRequestAttempts(await client.readCase(task),references),staleTime:30000});
+ const code=reading.error&&typeof reading.error==='object'&&'code' in reading.error?String(reading.error.code):'';
+ const denied=['access_denied','case_unavailable','assistance_case_unavailable','consent_required'].includes(code);
+ const items=denied?[]:reading.data??[],names=useMemberNames(runtime,subjectId,true,items.flatMap(item=>item.attempt?[item.attempt.actorId]:[]));
  const navigateTo=(path:string)=>{if(navigate)navigate(path);else location.assign(path);};
  return <section className="request-selected-attempts" aria-label="已有尝试与实际观察"><h2>已有尝试与实际观察</h2>
   <p className="muted">这里沿用发起者选定的当时记录；做法、实际观察和仍未知的部分分别保留。</p>
-  {!reading?<p><output>{navigator.onLine?'正在核对选定记录的当前阅读范围…':'当前离线，选定引用仍保留。连接恢复后会重新读取背景。'}</output></p>:reading.error?<output>这些背景暂时无法读取，求助说明仍可阅读。<button type="button" className="text-action" onClick={()=>setRetry(value=>value+1)}>重新读取背景</button></output>:
+  {!reading.data&&!reading.isError?<p><output>{navigator.onLine?'正在核对选定记录的当前阅读范围…':'当前离线，选定引用仍保留。连接恢复后会重新读取背景。'}</output></p>:(denied||!reading.data&&reading.isError)?<output>这些背景暂时无法读取，求助说明仍可阅读。<button type="button" className="text-action" onClick={()=>void reading.refetch()}>重新读取背景</button></output>:
    <ol>{items.map(({reference,attempt})=><li key={reference.id+':'+reference.version}>{attempt?<article>
     <header><MemberLink subjectId={attempt.actorId} ownId={subjectId} name={names[attempt.actorId]??undefined} navigate={navigateTo}/><span>{attemptState[attempt.status]??'保留当时记录状态'}</span></header>
     <h3>尝试的做法</h3><p className="request-reading-prose">{attempt.strategy}</p>

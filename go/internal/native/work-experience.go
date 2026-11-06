@@ -214,15 +214,26 @@ func searchExperienceWithin(ctx context.Context, db *sql.DB, owner, query, condi
 		}
 		sqlText += " AND (" + strings.Join(clauses, " OR ") + ")"
 	}
-	if conditions != "" {
-		sqlText += " AND instr(e.conditions, ?) > 0"
-		args = append(args, conditions)
+	// Conditions are contextual clues, not an exact mandatory phrase. Rank
+	// matching clues first while retaining other query candidates for review.
+	conditionIndexed, conditionShort := experienceTerms(conditions)
+	conditionTerms := append(conditionIndexed, conditionShort...)
+	if len(conditionTerms) > 8 {
+		conditionTerms = conditionTerms[:8]
+	}
+	order := " ORDER BY "
+	if len(conditionTerms) > 0 {
+		parts := make([]string, 0, len(conditionTerms))
+		for _, term := range conditionTerms {
+			parts = append(parts, "CASE WHEN instr(lower(e.conditions), ?) > 0 THEN 1 ELSE 0 END")
+			args = append(args, term)
+		}
+		order += "(" + strings.Join(parts, " + ") + ") DESC,"
 	}
 	if len(indexed) > 0 {
-		sqlText += " ORDER BY bm25(work_experience_search,0,0,6,4,2,1),e.updated_at DESC LIMIT ?"
-	} else {
-		sqlText += " ORDER BY e.updated_at DESC LIMIT ?"
+		order += "bm25(work_experience_search,0,0,6,4,2,1),"
 	}
+	sqlText += order + "e.updated_at DESC LIMIT ?"
 	args = append(args, limit)
 	rows, e := rowsMaps(ctx, db, sqlText, args...)
 	if e != nil {
@@ -235,6 +246,28 @@ func searchExperienceWithin(ctx context.Context, db *sql.DB, owner, query, condi
 			return nil, e
 		}
 		items = append(items, value)
+	}
+	// A mixed query may contain useful one- or two-character clues that
+	// trigram cannot index. Fill remaining slots from the bounded fallback.
+	if len(indexed) > 0 && len(short) > 0 && len(items) < limit {
+		extra, err := searchExperienceWithin(ctx, db, owner, strings.Join(short, " "), conditions, limit, includeMethod)
+		if err != nil {
+			return nil, err
+		}
+		seen := make(map[any]bool, len(items))
+		for _, item := range items {
+			seen[item.(map[string]any)["id"]] = true
+		}
+		for _, item := range extra {
+			id := item.(map[string]any)["id"]
+			if !seen[id] {
+				items = append(items, item)
+				seen[id] = true
+				if len(items) == limit {
+					break
+				}
+			}
+		}
 	}
 	return items, nil
 }

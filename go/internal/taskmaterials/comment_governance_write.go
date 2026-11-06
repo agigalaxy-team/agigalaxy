@@ -82,7 +82,7 @@ func (g *CommentGovernance) Event(ctx context.Context, a Actor, id string, input
 		}
 		if decision {
 			for _, party := range []string{str(current, "reporter_id"), str(current, "author_id")} {
-				if party != a.SubjectID && !contains(grant.Viewers, party) {
+				if party != "" && party != a.SubjectID && !contains(grant.Viewers, party) {
 					return nil, fail("comment_decision_notice_required", 403)
 				}
 			}

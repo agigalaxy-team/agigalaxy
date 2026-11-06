@@ -63,19 +63,42 @@ func (h *NativeA2a) Prepare(ctx context.Context, input any) (*A2aPreview, error)
 	var link map[string]any
 	if action == "send" {
 		link = map[string]any{"id": uuid.NewString(), "caseId": value["caseId"], "attemptId": value["attemptId"], "revision": 0}
+		if source := uploadObject(value["source"]); source != nil {
+			_, actual, e := h.sourceAccess(ctx, lease, source, nil)
+			if e != nil {
+				return nil, e
+			}
+			link["source"] = actual
+		}
+		if peer.source != nil {
+			link["peerSource"] = a2aClone(peer.source)
+			link["peerCardHash"] = peer.cardHash
+		}
 		_, _, facts, e := h.access(ctx, peer, lease, link, value)
 		if e != nil {
 			return nil, e
 		}
-		link["factContext"] = facts
+		if facts != nil {
+			link["factContext"] = facts
+		}
 		rows, e := j.list(ctx)
 		if e != nil {
 			return nil, e
 		}
 		for _, row := range rows {
 			v := uploadObject(row)
-			if v["caseId"] == link["caseId"] && v["attemptId"] == link["attemptId"] {
+			if link["attemptId"] != nil && v["caseId"] == link["caseId"] && v["attemptId"] == link["attemptId"] {
 				return nil, a2aError("Attempt already dispatched; inspect association")
+			}
+			if a2aSameWorkSource(uploadObject(v["source"]), uploadObject(link["source"])) && isOne(text(v["status"]), "unknown", "dispatching") {
+				ops := uploadRows(v["operations"])
+				if len(ops) > 0 {
+					last := uploadObject(ops[len(ops)-1])
+					raw, _ := protocol.EncodeJS(value["text"])
+					if isOne(text(last["kind"]), "send", "reply") && uploadObject(last["originalMessage"])["selectedTextHash"] == a2aHash(raw) {
+						return nil, &A2aOperationError{AssociationID: text(v["id"])}
+					}
+				}
 			}
 		}
 	} else {
@@ -90,8 +113,8 @@ func (h *NativeA2a) Prepare(ctx context.Context, input any) (*A2aPreview, error)
 		if link["status"] != "observed" {
 			return nil, a2aError("refresh observed peer task")
 		}
-		if action == "reply" && observed["state"] != "input-required" && observed["state"] != "auth-required" {
-			return nil, a2aError("peer task not waiting for input/authentication")
+		if action == "reply" && a2aTerminal(text(observed["state"])) {
+			return nil, a2aError("peer Task is terminal; select work for a new exchange")
 		}
 		if action == "cancel" && (text(observed["taskId"]) == "" || a2aTerminal(text(observed["state"]))) {
 			return nil, a2aError("refresh active peer task before cancellation")
@@ -130,6 +153,13 @@ func (h *NativeA2a) Prepare(ctx context.Context, input any) (*A2aPreview, error)
 	}
 	if link["factContext"] != nil {
 		payload.Set("factContext", a2aFactWire(uploadObject(link["factContext"])))
+	}
+	if link["source"] != nil {
+		payload.Set("source", link["source"])
+	}
+	if link["peerSource"] != nil {
+		payload.Set("peerSource", link["peerSource"])
+		payload.Set("peerCardHash", link["peerCardHash"])
 	}
 	raw, e := protocol.EncodeJS(payload)
 	if e != nil {

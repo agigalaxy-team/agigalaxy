@@ -20,6 +20,12 @@ type Object = map[string]any
 type RecruitmentReader interface {
 	OpportunitiesWithin(context.Context, pgx.Tx, *deviceauth.Actor, string, Object) ([]Object, error)
 }
+type ParticipantBuilderReader interface {
+	ReadWithin(context.Context, pgx.Tx, *deviceauth.Actor, Object) (Object, error)
+}
+type ParticipantRecruitmentReader interface {
+	ReadWithin(context.Context, pgx.Tx, *deviceauth.Actor, string, bool) (Object, error)
+}
 type HistoryReader interface {
 	QueryWithin(context.Context, pgx.Tx, *deviceauth.Actor, []byte) (map[string]any, error)
 }
@@ -28,6 +34,8 @@ type Service struct {
 	Devices                *deviceauth.Service
 	History                HistoryReader
 	Recruitment            RecruitmentReader
+	ParticipantBuilders    ParticipantBuilderReader
+	ParticipantRecruitment ParticipantRecruitmentReader
 	ScanWindowLimit        int
 	Endpoint               string
 	Profiles               *profiles.Service

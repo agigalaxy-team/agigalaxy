@@ -7,7 +7,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func TestA2aFiveConditionalOriginalToolsAndBranchDefaults(t *testing.T) {
+func TestA2aToolsIncludeDiscoveryAndPreserveBranchDefaults(t *testing.T) {
 	id := "00000000-0000-4000-8000-000000000001"
 	for _, action := range []string{"send", "reply", "cancel", "result"} {
 		value := map[string]any{"peerId": "peer", "action": action}
@@ -59,8 +59,20 @@ func TestA2aFiveConditionalOriginalToolsAndBranchDefaults(t *testing.T) {
 	}
 	defer session.Close()
 	listed, e := session.ListTools(context.Background(), nil)
-	if e != nil || len(listed.Tools) != 5 {
+	if e != nil {
 		t.Fatal(listed, e)
+	}
+	expected := map[string]bool{"galaxy_a2a_resolve": false, "galaxy_a2a_peers": false, "galaxy_a2a_read": false, "galaxy_a2a_prepare": false, "galaxy_a2a_execute": false, "galaxy_a2a_abort_local": false}
+	for _, tool := range listed.Tools {
+		if _, ok := expected[tool.Name]; !ok {
+			t.Fatalf("unexpected A2A tool %s", tool.Name)
+		}
+		expected[tool.Name] = true
+	}
+	for name, found := range expected {
+		if !found {
+			t.Fatalf("missing A2A tool %s", name)
+		}
 	}
 	result, e := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "galaxy_a2a_peers", Arguments: map[string]any{}})
 	if e != nil || result.IsError {

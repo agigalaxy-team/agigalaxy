@@ -216,7 +216,7 @@ func (l *helpLease) task(ctx context.Context, id string) (map[string]any, error)
 	if e != nil {
 		return nil, e
 	}
-	if task["taskId"] != id || !psSafeInteger(task["version"]) || psInt(task["version"]) < 1 {
+	if task["taskId"] != id || !helpSafeInteger(task["version"]) || psInt(task["version"]) < 1 {
 		return nil, helpError("help_task_mismatch")
 	}
 	return task, nil
@@ -238,7 +238,7 @@ func (l *helpLease) receipt(ctx context.Context, row map[string]any, contextual 
 			return nil, helpError("help_receipt_mismatch")
 		}
 	}
-	if !isOne(text(receipt["state"]), "absent", "acknowledged", "conflict") || !contextual && receipt["state"] == "acknowledged" && (!psSafeInteger(receipt["version"]) || psInt(receipt["version"]) < 1) {
+	if !isOne(text(receipt["state"]), "absent", "acknowledged", "conflict") || !contextual && receipt["state"] == "acknowledged" && (!helpSafeInteger(receipt["version"]) || psInt(receipt["version"]) < 1) {
 		return nil, helpError("help_receipt_mismatch")
 	}
 	return receipt, nil
@@ -283,7 +283,7 @@ func (l *helpLease) publish(ctx context.Context, id string, input map[string]any
 		return nil, e
 	}
 	receipt, _, sendErr := l.call(ctx, "/v2/tasks", input)
-	if sendErr == nil && (receipt["taskId"] != payload["taskId"] || receipt["eventId"] != operation || psInt(receipt["version"]) != 1) {
+	if sendErr == nil && (receipt["taskId"] != payload["taskId"] || receipt["eventId"] != operation || !helpSafeInteger(receipt["version"]) || psInt(receipt["version"]) != 1) {
 		sendErr = helpError("help_receipt_mismatch")
 	}
 	row, e := l.update(ctx, id, nil, func(row map[string]any) error {
@@ -429,6 +429,15 @@ func (l *helpLease) refresh(ctx context.Context, id string) (map[string]any, err
 	}
 	out["session"] = helpView(row)
 	out["remote"] = remote
+	comments, _, commentErr := l.call(ctx, "/v2/comments/query", map[string]any{"taskId": row["taskId"], "limit": 20})
+	if check := l.check(ctx); check != nil {
+		return nil, check
+	}
+	if commentErr != nil {
+		out["responses"] = map[string]any{"state": "unavailable", "error": helpSourceError(commentErr)}
+	} else {
+		out["responses"] = map[string]any{"state": "ready", "page": comments}
+	}
 	out["state"] = "refreshed"
 	out["remoteDataStoredLocally"] = false
 	out["suggestionsAreResponses"] = false

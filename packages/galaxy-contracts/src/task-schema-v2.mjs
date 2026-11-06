@@ -28,7 +28,7 @@ export const taskRequestV2Schema = z.strictObject({
   visibility: z.enum(['Public', 'Private']), collaboration: z.enum(['open-assistance', 'basic-bounty']),
   budget: budget.optional(), capabilityId: capabilityIdSchema.optional(),
   qualification: z.strictObject({ policyId: z.string().min(1).max(80), policyVersion: z.string().min(1).max(32),profile:z.literal('facts-v2').optional() }).optional(),
-  enrollmentExpiresAt: positive,
+  enrollmentExpiresAt: positive.nullable().default(null),
 }).refine(v => (v.collaboration === 'basic-bounty' ? !!v.budget && !!v.capabilityId && !!v.qualification : v.budget === undefined)
   && (!v.qualification || !!v.capabilityId)).refine(v=>taskMaterialReferenceIssue(v)===null,{message:'Task material references must match descriptors.'});
 
@@ -47,7 +47,7 @@ export const taskEventV2Schema = z.discriminatedUnion('kind', [
   // new close writes require the explicit intent in the domain authority.
   z.strictObject({ ...taskCommon, kind: z.literal('close'), reason: note, terminationIntent: z.literal('terminate-task').optional() }),
   z.strictObject({ ...taskCommon, kind: z.literal('stop-enrollment'), reason: note }),
-  z.strictObject({ ...taskCommon, kind: z.literal('extend-enrollment'), enrollmentExpiresAt: positive }),
+  z.strictObject({ ...taskCommon, kind: z.literal('extend-enrollment'), enrollmentExpiresAt: positive.nullable() }),
 ]);
 export const taskEnvelopeV2Schema = z.strictObject({ taskId: z.uuid(), event: taskEventV2Schema });
 export const participationProposalV2Schema = z.strictObject({ ...taskCommon,

@@ -140,7 +140,7 @@ func (j *a2aJournal) change(ctx context.Context, id string, revision int64, chec
 			}
 			for _, item := range links {
 				old := uploadObject(item)
-				if connectionEqual(old["caseId"], next["caseId"]) && connectionEqual(old["attemptId"], next["attemptId"]) {
+				if next["attemptId"] != nil && connectionEqual(old["caseId"], next["caseId"]) && connectionEqual(old["attemptId"], next["attemptId"]) {
 					return a2aError("Attempt already dispatched")
 				}
 			}
@@ -150,26 +150,29 @@ func (j *a2aJournal) change(ctx context.Context, id string, revision int64, chec
 		}
 		next["revision"] = revision + 1
 		data["links"] = links
-		// The original bound is the pretty JSON size, even though whitespace is
-		// immaterial to readers. Keep that bound before atomic replacement.
-		compact, e := a2aEncodeJSON(data)
-		if e != nil {
-			return e
-		}
-		var pretty bytes.Buffer
-		if e = json.Indent(&pretty, compact, "", "  "); e != nil {
-			return e
-		}
-		if pretty.Len()+1 > a2aJournalLimit {
-			return a2aError("journal limit exceeded")
-		}
-		if e = a2aWriteJournal(filepath.Join(dir, "a2a-"+j.scopeHash+".json"), append(pretty.Bytes(), '\n')); e != nil {
+		if e = j.save(dir, data); e != nil {
 			return e
 		}
 		result = next
 		return nil
 	})
 	return result, e
+}
+
+func (j *a2aJournal) save(dir string, data map[string]any) error {
+	// Cache metadata and associations share the existing durable storage bound.
+	compact, e := a2aEncodeJSON(data)
+	if e != nil {
+		return e
+	}
+	var pretty bytes.Buffer
+	if e = json.Indent(&pretty, compact, "", "  "); e != nil {
+		return e
+	}
+	if pretty.Len()+1 > a2aJournalLimit {
+		return a2aError("journal limit exceeded")
+	}
+	return a2aWriteJournal(filepath.Join(dir, "a2a-"+j.scopeHash+".json"), append(pretty.Bytes(), '\n'))
 }
 
 func a2aWriteJournal(path string, raw []byte) error {

@@ -55,6 +55,9 @@ func helpSourceError(e error) string {
 	return "source_failed"
 }
 func (l *helpLease) source(ctx context.Context, request map[string]any) (map[string]any, []any, error) {
+	if isOne(text(request["kind"]), "participants-v2", "participant-v2") {
+		return l.participantSource(ctx, request)
+	}
 	at := l.host.now()
 	kind := text(request["kind"])
 	input := psObject(request["input"])
@@ -99,10 +102,10 @@ func (l *helpLease) source(ctx context.Context, request map[string]any) (map[str
 			return nil, nil, helpError("help_source_invalid")
 		}
 		if kind == "search-v2" {
-			if page["type"] != input["type"] || !psSafeInteger(page["checkedAt"]) {
+			if page["type"] != input["type"] || !helpSafeInteger(page["checkedAt"]) {
 				return nil, nil, helpError("help_source_invalid")
 			}
-		} else if !psSafeInteger(page["computedAt"]) {
+		} else if !helpSafeInteger(page["computedAt"]) {
 			return nil, nil, helpError("help_source_invalid")
 		}
 		cursor := page["nextAfter"]
@@ -295,8 +298,10 @@ func helpView(row map[string]any) map[string]any {
 	return out
 }
 func (l *helpLease) query(ctx context.Context, id string, input map[string]any) (any, error) {
-	if _, e := l.get(ctx, id); e != nil {
-		return nil, e
+	if id != "" {
+		if _, e := l.get(ctx, id); e != nil {
+			return nil, e
+		}
 	}
 	results := []any{}
 	seen := map[string]bool{}
@@ -323,6 +328,9 @@ func (l *helpLease) query(ctx context.Context, id string, input map[string]any) 
 			result["state"] = "ready"
 		}
 		results = append(results, result)
+	}
+	if id == "" {
+		return map[string]any{"results": results, "queryDoesNotPublish": true, "sessionCreated": false, "coverage": "requested-visible-pages-only"}, l.check(ctx)
 	}
 	row, e := l.update(ctx, id, nil, func(draft map[string]any) error {
 		queries := trustArray(draft["queries"])

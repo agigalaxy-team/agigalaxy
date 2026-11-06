@@ -105,13 +105,13 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
  function selectForumMaterials(open:boolean){const url=new URL(location.href);if(open)url.searchParams.set('forumMaterial','select');else url.searchParams.delete('forumMaterial');history.replaceState(history.state,'',url.pathname+url.search+url.hash);setSelectMaterials(open);}
  const forumReadEpoch=useRef(0);
  async function refreshForumSource(){
-  if(!forumClient||!forumLocator)return;const token=++forumReadEpoch.current;setForumSourceState('reading');
+  if(!forumClient||!forumLocator)return;const token=++forumReadEpoch.current;if(!forumSource)setForumSourceState('reading');
   try{const value=await forumClient.version(forumLocator.postId,forumLocator.versionId);if(token!==forumReadEpoch.current||!current()||document.hidden||!navigator.onLine)return;setForumSource(value);setForumSourceState(availableForumContent(value,Math.floor(Date.now()/1000))?'available':'unavailable');}
-  catch{if(token===forumReadEpoch.current&&current())setForumSourceState('unknown');}
+  catch(reason){if(token===forumReadEpoch.current&&current()){const code=taskEntryError(reason,'code');if(['not_found','access_denied','consent_required'].includes(code)){setForumSource(null);setForumSourceState('unavailable');}else if(!forumSource)setForumSourceState('unknown');}}
  }
  const readForumSource=useEffectEvent(()=>{if(!document.hidden&&!working.current)void refreshForumSource();});
  useEffect(()=>{
-  const reads=forumReadEpoch;readForumSource();const hide=()=>{reads.current++;setForumSourceState('unknown');},visible=()=>{hide();if(!document.hidden&&navigator.onLine)readForumSource();};
+  const reads=forumReadEpoch;readForumSource();const hide=()=>{reads.current++;},visible=()=>{hide();if(!document.hidden&&navigator.onLine)readForumSource();};
   const timer=setInterval(()=>readForumSource(),15000);document.addEventListener('visibilitychange',visible);window.addEventListener('offline',hide);window.addEventListener('online',visible);
   return()=>{reads.current++;clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('offline',hide);window.removeEventListener('online',visible);forumClient?.close();};
  },[forumClient,forumLocator]);
@@ -163,7 +163,7 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
  async function refreshMaterials(){
   const original=structuredClone(draftRef.current),signature=JSON.stringify(original.materials),token=++materialReadEpoch.current;
   if(!original.materials.length){setMaterialStates({});return;}
-  setMaterialStates(Object.fromEntries(original.materials.map(material=>[material.materialId,{status:'unavailable',reason:'checking',availableUntil:material.expiresAt}])));
+  setMaterialStates(previous=>Object.fromEntries(original.materials.map(material=>[material.materialId,previous[material.materialId]??{status:'unavailable',reason:'checking',availableUntil:material.expiresAt}])));
   try{
    const result=await materialClient.sanitize(original);if(token!==materialReadEpoch.current||!current()||signature!==JSON.stringify(draftRef.current.materials)||document.hidden||!navigator.onLine)return;
    setMaterialStates(result.states);
@@ -185,7 +185,7 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
  const updateMaterialClock=useEffectEvent(()=>{const time=Math.floor(Date.now()/1000);setMaterialClock(time);if(forumSource?.payload&&(forumSource.publishedUntil??Infinity)<=time){setForumSource({...forumSource,payload:undefined,availability:'expired'});setForumSourceState('unavailable');}});
  useEffect(()=>{
   const reads=materialReadEpoch;readMaterialSources();const tick=setInterval(()=>updateMaterialClock(),1000);
-  const hide=()=>{reads.current++;setMaterialStates({});},refresh=()=>{hide();readMaterialSources();},timer=setInterval(()=>readMaterialSources(),15000);
+  const hide=()=>{reads.current++;},refresh=()=>{hide();readMaterialSources();},timer=setInterval(()=>readMaterialSources(),15000);
   document.addEventListener('visibilitychange',refresh);window.addEventListener('online',refresh);window.addEventListener('offline',hide);
   return()=>{reads.current++;clearInterval(tick);clearInterval(timer);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('online',refresh);window.removeEventListener('offline',hide);};
  },[materialClient,materialSignature,loaded]);
@@ -315,7 +315,7 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
   const read=async(value:PublishDraft|null,apply:(states:TaskMaterialStates)=>void)=>{if(!value?.materials.length){if(valid())apply({});return;}try{const checked=await materialClient.sanitize(value);if(valid())apply(checked.states);}catch{if(valid())apply({});}};
   void read(draftConflict?.value??null,setConflictMaterialStates);if(copiesOpen)void read(selectedCopyDraft,setCopyMaterialStates);
  });
- useEffect(()=>{const reads=recoveryMaterialEpoch,hide=()=>{reads.current++;setConflictMaterialStates({});setCopyMaterialStates({});},refresh=()=>{hide();readRecoveryMaterialSources();};refresh();const timer=setInterval(refresh,15000);window.addEventListener('offline',hide);window.addEventListener('online',refresh);document.addEventListener('visibilitychange',refresh);
+ useEffect(()=>{const reads=recoveryMaterialEpoch,hide=()=>{reads.current++;},refresh=()=>{hide();readRecoveryMaterialSources();};refresh();const timer=setInterval(refresh,15000);window.addEventListener('offline',hide);window.addEventListener('online',refresh);document.addEventListener('visibilitychange',refresh);
   return()=>{reads.current++;clearInterval(timer);window.removeEventListener('offline',hide);window.removeEventListener('online',refresh);document.removeEventListener('visibilitychange',refresh);};
  },[materialClient,draftConflict,conflictSourceSignature,copySourceSignature,selectedCopyId,copiesOpen]);
  function recoveryCopyLabel(copy:RecoveryCopy){let title='';try{title=literalTaskText(readPublishDraft(copy.snapshot.value).title).trim();}catch{}const time=new Date(copy.createdAt);return[copy.kind==='input'?'切换前的本页输入':'切换前已保存的输入',Number.isFinite(time.getTime())?time.toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'',title.slice(0,40)].filter(Boolean).join(' · ');}
@@ -352,7 +352,7 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
    </fieldset>
    <fieldset disabled={busy||!!pending} className="request-share-fields"><legend>分享范围</legend>
     <div className="request-visibility">{visibilityOptions.map(([value,title,description,Icon])=><label htmlFor={fieldId+value} className={draft.visibility===value?'selected':''} key={value}><input id={fieldId+value} type="radio" name="request-visibility" checked={draft.visibility===value} onChange={()=>change('visibility',value)}/><Icon size={20}/><span><strong>{title}</strong><small>{description}</small></span><span className="choice-indicator"/></label>)}</div>
-    <label className="request-enrollment" htmlFor={fieldId+'-enrollment'}><span>接受新回应直到<small>已有交流可以继续</small></span><Input id={fieldId+'-enrollment'} required type="datetime-local" value={draft.enrollmentLocal} onChange={event=>change('enrollmentLocal',event.target.value)}/></label>
+    <label className="request-enrollment" htmlFor={fieldId+'-enrollment'}><span>接受新回应直到（可选）<small>不填写则持续开放，已有交流可以继续</small></span><Input id={fieldId+'-enrollment'} type="datetime-local" value={draft.enrollmentLocal} onChange={event=>change('enrollmentLocal',event.target.value)}/></label>
    </fieldset>
    <section className="request-related request-related-help"><h2>已有的相关帮助{preparationChoice(draft.helpPreparation).selected.length?' · 已记下 '+preparationChoice(draft.helpPreparation).selected.length+' 位':''}</h2>
     <div className="request-help-search"><label htmlFor="request-help-keyword">搜索关键词<Input id="request-help-keyword" disabled={busy} maxLength={200} value={independentKeyword(draft)} onChange={event=>change('searchKeyword',event.target.value)} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();if(connected&&!busy&&!searching)findRelated();}}} placeholder="目标、方法或环境"/></label><Button type="button" variant="outline" onClick={findRelated} disabled={busy||!connected||searching||!independentKeyword(draft).trim()}>查找</Button></div>
@@ -367,7 +367,7 @@ function TaskPublishSession({runtime,subjectId,connected,navigate,registerShellN
    </div></footer>
   </form>}
 
-  {preview&&<article className="request-publication-preview"><div className="request-preview-meta">{preview.visibility==='Public'?<><Globe size={16}/>公开求助</>:<><Lock size={16}/>仅自己</>}<span>接受新回应至 {new Date(preview.enrollmentExpiresAt*1000).toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span></div><h2>{displayPreview(preview.title,true)}</h2><p className="request-main-text">{displayPreview(preview.summary)}</p>{displayPreview(preview.workContext.goal)&&displayPreview(preview.workContext.goal)!==displayPreview(preview.title)&&<section><h3>具体目标</h3><p>{displayPreview(preview.workContext.goal)}</p></section>}{displayPreview(preview.workContext.currentSituation)!=='未另行提供当前情况。'&&displayPreview(preview.workContext.currentSituation)!==displayPreview(preview.summary)&&<section><h3>背景</h3><p>{displayPreview(preview.workContext.currentSituation)}</p></section>}{preview.expectedOutcome&&<section><h3>预期结果</h3><p>{displayPreview(preview.expectedOutcome)}</p></section>}{originPreview&&<div className="request-origin"><BookOpen size={17}/><span>关联：{originReview?.task.request.title??'原工作'}{originPreview.attemptRefs.length>0?` · ${originPreview.attemptRefs.length} 条已有尝试`:''}</span></div>}
+  {preview&&<article className="request-publication-preview"><div className="request-preview-meta">{preview.visibility==='Public'?<><Globe size={16}/>公开求助</>:<><Lock size={16}/>仅自己</>}<span>{preview.enrollmentExpiresAt===null?'持续接受回应':`接受新回应至 ${new Date(preview.enrollmentExpiresAt*1000).toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}`}</span></div><h2>{displayPreview(preview.title,true)}</h2><p className="request-main-text">{displayPreview(preview.summary)}</p>{displayPreview(preview.workContext.goal)&&displayPreview(preview.workContext.goal)!==displayPreview(preview.title)&&<section><h3>具体目标</h3><p>{displayPreview(preview.workContext.goal)}</p></section>}{displayPreview(preview.workContext.currentSituation)!=='未另行提供当前情况。'&&displayPreview(preview.workContext.currentSituation)!==displayPreview(preview.summary)&&<section><h3>背景</h3><p>{displayPreview(preview.workContext.currentSituation)}</p></section>}{preview.expectedOutcome&&<section><h3>预期结果</h3><p>{displayPreview(preview.expectedOutcome)}</p></section>}{originPreview&&<div className="request-origin"><BookOpen size={17}/><span>关联：{originReview?.task.request.title??'原工作'}{originPreview.attemptRefs.length>0?` · ${originPreview.attemptRefs.length} 条已有尝试`:''}</span></div>}
    {!!preview.materials?.length&&<div className="message"><p>其中 {preview.materials.length} 段使用了你选定的帖子材料，撤回或到期后会停止展示相应文字。</p>{previewBlocked&&<p><output>部分材料正在核对或当前不可用，请核对来源后继续。</output></p>}<Button variant="ghost" disabled={busy} onClick={()=>void refreshMaterials()}>核对材料当前状态</Button></div>}
    {connected?<TaskAgentIdentityPrompt {...{runtime,subjectId,connected}} navigate={navigateWithSavedDraft} onReady={setAgentReady}/>:<div className="request-login"><p>接续已有身份后发布，当前草稿会保留。</p><Button onClick={()=>navigateWithSavedDraft('/app/settings/identity')}>接续已有身份</Button></div>}
    <footer className="request-form-footer"><Button type="button" variant="ghost" disabled={busy} onClick={()=>setPreview(null)}>继续修改</Button>{connected&&agentReady&&<Button type="button" disabled={busy||!!pending||previewBlocked} onClick={()=>void run(submit)}>{busy?'正在发布…':preview.visibility==='Public'?'发布求助':'保存这项工作'}</Button>}</footer>

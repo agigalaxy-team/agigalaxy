@@ -55,7 +55,7 @@ function TaskApplicationSession({task,runtime,subjectId,connected,navigate,refre
  useEffect(()=>{const timer=window.setInterval(()=>readPending(),4000),visible=()=>readPending();document.addEventListener('visibilitychange',visible);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[]);
  const stopped=useEffectEvent((event:{scopeTaskId:string|null})=>{if(event.scopeTaskId===task.taskId&&current())setPending(null);});
  useEffect(()=>runtime?.onTaskOperationStopped((event:{scopeTaskId:string|null})=>stopped(event)),[runtime]);
- const writable=connected&&subjectId&&task.requesterId!==subjectId,open=task.enrollmentOpen??(task.state==='open'&&task.request.enrollmentExpiresAt>readAt),legacyTerms=task.request.collaboration==='basic-bounty'||!!task.request.qualification;
+ const writable=connected&&subjectId&&task.requesterId!==subjectId,open=task.enrollmentOpen??(task.state==='open'&&(task.request.enrollmentExpiresAt===null||task.request.enrollmentExpiresAt>readAt)),legacyTerms=task.request.collaboration==='basic-bounty'||!!task.request.qualification;
  const sent=task.contacts?.responses.applications.find(item=>item.subjectId===subjectId&&item.state!=='withdrawn');
  async function run(fn:(valid:()=>boolean)=>Promise<void>){
   if(working.current||!runtime)return;const token=epoch.current,valid=()=>current(token);working.current=true;setBusy(true);setError('');

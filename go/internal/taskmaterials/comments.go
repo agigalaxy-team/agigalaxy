@@ -64,6 +64,23 @@ func (c *CommentService) commentSource(ctx context.Context, tx pgx.Tx, a *device
 	if source == nil || str(source, "payload_text") == "" || source["erased_at"] != nil {
 		return nil, fail("comment_source_erased", 403)
 	}
+	if source["account_id"] != nil {
+		if task["rootGrant"].(deviceauth.ConsentIntent).Visibility != "Public" {
+			return nil, fail("comment_permission_unavailable", 403)
+		}
+		payload, err := parseObject(str(source, "payload_text"))
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := payload["body"]; exists {
+			body, err := rawCommentBody(str(source, "payload_text"))
+			if err != nil {
+				return nil, err
+			}
+			payload["body"] = body
+		}
+		return Object{"task": task, "source": source, "payload": payload}, nil
+	}
 	grant, e := c.commentGrant(ctx, tx, source)
 	if e != nil {
 		return nil, e
@@ -101,6 +118,9 @@ func (c *CommentService) blocked(ctx context.Context, tx pgx.Tx, viewer, author 
 // ReadWithin is shared with exact-revision moderation and notification readers;
 // review=true is reserved for a caller that already authorized the real report.
 func (c *CommentService) ReadWithin(ctx context.Context, tx pgx.Tx, a *deviceauth.Actor, id string, revision int64, review bool) (Object, error) {
+	return c.readWithin(ctx, tx, a, "", id, revision, review)
+}
+func (c *CommentService) readWithin(ctx context.Context, tx pgx.Tx, a *deviceauth.Actor, accountID string, id string, revision int64, review bool) (Object, error) {
 	current, e := c.commentRow(ctx, tx, id, false)
 	if e != nil {
 		return nil, e
@@ -114,7 +134,7 @@ func (c *CommentService) ReadWithin(ctx context.Context, tx pgx.Tx, a *deviceaut
 	if revision == 0 {
 		revision = num(current["revision"])
 	}
-	own := a != nil && a.SubjectID == str(current, "subject_id")
+	own := a != nil && a.SubjectID == str(current, "subject_id") || accountID != "" && current["subject_id"] == nil && accountID == str(current, "account_id")
 	if revision != num(current["revision"]) && !own && !review {
 		return nil, fail("comment_version_unavailable", 404)
 	}
@@ -194,6 +214,27 @@ func (c *CommentService) ReadWithin(ctx context.Context, tx pgx.Tx, a *deviceaut
 		state = "visible"
 	}
 	out := Object{"commentId": id, "taskId": current["task_id"], "authorId": current["subject_id"], "revision": revision, "currentRevision": current["revision"], "state": state, "body": content, "replyTo": reply, "createdAt": isoValue(current["created_at"]), "expiresAt": isoValue(current["expires_at"]), "canEdit": own && current["state"] == "active" && source != nil && millis(current["created_at"])+86400*1000 > c.now()*1000, "canCorrect": own && current["state"] == "active" && source != nil, "canRetract": own && current["state"] == "active", "taskStateChanged": false, "participationCreated": false, "capabilityVerified": false, "authority": "current-authorized-comment-view"}
+	if current["subject_id"] != nil {
+		out["author"] = Object{"kind": "subject", "subjectId": current["subject_id"]}
+	} else if current["account_id"] != nil {
+		author := Object{"kind": "account", "accountId": current["account_id"], "uid": nil, "displayName": nil, "avatarKey": nil, "subjectType": nil}
+		// The evidence worker can read comment state but deliberately lacks
+		// public profile columns; its notification projection needs no profile.
+		var profileReadable bool
+		if err := tx.QueryRow(ctx, `SELECT has_column_privilege(current_user,'official_account_profiles_v1','display_name','SELECT') AND has_column_privilege(current_user,'official_account_profiles_v1','avatar_key','SELECT')`).Scan(&profileReadable); err != nil {
+			return nil, err
+		}
+		if profileReadable {
+			profile, err := row(ctx, tx, `SELECT jsonb_build_object('uid',a.uid,'displayName',nullif(btrim(p.display_name),''),'avatarKey',p.avatar_key,'subjectType',p.subject_type) FROM community_accounts a LEFT JOIN official_account_profiles_v1 p ON p.account_id=a.id WHERE a.id=$1 AND a.endpoint=$2`, current["account_id"], c.Endpoint)
+			if err != nil {
+				return nil, err
+			}
+			for key, value := range profile {
+				author[key] = value
+			}
+		}
+		out["author"] = author
+	}
 	if own || review {
 		restrictions := []any{}
 		for _, h := range held {

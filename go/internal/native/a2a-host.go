@@ -31,19 +31,38 @@ type A2aPreview struct {
 }
 
 func NewNativeA2a(runtime *Runtime, rawConfiguration []byte, options A2aOptions) (*NativeA2a, error) {
-	peers, e := a2aConfiguration(rawConfiguration)
-	if e != nil {
-		return nil, e
+	peers := []a2aPeer{}
+	if len(rawConfiguration) > 0 {
+		var e error
+		peers, e = a2aConfiguration(rawConfiguration)
+		if e != nil {
+			return nil, e
+		}
 	}
 	if options.Now == nil {
 		options.Now = time.Now
 	}
-	return &NativeA2a{runtime: runtime, peers: peers, options: options, previews: map[string]*A2aPreview{}}, nil
+	h := &NativeA2a{runtime: runtime, peers: peers, options: options, previews: map[string]*A2aPreview{}}
+	if e := h.restoreDiscovered(context.Background()); e != nil {
+		return nil, e
+	}
+	return h, nil
 }
 func (h *NativeA2a) Peers() []any {
+	_ = h.restoreDiscovered(context.Background())
+	scope, _ := h.runtime.store.ChoiceScope(context.Background())
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	out := []any{}
 	for _, p := range h.peers {
+		if p.source != nil && (p.owner != scope.Owner || p.official != scope.Endpoint) {
+			continue
+		}
 		v := map[string]any{"id": p.id, "endpoint": p.endpoint, "trustExpiresAt": p.trustExpiresAt}
+		if p.source != nil {
+			v["source"] = p.source
+			v["capabilityVerified"] = false
+		}
 		if p.hasTenant {
 			v["tenant"] = p.tenant
 		}
@@ -67,14 +86,18 @@ func (h *NativeA2a) Close() {
 	h.previews = map[string]*A2aPreview{}
 }
 func (h *NativeA2a) adapter(ctx context.Context, peerID string) (context.Context, func(), a2aPeer, *nativeIdentityLease, *a2aJournal, error) {
+	if e := h.restoreDiscovered(ctx); e != nil {
+		return nil, nil, a2aPeer{}, nil, nil, e
+	}
 	h.mu.Lock()
 	closed := h.closed
+	peers := append([]a2aPeer{}, h.peers...)
 	h.mu.Unlock()
 	if closed {
 		return nil, nil, a2aPeer{}, nil, nil, a2aError("host closed")
 	}
 	var peer a2aPeer
-	for _, p := range h.peers {
+	for _, p := range peers {
 		if p.id == peerID {
 			peer = p
 			break
@@ -100,8 +123,8 @@ func (h *NativeA2a) adapter(ctx context.Context, peerID string) (context.Context
 	if lease.connection.bindingID == "" {
 		return fail(a2aError("current Native connection required"))
 	}
-	if _, e = peer.authorize(h.options.Now(), h.options.ReadEnvironment); e != nil {
-		return fail(e)
+	if peer.source != nil && (peer.owner != lease.scope.Owner || peer.official != lease.scope.Endpoint) {
+		return fail(a2aError("selected peer belongs to another local identity or service"))
 	}
 	j, e := newA2aJournal(h.runtime.store, peer.scope(lease.scope.Owner, h.runtime.config.Endpoint))
 	if e != nil {
@@ -120,11 +143,31 @@ func (h *NativeA2a) access(ctx context.Context, p a2aPeer, l *nativeIdentityLeas
 	if e := l.check(ctx); e != nil {
 		return "", nil, nil, e
 	}
+	if p.source != nil {
+		if e := h.checkDiscovered(ctx, l, p); e != nil {
+			return "", nil, nil, e
+		}
+		if p.trustExpiresAt <= h.options.Now().UnixMilli() {
+			fresh, _, e := h.resolveBuilder(ctx, l, text(p.source["builderId"]))
+			if e != nil {
+				return "", nil, nil, e
+			}
+			if fresh.id != p.id || fresh.cardHash != p.cardHash {
+				return "", nil, nil, a2aError("actual AgentCard changed; resolve and prepare the selected current peer")
+			}
+			p = fresh
+		}
+	}
 	credential, e := p.authorize(h.options.Now(), h.options.ReadEnvironment)
 	if e != nil {
 		return "", nil, nil, e
 	}
-	current, facts, e := a2aReaders(l).resolve(ctx, text(link["caseId"]), text(link["attemptId"]), l.scope.Owner, selected, uploadObject(link["factContext"]))
+	var current, facts map[string]any
+	if link["source"] != nil {
+		current, _, e = h.sourceAccess(ctx, l, nil, uploadObject(link["source"]))
+	} else {
+		current, facts, e = a2aReaders(l).resolve(ctx, text(link["caseId"]), text(link["attemptId"]), l.scope.Owner, selected, uploadObject(link["factContext"]))
+	}
 	if e != nil {
 		return "", nil, nil, e
 	}
@@ -155,9 +198,6 @@ func (h *NativeA2a) perform(ctx context.Context, p a2aPeer, l *nativeIdentityLea
 	}
 	reserved, e := j.change(ctx, text(link["id"]), a2aInteger(link["revision"]), func(dir string) error { return h.guard(l, dir) }, func(previous map[string]any) (map[string]any, error) {
 		operations := uploadRows(previous["operations"])
-		if len(operations) >= 128 {
-			return nil, a2aError("association operation limit reached")
-		}
 		next := a2aClone(link)
 		op := map[string]any{"id": operationID, "kind": kind, "requestHash": requestHash, "at": h.options.Now().UnixMilli(), "outcome": "dispatching"}
 		if message := params.Values()["message"]; message != nil {
@@ -178,6 +218,11 @@ func (h *NativeA2a) perform(ctx context.Context, p a2aPeer, l *nativeIdentityLea
 				context = m["contextId"]
 			}
 			op["originalMessage"] = map[string]any{"messageId": m["messageId"], "contentHash": a2aHash(raw), "taskId": task, "contextId": context}
+			parts := uploadRows(m["parts"])
+			if len(parts) == 1 {
+				selected, _ := protocol.EncodeJS(a2aObject(parts[0])["text"])
+				uploadObject(op["originalMessage"])["selectedTextHash"] = a2aHash(selected)
+			}
 		}
 		next["status"] = "dispatching"
 		next["operations"] = append(append([]any{}, operations...), op)
@@ -209,7 +254,7 @@ func (h *NativeA2a) perform(ctx context.Context, p a2aPeer, l *nativeIdentityLea
 			next := a2aClone(previous)
 			next["peer"] = observed
 			next["status"] = "observed"
-			return a2aFinish(next, map[string]any{"outcome": "observed", "state": observed["state"], "responseHash": observed["responseHash"]}), nil
+			return a2aFinish(next, map[string]any{"outcome": "observed", "state": observed["state"], "responseHash": observed["responseHash"], "response": observed}), nil
 		})
 	}
 	var peerError *a2aPeerError

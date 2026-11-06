@@ -1,3 +1,6 @@
+import {AccountCommentGovernance} from './account-comment-governance';
+import {AccountTaskReply,type AccountCommentAction} from './account-task-reply';
+import {useAccountSessionModel} from '../../accounts/account-session-scope';
 import {nativeQueryScope} from "../../../application/query-scope";
 import {useQueryReads,sourceReadDeadline} from "../../../application/query-reads";
 import { states, actions, Audience, CommentStream, CommentReports } from "./presentation";
@@ -41,8 +44,8 @@ const emptyCommentForm = ():CommentForm => ({id: crypto.randomUUID(), revision: 
 // This component also renders for anonymous readers; put it outside the
 // authenticated-only collaboration workbench in the Task detail page.
 export function TaskCommentsWorkspace(props:CommentProps) {
-  const scope=useChoiceViewLease(props.runtime,props.subjectId);
-  return <TaskCommentsSession key={props.task.taskId+':'+scope.key+':'+props.connected} {...props} lease={scope.lease}/>;
+  const scope=useChoiceViewLease(props.runtime,props.subjectId),account=useAccountSessionModel();
+  return <TaskCommentsSession key={props.task.taskId+':'+scope.key+':'+props.connected+':'+(account.session?.account.id??'anonymous')} {...props} lease={scope.lease}/>;
 }
 function TaskCommentsSession({
   task,
@@ -52,10 +55,12 @@ function TaskCommentsSession({
   navigate,
   lease,
 }: CommentProps&{lease:ChoiceViewLease|null}) {
-  const taskId=task.taskId;
-  const dataReads=useQueryReads(nativeQueryScope(runtime,subjectId),'tasks','comments:'+taskId+':'+String(connected));
+  const taskId=task.taskId,account=useAccountSessionModel();
+  const [accountAction,setAccountAction]=useState<AccountCommentAction|null>(null);
   const [taskView,setTaskView]=useState(task);
   const privateTask=taskView.request?.visibility==='Private';
+  const accountId=!privateTask&&account.phase==='signed-in'?account.session?.account.id:null;
+  const dataReads=useQueryReads(accountId?{endpoint:runtime.api.endpoint,identity:accountId,surface:'web'}:nativeQueryScope(runtime,subjectId),'tasks','comments:'+taskId+':'+String(connected)+':'+(accountId??'anonymous')); 
   const client = useMemo<CommentClient|null>(
     () => {
       if(!connected)return null;
@@ -247,7 +252,7 @@ function TaskCommentsSession({
     return known[key]??(/[\u3400-\u9fff]/.test(message)?message:'暂时未能完成，已输入的内容仍保留。');
   }
   async function read(options:{query?:string;pages?:number}={}){
-    const result=await dataReads.run({lane:'comments',key:JSON.stringify([options.query??readingRef.current.submittedQuery,options.pages??readingRef.current.pages])},async()=>await readSnapshot(options)??null,{validUntil:sourceReadDeadline,onSuccess:value=>{if(current()&&value){setComments(value.items);setNext(value.next);setLoading(false);}},onError:()=>{if(current()){setComments([]);setNext(null);setReplyFresh(null);setSourceChange(old=>old&&old.kind!=='task'?{...old,source:null,canContinue:false}:null);}}});
+    const result=await dataReads.run({lane:'comments',key:JSON.stringify([options.query??readingRef.current.submittedQuery,options.pages??readingRef.current.pages])},async()=>await readSnapshot(options)??null,{validUntil:sourceReadDeadline,onSuccess:value=>{if(current()&&value){setComments(value.items);setNext(value.next);setLoading(false);}},onError:(cause)=>{if(current()){const code=cause&&typeof cause==='object'&&'code' in cause?String(cause.code):'';if(['access_denied','not_found','consent_required'].includes(code)){setComments([]);setNext(null);}setReplyFresh(null);setSourceChange(old=>old&&old.kind!=='task'?{...old,source:null,canContinue:false}:null);}}});
     if(result.status==='error')throw result.error;
     return result.status==='success'?result.value:undefined;
   }
@@ -255,7 +260,8 @@ function TaskCommentsSession({
     const sequence=++readSequence.current,selectedQuery=options.query??readingRef.current.submittedQuery,pages=options.pages??readingRef.current.pages,items:CommentView[]=[];let after:string|undefined,more:string|null=null;
     try{
       for(let page=0;page<Math.max(1,pages);page++){
-        const value:{items:CommentView[];nextAfter:string|null}=await runtime.api.call('/v2/comments/query',{taskId,query:selectedQuery,...(after?{after}:{}),limit:20},{authenticated:!!connected});
+        const input={taskId,query:selectedQuery,...(after?{after}:{}),limit:20};
+        const value:{items:CommentView[];nextAfter:string|null}=!privateTask&&account.phase==='signed-in'&&account.client&&account.session?await account.client.call('/v2/account-comments/query',input,{session:account.session}):await runtime.api.call('/v2/comments/query',input,{authenticated:!!connected});
         if(!current()||sequence!==readSequence.current)return;
         for(const item of value.items)if(!items.some(old=>old.commentId===item.commentId))items.push(item);more=value.nextAfter??null;if(!more)break;if(more===after)throw Error('评论分页暂时无法继续，请稍后重试。');after=more;
       }
@@ -266,7 +272,7 @@ function TaskCommentsSession({
       const reportTarget=formRef.current.editor?.report;
       if(reportTarget&&client){let fresh;try{fresh=await client.report(reportTarget.reportId);}catch{fresh=null;}if(fresh?.taskId!==taskId)fresh=null;if(current()&&sequence===readSequence.current)setSourceChange((old)=>old?.kind==='report'?{...old,source:fresh,canContinue:!!fresh&&permitted(formRef.current.editor?.kind,null,fresh)}:old);}
       return{items:ordered,next:more,query:selectedQuery};
-    }catch(cause){if(current()&&sequence===readSequence.current){setComments([]);setNext(null);setReplyFresh(null);setSourceChange((old)=>old&&(old.kind==='comment'||old.kind==='report')?{...old,source:null,canContinue:false}:old);}throw cause;}finally{if(current()&&sequence===readSequence.current)setLoading(false);}
+    }catch(cause){if(current()&&sequence===readSequence.current){setReplyFresh(null);setSourceChange((old)=>old&&(old.kind==='comment'||old.kind==='report')?{...old,source:null,canContinue:false}:old);}throw cause;}finally{if(current()&&sequence===readSequence.current)setLoading(false);}
   }
   const extras=useCallback(async()=>{
     if(!client)return;
@@ -337,7 +343,7 @@ function TaskCommentsSession({
   function begin(kind:CommentKind,comment?:CommentTarget,report?:CommentReportTarget){
     if(!current()||busy||draftState!=='ready')return;readingChange({reportOpen:false});
     const old=formRef.current,same=old.editor?.kind===kind&&old.editor?.comment?.commentId===comment?.commentId&&old.editor?.report?.reportId===report?.reportId;
-    if(same){editorElement.current?.scrollIntoView({block:'center'});editorElement.current?.querySelector<HTMLElement>('textarea,input')?.focus({preventScroll:true});setMenu(null);return;}
+    if(same){setMenu(null);requestAnimationFrame(()=>{editorElement.current?.scrollIntoView({block:'center'});editorElement.current?.querySelector<HTMLElement>('textarea,input,button[type=submit]')?.focus({preventScroll:true});});return;}
     if(old.editor&&(old.text.trim()||old.reason.trim()||old.operationId)&&!(kind==='create'&&old.editor.kind==='create'&&!old.operationId)){setMenu(null);setPreview({kind:'replace-draft',next:{kind,comment,report}});return;}
     beginNow(kind,comment,report);
   }
@@ -350,7 +356,7 @@ function TaskCommentsSession({
     if(!current())return;setReports(items);setReportNext(more);readingChange({reportOpen:true,reportComment:commentId??null,reportPages:pages});
     if(truncated)setNotice('可以从具体评论打开相关处理记录。');
   }
-  async function openReports(commentId?:string){setMenu(null);await loadReports(commentId,1);}
+  async function openReports(commentId?:string){setMenu(null);await loadReports(commentId,1);requestAnimationFrame(()=>reportsElement.current?.scrollIntoView({block:'center'}));}
   async function validateTarget(snapshot:CommentSnapshot){
     const freshTask:CommentTask=await runtime.api.call('/v2/tasks/'+taskId,undefined,{method:'GET'});if(!current())return false;
     if((freshTask.request?.visibility==='Private')!==privateTask){setSourceChange({kind:'task',task:freshTask,canContinue:true});return false;}
@@ -494,9 +500,9 @@ function TaskCommentsSession({
     </form>
     {loading&&!comments.length?<p className="discussion-reading"><output>正在读取讨论…</output></p>:!comments.length&&<div className="discussion-empty"><MessageCircle size={30}/><h3>{reading.submittedQuery?'暂时没有匹配的评论':'开始这段讨论'}</h3><p>{reading.submittedQuery?'换个关键词再找找。':'可以先澄清问题，或者说说你的想法。'}</p></div>}
     {comments.length>0&&next&&<p className="discussion-order">已加载内容按发布时间排列</p>}
-    <CommentStream comments={comments} subjectId={subjectId} requesterId={taskView.requesterId} connected={connected} busy={busy} person={person} menu={menu} onMenuChange={(id,open)=>setMenu(value=>open?id:value===id?null:value)} begin={begin} onReports={id=>void run(()=>openReports(id))}/>
+    <CommentStream accountGovernance={comment=><AccountCommentGovernance commentId={comment.commentId} endpoint={runtime.api.endpoint} onChanged={()=>{dataReads.invalidate('comments');void read();}}/>} accountId={!privateTask?account.session?.account.id:null} accountBegin={(kind,comment)=>{setMenu(null);setAccountAction({kind,comment});}} comments={comments} subjectId={subjectId} requesterId={taskView.requesterId} connected={connected} busy={busy} person={person} menu={menu} onMenuChange={(id,open)=>setMenu(value=>open?id:value===id?null:value)} begin={begin} onReports={id=>void run(()=>openReports(id))}/>
     {next&&<Button className="discussion-more-comments" variant="ghost" disabled={busy||loading} onClick={()=>{const pages=readingRef.current.pages+1;readingChange({pages});setLoading(true);void run(()=>read({pages}));}}>查看更多评论</Button>}
-    {!connected&&<p className="discussion-connect">连接身份后，可以加入讨论。<button className="text-link" onClick={()=>navigate('/app/settings/identity')}>连接身份 </button></p>}
+    {!privateTask&&<AccountTaskReply action={accountAction} clearAction={()=>setAccountAction(null)} taskId={taskId} endpoint={runtime.api.endpoint} onSent={()=>{dataReads.invalidate('comments');void read();}}/>}
     {editor&&draftState==='ready'&&<form ref={editorElement} className="discussion-editor workspace-form" onSubmit={event=>{event.preventDefault();void run(prepare);}}>
       <header><div><p className="eyebrow">{governanceAction?'评论处理':editor.kind==='create'&&editor.comment?'回复评论':editor.kind==='create'?'写下你的想法':actions[editor.kind]}</p><h3>{governanceAction?actions[editor.kind]:editor.kind==='create'?'继续这段讨论':actions[editor.kind]}</h3></div><button type="button" className="icon-button" aria-label="放弃编辑" disabled={busy} onClick={()=>{if(text.trim()||reason.trim())setPreview({kind:'discard'});else void run(discardDraft);}}><X size={18}/></button></header>
       {editor.comment&&<div className="discussion-editor-source">{editor.comment.authorId&&<strong>{person(editor.comment.authorId)}</strong>}{replyFresh?.commentId===editor.comment.commentId&&replyFresh.revision===editor.comment.revision&&replyFresh.body?<blockquote>{replyFresh.body}</blockquote>:<p>原内容已变化或正在重新读取。你的输入仍保留。</p>}</div>}

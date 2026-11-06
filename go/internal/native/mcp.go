@@ -102,7 +102,7 @@ func newToolServer(store *Store, runtime *Runtime, artifacts ...*InteractionArti
 	s := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: "0.3.0-go-development"}, &mcp.ServerOptions{Instructions: serverInstructions})
 	var closeServices func()
 	if runtime != nil {
-		if len(runtime.config.A2A) > 0 {
+		{
 			a2a, err := NewNativeA2a(runtime, runtime.config.A2A, A2aOptions{ReadEnvironment: os.LookupEnv})
 			if err != nil {
 				rt.browser.Close()

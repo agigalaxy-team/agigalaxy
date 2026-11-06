@@ -10,7 +10,7 @@
 
 从当前真实对象读取 ID、版本、参与者、Scope 与来源权限。阅读资料、推荐某人、选入联系清单、发邀请、接受参与和完成交付分别表示不同事实。发布与联系独立：发布结果未知不猜测是否已发布，也不以联系名单替代已收到邀请的回执。不要补造 Case、Attempt、参与者或收到的回应。
 
-现有 `galaxy_help_publish` 路径仍使用独立准确的 Task Consent。提交原 `consentId` / `payloadJson`，未知先用 `galaxy_help_reconcile` 查询原 operationId，不另建 Task 猜结果。精确动作路径按当前需要使用 `galaxy_help_prepare_action`、`galaxy_help_action_preview`、`galaxy_help_execute_action` 或 `galaxy_help_reconcile_action`；执行须引用实际预览，未知结果沿原操作查询。具体字段以工具 schema 和当前返回为准。
+准备独立求助时，先用 `galaxy_help_start` 关联当前工作，再调用 `galaxy_help_prepare_action`，传 `kind:publish-task` 和 `request` 业务字段（`title`、`summary`、`goal`、`currentSituation`，可选期望结果、意图、可见范围和截止时间）。不传截止时间即不设默认截止；程序生成准确操作载荷和定位。用 `galaxy_help_action_preview` 核对，沿返回的真实选择与 `galaxy_help_execute_action` 发布；结果未知时用 `galaxy_help_reconcile_action` 查询原操作，不另建请求猜结果。旧 `galaxy_help_publish` 路径继续支持已有准确 Consent 和载荷；具体字段以工具 schema 和当前返回为准。
 
 Prepare/preview 中核对动作、准确收件人、可见范围、材料原文、来源版本、业务 operationId、payloadHash 和 authorizationRequestId。调用 execute 只能使用同一预览的精确引用，通过真实宿主选择或本机审阅页；模型的 confirmed 布尔值不是 Consent。改正文、收件人、范围或来源后重做预览，不套用旧确认。普通 MCP 必须给用户足够审阅信息，不能因没有 Apps 而把确认所需内容隐藏。
 
@@ -20,13 +20,13 @@ Prepare/preview 中核对动作、准确收件人、可见范围、材料原文�
 
 ## A2A 对端
 
-只有工具列表含 `galaxy_a2a_peers` 时才使用 A2A。从明确配置的对端选择，关联本人当前真实 Attempt，prepare 只选必要文本，再用 execute 进入既有真实选择。不要生成临时对端、shell 命令、全量上下文或凭据请求，不要求用户贴 token 到聊天。
+按实际工具能力使用 A2A。`galaxy_a2a_peers` 列出现有配置的对端；选定可读 Builder 时，`galaxy_a2a_resolve({builderId})` 可读取实际 AgentCard 并检查当前支持的接口与认证。只有返回可用 peerId 后才沿该对端继续；声明、可读和协议观察本身不证明能力或端点控制。prepare 仅选必要文本，通过 execute 的真实选择发送，不索要聊天中的 token 或携带完整上下文。
 
 对端 input-required/auth-required 由用户选择补充内容或处理对端授权。初次发送回执未知时保留原 association，读取/恢复原操作，不换 ID 重发。停止本地等待不等于远端取消；若要远端取消，按实际协议准备并确认原任务的取消动作。
 
 对端 completed 只代表该协议任务结束。导入 Result 时说明 peer-reported、来源、限制与实际观察，不自动结束原 Attempt、生成 Verification、用户验收或成功履历。
 
-当前工具列表有 `galaxy_a2a_work_read/prepare/execute` 时，优先从当前工作沿这组目的入口继续。`galaxy_work_sources` 提供当前本人工作，`galaxy_work_read` 再读所选工作和真实尝试；对端、引用和已有宿主所选内容有效时沿用，不重复索取。发送、补充、停止和保留结果各沿真实当前动作及必要选择。没有当前尝试时继续原工作，不补造来源或让用户复制 Case/Attempt ID。
+当前工具列表有 `galaxy_a2a_work_read/prepare/execute` 时，按当前工作沿这组目的入口继续。发送可选真实本机工作 `source:{kind:local-work,workId}`、可读原请求 `source:{kind:task,taskId}`，或已有准确 Case/Attempt；具体字段依实际 schema。`galaxy_work_sources` 和 `galaxy_work_read` 可用于读取已有工作。发送、补充、停止和保留结果分别沿真实动作与必要选择，不补造 Case/Attempt。
 
 保留结果使用用户实际 summary、reportedOutcome 与限制；对端结束不替用户选择成功。已知固定来源说明留在原载荷及诊断，常用呈现显示用户所写限制和结果判断；未认识的原内容忠实保留。原 Result 草稿、payloadHash、事件与授权请求保持不变，重载自动接续原预览，已接受则读原回执。返回文字给出实际输出，确有完整材料时用真实下载或来源入口，不加泛化尾注。
 
@@ -39,3 +39,6 @@ Prepare/preview 中核对动作、准确收件人、可见范围、材料原文�
 执行、导入 participant-reported Result、记录独立 PackUse 是三个不同事实，分别核对、确认并保存各自原回执。阅读、对端完成或一次工具调用不是成功复用或原任务已解决。unknown 先用 read 核对原 association；`galaxy_worker_host_abort_local` 只结束本地等待/预览，不承诺远端取消。来源失权、控制变化或句柄到期后重新读取，不借旧授权重新发送。
 
 当前小面板先展示目的、必要输入、处理位置和实际对端输出。结果能直接使用时接回原工作；保留 Result 和 PackUse 按实际目的另外选择。已知原 Task 的进度和已提交原记录的回执由后台读取，不要求用户检查内部 ID 或报告表单。结构化输出按可读字段展示，并保留完整原文下载；不得把字段展示解释成独立验证、原问题已经解决或参与者已经验收。
+
+
+已发布的请求可沿原 `taskId` 用 `galaxy_task_v2_get` 读取，用 `galaxy_comments_query` 读取评论及后续页，必要时用 `galaxy_comment_get` 核对当前评论。将实际回应带回原工作并判断下一步；未读取、读取失败和已读无新回应分别处理。无需先建立本机 HelpSession，通知与后续运行只按宿主真实支持的接口进行。

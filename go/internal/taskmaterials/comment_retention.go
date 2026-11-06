@@ -9,13 +9,13 @@ import (
 // CleanupCommentsWithin is the original retained temporary comment/governance
 // cleanup, invoked only in the maintenance caller's already-authorized tx.
 func (s *Service) CleanupCommentsWithin(ctx context.Context, tx pgx.Tx, at int64) (Object, error) {
-	expired, e := rows(ctx, tx, `SELECT jsonb_build_object('id',e.id,'subject_id',e.subject_id,'payload_hash',e.payload_hash) FROM task_comment_events_v2 e JOIN task_comments_v2 c ON c.id=e.comment_id WHERE c.expires_at<=$1 AND e.payload_text<>'' ORDER BY c.expires_at,e.id LIMIT 100 FOR UPDATE OF e`, stamp(at))
+	expired, e := rows(ctx, tx, `SELECT jsonb_build_object('id',e.id,'subject_id',e.subject_id,'account_id',e.account_id,'payload_hash',e.payload_hash) FROM task_comment_events_v2 e JOIN task_comments_v2 c ON c.id=e.comment_id WHERE c.expires_at<=$1 AND e.payload_text<>'' ORDER BY c.expires_at,e.id LIMIT 100 FOR UPDATE OF e`, stamp(at))
 	if e != nil {
 		return nil, e
 	}
 	ids := []string{}
 	for _, r := range expired {
-		if _, e = tx.Exec(ctx, `INSERT INTO lifecycle_erasure_records(id,table_name,object_key,subject_id,reason,policy_version,original_payload_hash,request_id,erased_at,retained_until,account_id) VALUES($1,'task_comment_events_v2',$2,$3,'temporary-content-expired','galaxy-retention/v1-product-v2',$4,NULL,$5,$6,NULL) ON CONFLICT(table_name,object_key) DO NOTHING`, uuid.NewString(), r["id"], r["subject_id"], r["payload_hash"], stamp(at), stamp(at+180*86400)); e != nil {
+		if _, e = tx.Exec(ctx, `INSERT INTO lifecycle_erasure_records(id,table_name,object_key,subject_id,reason,policy_version,original_payload_hash,request_id,erased_at,retained_until,account_id) VALUES($1,'task_comment_events_v2',$2,$3,'temporary-content-expired','galaxy-retention/v1-product-v2',$4,NULL,$5,$6,$7) ON CONFLICT(table_name,object_key) DO NOTHING`, uuid.NewString(), r["id"], r["subject_id"], r["payload_hash"], stamp(at), stamp(at+180*86400), r["account_id"]); e != nil {
 			return nil, e
 		}
 		ids = append(ids, str(r, "id"))

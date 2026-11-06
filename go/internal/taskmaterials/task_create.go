@@ -79,11 +79,11 @@ func parseTask(raw string) (Object, error) {
 	}
 	copy := Object{}
 	for k, value := range v {
-		if k != "caseId" {
+		if k != "caseId" && !(k == "enrollmentExpiresAt" && value == nil) {
 			copy[k] = value
 		}
 	}
-	if !exactFields(copy, []string{"operationId", "taskId", "intent", "workContext", "title", "summary", "visibility", "collaboration", "enrollmentExpiresAt"}, []string{"parentTaskId", "expectedOutcome", "materials", "budget", "capabilityId", "qualification"}) || !validID(str(v, "operationId")) || !validID(str(v, "taskId")) || caseID != nil && !validID(text(caseID)) || !contains([]string{"stuck", "proactive-review", "diagnosis", "collaboration", "delegation"}, str(v, "intent")) || !contains([]string{"Public", "Private"}, str(v, "visibility")) || !contains([]string{"open-assistance", "basic-bounty"}, str(v, "collaboration")) || !validInt(v["enrollmentExpiresAt"], 1, math.MaxInt64) || !validateTaskText(v, "title", 120, true) || !validateTaskText(v, "summary", 10000, false) {
+	if !exactFields(copy, []string{"operationId", "taskId", "intent", "workContext", "title", "summary", "visibility", "collaboration"}, []string{"enrollmentExpiresAt", "parentTaskId", "expectedOutcome", "materials", "budget", "capabilityId", "qualification"}) || !validID(str(v, "operationId")) || !validID(str(v, "taskId")) || caseID != nil && !validID(text(caseID)) || !contains([]string{"stuck", "proactive-review", "diagnosis", "collaboration", "delegation"}, str(v, "intent")) || !contains([]string{"Public", "Private"}, str(v, "visibility")) || !contains([]string{"open-assistance", "basic-bounty"}, str(v, "collaboration")) || (v["enrollmentExpiresAt"] != nil && !validInt(v["enrollmentExpiresAt"], 1, math.MaxInt64)) || !validateTaskText(v, "title", 120, true) || !validateTaskText(v, "summary", 10000, false) {
 		return invalid()
 	}
 	if _, ok := v["expectedOutcome"]; ok && !validateTaskText(v, "expectedOutcome", 1500, false) {
@@ -178,6 +178,9 @@ func parseTask(raw string) (Object, error) {
 		if !seen[id] {
 			return invalid()
 		}
+	}
+	if _, ok := v["enrollmentExpiresAt"]; !ok {
+		v["enrollmentExpiresAt"] = nil
 	}
 	return v, nil
 }
@@ -315,7 +318,7 @@ func (s *Service) CreateTask(ctx context.Context, a Actor, submission TaskSubmis
 				return nil, e
 			}
 		}
-		if num(request["enrollmentExpiresAt"]) <= s.now() {
+		if request["enrollmentExpiresAt"] != nil && num(request["enrollmentExpiresAt"]) <= s.now() {
 			return nil, fail("task_enrollment_expired")
 		}
 		if request["parentTaskId"] != nil && request["parentTaskId"] == request["taskId"] {

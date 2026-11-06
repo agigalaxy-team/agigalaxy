@@ -82,8 +82,9 @@ function ContextSession({ task, runtime, subjectId, connected, initialGrantId=nu
   async function load(after?: string) {
     if (!client) return;
     const token=lifecycle.current.generation,ticket=++lifecycle.current.reading,currentOpen=openId.current;
-    if (currentOpen) setOpened(null);
-    const page=await client.query({taskId:task.taskId,...(after?{after}:{}),limit:20});
+    let page:Awaited<ReturnType<typeof client.query>>;
+    try{page=await client.query({taskId:task.taskId,...(after?{after}:{}),limit:20});}
+    catch(reason){if(token===lifecycle.current.generation&&ticket===lifecycle.current.reading&&['not_found','access_denied'].includes(recordErrorField(reason,'code')))setOpened(null);throw reason;}
     if (token!==lifecycle.current.generation || ticket!==lifecycle.current.reading || !navigator.onLine || document.hidden) return;
     setItems(previous => after ? [...previous.filter(x=>!page.items.some(y=>y.metadata.grantId===x.metadata.grantId)),...page.items] : page.items);
     setNextAfter(page.nextAfter??null); setLoaded(true);
@@ -91,8 +92,9 @@ function ContextSession({ task, runtime, subjectId, connected, initialGrantId=nu
     if (token!==lifecycle.current.generation || ticket!==lifecycle.current.reading || !navigator.onLine || document.hidden) return;
     setPending(local);
     if (currentOpen && openId.current===currentOpen) {
-      const view=await client.get(currentOpen);
-      if(token===lifecycle.current.generation&&ticket===lifecycle.current.reading&&openId.current===currentOpen&&navigator.onLine&&!document.hidden)setOpened(checkedMaterial(view));
+      try{const view=await client.get(currentOpen);
+      if(token===lifecycle.current.generation&&ticket===lifecycle.current.reading&&openId.current===currentOpen&&navigator.onLine&&!document.hidden)setOpened(checkedMaterial(view));}
+      catch(reason){if(token===lifecycle.current.generation&&ticket===lifecycle.current.reading&&recordErrorField(reason,'code')==='not_found')setOpened(null);throw reason;}
     }
   }
   function checkedMaterial(view:ContextView){if(!contextMaterialMatchesWork(view,task.taskId,subjectId))throw Error('这份材料不属于当前工作或当前身份，请回到材料列表。');return currentMaterial(view);}
@@ -124,7 +126,7 @@ function ContextSession({ task, runtime, subjectId, connected, initialGrantId=nu
     return()=>{control.generation++;control.reading++;clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};
   },[client,task.taskId]);
   useEffect(()=>{
-    const control=lifecycle.current,hide=()=>{control.reading++;setOpened(null);},resume=()=>{hide();refreshOnTick();};
+    const control=lifecycle.current,hide=()=>{control.reading++;},resume=()=>{hide();refreshOnTick();};
     window.addEventListener('offline',hide);window.addEventListener('online',resume);document.addEventListener('visibilitychange',resume);
     return()=>{window.removeEventListener('offline',hide);window.removeEventListener('online',resume);document.removeEventListener('visibilitychange',resume);};
   },[client]);

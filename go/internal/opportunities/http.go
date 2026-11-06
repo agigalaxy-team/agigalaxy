@@ -18,7 +18,7 @@ type Handler struct {
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" || !has([]string{"/v2/discovery/query", "/v2/discovery/detail", "/v1/discovery/query", "/v1/discovery/preferences/read", "/v1/discovery/preferences/save"}, r.URL.Path) {
+	if r.Method != "POST" || !has([]string{"/v2/discovery/query", "/v2/discovery/detail", "/v2/discovery/participants/query", "/v2/discovery/participants/detail", "/v1/discovery/query", "/v1/discovery/preferences/read", "/v1/discovery/preferences/save"}, r.URL.Path) {
 		if h.Next != nil {
 			h.Next.ServeHTTP(w, r)
 		} else {
@@ -91,6 +91,12 @@ func (h Handler) dispatch(r *http.Request, requestID string) (Object, error) {
 		default:
 			return s.QueryLegacy(r.Context(), a, input)
 		}
+	}
+	if r.URL.Path == "/v2/discovery/participants/query" {
+		return s.ParticipantsQuery(r.Context(), a, input)
+	}
+	if r.URL.Path == "/v2/discovery/participants/detail" {
+		return s.ParticipantsDetail(r.Context(), a, input)
 	}
 	if strings.HasSuffix(r.URL.Path, "/detail") {
 		return s.Detail(r.Context(), a, input)

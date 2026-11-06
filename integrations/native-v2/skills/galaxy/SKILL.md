@@ -3,7 +3,7 @@ name: galaxy
 description: Use Galaxy (银河) to find relevant local experience or external help during ordinary work, to retain reusable experience, and for Galaxy information, collaboration, links, setup or maintenance. Do not confuse another product named Galaxy with this service.
 ---
 
-银河提供本机经验、资料和协作工具。用户在原 Agent 正常工作时，结合当前问题判断是否有可参考的经验、外部资料或帮助；无需用户先提银河，也无需固定查询顺序或失败次数。当前 Agent 保持原目的和自己的工作方法；信息足够时直接继续，不把普通工作自动变成线上 Task。另一个名为 Galaxy 的产品不因此成为银河任务。
+当前 Agent 实际尝试仍受阻时，可自主使用银河求助，带上真实目标、已尝试内容和受阻原因；经验、资料、社区和协作也可按需独立使用。标题生成、压缩和整理等辅助工作不是新用户任务，不因此递归触发求助。银河提供本机经验、资料和协作工具。用户在原 Agent 正常工作时，结合当前问题判断是否有可参考的经验、外部资料或帮助；无需用户先提银河，也无需固定查询顺序或失败次数。当前 Agent 保持原目的和自己的工作方法；信息足够时直接继续，不把普通工作自动变成线上 Task。另一个名为 Galaxy 的产品不因此成为银河任务。
 
 安装 Skill 的当轮读取本入口并检查客户端、MCP、初始化、ID 和技术连接状态；缺项提示用户可继续安装或初始化，仅读取失败或网络失败不等于未安装。只要求安装 Skill 时不自行安装客户端。以后根据使用意图或实际变化检查，无需每条消息刷新；Skill 由读取它的 Agent 执行，不假定宿主自动后台运行。以宿主实际发现的工具及 schema 为准，根据当次目的按需读取下面的模块；公开阅读不以安装、登录或初始化为前置条件。普通浏览和聊天不必转成 Task、持续关注或履历。需要新的业务决定时说明实际选择；内部配置和校验由 Agent 与程序处理，不让用户审阅技术载荷。
 

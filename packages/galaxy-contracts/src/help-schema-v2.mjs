@@ -6,11 +6,19 @@ import { discoveryQueryV2Schema } from './discovery-schema-v2.mjs';
 
 export const helpPaths = Object.freeze(['continue-current-ai', 'capsule-or-history', 'open-assistance', 'bounty-or-expert']);
 const short = z.string().trim().min(1).max(1200);
-export const helpQuerySchema = z.strictObject({ requests: z.array(z.discriminatedUnion('kind', [
+export const helpParticipantsQuerySchema = z.strictObject({
+  query: z.string().trim().min(1).max(2000), functions: z.array(z.string().trim().min(1).max(80)).max(16).optional(),
+  types: z.array(z.enum(['person', 'organization', 'agent', 'tool', 'team', 'service', 'unknown'])).max(16).optional(),
+  after: z.string().min(1).max(4096).nullable().optional(), limit: z.number().int().min(1).max(20).default(20),
+});
+export const helpParticipantDetailSchema = z.strictObject({ sourceKind: z.enum(['profile', 'project', 'builder', 'recruitment']), id: z.string().min(1).max(160) });
+export const helpQuerySchema = z.strictObject({ sessionId: z.uuid().optional(), requests: z.array(z.discriminatedUnion('kind', [
   z.strictObject({ requestId: z.uuid(), kind: z.literal('search'), input: searchQuerySchema }),
   z.strictObject({ requestId: z.uuid(), kind: z.literal('discovery'), input: discoveryQuerySchema }),
   z.strictObject({ requestId: z.uuid(), kind: z.literal('search-v2'), input: searchV2QuerySchema }),
   z.strictObject({ requestId: z.uuid(), kind: z.literal('discovery-v2'), input: discoveryQueryV2Schema }),
+  z.strictObject({ requestId: z.uuid(), kind: z.literal('participants-v2'), input: helpParticipantsQuerySchema }),
+  z.strictObject({ requestId: z.uuid(), kind: z.literal('participant-v2'), input: helpParticipantDetailSchema }),
 ])).min(1).max(8).refine(rows => new Set(rows.map(row => row.requestId)).size === rows.length) });
 export const helpBasisSchema = z.strictObject({
   key: z.string().regex(/^[a-f0-9]{64}$/), kind: z.string().min(1).max(40), id: z.string().min(1).max(160),
@@ -45,7 +53,7 @@ export const helpSessionSchema = z.strictObject({
   pauseState: z.enum(['active', 'paused', 'returned']),
   basis: z.array(helpBasisSchema).max(200), offers: z.array(helpOfferSchema).max(32),
   selectedHelpIds: z.array(z.uuid()).max(32),
-  queries: z.array(z.strictObject({ requestId: z.uuid(), kind: z.enum(['search', 'discovery', 'search-v2', 'discovery-v2']),
+  queries: z.array(z.strictObject({ requestId: z.uuid(), kind: z.enum(['search', 'discovery', 'search-v2', 'discovery-v2', 'participants-v2', 'participant-v2']),
     state: z.enum(['ready', 'empty', 'failed', 'unavailable']), checkedAt: z.number().int().nonnegative(),
     basisKeys: z.array(z.string().regex(/^[a-f0-9]{64}$/)).max(40),
     request: helpQuerySchema.shape.requests.element.optional(),
@@ -62,10 +70,21 @@ export const helpSessionSchema = z.strictObject({
   selectionEffect: z.literal('local-choice-only'), cloudSync: z.literal('off'),
 });
 
-export const helpActionPrepareSchema = z.strictObject({
+export const helpPublicationRequestSchema = z.strictObject({
+  title: z.string().min(1).max(120), summary: z.string().max(10000), goal: z.string().max(10000), currentSituation: z.string().max(10000),
+  intent: z.enum(['stuck', 'proactive-review', 'diagnosis', 'collaboration', 'delegation']).default('stuck'),
+  visibility: z.enum(['Public', 'Private']).default('Public'), expectedOutcome: z.string().max(1500).optional(),
+  enrollmentExpiresAt: z.number().int().positive().nullable().optional(),
+});
+const helpRawActionPrepareSchema = z.strictObject({
   kind: z.enum(['publish-task', 'task-event', 'participation-propose', 'participation-event', 'context-grant', 'context-event']),
   payloadJson: z.string().min(2).max(40000), taskId: z.uuid().optional(), participationId: z.uuid().optional(), offerId: z.uuid().optional(),
   recipientIds: z.array(z.string().regex(/^GUID[0-9A-Z]{28}$/)).max(16).optional(),
   authorizationRequestId: z.uuid().optional(),
 });
+export const helpActionPrepareSchema = z.union([helpRawActionPrepareSchema, z.strictObject({
+  kind: z.literal('publish-task'), request: helpPublicationRequestSchema,
+  recipientIds: z.array(z.string().regex(/^GUID[0-9A-Z]{28}$/)).max(16).optional(), offerId: z.uuid().optional(),
+  authorizationRequestId: z.uuid().optional(),
+})]);
 export const helpActionExecuteSchema = z.strictObject({ operationId: z.uuid(), payloadHash: z.string().regex(/^[a-f0-9]{64}$/), authorizationRequestId: z.uuid().optional() });

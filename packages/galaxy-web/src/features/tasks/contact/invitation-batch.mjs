@@ -84,7 +84,7 @@ export function createContactInvitationBatch({ runtime, taskId, key, owner, chec
         note: item.note.trim(),
         state: 'queued',
         expiresAt: Math.min(
-          current.request.enrollmentExpiresAt,
+          current.request.enrollmentExpiresAt ?? Infinity,
           Math.floor(Date.now() / 1000) + 7 * 86400,
         ),
       };

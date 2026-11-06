@@ -219,14 +219,29 @@ func a2aSnapshot(raw any, previous map[string]any) (map[string]any, error) {
 	}
 	v = wire.Values()
 	context := text(v["contextId"])
-	if !a2aIdentifier(context) || text(previous["contextId"]) != "" && text(previous["contextId"]) != context {
+	if context == "" && !isTask {
+		context = text(previous["contextId"])
+	}
+	if (isTask || context != "") && !a2aIdentifier(context) || text(previous["contextId"]) != "" && text(previous["contextId"]) != context {
 		return nil, a2aError("peer context changed or invalid")
 	}
 	if !isTask {
-		if text(previous["taskId"]) != "" || !a2aIdentifier(text(v["messageId"])) || text(v["taskId"]) != "" {
-			return nil, a2aError("unexpected standalone peer message")
+		task := text(v["taskId"])
+		if !a2aIdentifier(text(v["messageId"])) || task != "" && !a2aIdentifier(task) || task != "" && text(previous["taskId"]) != "" && task != text(previous["taskId"]) {
+			return nil, a2aError("peer message association changed or invalid")
 		}
-		return map[string]any{"kind": "message", "contextId": context, "messageId": v["messageId"], "state": "message-only", "responseHash": a2aHash(encoded), "artifacts": []any{}, "verification": "peer-reported", "text": a2aText(v["parts"])}, nil
+		if task == "" {
+			task = text(previous["taskId"])
+		}
+		state := "message-only"
+		if task != "" && text(previous["state"]) != "" {
+			state = text(previous["state"])
+		}
+		out := map[string]any{"kind": "message", "contextId": context, "messageId": v["messageId"], "state": state, "responseHash": a2aHash(encoded), "artifacts": []any{}, "verification": "peer-reported", "text": a2aText(v["parts"]), "output": wire, "goalCompletion": "unconfirmed"}
+		if task != "" {
+			out["taskId"] = task
+		}
+		return out, nil
 	}
 	states := map[string]string{"TASK_STATE_SUBMITTED": "submitted", "TASK_STATE_WORKING": "working", "TASK_STATE_COMPLETED": "completed", "TASK_STATE_FAILED": "failed", "TASK_STATE_CANCELED": "canceled", "TASK_STATE_INPUT_REQUIRED": "input-required", "TASK_STATE_REJECTED": "rejected", "TASK_STATE_AUTH_REQUIRED": "auth-required"}
 	status := a2aObject(v["status"])
@@ -283,5 +298,5 @@ func a2aSnapshot(raw any, previous map[string]any) (map[string]any, error) {
 		}
 		artifacts = append(artifacts, map[string]any{"artifactId": aid, "name": a2aSlice(text(a["name"]), 160), "objectHash": a2aHash(raw), "parts": projections})
 	}
-	return map[string]any{"kind": "task", "taskId": id, "contextId": context, "state": state, "responseHash": a2aHash(encoded), "artifacts": artifacts, "verification": "peer-reported", "text": a2aText(a2aObject(status["message"])["parts"])}, nil
+	return map[string]any{"kind": "task", "taskId": id, "contextId": context, "state": state, "responseHash": a2aHash(encoded), "artifacts": artifacts, "verification": "peer-reported", "text": a2aText(a2aObject(status["message"])["parts"]), "output": wire, "goalCompletion": "unconfirmed"}, nil
 }

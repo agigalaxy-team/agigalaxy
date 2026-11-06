@@ -40,7 +40,7 @@ func (s *Service) readTaskViewerWithin(ctx context.Context, tx pgx.Tx, viewer st
 	} else if identified {
 		view = "participant-or-reader"
 	}
-	out := Object{"schemaVersion": 2, "taskId": id, "caseId": task["case_id"], "request": request, "requesterId": task["requester_id"], "version": state["version"], "state": state["state"], "enrollmentState": enrollment, "enrollmentOpen": str(state, "state") == "open" && enrollment != "stopped" && num(request["enrollmentExpiresAt"]) > s.now() && !contains(stringsOf(governance["scopes"]), "new-participation-paused"), "paused": access["paused"], "governance": governance, "paymentExecuted": false, "contextAccessGranted": false, "roomMembershipGranted": false, "compatibility": Object{"writableApiVersion": 2, "legacyWrites": false}, "view": view}
+	out := Object{"schemaVersion": 2, "taskId": id, "caseId": task["case_id"], "request": request, "requesterId": task["requester_id"], "version": state["version"], "state": state["state"], "enrollmentState": enrollment, "enrollmentOpen": str(state, "state") == "open" && enrollment != "stopped" && (request["enrollmentExpiresAt"] == nil || num(request["enrollmentExpiresAt"]) > s.now()) && !contains(stringsOf(governance["scopes"]), "new-participation-paused"), "paused": access["paused"], "governance": governance, "paymentExecuted": false, "contextAccessGranted": false, "roomMembershipGranted": false, "compatibility": Object{"writableApiVersion": 2, "legacyWrites": false}, "view": view}
 	material := len(arr(request["materials"])) > 0
 	for _, v := range textFields(request) {
 		if _, ok := v.(string); !ok {
@@ -256,7 +256,7 @@ func (s *Service) queryTasks(ctx context.Context, a *Actor, view, query, after s
 			subject = a.SubjectID
 		}
 		for {
-			candidates, e := rows(ctx, tx, `SELECT jsonb_build_object('id',id) FROM task_requests WHERE ($1::uuid IS NULL OR id>$1) AND ($2='open' AND snapshot->>'state'='open' AND COALESCE(snapshot->'enrollment'->>'state','open')='open' AND (snapshot->'request'->>'enrollmentExpiresAt')::bigint>$3 OR $2='requested' AND requester_id=$4 OR $2='participating' AND EXISTS(SELECT 1 FROM task_participations p WHERE p.task_id=task_requests.id AND p.subject_id=$4) OR $2='participating' AND snapshot->'invitations' @> jsonb_build_array(jsonb_build_object('recipientId',$4::text)) OR $2='participating' AND EXISTS(SELECT 1 FROM task_events e WHERE e.task_id=task_requests.id AND e.subject_id=$4)) ORDER BY id LIMIT 100`, position, view, s.now(), subject)
+			candidates, e := rows(ctx, tx, `SELECT jsonb_build_object('id',id) FROM task_requests WHERE ($1::uuid IS NULL OR id>$1) AND ($2='open' AND snapshot->>'state'='open' AND COALESCE(snapshot->'enrollment'->>'state','open')='open' AND ((snapshot->'request'->>'enrollmentExpiresAt') IS NULL OR (snapshot->'request'->>'enrollmentExpiresAt')::bigint>$3) OR $2='requested' AND requester_id=$4 OR $2='participating' AND EXISTS(SELECT 1 FROM task_participations p WHERE p.task_id=task_requests.id AND p.subject_id=$4) OR $2='participating' AND snapshot->'invitations' @> jsonb_build_array(jsonb_build_object('recipientId',$4::text)) OR $2='participating' AND EXISTS(SELECT 1 FROM task_events e WHERE e.task_id=task_requests.id AND e.subject_id=$4)) ORDER BY id LIMIT 100`, position, view, s.now(), subject)
 			if e != nil {
 				return nil, e
 			}

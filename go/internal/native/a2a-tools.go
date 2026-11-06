@@ -9,9 +9,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// Register only after explicit A2A configuration constructed the actual host.
-// Closing this returned hook stops retained local previews/transports; it never
-// reports remote task cancellation. No host is constructed by tools/list.
+// Registration permits selected public service resolution. It never grants
+// dispatch; original Native review is still required for every actual send.
+// Closing stops local previews/transports and never reports remote cancellation.
 func registerNativeA2aTools(server *mcp.Server, tools *toolRuntime, host *NativeA2a) func() {
 	tools.pending = append(tools.pending, host.pendingInteractions)
 	if host == nil {
@@ -55,6 +55,12 @@ func registerNativeA2aTools(server *mcp.Server, tools *toolRuntime, host *Native
 				return failed(e)
 			}
 			switch name {
+			case "galaxy_a2a_resolve":
+				value, e := host.Resolve(ctx, input)
+				if e != nil {
+					return failed(e)
+				}
+				return toolResult(value)
 			case "galaxy_a2a_peers":
 				return toolResult(host.Peers())
 			case "galaxy_a2a_read":

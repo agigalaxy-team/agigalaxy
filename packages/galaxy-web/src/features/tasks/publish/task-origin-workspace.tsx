@@ -26,17 +26,17 @@ function TaskOriginPickerSession({runtime,connected,locator,selection,busy,sourc
  const [source,setSource]=useState<{client:HelpOriginClient;taskId:string;slot:string;value:HelpOriginView|null;error:string}|null>(null),[retry,setRetry]=useState(0),fieldId=useId();
  const slot=JSON.stringify([taskId,retry,sourceRevision]);
  const busyRef=useRef(busy);useEffect(()=>{busyRef.current=busy;},[busy]);
- const scoped=source?.client===client&&source?.taskId===taskId&&source.slot===slot?source:null,view=scoped?.value??null,error=scoped?.error??'',reading=!!client&&!!taskId&&!scoped;
+ const scoped=source?.client===client&&source?.taskId===taskId?source:null,view=scoped?.value??null,error=scoped?.error??'',reading=!!client&&!!taskId&&!scoped;
  const attemptsSource=view?.attempts??[],names=useMemberNames(runtime,connection?.subjectId,connected,attemptsSource.map(item=>item.actorId));
  useEffect(()=>{
   let active=true,reading=false,readGeneration=0;
   const read=async(initial=false)=>{
    if(!client||!taskId||!active||reading||(!initial&&busyRef.current)||document.hidden||!navigator.onLine)return;reading=true;const ticket=++readGeneration;
    try{const value=await client.read(taskId);if(active&&ticket===readGeneration&&!document.hidden&&navigator.onLine)setSource({client,taskId,slot,value,error:''});}
-   catch{if(active&&ticket===readGeneration)setSource({client,taskId,slot,value:null,error:'原工作目前无法读取。已选关联仍保留，可以稍后继续，也可以取消关联后独立发布。'});}
+   catch(reason){if(active&&ticket===readGeneration){const code=reason&&typeof reason==='object'&&'code'in reason?String(reason.code):'';setSource(previous=>({client,taskId,slot,value:['not_found','access_denied','consent_required','case_unavailable'].includes(code)?null:previous?.client===client&&previous.taskId===taskId?previous.value:null,error:'原工作目前无法读取，可以稍后重试。'}));}}
    finally{if(ticket===readGeneration)reading=false;}
   };
-  const hide=()=>{readGeneration++;reading=false;if(client&&taskId)setSource({client,taskId,slot,value:null,error:'原工作暂时无法核对，原关联和本页文字仍保留。连接恢复后会重新读取。'});};
+  const hide=()=>{readGeneration++;reading=false;};
   const visible=()=>{hide();void read();};
   void read(true);const timer=setInterval(()=>void read(),20000);document.addEventListener('visibilitychange',visible);window.addEventListener('offline',hide);window.addEventListener('online',visible);
   return()=>{active=false;readGeneration++;clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('offline',hide);window.removeEventListener('online',visible);};

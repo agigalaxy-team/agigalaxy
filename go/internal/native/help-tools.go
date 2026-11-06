@@ -42,9 +42,14 @@ func helpInput(name string, input any) (map[string]any, error) {
 			}
 		}
 	}
-	values, e = remoteReputationInput(psObject(helpContracts()["contracts"]), name, values)
-	if e != nil {
-		return nil, e
+	contract := psObject(psObject(helpContracts()["contracts"])[name])
+	if contract == nil {
+		return nil, remoteFactsInvalid()
+	}
+	schema := psObject(contract["schema"])
+	helpDefaults(schema, values)
+	if remoteChatValidate(schema, values) != nil {
+		return nil, remoteFactsInvalid()
 	}
 	key, field := "", ""
 	switch name {
@@ -74,6 +79,68 @@ func helpInput(name string, input any) (map[string]any, error) {
 	}
 	return values, nil
 }
+
+// Help queries contain several different input unions. Defaults from a search
+// branch must not be copied into a participant query (or into stored snapshots
+// later reviewed for their original source). Match actual discriminants before
+// descending; final full-schema validation still rejects invalid input.
+func helpDefaultBranchMatches(schema, value map[string]any) bool {
+	properties := psObject(schema["properties"])
+	for _, raw := range trustArray(schema["required"]) {
+		key := text(raw)
+		if _, present := value[key]; !present {
+			if _, hasDefault := psObject(properties[key])["default"]; !hasDefault {
+				return false
+			}
+		}
+	}
+	for key, raw := range properties {
+		property := psObject(raw)
+		actual, present := value[key]
+		if constant, exists := property["const"]; exists && (!present || !connectionEqual(actual, constant)) {
+			return false
+		}
+		if options, exists := property["enum"]; exists && present {
+			matched := false
+			for _, option := range trustArray(options) {
+				matched = matched || connectionEqual(actual, option)
+			}
+			if !matched {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func helpDefaults(schema map[string]any, value any) {
+	if object, ok := value.(map[string]any); ok {
+		for _, union := range []string{"oneOf", "anyOf"} {
+			for _, raw := range trustArray(schema[union]) {
+				branch := psObject(raw)
+				if helpDefaultBranchMatches(branch, object) {
+					helpDefaults(branch, object)
+				}
+			}
+		}
+		for key, raw := range psObject(schema["properties"]) {
+			property := psObject(raw)
+			if _, present := object[key]; !present {
+				if initial, exists := property["default"]; exists {
+					object[key] = psClone(initial)
+				}
+			}
+			if child, present := object[key]; present {
+				helpDefaults(property, child)
+			}
+		}
+	}
+	if rows, ok := value.([]any); ok {
+		for _, child := range rows {
+			helpDefaults(psObject(schema["items"]), child)
+		}
+	}
+}
 func helpToolError(e error) (*mcp.CallToolResult, error) {
 	code := runtimeErrorCode(e)
 	recovery := psObject(helpContracts()["recovery"])
@@ -93,7 +160,7 @@ func (h *NativeHelp) Call(ctx context.Context, name string, input any) (any, err
 	if e != nil {
 		return nil, e
 	}
-	l, e := h.begin(ctx)
+	l, e := h.beginQuery(ctx, name == "galaxy_help_query" && text(values["sessionId"]) == "")
 	if e != nil {
 		return nil, e
 	}

@@ -31,7 +31,7 @@ func privateCommentRecipients(grant deviceauth.ConsentIntent, actor string, allo
 	return nil
 }
 func (g *CommentGovernance) load(ctx context.Context, tx pgx.Tx, id string, lock bool) (Object, error) {
-	query := `SELECT to_jsonb(r)||jsonb_build_object('task_id',c.task_id,'author_id',c.subject_id,'requester_id',t.requester_id) FROM comment_reports_v2 r JOIN task_comments_v2 c ON c.id=r.comment_id JOIN task_requests t ON t.id=c.task_id WHERE r.id=$1`
+	query := `SELECT to_jsonb(r)||jsonb_build_object('task_id',c.task_id,'author_id',c.subject_id,'author_account_id',CASE WHEN c.subject_id IS NULL THEN c.account_id ELSE NULL END,'requester_id',t.requester_id) FROM comment_reports_v2 r JOIN task_comments_v2 c ON c.id=r.comment_id JOIN task_requests t ON t.id=c.task_id WHERE r.id=$1`
 	if lock {
 		query += " FOR UPDATE OF r"
 	}
@@ -45,7 +45,7 @@ func (g *CommentGovernance) parties(ctx context.Context, tx pgx.Tx, current Obje
 	ids := []string{}
 	for _, key := range []string{"reporter_id", "author_id", "requester_id"} {
 		id := str(current, key)
-		if !contains(ids, id) {
+		if id != "" && !contains(ids, id) {
 			ids = append(ids, id)
 		}
 	}
@@ -82,6 +82,9 @@ func (g *CommentGovernance) independent(ctx context.Context, tx pgx.Tx, a Actor,
 			return false, e
 		}
 		if account != nil {
+			if current["author_account_id"] != nil && account["id"] == current["author_account_id"] {
+				return false, nil
+			}
 			var shared bool
 			if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM community_account_links WHERE account_id=$1 AND subject_id=ANY($2::text[]))", account["id"], parties).Scan(&shared); e != nil {
 				return false, e
@@ -101,6 +104,32 @@ func (g *CommentGovernance) readableEvents(ctx context.Context, tx pgx.Tx, a Act
 	out := []Object{}
 	for _, event := range events {
 		if str(event, "payload_text") == "" || event["erased_at"] != nil {
+			continue
+		}
+		if event["account_id"] != nil {
+			if !contains(g.ModeratorIDs, a.SubjectID) {
+				continue
+			}
+			current, e := g.load(ctx, tx, id, false)
+			if e != nil {
+				return nil, e
+			}
+			independent, e := g.independent(ctx, tx, a, current)
+			if e != nil {
+				return nil, e
+			}
+			if !independent {
+				continue
+			}
+			payload, e := parseObject(str(event, "payload_text"))
+			if e != nil {
+				return nil, e
+			}
+			view := Object{"eventId": event["id"], "author": Object{"kind": "account", "accountId": event["account_id"]}, "version": event["version"], "at": isoValue(event["created_at"])}
+			for key, value := range payload {
+				view[key] = value
+			}
+			out = append(out, view)
 			continue
 		}
 		grant, e := g.governanceGrant(ctx, tx, str(event, "subject_id"), str(event, "id"), Envelope{ConsentID: str(event, "consent_id"), PayloadJSON: str(event, "payload_text")})

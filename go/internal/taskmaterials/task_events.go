@@ -181,13 +181,26 @@ func parseTaskEvent(raw string) (Object, error) {
 		}
 	case "extend-enrollment":
 		add("enrollmentExpiresAt")
-		if !validInt(v["enrollmentExpiresAt"], 1, math.MaxInt64) {
+		if v["enrollmentExpiresAt"] != nil && !validInt(v["enrollmentExpiresAt"], 1, math.MaxInt64) {
 			return invalid()
 		}
 	default:
 		return invalid()
 	}
-	if !exactFields(v, required, optional) {
+	fields := v
+	if str(v, "kind") == "extend-enrollment" {
+		if _, exists := v["enrollmentExpiresAt"]; !exists {
+			return invalid()
+		}
+		if v["enrollmentExpiresAt"] == nil {
+			fields = Object{}
+			for key, value := range v {
+				fields[key] = value
+			}
+			fields["enrollmentExpiresAt"] = int64(1)
+		}
+	}
+	if !exactFields(fields, required, optional) {
 		return invalid()
 	}
 	return x, nil
@@ -225,7 +238,7 @@ func nextTask(state Object, actor string, event Object, now int64) (Object, erro
 	return next, nil
 }
 func enrollmentOpen(state Object, now int64) bool {
-	return str(state, "state") == "open" && str(obj(state, "enrollment"), "state") != "stopped" && num(obj(state, "request")["enrollmentExpiresAt"]) > now
+	return str(state, "state") == "open" && str(obj(state, "enrollment"), "state") != "stopped" && (obj(state, "request")["enrollmentExpiresAt"] == nil || num(obj(state, "request")["enrollmentExpiresAt"]) > now)
 }
 func applyTaskEvent(state Object, actor string, event Object, now int64) (Object, error) {
 	if num(event["expectedTaskVersion"]) != num(state["version"]) {
@@ -267,7 +280,7 @@ func applyTaskEvent(state Object, actor string, event Object, now int64) (Object
 		if deny(requester && enrollmentOpen(state, now) && str(event, "recipientId") != actor) {
 			break
 		}
-		if deny(num(event["expiresAt"]) > now && num(event["expiresAt"]) <= min(now+7*86400, num(obj(state, "request")["enrollmentExpiresAt"])), "task_invitation_expiry") {
+		if deny(num(event["expiresAt"]) > now && num(event["expiresAt"]) <= now+7*86400 && (obj(state, "request")["enrollmentExpiresAt"] == nil || num(event["expiresAt"]) <= num(obj(state, "request")["enrollmentExpiresAt"])), "task_invitation_expiry") {
 			break
 		}
 		for _, v := range arr(state["invitations"]) {
@@ -348,7 +361,7 @@ func applyTaskEvent(state Object, actor string, event Object, now int64) (Object
 			next["enrollment"] = Object{"state": "stopped", "eventId": event["eventId"], "stoppedAt": now, "actorId": actor}
 		}
 	case "extend-enrollment":
-		if deny(requester && str(state, "state") == "open" && str(obj(state, "enrollment"), "state") != "stopped" && num(event["enrollmentExpiresAt"]) > now && num(event["enrollmentExpiresAt"]) > num(obj(state, "request")["enrollmentExpiresAt"])) {
+		if deny(requester && str(state, "state") == "open" && str(obj(state, "enrollment"), "state") != "stopped" && (event["enrollmentExpiresAt"] == nil && obj(state, "request")["enrollmentExpiresAt"] != nil || event["enrollmentExpiresAt"] != nil && num(event["enrollmentExpiresAt"]) > now && (obj(state, "request")["enrollmentExpiresAt"] == nil || num(event["enrollmentExpiresAt"]) > num(obj(state, "request")["enrollmentExpiresAt"])))) {
 			break
 		}
 		obj(next, "request")["enrollmentExpiresAt"] = event["enrollmentExpiresAt"]
