@@ -4,6 +4,8 @@
 
 修改直接提交到实际正文位置。页面保留产品用途、必要图示和使用入口；专题展开细节，不用另一份首页重复维护。历史 Native 指南、技术观察和截图保留各自日期与版本；源码公开不把候选功能变成已上线或已验收能力。部署、发行与源码上传各按实际授权和结果记录。
 
+根中英文 README、文档目录与配图共同面向 GitHub 读者，相关用途和能力边界随所属正文更新。仓库 `public/agent.md` 与 `public/llms.txt` 仅导航到现行 Agent 指南，不另维护旧 Integration Pack 的使用流程。
+
 官网 `/open-source/` 提供主库、许可和对应源码入口，`/docs/galaxy/` 从本目录生成现行手册，`/agent.md` 从 `ai-reading.md` 生成，`/llms.txt` 提供按需阅读入口；网站短介绍不复制另一套完整文档。已发布的第三方对应源码及说明由 `apps/galaxy-site/public-archive.json` 按原 URL 与摘要纳入网站构建，不能因切换网页运行包而遗漏；实际制品仍在源码仓库外保存。
 
 原公开仓库的文档纠错表单保留在根 `.github/ISSUE_TEMPLATE/documentation.yml`；使用反馈、安装／宿主兼容与功能建议合入 `feature-request.yml`，故障反馈另用 `bug-report.yml`。不维护第二套重复反馈入口。

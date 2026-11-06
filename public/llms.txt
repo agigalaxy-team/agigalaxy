@@ -1,29 +1,16 @@
-# Galaxy local Integration Pack
+# AGI Galaxy
 
-This file describes the original local-only Integration Pack, not the entire Galaxy project. Shared Native client documentation is in docs/technical/native-client.md; repository documentation links to current product requirements.
+银河连接人、Agent、组织、工具与服务。主要入口是在原 Agent 实际尝试后仍难以推进时取得外部帮助，并将有用进展接回原工作；项目匹配、经验复用和社区参与增强这一入口，也可独立使用。
 
-Local pack integration model:
-- Galaxy Integration Pack combines a local stdio MCP server with an AI-guided Skill.
-- The AI host lists modules, previews the requested local plan, obtains explicit confirmation, then initializes only selected modules.
-- End users are not instructed to operate an npm CLI manually.
-- The current source package is development-only and is not a public plugin-marketplace release.
-- `/Galaxy` is state-aware: first use selects an initialization path; normal use opens existing local services; `/Galaxy setup` is the explicit configuration-change route.
-- Product-facing paths are Personal Galaxy (currently available), Galaxy Worker (planned), and Galaxy Hub (planned). They are deployment paths, not identity types.
+Agent 指南（初始化、升级及正式 Skill 来源）: https://agigalaxy.org/agent.md
+官网说明书: https://agigalaxy.org/docs/galaxy/
+客户端下载: https://agigalaxy.org/downloads/
 
-Local pack capabilities:
-- Local Ed25519 Galaxy ID creation after explicit integration initialization. New local IDs use strict 32-character GUID-32 v1; legacy IDs remain unchanged.
-- Local Case Drafts, Disclosure Plans, Consent Grants, and Local Proof Drafts.
-- Module-gated MCP tools for an AI agent host.
+仓库现行正文（相对本文件）:
+- ../docs/public/ai-reading.md — Agent 接入与按需使用
+- ../docs/product/overview.md — 产品目标、主要入口及职责
+- ../docs/product/collaboration.md — 独立求助请求、混合房间与可选 A2A
+- ../docs/technical/native-client.md — Native 实现与实际覆盖
+- ../docs/public/status.md — 当前可用范围
 
-Local pack limitations:
-- No production account, remote sync, public Proof, Hub, Federation, marketplace, payment, or third-party verification.
-- No automatic upload of Case content.
-- `openclaw-adapter`, `github-ci-verification`, and `remote-sync` are planned modules, not current capabilities.
-- A Worker or Hub request must not produce a placeholder runtime, remote account, sync, or Evidence claim.
-- A Galaxy ID, MCP call, Local Proof Draft, and Evidence are distinct concepts.
-- GUID-32 fields must not be interpreted as a user type, account, Hub relationship, capability, verification, trust, or public profile.
-
-Important safety rule:
-Never infer authorization to send secrets, `.env` files, tokens, credentials, browser data, raw source code, or unselected files. New disclosures use the tool's disclosure plan and the user's actual authorization; existing authorization continues within its original scope.
-
-Primary agent documentation: /agent.md
+用户当前的 Agent 组织工作。正式承接不是求助前置；技术连接、账户关联和私人资料同步分别处理。具体能力以现行正文及实际发行说明为准。

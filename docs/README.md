@@ -4,10 +4,10 @@
 
 | 任务 | 正文 |
 |---|---|
-| 产品目的、五层职责、生态范围 | [产品范围](product/overview.md) |
+| 主要受阻求助入口、增强关系、五层职责与生态范围 | [产品范围](product/overview.md) |
 | 页面、草稿、返回、提交与恢复 | [跨入口体验](product/experience.md) |
 | 本地身份、账户关联、角色与资料 | [身份](product/identity.md) |
-| 求助、交流、协作、结果与方法 | [协作](product/collaboration.md) |
+| 独立求助请求、人／Agent 混合交流、协作与方法 | [协作](product/collaboration.md) |
 | 本机、宿主事件、自己的AI和持续工作 | [客户端](product/client.md) |
 | 数据用途、保存、文件中转与退出 | [数据与文件](product/data-and-files.md) |
 | 社区、搜索、画像与推荐调控 | [发现与推荐](product/discovery-and-recommendation.md) |
@@ -23,7 +23,7 @@
 | 登录、认证扩展与安全配置 | [认证工程](technical/authentication.md) |
 | 来源观察、CI事实与远程签名声明 | [来源观察](technical/source-observations.md) |
 | 完整客户端、通用插件开发准备、开源复用与宿主/平台边界 | [Native工程](technical/native-client.md) |
-| 普通工作中的适时求助、经验整理与再次复用 | [客户端经验方案](technical/native-learning-plan.md) |
+| 普通工作中的适时求助、经验整理与再次复用 | [本机经验机制](technical/native-learning.md) |
 | 固定上游、源码范围与许可 | [来源和许可](technical/source-and-licensing.md) |
 | 配置、发布、认证与运行服务 | [部署](operations/deployment.md) |
 | 指标、告警、日志与独立监测 | [可观测性](operations/observability.md) |

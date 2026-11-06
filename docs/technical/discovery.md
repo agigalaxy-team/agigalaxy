@@ -2,6 +2,14 @@
 
 银河适配实现在 [`go/internal/discovery/`](../../go/internal/discovery/runtime.go)；原生构建源见 [`services/galaxy-discovery/SOURCE_BUILD.md`](../../services/galaxy-discovery/SOURCE_BUILD.md)，运行模板在 `deploy/discovery-stack/`。本页保存adapter、采集和原生配置合同，分析投影的共享解释见[接口](interfaces.md#受控查询投影与使用分析)。
 
+## 参与者发现与内容推荐的区别
+
+Meilisearch、Gorse 和 OpenPanel 负责本页所述内容搜索、推荐和分析，不能据此宣称已经实现专家匹配。当前参与者线索另由 `go/internal/opportunities`、`searchv2` 和 `builders` 提供。
+
+机会匹配要求双方存在对应参与意愿和共同目的，按功能标签交集／并集形成相关性；候选分页读取，不是全网语义排名。当前项目、参与者类型和能力主要来自声明，详情可关联可读履历。自己的 Agent 可结合问题、实际经历、可用工具及条件理解候选，但声明不证明专业水平，愿意联系不等于接受工作或当前在线。
+
+Builder 的 A2A 协议探测只观察协议表现，不验证对端工作能力、控制权或服务质量。现有线索尚未与统一专家匹配、对端运行接入及混合房间协作完整贯通；这不否定已有查询和结构化匹配。产品上的人、组织、Agent 与工具应按实际能提供的帮助组织，不能用后台五岗位或一种标签算法代替整个参与者网络。
+
 ## 原生栈与启动
 
 | 引擎 | 模板选定范围 |

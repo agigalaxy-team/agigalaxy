@@ -4,11 +4,11 @@
 <style>text{font-family:system-ui,"Microsoft YaHei",sans-serif;fill:#292631}.title{font-size:27px;font-weight:700}.head{font-size:21px;font-weight:700}.body{font-size:18px}.small{font-size:16px;fill:#605969}.accent{fill:#b54179;font-size:20px;font-weight:700}</style>
 <rect x="1" y="1" width="1078" height="808" rx="22" fill="#fff" stroke="#ded6e1"/>
 <text x="32" y="48" class="title">从一次有用的参与，长成共同维护的知识网络</text>
-<text x="32" y="80" class="body">低负担接入、真实内容与长期贡献，一起支持冷启动和持续建设。</text>
+<text x="32" y="80" class="body">主要入口：反复受阻时取得帮助；社区与经验复用增强整个网络。</text>
 <rect x="32" y="108" width="236" height="173" rx="14" fill="#faf2f7"/>
 <text x="48" y="144" class="accent">进入已有工作</text><text x="48" y="180" class="body">插件或 Skill＋MCP</text><text x="48" y="212" class="body">先在本机取得 ID</text><text x="48" y="250" class="small">按需接入所选在线服务</text>
 <rect x="292" y="108" width="236" height="173" rx="14" fill="#faf2f7"/>
-<text x="308" y="144" class="accent">服务眼前目的</text><text x="308" y="180" class="body">帮助、项目与交流</text><text x="308" y="212" class="body">真实参与和使用反馈</text><text x="308" y="250" class="small">无需先发布完整方法</text>
+<text x="308" y="144" class="accent">受阻时取得帮助</text><text x="308" y="180" class="body">独立求助请求</text><text x="308" y="212" class="body">有用进展回到原工作</text><text x="308" y="250" class="small">正式承接按需要选择</text>
 <rect x="552" y="108" width="236" height="173" rx="14" fill="#faf2f7"/>
 <text x="568" y="144" class="accent">积累可用知识</text><text x="568" y="180" class="body">来源、条件与结果</text><text x="568" y="212" class="body">许可、版本与修正</text><text x="568" y="250" class="small">高质量来自时间与实用</text>
 <rect x="812" y="108" width="236" height="173" rx="14" fill="#faf2f7"/>

@@ -10,7 +10,7 @@
 
 接入方式与账户分工集中见[客户端入门](client-entry.md)，实际安装步骤见[开始使用](getting-started.md)。这里仅保留与本次技术核对相关的机制和版本观察。
 
-`galaxy_native_initialize_preview` 和 `galaxy_native_initialize` 负责本机准备，`galaxy_native_connect` 另行连接所选服务；它们不能混成一次自动注册、连接及上传。OpenCode 的 `setup.mjs` 已将本机准备接到同次安装选择，其他宿主按实际插件或 MCP／Skill 能力初始化。
+`galaxy_native_initialize_preview` 只准备预览，`galaxy_native_initialize` 在本人选择后沿用或创建本机身份；正式客户端已配置所选服务时，会继续办理技术连接及必要设备登记。仅本机运行则不连接服务。`galaxy_native_connect` 也可单独用于连接及接续。技术连接不等于注册或关联官网账户，更不等于开始上传工作资料；需要账户功能时再沿原 ID 登录并确认关联。宿主安装与交互按实际适配能力完成，不要求用户手动串联这些工具名。
 
 0.1.16 当时要求 Node.js 22.13+；另核 0.1.19 实际打包 `package.json` 仍声明 Node.js >=22.13.0。安装工具读取所选官网的公开配置，不据此宣称完整安装完全离线或任意宿主都能一键完成。
 
