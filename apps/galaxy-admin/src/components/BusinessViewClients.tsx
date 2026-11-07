@@ -12,6 +12,7 @@ export const BusinessUsers = dynamic(() => import("./accounts/BusinessUsers").th
 export const Cases = dynamic(() => import("./content-governance/Cases").then(module => module.Cases), {ssr: true});
 export const ChatReports = dynamic(() => import("./chat-reports/ChatReports").then(module => module.ChatReports), {ssr: true});
 export const Community = dynamic(() => import("./content-governance/Community").then(module => module.Community), {ssr: true});
+export const CommunityMacro = dynamic(() => import("./content-governance/CommunityMacro").then(module => module.CommunityMacro), {ssr: true});
 export const Feedback = dynamic(() => import('./feedback/Feedback').then(module => module.Feedback), {ssr: true});
 export const Files = dynamic(() => import("./files/Files").then(module => module.Files), {ssr: true});
 export const Maintenance = dynamic(() => import("./maintenance/Maintenance").then(module => module.Maintenance), {ssr: true});

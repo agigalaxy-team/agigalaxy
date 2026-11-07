@@ -29,6 +29,14 @@ func (s *Service) toolsWithin(ctx context.Context, tx pgx.Tx, row Object, actor 
 	}
 	caps := operationsai.Capabilities(str(row["domain"]), role.Permissions)
 	tools := []string{"assess-task", "reconcile-task-operations"}
+	if communityParametersAllowed(row) && (has(role.Permissions, "rules.read") || has(role.Permissions, "recommendations.read")) {
+		if s.CommunityParameters != nil {
+			tools = append(tools, readCommunityParameterTool)
+		}
+		if s.PrepareCommunityParameters != nil && has([]string{"ai", "ai-human"}, str(row["mode"])) {
+			tools = append(tools, prepareCommunityParameterTool)
+		}
+	}
 	if len(texts(caps["queryPermissions"])) > 0 {
 		tools = append(tools, "current-summary")
 		if s.QueryTool != nil {

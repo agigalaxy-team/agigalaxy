@@ -13,6 +13,9 @@ func (s *Service) ensureDefaults(ctx context.Context, tx pgx.Tx) error {
 	if tag.RowsAffected() == 0 {
 		return nil
 	}
+	if e = s.prepareLedgerWithin(ctx, tx); e != nil {
+		return e
+	}
 	_, e = tx.Exec(ctx, `INSERT INTO community_growth_rules_v1(endpoint,rule_key,source_kind,label,experience,enabled,version,updated_at) VALUES
  ($1,'post','post','公开帖子',5,true,1,$2),($1,'reply','reply','公开回复',2,true,1,$2),
  ($1,'like_received','like','收到点赞',1,true,1,$2),($1,'recognition','recognition','社区认可',10,true,1,$2),

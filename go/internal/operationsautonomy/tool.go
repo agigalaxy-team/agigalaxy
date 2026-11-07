@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "read-ai-delegation", "assess-task", "reconcile-task-operations", "inspect-operations", "read-community-assessment-material", "save-community-assessment-result"}
+var toolNames = []string{"current-summary", "query-operations", "read-operation-object", "execute-operation", "manage-ai-role", "read-ai-delegation", "assess-task", "reconcile-task-operations", "inspect-operations", "read-community-assessment-material", "save-community-assessment-result", readCommunityParameterTool, prepareCommunityParameterTool}
 
 func parseTool(input Object) (Object, error) {
 	if !closed(input, []string{"taskId", "callId", "tool", "arguments"}, []string{"nativeRunId", "nativeAttemptId", "validationFailure"}) || !schemaUUID.MatchString(str(input["taskId"])) || !schemaUUID.MatchString(str(input["callId"])) || !has(toolNames, str(input["tool"])) || obj(input["arguments"]) == nil {
@@ -168,7 +168,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		if prior != nil && isNoEffect(prior) {
 			return toolBinding{row: row, prior: prior, operationID: str(prior["operation_id"]), pauseRejected: true, rejectionCode: str(prior["code"])}, nil
 		}
-		if prior == nil && has(dutyWriters, str(x["tool"])) && obj(row["control_state"])["kind"] == "manual-pause" && has([]string{"requested", "paused"}, str(obj(row["control_state"])["phase"])) {
+		if prior == nil && (has(dutyWriters, str(x["tool"])) || x["tool"] == prepareCommunityParameterTool) && obj(row["control_state"])["kind"] == "manual-pause" && has([]string{"requested", "paused"}, str(obj(row["control_state"])["phase"])) {
 			operationID := uuid.NewString()
 			if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_tool_calls_v1(endpoint,task_id,call_id,tool,arguments,operation_id,state,code,created_at,updated_at,native_run_id,native_attempt_id) VALUES($1,$2,$3,$4,$5,$6,'not-admitted','operations_autonomy_pause_requested',$7,$7,$8,$9)`, s.Endpoint, row["id"], x["callId"], x["tool"], jsonText(x["arguments"]), operationID, s.now(), x["nativeRunId"], x["nativeAttemptId"]); e != nil {
 				return toolBinding{}, e
@@ -217,6 +217,24 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 	result, e := func() (Object, error) {
 		row, actor, operationID := binding.row, binding.actor, binding.operationID
 		tool, args := str(x["tool"]), obj(x["arguments"])
+		if tool == readCommunityParameterTool {
+			return s.CommunityParameters(ctx, actor, str(row["domain"]), args)
+		}
+		if tool == prepareCommunityParameterTool {
+			if original := obj(obj(binding.prior["read_outcome"])["originalProposal"]); original != nil {
+				return Object{"state": "already-pending", "effectState": "not-started", "operationId": operationID, "originalProposal": original}, nil
+			}
+			proposal := macroProposal(binding.prior)
+			if proposal == nil {
+				var err error
+				proposal, err = s.PrepareCommunityParameters(ctx, actor, str(row["domain"]), operationID, args)
+				if err != nil {
+					return nil, err
+				}
+			}
+			return Object{"state": "waiting-human", "reason": "community-parameter-confirmation-required", "operationId": operationID,
+				"effectState": "not-started", "communityParameterProposal": macroProposalView(proposal, actor), "_storedCommunityParameterProposal": proposal}, nil
+		}
 		if tool == "read-community-assessment-material" || tool == "save-community-assessment-result" {
 			if s.CommunityAssessmentTool == nil {
 				return nil, fault.New("operations_autonomy_tool_not_configured", 503)
@@ -288,7 +306,7 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 				return false, fail("operations_autonomy_operation_conflict")
 			}
 			tool := str(x["tool"])
-			if has([]string{"current-summary", "query-operations", "read-operation-object", "inspect-operations"}, tool) {
+			if has([]string{"current-summary", "query-operations", "read-operation-object", "inspect-operations", readCommunityParameterTool, prepareCommunityParameterTool}, tool) {
 				if _, e = s.DutyForTaskWithin(ctx, tx, str(current["id"]), "query"); e != nil {
 					return false, e
 				}
@@ -372,10 +390,36 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 					outcome = jsonText(projected)
 				}
 			}
-			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state=$5,code=$6,updated_at=$4,read_outcome=CASE WHEN $7 THEN $8::jsonb ELSE read_outcome END WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, x["taskId"], x["callId"], s.now(), state, code, tool == "inspect-operations" || isQuery, outcome); e != nil {
+			if tool == prepareCommunityParameterTool {
+				frozen := obj(result["_storedCommunityParameterProposal"])
+				if frozen != nil {
+					existing, err := s.existingMacroProposalWithin(ctx, tx, frozen, binding.operationID)
+					if err != nil {
+						return false, err
+					}
+					if existing != nil {
+						result = Object{"state": "already-pending", "effectState": "not-started", "operationId": binding.operationID, "originalProposal": existing}
+					}
+				}
+				if result["state"] == "already-pending" {
+					state, code = "completed", "community-parameter-original-pending"
+				}
+				proposal := jsonText(Object{"communityParameterProposal": result["_storedCommunityParameterProposal"], "originalProposal": result["originalProposal"]})
+				var bytes int
+				if e = tx.QueryRow(ctx, `SELECT octet_length($1::jsonb::text)`, proposal).Scan(&bytes); e != nil {
+					return false, e
+				}
+				// Leave room for the original receipt added when a human adopts it.
+				if bytes > 7600 {
+					return false, MarkPreparationRejected("prepare", fault.New("operations_autonomy_community_proposal_too_large", 400))
+				}
+				outcome = proposal
+			}
+			if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state=$5,code=$6,updated_at=$4,read_outcome=CASE WHEN $7 THEN $8::jsonb ELSE read_outcome END WHERE endpoint=$1 AND task_id=$2 AND call_id=$3`, s.Endpoint, x["taskId"], x["callId"], s.now(), state, code, tool == "inspect-operations" || isQuery || tool == prepareCommunityParameterTool, outcome); e != nil {
 				return false, e
 			}
-			if result["availability"] == "available" && (has([]string{"query-operations", "read-operation-object"}, tool) || has([]string{"current-summary", "inspect-operations"}, tool) && result["inspectionChecked"] == true) {
+			if result["availability"] == "available" && (has([]string{"query-operations", "read-operation-object"}, tool) || has([]string{"current-summary", "inspect-operations"}, tool) && result["inspectionChecked"] == true ||
+				tool == readCommunityParameterTool && num(obj(result["sample"])["sampledPosts"]) > 0) {
 				if _, e = tx.Exec(ctx, `UPDATE operations_autonomy_tasks_v1 SET effective_check=true,updated_at=$3 WHERE endpoint=$1 AND id=$2`, s.Endpoint, x["taskId"], s.now()); e != nil {
 					return false, e
 				}
@@ -420,5 +464,6 @@ func (s *Service) Tool(ctx context.Context, input Object, ruleSource bool) (Obje
 		}
 		return nil, e
 	}
+	delete(result, "_storedCommunityParameterProposal")
 	return result, nil
 }

@@ -35,6 +35,10 @@ func (s *Service) proposal(proposal Object, operationID string) (Object, Object,
 	}
 	kind := str(x["kind"])
 	switch kind {
+	case CommunityParameterAdjustment:
+		if !same(command, macroOwnerInput(x, operationID)) || obj(proposal["target"])["id"] != str(x["area"])+":"+str(x["scope"]) {
+			return nil, nil, invalid()
+		}
 	case "file-cleanup-plan-create", "file-cleanup-plan-cancel":
 		var err error
 		command, err = normalizeCleanupPlanCommand(x, command, proposal)
@@ -244,6 +248,25 @@ func (s *Service) ExecutePrepared(ctx context.Context, a Actor, proposal Object,
 	}
 	if authorize == nil {
 		return nil, fail("operations_authorization_unavailable", 503)
+	}
+	if x["kind"] == CommunityParameterAdjustment {
+		if s.isDuty(a) {
+			return nil, fail("operations_agentos_human_review_required", 403)
+		}
+		fresh, err := authorize(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+		if fresh.ID != a.ID || fresh.Endpoint != a.Endpoint {
+			return nil, fail("business_admin_denied", 403)
+		}
+		return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
+			fresh, err := s.Permissions.HumanAIWithin(ctx, tx, fresh, "governance", "prepare", required(x))
+			if err != nil {
+				return nil, err
+			}
+			return s.ConfirmCommunityParametersWithin(ctx, tx, fresh, proposal, operationID)
+		})
 	}
 	purpose := "prepare"
 	if s.isDuty(a) {

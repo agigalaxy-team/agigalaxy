@@ -25,7 +25,7 @@ func (s *AssessmentService) assessmentTaskWithin(ctx context.Context, tx pgx.Tx,
 	}
 	var valid bool
 	e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM community_assessment_scopes_v1 x JOIN community_assessment_config_v1 c ON c.endpoint=x.endpoint
-		WHERE x.endpoint=$1 AND x.account_id=$2 AND x.domain=$3 AND x.purpose=$4 AND x.input_revision=$5 AND x.task_id=$6 AND c.enabled AND c.version=$7)`, s.Endpoint, task.AccountID, task.Domain, task.Purpose, task.InputRevision, task.ID, task.ConfigVersion).Scan(&valid)
+		WHERE x.endpoint=$1 AND x.account_id=$2 AND x.domain=$3 AND x.purpose=$4 AND x.input_revision=$5 AND x.task_id=$6 AND c.enabled AND c.retired_at IS NULL AND c.version=$7)`, s.Endpoint, task.AccountID, task.Domain, task.Purpose, task.InputRevision, task.ID, task.ConfigVersion).Scan(&valid)
 	if e == nil && !valid {
 		e = fault.New("community_assessment_source_changed", 409)
 	}

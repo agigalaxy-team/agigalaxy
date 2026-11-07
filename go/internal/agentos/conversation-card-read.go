@@ -2,8 +2,10 @@ package agentos
 
 import (
 	"context"
+	"slices"
 	"sync"
 
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
 	"github.com/jackc/pgx/v5"
@@ -58,6 +60,9 @@ func (b *cardReadBatch) actor(ctx context.Context, row *conversationCard) (opera
 // The list is a projection of already saved cards for the currently owned
 // conversation. The confirmation endpoint still performs all live checks.
 func (t *ConversationTools) readCardBatch(ctx context.Context, human operationspermissions.Actor, domain string, turns ...string) ([]Object, error) {
+	return t.readCardBatchFiltered(ctx, human, domain, "", turns...)
+}
+func (t *ConversationTools) readCardBatchFiltered(ctx context.Context, human operationspermissions.Actor, domain, kind string, turns ...string) ([]Object, error) {
 	if !validConversationDomain(domain) {
 		return nil, fail("invalid_operations_agentos_request", 400)
 	}
@@ -67,11 +72,18 @@ func (t *ConversationTools) readCardBatch(ctx context.Context, human operationsp
 		return nil, err
 	}
 	out := []Object{}
-	if current.Row == nil {
+	if current.Row == nil && kind == "" {
 		return out, nil
 	}
-	query := `SELECT ` + conversationCardColumns + ` FROM operations_agentos_conversation_cards_v1 WHERE endpoint=$1 AND conversation_id=$2 AND operator_id=$3 AND domain=$4`
-	args := []any{s.Endpoint, current.Row.ID, human.ID, domain}
+	query := `SELECT ` + conversationCardColumns + ` FROM operations_agentos_conversation_cards_v1 WHERE endpoint=$1 AND operator_id=$2 AND domain=$3`
+	args := []any{s.Endpoint, human.ID, domain}
+	if kind != "" {
+		query += ` AND proposal->>'kind'=$4`
+		args = append(args, kind)
+	} else {
+		query += ` AND conversation_id=$4`
+		args = append(args, current.Row.ID)
+	}
 	if len(turns) > 0 {
 		query += ` AND turn_id=ANY($5::uuid[])`
 		args = append(args, turns)
@@ -85,12 +97,28 @@ func (t *ConversationTools) readCardBatch(ctx context.Context, human operationsp
 		return nil, err
 	}
 	defer rows.Close()
+	candidates := []conversationCard{}
 	for rows.Next() {
 		var row conversationCard
 		if err = rows.Scan(cardScanFields(&row)...); err != nil {
 			return nil, err
 		}
+		candidates = append(candidates, row)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	for _, row := range candidates {
 		p := row.Proposal
+		if p["kind"] == "community-parameter-adjustment" {
+			if _, err = t.cardActor(ctx, human, &row); err != nil {
+				if fault.Status(err) == 403 {
+					continue
+				}
+				return nil, err
+			}
+		}
 		presentation := cardPresentation(p)
 		attempted := cardAttempted(&row)
 		canConfirm := row.State == "prepared" && !attempted && presentation["reviewable"] == true
@@ -104,6 +132,10 @@ func (t *ConversationTools) readCardBatch(ctx context.Context, human operationsp
 		if presentation["reviewable"] != true {
 			capability["reason"] = "presentation-review-unavailable"
 		}
+		if permission := communityParameterWritePermission(p); permission != "" && !slices.Contains(human.Permissions, permission) {
+			capability["canConfirm"] = false
+			capability["reason"] = "operations_permission_denied"
+		}
 		target := p["target"]
 		if p["kind"] == "recommendation-policy-save" {
 			v := copyObject(object(target))
@@ -116,17 +148,15 @@ func (t *ConversationTools) readCardBatch(ctx context.Context, human operationsp
 		}
 		out = append(out, value)
 	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	rows.Close()
-	qualified, err := s.CurrentRead(ctx, current.Row.ID, &human)
-	if err != nil {
-		return nil, err
-	}
-	for _, card := range out {
-		if qualified.SourceQualification.restricts(text(card, "turnId")) {
-			redactSourceCard(card)
+	if current.Row != nil {
+		qualified, err := s.CurrentRead(ctx, current.Row.ID, &human)
+		if err != nil {
+			return nil, err
+		}
+		for _, card := range out {
+			if qualified.SourceQualification.restricts(text(card, "turnId")) {
+				redactSourceCard(card)
+			}
 		}
 	}
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {

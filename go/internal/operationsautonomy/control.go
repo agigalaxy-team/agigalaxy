@@ -511,7 +511,7 @@ func (s *Service) Decide(ctx context.Context, a Actor, id string, input Object, 
 			s.finalizeTaskReports(ctx, a, out)
 		}
 	}()
-	if !closed(input, []string{"operationId", "expectedRevision", "callId", "decision"}, nil) || !schemaUUID.MatchString(str(input["operationId"])) || !schemaUUID.MatchString(str(input["callId"])) || !integer(input["expectedRevision"], 1, 9007199254740991) || !has([]string{"rejected", "cancelled", "no-action"}, str(input["decision"])) {
+	if !closed(input, []string{"operationId", "expectedRevision", "callId", "decision"}, nil) || !schemaUUID.MatchString(str(input["operationId"])) || !schemaUUID.MatchString(str(input["callId"])) || !integer(input["expectedRevision"], 1, 9007199254740991) || !has([]string{"rejected", "cancelled", "no-action", "approved"}, str(input["decision"])) {
 		return nil, invalid()
 	}
 	x := obj(clone(input))
@@ -526,8 +526,26 @@ func (s *Service) Decide(ctx context.Context, a Actor, id string, input Object, 
 		intent := obj(clone(x))
 		intent["id"] = id
 		prior, e := s.previousWithin(ctx, tx, actor, str(x["operationId"]), "decision", intent)
-		if e != nil || prior != nil {
-			return prior, e
+		if e != nil {
+			return nil, e
+		}
+		if prior != nil {
+			receipt := obj(prior["communityParameterReceipt"])
+			if receipt != nil && !has(actor.Permissions, communityParameterPermission(str(receipt["area"]), false)) {
+				return nil, dutyFail("operations_permission_denied")
+			}
+			if obj(prior["task"])["communityParameterProposals"] != nil {
+				current, e := s.taskWithin(ctx, tx, id, "")
+				if e != nil {
+					return nil, e
+				}
+				view, e := s.taskViewWithin(ctx, tx, current, actor, true, true)
+				if e != nil {
+					return nil, e
+				}
+				prior["task"] = view
+			}
+			return prior, nil
 		}
 		reference, e := s.taskWithin(ctx, tx, id, "")
 		if e != nil {
@@ -556,6 +574,13 @@ func (s *Service) Decide(ctx context.Context, a Actor, id string, input Object, 
 		if call == nil {
 			return nil, fail("operations_autonomy_decision_not_pending")
 		}
+		proposal := macroProposal(call)
+		if proposal != nil && !has(actor.Permissions, communityParameterPermission(str(obj(proposal["request"])["area"]), false)) {
+			return nil, dutyFail("operations_permission_denied")
+		}
+		if x["decision"] == "approved" && proposal == nil {
+			return nil, fail("operations_autonomy_decision_not_pending")
+		}
 		if _, e = tx.Exec(ctx, `INSERT INTO operations_autonomy_decisions_v1(endpoint,task_id,call_id,operation_id,decision_operation_id,operator_id,decision,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(endpoint,task_id,call_id) DO NOTHING`, s.Endpoint, id, x["callId"], call["operation_id"], x["operationId"], actor.ID, x["decision"], s.now()); e != nil {
 			return nil, e
 		}
@@ -566,6 +591,13 @@ func (s *Service) Decide(ctx context.Context, a Actor, id string, input Object, 
 		if recorded["decision_operation_id"] != x["operationId"] {
 			return nil, fail("operations_autonomy_decision_already_recorded")
 		}
+		var receipt Object
+		if x["decision"] == "approved" {
+			receipt, e = s.confirmMacroDecisionWithin(ctx, tx, actor, row, call)
+			if e != nil {
+				return nil, e
+			}
+		}
 		saved, e := one(ctx, tx, `UPDATE operations_autonomy_tasks_v1 SET human_decision=$3,control_revision=control_revision+1,revision=revision+1,updated_at=$4 WHERE endpoint=$1 AND id=$2 RETURNING to_jsonb(operations_autonomy_tasks_v1)`, s.Endpoint, id, jsonText(Object{"kind": "resolved", "operatorId": actor.ID, "operationId": call["operation_id"], "decision": x["decision"], "at": s.now().UTC().Format("2006-01-02T15:04:05.000Z")}), s.now())
 		if e != nil {
 			return nil, e
@@ -574,6 +606,10 @@ func (s *Service) Decide(ctx context.Context, a Actor, id string, input Object, 
 		if e != nil {
 			return nil, e
 		}
-		return s.recordWithin(ctx, tx, actor, str(x["operationId"]), "decision", intent, Object{"operationId": x["operationId"], "task": view, "replayed": false})
+		result := Object{"operationId": x["operationId"], "task": view, "replayed": false}
+		if receipt != nil {
+			result["communityParameterReceipt"] = receipt
+		}
+		return s.recordWithin(ctx, tx, actor, str(x["operationId"]), "decision", intent, result)
 	})
 }

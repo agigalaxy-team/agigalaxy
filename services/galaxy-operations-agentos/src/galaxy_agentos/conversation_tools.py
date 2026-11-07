@@ -61,6 +61,8 @@ from .conversation_tool_contracts import (
     SearchRestore,
     RecommendationThemeKey,
     RecommendationDirection,
+    CommunityParameterArea,
+    CommunityParameterScope,
     RuleKey,
     RuleReason,
     RulePublish,
@@ -337,6 +339,19 @@ def _conversation_tools(gateway, *, domain=None, include_legacy=False):
     tools = [query_operations, read_operation_object, list_authorized_work,
         run_authorized_work, task_operation_tool(send), read_ai_delegation,
         plan_turn_tool(send), assess_turn_tool(send), load_business_tools, *dispatch_tools(send)]
+    if domain == "governance":
+        def read_community_parameters(run_context: RunContext, fc: FunctionCall,
+                area: CommunityParameterArea, scope: CommunityParameterScope | None = None) -> str:
+            """Read uniform community rules and available public aggregate evidence.
+
+            Use growth with no scope to list rule keys, then select one rule.
+            Content-score and recommendation have global scope.
+            Use the returned version when preparing the human confirmation card.
+            """
+            return send(run_context, fc, "read-community-parameters",
+                        {"area": area, **({"scope": scope} if scope is not None else {})})
+
+        tools.append(read_community_parameters)
     if include_legacy:
         tools.append(prepare_operation)
     return tools

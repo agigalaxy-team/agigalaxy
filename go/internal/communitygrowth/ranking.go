@@ -3,116 +3,138 @@ package communitygrowth
 import (
 	"context"
 	"encoding/json"
+	"strconv"
+	"time"
+
 	"github.com/agigalaxy-team/agigalaxy/go/internal/discovery"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
-// RankingSignals combines real reactions with current, independently checked
-// saved assessments. No model is called on the recommendation path.
-func (s *Service) RankingSignals(ctx context.Context, candidates []discovery.CommunityCandidate) (map[string]discovery.CommunitySignal, error) {
+type rankingCounts struct {
+	likes, recognitions int64
+}
+
+// RankingSignalsWithRules scores current forum facts in one snapshot. No
+// author record, reputation result, or model participates in this read.
+func (s *Service) RankingSignalsWithRules(ctx context.Context, candidates []discovery.CommunityCandidate, rules discovery.CommunityScoringRules) (map[string]discovery.CommunitySignal, error) {
 	if s == nil || s.Pool == nil {
 		return nil, fault.New("community_growth_source_unavailable", 503)
 	}
-	if len(candidates) > 100 {
+	if len(candidates) > 100 || rules.DiminishingScale <= 0 || rules.HalfLifeHours <= 0 {
 		return nil, invalid()
 	}
-	inputs := []Object{}
-	seen := map[string]bool{}
-	for _, x := range candidates {
-		if (x.Kind != "post" && x.Kind != "reply") || x.Key == "" || seen[x.Key] {
+	result := make(map[string]discovery.CommunitySignal, len(candidates))
+	if len(candidates) == 0 {
+		return result, nil
+	}
+	refs := make([]publicObjectRef, 0, len(candidates))
+	seen := make(map[string]bool, len(candidates))
+	for i := range candidates {
+		c := candidates[i]
+		id, e := uuid.Parse(c.ID)
+		if e != nil || c.Key == "" || seen[c.Key] || c.Kind != "post" && c.Kind != "reply" {
 			return nil, invalid()
 		}
-		if _, e := uuid.Parse(x.ID); e != nil {
-			return nil, invalid()
+		seen[c.Key] = true
+		refs = append(refs, publicObjectRef{c.Kind, id.String()})
+	}
+	at := s.now()
+	tx, e := s.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	if e != nil {
+		return nil, e
+	}
+	defer tx.Rollback(context.Background())
+	views := eligibilityCache{}
+	if e = s.prefetchWithin(ctx, tx, views, refs); e != nil {
+		return nil, e
+	}
+	inputs := make([]Object, 0, len(candidates))
+	postIDs := make([]string, 0, len(candidates))
+	published := make(map[string]time.Time, len(candidates))
+	for i, c := range candidates {
+		ref := refs[i]
+		view := views[ref.kind+":"+ref.id]
+		if view == nil || str(view, "availability") != "available" || ref.kind == "reply" && str(view, "parentAvailability") != "available" {
+			continue
 		}
-		if x.AuthorAccountID != "" {
-			if _, e := uuid.Parse(x.AuthorAccountID); e != nil {
-				return nil, invalid()
-			}
+		version := str(view, "currentVersionId")
+		if c.Kind == "reply" {
+			revision, _ := integer(view["revision"])
+			version = strconv.FormatInt(revision, 10)
 		}
-		seen[x.Key] = true
-		inputs = append(inputs, Object{"key": x.Key, "kind": x.Kind, "id": x.ID})
+		if c.Version != "" && version != c.Version {
+			continue
+		}
+		if created, ok := integer(view["createdAt"]); ok && created > 0 {
+			published[c.Key] = time.Unix(created, 0)
+		}
+		inputs = append(inputs, Object{"key": c.Key, "kind": ref.kind, "id": ref.id})
+		if c.Kind == "post" {
+			postIDs = append(postIDs, ref.id)
+		}
+	}
+	counts, e := s.rankingCountsWithin(ctx, tx, inputs)
+	if e != nil {
+		return nil, e
+	}
+	discussion := map[string]float64{}
+	if rules.DiscussionWeight > 0 && len(postIDs) > 0 {
+		discussion, e = s.discussionHeatWithin(ctx, tx, postIDs, at, rules.HalfLifeHours)
+		if e != nil {
+			return nil, e
+		}
+	}
+	for i, c := range candidates {
+		count, ok := counts[c.Key]
+		if !ok {
+			continue
+		}
+		heat := rules.FreshnessWeight * contentDecay(at, published[c.Key], rules.HalfLifeHours)
+		if c.Kind == "post" {
+			heat += rules.DiscussionWeight * discussion[refs[i].id]
+		}
+		result[c.Key] = discovery.CommunitySignal{
+			Recognition:  contentRecognition(count, rules),
+			Heat:         heat,
+			Version:      rules.Version,
+			CalculatedAt: at,
+		}
+	}
+	if e = tx.Commit(ctx); e != nil {
+		return nil, e
+	}
+	return result, nil
+}
+
+func (s *Service) rankingCountsWithin(ctx context.Context, tx pgx.Tx, inputs []Object) (map[string]rankingCounts, error) {
+	counts := make(map[string]rankingCounts, len(inputs))
+	if len(inputs) == 0 {
+		return counts, nil
 	}
 	data, e := json.Marshal(inputs)
 	if e != nil {
 		return nil, e
 	}
-	tx, e := s.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	rows, e := tx.Query(ctx, `
+		SELECT c.key,
+		 (SELECT count(*) FROM forum_reactions_v1 r JOIN community_accounts a ON a.id=r.account_id AND a.endpoint=$1
+		  WHERE r.kind=c.kind AND r.object_id=c.id::uuid AND r.liked),
+		 (SELECT count(*) FROM community_growth_recognitions_v1 g
+		  WHERE g.endpoint=$1 AND g.object_kind=c.kind AND lower(g.object_id)=c.id AND g.active AND g.kind='content')
+		FROM jsonb_to_recordset($2::jsonb) AS c(key text,kind text,id text)`, s.Endpoint, string(data))
 	if e != nil {
 		return nil, e
 	}
-	defer tx.Rollback(ctx)
-	rows, e := tx.Query(ctx, `SELECT c.key,r.account_id::text FROM jsonb_to_recordset($2::jsonb) AS c(key text,kind text,id text) JOIN forum_reactions_v1 r ON r.kind=c.kind AND r.object_id=c.id::uuid AND r.liked JOIN community_accounts a ON a.id=r.account_id AND a.endpoint=$1 ORDER BY c.key,r.account_id`, s.Endpoint, string(data))
-	if e != nil {
-		return nil, e
-	}
-	reactions := map[string][]string{}
+	defer rows.Close()
 	for rows.Next() {
-		var key, account string
-		if e = rows.Scan(&key, &account); e != nil {
-			rows.Close()
+		var key string
+		var count rankingCounts
+		if e = rows.Scan(&key, &count.likes, &count.recognitions); e != nil {
 			return nil, e
 		}
-		reactions[key] = append(reactions[key], account)
+		counts[key] = count
 	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return nil, e
-	}
-	assessment := &AssessmentService{Service: s, ReadSourceWithin: s.AssessmentSourceWithin}
-	type weight struct {
-		value *float64
-		id    string
-	}
-	cache := map[string]weight{}
-	read := func(account, domain, purpose string) (weight, error) {
-		key := jsonText([]string{account, domain, purpose})
-		if v, ok := cache[key]; ok {
-			return v, nil
-		}
-		value, id, e := assessment.CurrentWeightWithin(ctx, tx, account, domain, purpose)
-		if e != nil {
-			return weight{}, e
-		}
-		v := weight{value, id}
-		cache[key] = v
-		return v, nil
-	}
-	out := map[string]discovery.CommunitySignal{}
-	for _, c := range candidates {
-		domain := assessmentDomains([]string{c.Topic})[0]
-		signal := discovery.CommunitySignal{ResultIDs: []string{}}
-		if c.AuthorAccountID != "" {
-			w, e := read(c.AuthorAccountID, domain, "contribution-impact")
-			if e != nil {
-				return nil, e
-			}
-			signal.Author = w.value
-			if w.id != "" {
-				signal.ResultIDs = append(signal.ResultIDs, w.id)
-			}
-		}
-		for _, account := range reactions[c.Key] {
-			w, e := read(account, domain, "evaluation-reference")
-			if e != nil {
-				return nil, e
-			}
-			amount := float64(1)
-			if w.value != nil {
-				amount = *w.value * 2
-			}
-			signal.Recognition += amount
-			if w.id != "" {
-				signal.ResultIDs = append(signal.ResultIDs, w.id)
-			}
-		}
-		out[c.Key] = signal
-	}
-	if e = tx.Commit(ctx); e != nil {
-		return nil, e
-	}
-	return out, nil
+	return counts, rows.Err()
 }

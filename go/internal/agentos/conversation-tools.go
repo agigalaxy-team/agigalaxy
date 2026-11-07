@@ -17,6 +17,7 @@ import (
 type ConversationTools struct {
 	Conversations         *Conversations
 	Query                 func(context.Context, operationspermissions.Actor, string, string, Object) (Object, error)
+	CommunityParameters   func(context.Context, operationspermissions.Actor, string, Object) (Object, error)
 	ReadTaskOperation     func(context.Context, operationspermissions.Actor, Conversation, Object) (Object, error)
 	Summary               func(context.Context, operationspermissions.Actor, string, Object) (Object, error)
 	Prepare               func(context.Context, operationspermissions.Actor, Conversation, Object, string) (Object, error)
@@ -49,7 +50,7 @@ var toolRoute = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,79}$`)
 // descriptors are still recorded, but they cannot prepare or execute a command.
 func conversationReadTool(tool string) bool {
 	switch tool {
-	case "assess-conversation-task", "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "read-task-operation", "read-dispatched-task":
+	case "assess-conversation-task", "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "read-task-operation", "read-dispatched-task", "read-community-parameters":
 		return true
 	}
 	return false
@@ -73,7 +74,7 @@ func (t *ConversationTools) bind(ctx context.Context, input Object) (boundConver
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
 	switch tool {
-	case "assess-conversation-task", "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "run-authorized-work", "prepare-operation", "read-task-operation", "read-dispatched-task":
+	case "assess-conversation-task", "plan-conversation-turn", "workbench-summary", "query-operations", "read-operation-object", "read-ai-delegation", "list-authorized-work", "run-authorized-work", "prepare-operation", "read-task-operation", "read-dispatched-task", "read-community-parameters":
 	default:
 		return out, fail("invalid_operations_agentos_request", 400)
 	}
@@ -180,6 +181,12 @@ func (t *ConversationTools) Execute(ctx context.Context, input Object) (Object, 
 		}
 	case "read-ai-delegation":
 		result, err = s.Permissions.ReadManagementTool(ctx, bound.actor, bound.row.Domain, bound.args)
+	case "read-community-parameters":
+		if t.CommunityParameters == nil {
+			err = fail("operations_agentos_conversation_not_ready", 503)
+		} else {
+			result, err = t.CommunityParameters(ctx, bound.actor, bound.row.Domain, bound.args)
+		}
 	case "query-operations", "read-operation-object":
 		if t.Query == nil {
 			err = fail("operations_query_not_configured", 503)

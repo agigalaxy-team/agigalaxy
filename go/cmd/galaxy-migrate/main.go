@@ -35,6 +35,9 @@ func run(ctx context.Context, args []string) error {
 	if len(args) > 0 && args[0] == "jobs-adopt-schedule" {
 		return adoptSchedule(ctx, args[1:])
 	}
+	if len(args) > 0 && args[0] == "community-growth-activate" {
+		return activateCommunityGrowth(ctx, args[1:])
+	}
 	if len(args) != 1 || (args[0] != "jobs-up" && args[0] != "jobs-provision-roles" && args[0] != "storage-up" && args[0] != "storage-provision-roles") {
 		return fault.New("migration_action_required", 400)
 	}
@@ -67,7 +70,7 @@ func run(ctx context.Context, args []string) error {
 }
 func main() {
 	if len(os.Args) == 2 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
-		fmt.Println("Usage: galaxy-migrate business-up [--roles=api,worker,deletion-review,content-publisher] | jobs-up | jobs-provision-roles | storage-up | storage-provision-roles\n       galaxy-migrate jobs-adopt --endpoint URL --ids-file ABS_JSON\n       galaxy-migrate jobs-adopt-schedule --endpoint URL --key messaging:PLAN_UUID\nRequires a separately supplied administrative DATABASE_URL. Business-up retains the original schema history; roles are opt-in. Technical role provisioning expects existing Galaxy roles. Schema actions never activate River or delete stored objects. Jobs-adopt hands over selected original unclaimed jobs; jobs-adopt-schedule hands over one original recurring definition using its actual slots. Stop old producers and consumers first; neither action enables River.")
+		fmt.Println("Usage: galaxy-migrate business-up [--roles=api,worker,deletion-review,content-publisher] | jobs-up | jobs-provision-roles | storage-up | storage-provision-roles\n       galaxy-migrate jobs-adopt --endpoint URL --ids-file ABS_JSON\n       galaxy-migrate jobs-adopt-schedule --endpoint URL --key messaging:PLAN_UUID\n       galaxy-migrate community-growth-activate --endpoint URL\nRequires a separately supplied administrative DATABASE_URL. Business-up retains the original schema history; roles are opt-in. Technical role provisioning expects existing Galaxy roles. Schema actions never activate River or delete stored objects. Jobs-adopt hands over selected original unclaimed jobs; jobs-adopt-schedule hands over one original recurring definition using its actual slots. Stop old producers and consumers first; neither action enables River. Community growth activation requires the new API and Worker and a caught-up source projection.")
 		return
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

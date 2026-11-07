@@ -280,6 +280,7 @@ GRANT SELECT ON community_assessment_config_history_v1 TO galaxy_evidence_worker
 GRANT SELECT ON community_assessment_results_v1 TO galaxy_evidence_worker;
 GRANT SELECT,INSERT,UPDATE,DELETE ON community_growth_sources_v1 TO galaxy_evidence_worker;
 GRANT SELECT,INSERT,UPDATE,DELETE ON community_growth_reconcile_state_v1 TO galaxy_evidence_worker;
+GRANT SELECT,INSERT(endpoint,prepared_at),UPDATE(reconciled_at) ON community_growth_ledger_state_v1 TO galaxy_evidence_worker;
 GRANT SELECT,INSERT,UPDATE,DELETE ON community_growth_dirty_objects_v1 TO galaxy_evidence_worker;
 GRANT SELECT,INSERT,UPDATE,DELETE ON community_assessment_source_revisions_v1 TO galaxy_evidence_worker;
 GRANT SELECT,INSERT,UPDATE,DELETE ON community_assessment_scopes_v1 TO galaxy_evidence_worker;
@@ -289,6 +290,7 @@ GRANT SELECT,INSERT ON community_growth_initialized_v1,community_assessment_conf
 
 -- First-use defaults only; existing human rule values cannot be updated by workers.
 GRANT INSERT ON community_growth_rules_v1,community_growth_levels_v1,community_growth_rule_history_v1,community_growth_levels_history_v1 TO galaxy_evidence_worker;
+GRANT SELECT ON community_growth_rule_history_v1 TO galaxy_evidence_worker;
 
 GRANT EXECUTE ON FUNCTION galaxy_forum_public_payload_summary_v1(text) TO galaxy_evidence_worker;
 

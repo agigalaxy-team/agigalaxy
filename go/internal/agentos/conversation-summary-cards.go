@@ -29,7 +29,7 @@ func (t *ConversationTools) summaryCardBatch(ctx context.Context, human operatio
 				continue
 			}
 			seen[card.ID] = true
-			permission, err := t.cardReadPermission(text(card.Proposal, "kind"))
+			permission, err := t.proposalReadPermission(card.Proposal)
 			if err != nil || row.AIAccountID == nil || card.OperatorID != human.ID || card.Domain != row.Domain {
 				continue
 			}

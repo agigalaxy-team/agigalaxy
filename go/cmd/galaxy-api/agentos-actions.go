@@ -5,6 +5,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos/actions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/communitygrowth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/filegovernance"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/identity"
@@ -232,6 +233,14 @@ func connectWorkbenchActions(conversations *agentos.Conversations, autonomy *ope
 		return priorSource(ctx, tx, metadata)
 	}
 	return service
+}
+
+func connectCommunityParameterActions(conversations *agentos.Conversations, autonomy *operationsautonomy.Service, service *actions.Service, growth *communitygrowth.Service) {
+	service.GrowthParameters = growth
+	conversations.Tools.CommunityParameters = service.CommunityParameters
+	autonomy.CommunityParameters = service.CommunityParameters
+	autonomy.PrepareCommunityParameters = service.PrepareDutyCommunityParameters
+	autonomy.ConfirmCommunityParametersWithin = service.ConfirmCommunityParametersWithin
 }
 
 // normalizeOriginalAIReceiptSource compares the actual call against the exact

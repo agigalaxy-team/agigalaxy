@@ -12,6 +12,9 @@ func (s *Service) SaveConfig(ctx context.Context, a Actor, domain string, input 
 	if e != nil {
 		return nil, e
 	}
+	if obj(x["plan"])["communityParameterProposals"] == true && domain != "governance" {
+		return nil, invalid()
+	}
 	if _, e = postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Actor, error) { return s.actor(ctx, tx, a, "autonomy.configure", authorize) }); e != nil {
 		return nil, e
 	}

@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .conversation_tools import conversation_tools
 from .conversation_tool_feedback import _summary_feedback
-from .conversation_tool_contracts import DutyPreparedOperation, _prepared_arguments
+from .conversation_tool_contracts import CommunityParameterAdjustment, CommunityParameterArea, CommunityParameterScope, DutyPreparedOperation, _prepared_arguments
 from .duty_storage import duty_database
 from .duty_deadline import DutyAgent, MAX_ROUND_SECONDS
 from .duty_continuation import call_reference, with_duty_pauses
@@ -159,6 +159,26 @@ class _DutyReadGateway:
 
 
 def duty_tools(gateway, allowed, progress=None):
+    def read_community_parameters(run_context: RunContext, fc: FunctionCall,
+            area: CommunityParameterArea, scope: CommunityParameterScope | None = None) -> str:
+        """Read uniform community rules and available public aggregate evidence.
+
+        Omit scope to list growth rule keys, then select one rule. Use global
+        for content-score and recommendation. Use the actual returned version.
+        """
+        return _call(gateway, run_context, fc, "read-community-parameters",
+                     {"area": area, **({"scope": scope} if scope is not None else {})})
+
+    def prepare_community_parameters(run_context: RunContext, fc: FunctionCall,
+            operation: CommunityParameterAdjustment) -> str:
+        """Prepare one uniform parameter revision for a manager's confirmation.
+
+        Use the current rule version and available evidence. Propose changed
+        numeric values for one scope. No account, post or reply is scored.
+        A prepared card is pending human action and has made no business change.
+        """
+        return _call(gateway, run_context, fc, "prepare-community-parameters", _prepared_arguments(operation))
+
     def read_community_assessment_material(run_context: RunContext, fc: FunctionCall,
             after: str | None = None, limit: Annotated[int, Field(ge=1, le=100)] = 20) -> str:
         """Read this calculation's current public community sources and human instructions.
@@ -244,6 +264,8 @@ def duty_tools(gateway, allowed, progress=None):
     candidates = {"inspect-operations": inspect_operations, "assess-task": assess_task, "reconcile-task-operations": reconcile_task_operations, "current-summary": current_summary, "query-operations": reads[0],
         "read-operation-object": reads[1], "execute-operation": execute_operation,
         "read-ai-delegation": read_ai_delegation,
+        "read-community-parameters": read_community_parameters,
+        "prepare-community-parameters": prepare_community_parameters,
         "read-community-assessment-material": read_community_assessment_material,
         "save-community-assessment-result": save_community_assessment_result}
     # The delegated role writer is supplied below from the matching closed

@@ -16,6 +16,7 @@ const sectionItems:Partial<Record<AdminArea,readonly AdminTabItem[]>>={
   ],
   governance:[
     {id:'reports',label:'举报与申诉',href:'/admin/operations/community?tab=reports'},
+    {id:'macro',label:'宏观调控',href:'/admin/operations/community?tab=macro'},
     {id:'chat-reports',label:'私聊举报',href:'/admin/operations/chat-reports'},
     {id:'resources',label:'项目与方法',href:'/admin/operations/resources'},
     {id:'files',label:'文件处理',href:'/admin/operations/files'},
@@ -69,7 +70,7 @@ export function AdminSectionTabs(){
   if(!items)return null;
   const active=system?system.tab:area==='users'?(pathname.startsWith('/admin/operations/ai-work-accounts')?'ai-accounts':pathname.startsWith('/admin/operations/management-accounts')?'management-accounts':'users')
     :area==='content'?(pathname.startsWith('/admin/operations/search-quality')?'search-quality':pathname.startsWith('/admin/operations/recommendation')?'recommendation':search.get('tab')==='posts'?'posts':search.get('tab')==='growth'?'growth':'sections')
-    :area==='governance'?(pathname.startsWith('/admin/operations/community')?'reports':pathname.split('/').at(-1)??'reports')
+    :area==='governance'?(pathname.startsWith('/admin/operations/community')?(search.get('tab')==='macro'?'macro':'reports'):pathname.split('/').at(-1)??'reports')
     :area==='messages'?pathname.split('/').at(-1)??'messaging'
     :area==='strategy'?(pathname==='/admin/operations/autonomy'?'autonomy':pathname.startsWith('/admin/operations/rules')?'rules':pathname==='/admin/operations/models'?'models':pathname==='/admin/operations/strategy'?'strategy':'ai-runs')
     :area==='analytics'?'analytics'

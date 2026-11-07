@@ -153,10 +153,14 @@ func (h ConversationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			out, err = h.Service.ReadHistoryPage(r.Context(), actor, domain, cursor)
 		}
 	case path[2] == "cards":
-		var turns []string
-		turns, err = cardTurnsQuery(r.URL)
-		if err == nil {
-			out, err = h.Service.ReadCardsForTurns(r.Context(), actor, domain, turns)
+		if domain == "governance" && r.URL.RawQuery == "kind=community-parameter-adjustment" {
+			out, err = h.Service.ReadCommunityParameterCards(r.Context(), actor)
+		} else {
+			var turns []string
+			turns, err = cardTurnsQuery(r.URL)
+			if err == nil {
+				out, err = h.Service.ReadCardsForTurns(r.Context(), actor, domain, turns)
+			}
 		}
 	case path[2] == "context":
 		out, err = h.Service.ReadContext(r.Context(), actor, domain)

@@ -15,7 +15,7 @@ func taskSourceRefsSQL(endpoint, task string) string {
  UNION SELECT 'content-'||(item->>'kind'),item->>'id' FROM operations_autonomy_receipts_v1 r CROSS JOIN LATERAL jsonb_array_elements(r.details->'items') item WHERE r.endpoint=` + endpoint + ` AND r.task_id=` + task + `
  UNION SELECT ` + proposalTargetTypeSQL("o.proposal") + `,o.proposal->'target'->>'id' FROM operations_ai_duty_operations_v1 o WHERE o.endpoint=` + endpoint + ` AND o.task_id=` + task + ` AND o.kind<>'public-content-batch'
  UNION SELECT 'content-'||(item->>'kind'),item->>'id' FROM operations_ai_duty_operations_v1 o CROSS JOIN LATERAL jsonb_array_elements(o.request->'items') item WHERE o.endpoint=` + endpoint + ` AND o.task_id=` + task + ` AND o.kind='public-content-batch'
- UNION SELECT ` + proposalTargetTypeSQL("c.proposal") + `,c.proposal->'target'->>'id' FROM operations_agentos_conversation_cards_v1 c WHERE ` + card + ` AND c.proposal->>'kind'<>'public-content-batch'
+ UNION SELECT ` + proposalTargetTypeSQL("c.proposal") + `,c.proposal->'target'->>'id' FROM operations_agentos_conversation_cards_v1 c WHERE ` + card + ` AND c.proposal->>'kind' NOT IN ('public-content-batch','community-parameter-adjustment')
  UNION SELECT 'content-'||(item->>'kind'),item->>'id' FROM operations_agentos_conversation_cards_v1 c CROSS JOIN LATERAL jsonb_array_elements(c.proposal->'request'->'items') item WHERE ` + card + ` AND c.proposal->>'kind'='public-content-batch'`
 }
 func (s *Service) TaskSourceRefsWithin(ctx context.Context, tx pgx.Tx, id string) ([]Object, error) {

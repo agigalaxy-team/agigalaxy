@@ -31,7 +31,7 @@ export function currentAdminArea(pathname:string,tab:string|null):AdminArea{
   if(pathname==='/admin/operations/system-settings')return 'settings';
   if(pathname.startsWith('/admin/operations/smtp'))return 'settings';
   if(['/admin/operations/users','/admin/operations/management-accounts','/admin/operations/ai-work-accounts'].some(path=>pathname.startsWith(path)))return 'users';
-  if(pathname.startsWith('/admin/operations/community'))return tab==='reports'?'governance':'content';
+  if(pathname.startsWith('/admin/operations/community'))return tab==='reports'||tab==='macro'?'governance':'content';
   if(['/admin/operations/recommendation','/admin/operations/search-quality'].some(path=>pathname.startsWith(path)))return 'content';
   if(['/admin/operations/chat-reports','/admin/operations/resources','/admin/operations/files','/admin/operations/feedback'].some(path=>pathname.startsWith(path)))return 'governance';
   if(['/admin/operations/messaging','/admin/operations/notices'].some(path=>pathname.startsWith(path)))return 'messages';

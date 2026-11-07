@@ -12,14 +12,15 @@ import (
 )
 
 type Recommendations struct {
-	CommunitySignals  func(context.Context, []CommunityCandidate) (map[string]CommunitySignal, error)
-	Pool              *pgxpool.Pool
-	Endpoint          string
-	Authority         *operationspermissions.BusinessAuthority
-	Source            Source
-	OpenPanel         *OpenPanel
-	Now               func() time.Time
-	preparedAuthorize func(context.Context, pgx.Tx) (Actor, error)
+	CommunitySignals      func(context.Context, []CommunityCandidate, CommunityScoringRules) (map[string]CommunitySignal, error)
+	CommunitySampleWithin func(context.Context, pgx.Tx, *CommunityScoringRules, *CommunityScoringRules) (Object, error)
+	Pool                  *pgxpool.Pool
+	Endpoint              string
+	Authority             *operationspermissions.BusinessAuthority
+	Source                Source
+	OpenPanel             *OpenPanel
+	Now                   func() time.Time
+	preparedAuthorize     func(context.Context, pgx.Tx) (Actor, error)
 }
 
 func (s *Recommendations) business() *SearchQuality {
@@ -129,7 +130,11 @@ func (s *Recommendations) issue(ctx context.Context, profile, mode string, candi
 	items := []Object{}
 	for i, candidate := range candidates {
 		document := candidate.Document
-		items = append(items, Object{"key": document.ID, "kind": document.Kind, "id": document.SourceID, "sourceVersion": document.Version, "position": i + 1, "candidateSource": candidate.Candidate["source"], "themeKeys": themeKeys(plan.Themes, document), "communityResultIds": candidate.ResultIDs})
+		item := Object{"key": document.ID, "kind": document.Kind, "id": document.SourceID, "sourceVersion": document.Version, "position": i + 1, "candidateSource": candidate.Candidate["source"], "themeKeys": themeKeys(plan.Themes, document)}
+		if signal := candidate.CommunitySignal; signal != nil {
+			item["communitySignal"] = Object{"version": signal.Version, "calculatedAt": signal.CalculatedAt, "recognition": signal.Recognition, "heat": signal.Heat}
+		}
+		items = append(items, item)
 	}
 	_, e := s.Pool.Exec(ctx, "INSERT INTO discovery_recommendation_requests_v1(endpoint,id,profile_id,policy_version,mode,placement,items,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", s.Endpoint, id, profile, version, mode, placement, jsonString(items), s.now())
 	if e != nil {

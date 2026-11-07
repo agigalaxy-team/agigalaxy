@@ -14,6 +14,24 @@ import (
 
 func (s *Service) Query(ctx context.Context, a Actor, input Object) (Object, error) {
 	kind := str(input, "kind")
+	if kind == "contributions" {
+		account := str(input, "accountId")
+		if _, err := uuid.Parse(account); err != nil {
+			return nil, invalid()
+		}
+		limit := int64(50)
+		if value, present := input["limit"]; present {
+			var valid bool
+			limit, valid = integer(value)
+			if !valid || limit < 1 || limit > 100 {
+				return nil, invalid()
+			}
+		}
+		return s.contributions(ctx, account, int(limit), str(input, "after"), true, func(tx pgx.Tx) error {
+			_, err := s.require(ctx, tx, a, "content.read")
+			return err
+		})
+	}
 	permission := "rules.read"
 	if kind == "recognitions" {
 		permission = "content.read"
@@ -176,11 +194,6 @@ func (s *Service) Command(ctx context.Context, a Actor, input Object) (Object, e
 	if kind != "rule-save" && kind != "levels-save" && kind != "definition-save" && kind != "recognition-save" {
 		return nil, invalid()
 	}
-	b, e := identity.Canonical(input)
-	if e != nil {
-		return nil, e
-	}
-	hash := identity.Digest(b)
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
 		fresh, e := s.require(ctx, tx, a, permission)
 		if e != nil {
@@ -189,51 +202,76 @@ func (s *Service) Command(ctx context.Context, a Actor, input Object) (Object, e
 		if kind == "recognition-save" && ((s.Authority.Duty != nil && s.Authority.Duty.AcceptsDuty(fresh)) || (s.Authority.Execution != nil && s.Authority.Execution.AcceptsExecution(fresh)) || fresh.AIProof != nil) {
 			return nil, fault.New("business_admin_denied", 403)
 		}
-		if e = s.ensureDefaults(ctx, tx); e != nil {
-			return nil, e
-		}
-		if _, e = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,734912765))`, s.Endpoint+":"+op); e != nil {
-			return nil, e
-		}
-		var oldHash, owner string
-		var old Object
-		e = tx.QueryRow(ctx, `SELECT request_hash,actor_id,result FROM community_growth_operations_v1 WHERE endpoint=$1 AND operation_id=$2`, s.Endpoint, op).Scan(&oldHash, &owner, &old)
-		if e == nil {
-			if hash != oldHash || owner != fresh.ID {
-				return nil, fault.New("community_growth_operation_conflict", 409)
+		return s.commandWithin(ctx, tx, fresh, kind, op, input, func() (Object, error) {
+			switch kind {
+			case "rule-save":
+				return s.saveRule(ctx, tx, input)
+			case "levels-save":
+				return s.saveLevels(ctx, tx, input)
+			case "definition-save":
+				return s.saveDefinition(ctx, tx, input)
+			default:
+				return s.saveRecognition(ctx, tx, fresh, input)
 			}
-			old["replayed"] = true
-			return old, nil
-		}
-		if !noRows(e) {
-			return nil, e
-		}
-		var result Object
-		switch kind {
-		case "rule-save":
-			result, e = s.saveRule(ctx, tx, input)
-		case "levels-save":
-			result, e = s.saveLevels(ctx, tx, input)
-		case "definition-save":
-			result, e = s.saveDefinition(ctx, tx, input)
-		case "recognition-save":
-			result, e = s.saveRecognition(ctx, tx, fresh, input)
-		}
-		if e != nil {
-			return nil, e
-		}
-		result["operationId"] = op
-		result["replayed"] = false
-		_, e = tx.Exec(ctx, `INSERT INTO community_growth_operations_v1(endpoint,operation_id,actor_id,kind,request_hash,result,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)`, s.Endpoint, op, fresh.ID, kind, hash, jsonText(result), s.now())
-		if e != nil {
-			return nil, e
-		}
-		selection, _ := json.Marshal(input)
-		res, _ := json.Marshal(result)
-		_, e = tx.Exec(ctx, `INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,operator_role,action,operation_id,http_request_id,selection,result,created_at,actor_kind) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'business-operator')`, uuid.NewString(), s.Endpoint, fresh.ID, fresh.Role, "community-growth."+kind, op, fresh.RequestID, selection, res, s.now())
-		if e != nil {
-			return nil, e
-		}
-		return result, nil
+		})
 	})
+}
+
+func (s *Service) operationWithin(ctx context.Context, tx pgx.Tx, a Actor, kind, op, hash string) (Object, error) {
+	var oldHash, owner, oldKind string
+	var result Object
+	err := tx.QueryRow(ctx, `SELECT request_hash,actor_id,kind,result FROM community_growth_operations_v1 WHERE endpoint=$1 AND operation_id=$2`, s.Endpoint, op).Scan(&oldHash, &owner, &oldKind, &result)
+	if noRows(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if hash != oldHash || owner != a.ID || kind != oldKind {
+		return nil, fault.New("community_growth_operation_conflict", 409)
+	}
+	return result, nil
+}
+
+func (s *Service) commandWithin(ctx context.Context, tx pgx.Tx, a Actor, kind, op string, input Object, apply func() (Object, error)) (Object, error) {
+	selection, err := identity.Canonical(input)
+	if err != nil {
+		return nil, err
+	}
+	hash := identity.Digest(selection)
+	if err = s.ensureDefaults(ctx, tx); err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,734912765))`, s.Endpoint+":"+op); err != nil {
+		return nil, err
+	}
+	old, err := s.operationWithin(ctx, tx, a, kind, op, hash)
+	if err != nil {
+		return nil, err
+	}
+	if old != nil {
+		old["replayed"] = true
+		return old, nil
+	}
+	result, err := apply()
+	if err != nil {
+		return nil, err
+	}
+	result["operationId"] = op
+	result["replayed"] = false
+	res := jsonText(result)
+	at := s.now()
+	_, err = tx.Exec(ctx, `INSERT INTO community_growth_operations_v1(endpoint,operation_id,actor_id,kind,request_hash,result,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)`, s.Endpoint, op, a.ID, kind, hash, res, at)
+	if err != nil {
+		return nil, err
+	}
+	auditKind := kind
+	if kind == experienceAdoption {
+		auditKind = "rule-save"
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO business_admin_audit_v1(id,endpoint,operator_id,operator_role,action,operation_id,http_request_id,selection,result,created_at,actor_kind) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'business-operator')`, uuid.NewString(), s.Endpoint, a.ID, a.Role, "community-growth."+auditKind, op, a.RequestID, string(selection), res, at)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/jackc/pgx/v5"
 	"math"
+	"time"
 	"unicode/utf8"
 )
 
@@ -33,15 +34,22 @@ func (s *Service) saveRule(ctx context.Context, tx pgx.Tx, x Object) (Object, er
 	if key == "" || label == "" || utf8.RuneCountInString(label) > 200 || !ok || xp < 0 || !b || !v || version < 1 {
 		return nil, invalid()
 	}
+	if e := s.lockLedger(ctx, tx); e != nil {
+		return nil, e
+	}
+	if e := s.lockGrowthRuleWithin(ctx, tx, key); e != nil {
+		return nil, e
+	}
+	at := s.now().Truncate(time.Microsecond)
 	var newVersion int64
-	e := tx.QueryRow(ctx, `UPDATE community_growth_rules_v1 SET label=$3,experience=$4,enabled=$5,version=version+1,updated_at=$6 WHERE endpoint=$1 AND rule_key=$2 AND version=$7 RETURNING version`, s.Endpoint, key, label, xp, enabled, s.now(), version).Scan(&newVersion)
+	e := tx.QueryRow(ctx, `UPDATE community_growth_rules_v1 SET label=$3,experience=$4,enabled=$5,version=version+1,updated_at=$6 WHERE endpoint=$1 AND rule_key=$2 AND version=$7 RETURNING version`, s.Endpoint, key, label, xp, enabled, at, version).Scan(&newVersion)
 	if noRows(e) {
 		return nil, fault.New("community_growth_version_conflict", 409)
 	}
 	if e != nil {
 		return nil, e
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO community_growth_rule_history_v1(endpoint,rule_key,version,snapshot,created_at) SELECT endpoint,rule_key,version,to_jsonb(r),$3 FROM community_growth_rules_v1 r WHERE endpoint=$1 AND rule_key=$2`, s.Endpoint, key, s.now())
+	_, e = tx.Exec(ctx, `INSERT INTO community_growth_rule_history_v1(endpoint,rule_key,version,snapshot,created_at) SELECT endpoint,rule_key,version,to_jsonb(r),updated_at FROM community_growth_rules_v1 r WHERE endpoint=$1 AND rule_key=$2`, s.Endpoint, key)
 	if e != nil {
 		return nil, e
 	}

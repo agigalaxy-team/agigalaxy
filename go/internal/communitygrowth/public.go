@@ -240,15 +240,19 @@ func (s *Service) eligibleWithin(ctx context.Context, tx pgx.Tx, cache eligibili
 }
 
 type growthRow struct {
-	Kind, ID, Rule, Title, ObjectKind, ObjectID, OpaqueID string
-	Domains                                               []string
-	Experience                                            int64
-	At                                                    time.Time
+	Kind, ID, Rule, Title, ObjectKind, ObjectID, OpaqueID, Basis string
+	Domains                                                      []string
+	Experience, RuleVersion                                      int64
+	At                                                           time.Time
 }
 
 func (r growthRow) cursor() cursor { return cursor{r.At, r.OpaqueID} }
-func (r growthRow) item() Object {
-	return Object{"sourceKind": r.Kind, "sourceId": r.OpaqueID, "title": r.Title, "objectKind": r.ObjectKind, "objectId": r.ObjectID, "domains": r.Domains, "experience": r.Experience, "occurredAt": r.At}
+func (r growthRow) item(management bool) Object {
+	item := Object{"sourceKind": r.Kind, "sourceId": r.OpaqueID, "title": r.Title, "objectKind": r.ObjectKind, "objectId": r.ObjectID, "domains": r.Domains, "experience": r.Experience, "occurredAt": r.At}
+	if management {
+		item["ruleKey"], item["ruleVersion"], item["basis"] = r.Rule, r.RuleVersion, r.Basis
+	}
+	return item
 }
 func (s *Service) sourceRows(ctx context.Context, tx pgx.Tx, account string, c *cursor, limit int) ([]growthRow, error) {
 	var at any
@@ -257,7 +261,20 @@ func (s *Service) sourceRows(ctx context.Context, tx pgx.Tx, account string, c *
 		at = c.At
 		id = c.ID
 	}
-	rows, e := tx.Query(ctx, `SELECT x.source_kind,x.source_id,x.rule_key,x.title,x.object_kind,x.object_id,x.domains,r.experience,x.occurred_at,x.id::text FROM community_growth_sources_v1 x JOIN community_growth_rules_v1 r ON r.endpoint=x.endpoint AND r.rule_key=x.rule_key AND r.source_kind=x.source_kind WHERE x.endpoint=$1 AND x.account_id=$2 AND x.active AND r.enabled AND x.source_kind<>'evaluation' AND ($3::timestamptz IS NULL OR (x.occurred_at,x.id)<($3,$4::uuid)) ORDER BY x.occurred_at DESC,x.id DESC LIMIT $5`, s.Endpoint, account, at, func() any {
+	rows, e := tx.Query(ctx, `SELECT x.source_kind,x.source_id,x.rule_key,x.title,x.object_kind,x.object_id,x.domains,
+		CASE WHEN x.growth_rule_version IS NULL THEN r.experience ELSE x.growth_experience END,
+		x.occurred_at,x.id::text,
+		COALESCE(x.growth_rule_version,r.version),
+		CASE WHEN x.growth_rule_version IS NULL THEN 'current' ELSE x.growth_basis END
+		FROM community_growth_sources_v1 x
+		LEFT JOIN community_growth_ledger_state_v1 st ON st.endpoint=x.endpoint
+		LEFT JOIN community_growth_rules_v1 r ON r.endpoint=x.endpoint AND r.rule_key=x.rule_key AND r.source_kind=x.source_kind
+		WHERE x.endpoint=$1 AND x.account_id=$2 AND x.active AND x.source_kind NOT IN ('evaluation','honor')
+		  AND CASE WHEN st.activated_at IS NULL AND x.growth_rule_version IS NULL
+		      AND (st.prepared_at IS NULL OR x.growth_basis='legacy' OR x.occurred_at<st.prepared_at)
+		    THEN r.enabled ELSE x.growth_experience IS NOT NULL END
+		  AND ($3::timestamptz IS NULL OR (x.occurred_at,x.id)<($3,$4::uuid))
+		ORDER BY x.occurred_at DESC,x.id DESC LIMIT $5`, s.Endpoint, account, at, func() any {
 		if id == "" {
 			return nil
 		}
@@ -269,7 +286,7 @@ func (s *Service) sourceRows(ctx context.Context, tx pgx.Tx, account string, c *
 	out := []growthRow{}
 	for rows.Next() {
 		var r growthRow
-		if e = rows.Scan(&r.Kind, &r.ID, &r.Rule, &r.Title, &r.ObjectKind, &r.ObjectID, &r.Domains, &r.Experience, &r.At, &r.OpaqueID); e != nil {
+		if e = rows.Scan(&r.Kind, &r.ID, &r.Rule, &r.Title, &r.ObjectKind, &r.ObjectID, &r.Domains, &r.Experience, &r.At, &r.OpaqueID, &r.RuleVersion, &r.Basis); e != nil {
 			rows.Close()
 			return nil, e
 		}
@@ -454,6 +471,12 @@ type cursor struct {
 }
 
 func (s *Service) PublicContributions(ctx context.Context, viewer, account string, limit int, after string) (Object, error) {
+	return s.contributions(ctx, account, limit, after, false, func(tx pgx.Tx) error {
+		return s.publicAccount(ctx, tx, viewer, account)
+	})
+}
+
+func (s *Service) contributions(ctx context.Context, account string, limit int, after string, management bool, authorize func(pgx.Tx) error) (Object, error) {
 	if limit == 0 {
 		limit = 30
 	}
@@ -473,7 +496,7 @@ func (s *Service) PublicContributions(ctx context.Context, viewer, account strin
 		initial = &c
 	}
 	return s.publicTransaction(ctx, func(tx pgx.Tx) (Object, error) {
-		if e := s.publicAccount(ctx, tx, viewer, account); e != nil {
+		if e := authorize(tx); e != nil {
 			return nil, e
 		}
 		if e := s.ensureDefaults(ctx, tx); e != nil {
@@ -517,7 +540,7 @@ func (s *Service) PublicContributions(ctx context.Context, viewer, account strin
 					more = true
 					break
 				}
-				item := r.item()
+				item := r.item(management)
 				if r.Kind == "post" || r.Kind == "reply" || r.Kind == "like" {
 					item["title"] = ""
 					if payload, valid := ok["payload"].(map[string]any); valid && r.ObjectKind == "post" {

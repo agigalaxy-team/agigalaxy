@@ -30,3 +30,8 @@
 @media(max-width:1250px){.auto-metric{padding-inline:9px}.auto-metric dd{font-size:19px}.auto-main-grid{grid-template-columns:minmax(0,1.75fr) minmax(265px,1fr);gap:11px}.auto-chart-pair{gap:10px}.auto-distribution li{grid-template-columns:92px minmax(0,1fr) 33px}.auto-summary-accounts{gap:4px}.aw-duty-fields{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.galaxy-autonomy *,.auto-summary *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 .auto-task-evidence{display:grid;gap:12px;margin:12px 0}.auto-task-evidence h4,.auto-task-evidence h5{margin:0 0 6px}.auto-inspection-section{border-top:1px solid var(--border,#ddd);padding:10px 0}.auto-inspection-section p{margin:4px 0}.auto-inspection-section dl{display:grid;gap:4px;margin:8px 0}.auto-inspection-section dl div{display:flex;justify-content:space-between;gap:12px}.auto-inspection-section dd{margin:0;text-align:right}
+.auto-pending-call .wb-action-basis{display:grid;gap:7px;margin:9px 0;font-size:13px}
+.auto-pending-call .wb-action-basis>div{display:grid;grid-template-columns:minmax(100px,150px) 1fr;gap:10px}
+.auto-pending-call .wb-action-basis dt{color:var(--admin-muted)}
+.auto-pending-call .wb-action-basis dd{margin:0;overflow-wrap:anywhere}
+.auto-pending-call .wb-action-impact{font-size:13px;padding-left:20px}

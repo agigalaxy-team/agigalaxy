@@ -85,13 +85,35 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 	if e != nil {
 		return nil, e
 	}
-	calls, e := many(ctx, tx, `SELECT to_jsonb(c) FROM(SELECT call_id,operation_id,tool,code FROM operations_autonomy_tool_calls_v1 WHERE endpoint=$1 AND task_id=$2 AND state='waiting-human' ORDER BY created_at,call_id)c`, s.Endpoint, row["id"])
+	calls, e := many(ctx, tx, `SELECT to_jsonb(c) FROM(SELECT c.call_id,c.operation_id,c.tool,c.code,
+		CASE WHEN c.tool=$3 THEN c.read_outcome END AS read_outcome,d.decision
+		FROM operations_autonomy_tool_calls_v1 c LEFT JOIN operations_autonomy_decisions_v1 d
+		ON d.endpoint=c.endpoint AND d.task_id=c.task_id AND d.call_id=c.call_id
+		WHERE c.endpoint=$1 AND c.task_id=$2 AND c.state='waiting-human' ORDER BY c.created_at,c.call_id)c`, s.Endpoint, row["id"], prepareCommunityParameterTool)
 	if e != nil {
 		return nil, e
 	}
 	pending := []Object{}
+	parameterProposals := []Object{}
+	parameterReceipts := map[string]bool{}
 	for _, c := range calls {
-		pending = append(pending, Object{"callId": c["call_id"], "operationId": c["operation_id"], "tool": c["tool"], "code": c["code"]})
+		call := Object{"callId": c["call_id"], "operationId": c["operation_id"], "tool": c["tool"], "code": c["code"]}
+		if c["tool"] == prepareCommunityParameterTool {
+			proposal := macroProposalView(macroProposal(c), a)
+			if proposal == nil {
+				continue
+			}
+			proposal["callId"], proposal["operationId"], proposal["decision"] = c["call_id"], c["operation_id"], c["decision"]
+			proposal["receipt"] = obj(c["read_outcome"])["communityParameterReceipt"]
+			proposal["canApprove"] = proposal["canApprove"] == true && c["decision"] == nil && row["state"] == "waiting-human"
+			parameterProposals = append(parameterProposals, proposal)
+			parameterReceipts[str(c["operation_id"])] = true
+			call["communityParameterProposal"] = proposal
+			if c["decision"] != nil || row["state"] != "waiting-human" {
+				continue
+			}
+		}
+		pending = append(pending, call)
 	}
 	href, e := s.workbenchHrefWithin(ctx, tx, row, a)
 	if e != nil {
@@ -129,6 +151,9 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 			return nil, e
 		}
 		for _, r := range rows {
+			if r["action"] == communityParameterAdjustment && !parameterReceipts[str(r["operation_id"])] {
+				continue
+			}
 			receipts = append(receipts, Object{"operationId": r["operation_id"], "action": r["action"], "targetType": r["target_type"], "targetId": r["target_id"], "state": r["state"], "basis": r["basis"], "details": r["details"], "createdAt": iso(r["created_at"])})
 		}
 	}
@@ -163,6 +188,9 @@ func (s *Service) taskViewWithin(ctx context.Context, tx pgx.Tx, row Object, a A
 		out["manualPause"] = pause
 	}
 	out["effects"], out["businessReceipts"], out["pendingCalls"], out["continuation"], out["workbenchHref"], out["availableControls"] = receipts, receipts, pending, continuation, href, controls
+	if len(parameterProposals) != 0 {
+		out["communityParameterProposals"] = parameterProposals
+	}
 	if includeReceipts && checkTarget {
 		report, err := s.taskReportWithin(ctx, tx, row, a)
 		if err != nil {
@@ -218,10 +246,13 @@ func (s *Service) GetTask(ctx context.Context, a Actor, id string) (out Object, 
 	})
 }
 func parseTaskQuery(input Object) (Object, error) {
-	if !closed(input, nil, []string{"page", "limit", "domain", "source", "state", "mode", "targetType", "targetId", "projection"}) {
+	if !closed(input, nil, []string{"page", "limit", "domain", "source", "state", "mode", "targetType", "targetId", "projection", "kind"}) {
 		return nil, invalid()
 	}
 	x := obj(clone(input))
+	if x["kind"] != nil && x["kind"] != communityParameterAdjustment {
+		return nil, invalid()
+	}
 	if x["projection"] != nil && x["projection"] != "summary" {
 		return nil, invalid()
 	}
@@ -276,6 +307,16 @@ func (s *Service) Tasks(ctx context.Context, a Actor, input Object) (out Object,
 			if v, ok := q[k]; ok {
 				parts = append(parts, "t."+k+"="+arg(v))
 			}
+		}
+		if q["kind"] == communityParameterAdjustment {
+			areas := []string{}
+			if has(actor.Permissions, "rules.read") {
+				areas = append(areas, "growth")
+			}
+			if has(actor.Permissions, "recommendations.read") {
+				areas = append(areas, "content-score", "recommendation")
+			}
+			parts = append(parts, "EXISTS(SELECT 1 FROM operations_autonomy_tool_calls_v1 p WHERE p.endpoint=t.endpoint AND p.task_id=t.id AND p.tool="+arg(prepareCommunityParameterTool)+" AND p.read_outcome#>>'{communityParameterProposal,request,area}'=ANY("+arg(areas)+"::text[]))")
 		}
 		if q["targetType"] != nil {
 			kind, id := arg(q["targetType"]), arg(q["targetId"])

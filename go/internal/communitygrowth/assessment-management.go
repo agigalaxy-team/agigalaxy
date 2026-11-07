@@ -27,7 +27,7 @@ func (s *AssessmentService) assessmentManager(ctx context.Context, tx pgx.Tx, ac
 
 func (s *AssessmentService) configurationWithin(ctx context.Context, tx pgx.Tx) (Object, error) {
 	var out Object
-	e := tx.QueryRow(ctx, `SELECT jsonb_build_object('version',version,'enabled',enabled,'instructions',instructions,'purposeInstructions',instructions_by_purpose,'purposes',purposes,'executorConfigId',executor_config_id)
+	e := tx.QueryRow(ctx, `SELECT jsonb_build_object('version',version,'enabled',enabled AND retired_at IS NULL,'retiredAt',retired_at,'instructions',instructions,'purposeInstructions',instructions_by_purpose,'purposes',purposes,'executorConfigId',executor_config_id)
 		FROM community_assessment_config_v1 WHERE endpoint=$1`, s.Endpoint).Scan(&out)
 	return out, e
 }
@@ -144,8 +144,12 @@ func (s *AssessmentService) SaveConfiguration(ctx context.Context, actor Actor, 
 			return nil, e
 		}
 		var current int64
-		if e = tx.QueryRow(ctx, `SELECT version FROM community_assessment_config_v1 WHERE endpoint=$1 FOR UPDATE`, s.Endpoint).Scan(&current); e != nil {
+		var retired bool
+		if e = tx.QueryRow(ctx, `SELECT version,retired_at IS NOT NULL FROM community_assessment_config_v1 WHERE endpoint=$1 FOR UPDATE`, s.Endpoint).Scan(&current, &retired); e != nil {
 			return nil, e
+		}
+		if retired {
+			return nil, assessmentRetired()
 		}
 		if current != version {
 			return nil, fault.New("community_growth_version_conflict", 409)

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/businessadmin"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/chat"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/communitygrowth"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/discovery"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/feedback"
@@ -54,6 +55,7 @@ type Service struct {
 	Rules             *operationsrules.Service
 	SearchQuality     *discovery.SearchQuality
 	Recommendations   *discovery.Recommendations
+	GrowthParameters  *communitygrowth.Service
 	Now               func() time.Time
 }
 
@@ -263,6 +265,8 @@ func (s *Service) chatReports(a Actor) (*chat.ReportService, error) {
 }
 func required(x Object) string {
 	switch str(x["kind"]) {
+	case CommunityParameterAdjustment:
+		return CommunityParameterReadAction(str(x["area"]))
 	case "strategy-draft":
 		return "strategies.configure"
 	case "strategy-rehearsal":

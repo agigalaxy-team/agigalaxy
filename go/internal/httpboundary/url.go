@@ -226,7 +226,7 @@ func AllowedQuery(method, path, raw, preflightMethod string) bool {
 		{"/v1/operations/messaging/plans", 8192, []string{"after", "limit", "state"}},
 		{"/v1/operations/messaging/runs", 8192, []string{"after", "limit", "planId"}},
 		{"/v1/announcements", 8192, []string{"after", "limit"}},
-		{"/v1/operations/autonomy/tasks", 2048, []string{"page", "limit", "domain", "source", "state", "mode", "targetType", "targetId", "projection"}},
+		{"/v1/operations/autonomy/tasks", 2048, []string{"page", "limit", "domain", "source", "state", "mode", "targetType", "targetId", "projection", "kind"}},
 		{"/v1/operations/autonomy/overview", 2048, []string{"days"}},
 		{"/v1/operations/agentos/runs", 2048, []string{"page", "limit", "domain", "state"}},
 		{"/v1/operations/strategies/records", 2048, []string{"after", "limit", "strategyId"}},
@@ -284,6 +284,9 @@ func AllowedQuery(method, path, raw, preflightMethod string) bool {
 		return true
 	}
 	if read && match(conversationRoot+`/cards$`, path) && n <= 2500 && len(q) == 1 {
+		if kinds := q["kind"]; path == "/v1/operations/agentos/conversations/governance/cards" && len(kinds) == 1 && kinds[0] == "community-parameter-adjustment" {
+			return true
+		}
 		values := q["turnId"]
 		if len(values) == 0 || len(values) > 50 {
 			return false

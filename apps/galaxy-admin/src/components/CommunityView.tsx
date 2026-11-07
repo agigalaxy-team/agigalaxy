@@ -1,6 +1,6 @@
 import type {AdminViewServerProps} from 'payload';
 import {OperationsPage,operationsPageContext,operationsSearch} from './OperationsPage';
-import {Community} from './BusinessViewClients';
+import {Community,CommunityMacro} from './BusinessViewClients';
 import {CasesView} from './CasesView';
 import {uuidPattern} from './operations-task-types';
 import type {PublicContentFilters,PublicContentTab,PublicContentTopic} from "./content-governance/public-content-types";
@@ -10,6 +10,14 @@ import {OperationsPermissionNotice} from './OperationsPermissionNotice';
 export async function CommunityView(props:AdminViewServerProps){
   if(operationsSearch(props.searchParams,'tab')==='reports')return <CasesView {...props}/>;
   const {session,searchParams}=await operationsPageContext(props,'/admin/operations/community'),text=(key:string)=>operationsSearch(searchParams,key),id=text('id'),after=text('after');
+  if(text('tab')==='macro'){
+    const canReadGrowth=hasOperatorPermission(session.operator,'rules.read');
+    const canReadRanking=hasOperatorPermission(session.operator,'recommendations.read');
+    if(!canReadGrowth&&!canReadRanking)return <OperationsPage page={props}><OperationsPermissionNotice permission="rules.read"/></OperationsPage>;
+    const canReadAutonomy=hasOperatorPermission(session.operator,'autonomy.read');
+    const canConfigureAutonomy=canReadAutonomy&&hasOperatorPermission(session.operator,'autonomy.configure')&&hasOperatorPermission(session.operator,'ai.accounts.read');
+    return <OperationsPage page={props}><CommunityMacro key={session.operator.id} operatorId={session.operator.id} csrfToken={session.csrfToken} canReadGrowth={canReadGrowth} canReadRanking={canReadRanking} canReadWorkbench={hasOperatorPermission(session.operator,'workbench.read')} canReadAutonomy={canReadAutonomy} canConfigureAutonomy={canConfigureAutonomy}/></OperationsPage>;
+  }
   const tab=text('tab')==='reports'?'reports':text('tab')==='posts'?'posts':text('tab')==='growth'?'growth':'sections';
   const readPermission=tab==='growth'?(hasOperatorPermission(session.operator,'rules.read')?'rules.read':hasOperatorPermission(session.operator,'content.read')?'content.read':'autonomy.read'):tab==='posts'?'content.read':'sections.read';
   if(!hasOperatorPermission(session.operator,readPermission))return <OperationsPage page={props}><OperationsPermissionNotice permission={readPermission}/></OperationsPage>;

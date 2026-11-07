@@ -25,6 +25,9 @@ func (s *Service) RecordSourceWithin(ctx context.Context, tx pgx.Tx, x Source) e
 	if x.Domains == nil {
 		x.Domains = []string{}
 	}
+	if e := s.lockLedger(ctx, tx); e != nil {
+		return e
+	}
 	var exists bool
 	if e := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM community_accounts WHERE endpoint=$1 AND id=$2)`, s.Endpoint, x.AccountID).Scan(&exists); e != nil {
 		return e
@@ -44,11 +47,23 @@ func (s *Service) RecordSourceWithin(ctx context.Context, tx pgx.Tx, x Source) e
 			return invalid()
 		}
 	}
-	tag, e := tx.Exec(ctx, `INSERT INTO community_growth_sources_v1(endpoint,source_kind,source_id,rule_key,account_id,domains,title,object_kind,object_id,active,revision,occurred_at,updated_at)
+	var id string
+	e := tx.QueryRow(ctx, `INSERT INTO community_growth_sources_v1(endpoint,source_kind,source_id,rule_key,account_id,domains,title,object_kind,object_id,active,revision,occurred_at,updated_at)
  VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(endpoint,source_kind,source_id,rule_key,account_id) DO UPDATE
  SET domains=EXCLUDED.domains,title=EXCLUDED.title,object_kind=EXCLUDED.object_kind,object_id=EXCLUDED.object_id,active=EXCLUDED.active,revision=EXCLUDED.revision,occurred_at=EXCLUDED.occurred_at,updated_at=EXCLUDED.updated_at
- WHERE community_growth_sources_v1.revision<EXCLUDED.revision`, s.Endpoint, x.Kind, x.ID, x.RuleKey, x.AccountID, x.Domains, x.Title, x.ObjectKind, x.ObjectID, x.Active, x.Revision, x.OccurredAt, s.now())
-	if e != nil {
+ WHERE community_growth_sources_v1.revision<EXCLUDED.revision RETURNING id::text`, s.Endpoint, x.Kind, x.ID, x.RuleKey, x.AccountID, x.Domains, x.Title, x.ObjectKind, x.ObjectID, x.Active, x.Revision, x.OccurredAt, s.now()).Scan(&id)
+	if e == nil {
+		if x.Active && kind != "" {
+			if _, e = s.awardWithin(ctx, tx, id, x.RuleKey, false); e != nil {
+				return e
+			}
+		}
+		if s.OnSourceWithin != nil {
+			return s.OnSourceWithin(ctx, tx, x)
+		}
+		return nil
+	}
+	if !noRows(e) {
 		return e
 	}
 	var revision int64
@@ -62,9 +77,6 @@ func (s *Service) RecordSourceWithin(ctx context.Context, tx pgx.Tx, x Source) e
 	}
 	if revision == x.Revision && (title != x.Title || objectKind != x.ObjectKind || objectID != x.ObjectID || active != x.Active || jsonText(domains) != jsonText(x.Domains) || !occurred.Equal(x.OccurredAt)) {
 		return fault.New("community_growth_source_revision_conflict", 409)
-	}
-	if tag.RowsAffected() > 0 && s.OnSourceWithin != nil {
-		return s.OnSourceWithin(ctx, tx, x)
 	}
 	return nil
 }

@@ -134,12 +134,11 @@ func (r *Runtime) Recommend(ctx context.Context, identity UsageIdentity, input O
 	}
 	ordered := accepted
 	if communityEnabled {
-		if r.Recommendations == nil || r.Recommendations.CommunitySignals == nil {
-			return nil, fail("community_recommendation_not_connected")
-		}
-		ordered, e = r.Recommendations.rankCommunity(ctx, ordered, object(plan.Policy["communitySignals"]))
-		if e != nil {
-			return nil, e
+		ranked, rankingErr := r.Recommendations.rankCommunity(ctx, accepted, object(plan.Policy["communitySignals"]), number(plan.Policy, "version"))
+		if rankingErr == nil {
+			ordered = ranked
+		} else if ctx.Err() != nil {
+			return nil, ctx.Err()
 		}
 	}
 	if controlled {

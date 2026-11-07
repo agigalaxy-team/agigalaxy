@@ -6,6 +6,7 @@ import {useOperationsRead} from '../../lib/use-operations-read';
 import {AccountPicker} from '../AccountPicker';
 import {CommandFeedback,ReadStatus} from '../OperationControls';
 import {publicContentTopics} from '../content-governance/public-content-types';
+import {AccountContributions} from './AccountContributions';
 import type {PublicContentPage,PublicContentItem} from '../content-governance/public-content-types';
 
 export type GrowthPermissions={rulesRead:boolean;rulesWrite:boolean;contentRead:boolean;curate:boolean;accountsRead:boolean;identityRead:boolean;autonomyRead:boolean};
@@ -24,7 +25,6 @@ function useGrowthRead<T>(csrfToken:string,kind:string,enabled:boolean,accountId
  return {value:result?.key===key?result.value:null,error,loading,read:async()=>{setRefresh(n=>n+1);},more:()=>{pagination.current.wanted=pagination.current.loaded+1;setRefresh(n=>n+1);}};
 }
 const Owner=createContext('');
-export function GrowthOperationOwner({operatorId,children}:{operatorId:string;children:React.ReactNode}){return <Owner.Provider value={operatorId}>{children}</Owner.Provider>;}
 type GrowthIntent={body:Record<string,unknown>;label:string};
 type GrowthCommandState={key:string;pending:GrowthIntent|null;busy:boolean;error:string;message:string};
 export function useGrowthCommand(csrfToken:string,canWrite:boolean,done:(value:Result)=>void,slot:string,commandPath=base+'/command',receiptPath=base+'/receipt'){
@@ -74,15 +74,19 @@ function RecognitionEditor({permissions,definitions,accountId,item,content,comma
 }
 const domainName=(id:string)=>publicContentTopics[id as keyof typeof publicContentTopics]??id;
 type Weight={domain:string;purpose:string;state:string;inputRevision:number;appliedRevision:number;result:null|{status:'assessed'|'insufficient-material';value:number|null;coverage:string;reason:string;missing:string[];evidence:unknown[]}};
-function AccountWeights({csrfToken,accountId}:{csrfToken:string;accountId:string}){
+function HistoricalAssessments({csrfToken,accountId}:{csrfToken:string;accountId:string}){
  const [items,setItems]=useState<Weight[]>([]),[after,setAfter]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
- async function read(cursor?:string){setBusy(true);try{const value=await operationsRequest<{items:Weight[];nextAfter:string|null}>(base+'/weights',{csrfToken,body:{accountId,...(cursor?{after:cursor}:{})}});if(!Array.isArray(value.items))throw Error();setItems(old=>cursor?[...old,...value.items]:value.items);setAfter(value.nextAfter);setError('');}catch(problem){if(problem instanceof OperationsRequestError&&[401,403,404,410].includes(problem.status)){setItems([]);setAfter(null);}setError('权重资料暂时无法读取。');}finally{setBusy(false);}}
+ async function read(cursor?:string){setBusy(true);try{const value=await operationsRequest<{items:Weight[];nextAfter:string|null}>(base+'/weights',{csrfToken,body:{accountId,...(cursor?{after:cursor}:{})}});if(!Array.isArray(value.items))throw Error();setItems(old=>cursor?[...old,...value.items]:value.items);setAfter(value.nextAfter);setError('');}catch(problem){if(problem instanceof OperationsRequestError&&[401,403,404,410].includes(problem.status)){setItems([]);setAfter(null);}setError('历史评估暂时无法读取。');}finally{setBusy(false);}}
  useEffect(()=>{setItems([]);setAfter(null);void read();},[accountId,csrfToken]);
- return <section><h3>领域权重</h3><ReadStatus loading={busy} error={error} retry={()=>read()}/>{items.length?<ul className="galaxy-records">{items.map((item,index)=><li key={item.domain+':'+item.purpose+':'+index}><strong>{item.domain?domainName(item.domain):'综合'} · {item.purpose==='contribution-impact'?'贡献参考':item.purpose==='evaluation-reference'?'评价参考':'其他用途'}</strong>{item.result?<><span>{item.result.status==='insufficient-material'?'材料不足':item.result.value===null?'尚无数值':String(item.result.value)}</span><span>{item.state==='applied'&&item.appliedRevision===item.inputRevision?'已应用':item.state==='running'?'正在更新':item.state==='failed'?'更新未完成':'等待更新'}</span><span>{({none:'暂无覆盖',partial:'部分覆盖',broad:'广泛覆盖'} as Record<string,string>)[item.result.coverage]??'覆盖情况未提供'}{Array.isArray(item.result.evidence)?' · '+item.result.evidence.length+' 项依据':''}</span>{item.result.reason&&<p>{item.result.reason}</p>}{item.result.missing?.length>0&&<p>待补充：{item.result.missing.join('、')}</p>}</>:<span>{item.state==='pending'?'待计算':item.state==='running'?'计算中':item.state==='failed'?'暂未完成':item.state==='source-unavailable'?'依据当前不可用':'尚无结果'}</span>}</li>)}</ul>:!busy&&!error&&<p>尚无可查看的结果。</p>}{after&&<button type="button" className="galaxy-secondary" disabled={busy} onClick={()=>void read(after)}>更多结果</button>}</section>;
+ return <section><h3>历史评估结果</h3><ReadStatus loading={busy} error={error} retry={()=>read()}/>{items.length?<ul className="galaxy-records">{items.map((item,index)=><li key={item.domain+':'+item.purpose+':'+index}><strong>{item.domain?domainName(item.domain):'综合'} · {item.purpose==='contribution-impact'?'贡献参考':item.purpose==='evaluation-reference'?'评价参考':'其他用途'}</strong>{item.result?<><span>{item.result.status==='insufficient-material'?'材料不足':item.result.value===null?'尚无数值':String(item.result.value)}</span><span>{item.state==='applied'&&item.appliedRevision===item.inputRevision?'原结果已记录':'原计算未完成'}</span><span>{({none:'暂无覆盖',partial:'部分覆盖',broad:'广泛覆盖'} as Record<string,string>)[item.result.coverage]??'覆盖情况未提供'}{Array.isArray(item.result.evidence)?' · '+item.result.evidence.length+' 项依据':''}</span>{item.result.reason&&<p>{item.result.reason}</p>}{item.result.missing?.length>0&&<p>待补充：{item.result.missing.join('、')}</p>}</>:<span>{item.state==='source-unavailable'?'依据当前不可用':item.state==='failed'?'原计算失败':'无已记录结果'}</span>}</li>)}</ul>:!busy&&!error&&<p>尚无可查看的结果。</p>}{after&&<button type="button" className="galaxy-secondary" disabled={busy} onClick={()=>void read(after)}>更多结果</button>}</section>;
 }
-function Weights({csrfToken,permissions}:{csrfToken:string;permissions:GrowthPermissions}){
+function AccountGrowth({csrfToken,permissions,historical=false}:{csrfToken:string;permissions:GrowthPermissions;historical?:boolean}){
  const [account,setAccount]=useState<string[]>([]);
- return <section><h2>账户领域权重</h2>{permissions.accountsRead?<AccountPicker label="选择账户" selected={account} maxSelected={1} canSearchEmail={permissions.identityRead} onChange={setAccount}/>:<p>当前没有账户查找权限。</p>}{account[0]&&<AccountWeights key={account[0]} csrfToken={csrfToken} accountId={account[0]}/>}</section>;
+ return <section>
+  <h2>{historical?'历史评估':'账户成长'}</h2>
+  {permissions.accountsRead?<AccountPicker label="选择账户" selected={account} maxSelected={1} canSearchEmail={permissions.identityRead} onChange={setAccount}/>:<p>当前没有账户查找权限。</p>}
+  {account[0]&&(historical?<HistoricalAssessments key={account[0]} csrfToken={csrfToken} accountId={account[0]}/>:<AccountContributions key={account[0]} csrfToken={csrfToken} accountId={account[0]}/>)}
+ </section>;
 }
 function Recognitions({csrfToken,permissions}:{csrfToken:string;permissions:GrowthPermissions}){
  const fieldId=useId();
@@ -94,10 +98,28 @@ function Recognitions({csrfToken,permissions}:{csrfToken:string;permissions:Grow
  const saved=useCallback((_result:Result)=>{setDrafts(old=>{const next={...old};delete next[draftKey];return next;});void page.read();},[page.read,draftKey]);
  const command=useGrowthCommand(csrfToken,permissions.curate&&!!account[0],saved,'recognition:'+draftKey);
  return <section><h2>内容认可与活动结果</h2>{permissions.accountsRead&&<AccountPicker label="选择账户" selected={account} maxSelected={1} canSearchEmail={permissions.identityRead} onChange={value=>{setAccount(value);setSelected('new');}}/>}<h3>选择相关内容</h3><form onSubmit={e=>{e.preventDefault();setAfter('');setQuery(input.trim());}}><label>搜索帖子或回复<input value={input} onChange={e=>setInput(e.target.value)}/></label><button type="submit">搜索</button></form><ReadStatus loading={directory.loading} error={directory.error} retry={directory.read}/>{directory.value&&<><ul className="galaxy-records">{directory.value.items.filter(x=>x.sourceState==='available').map(x=><li key={x.kind+':'+x.id}><strong>{x.title||x.excerpt||'回复'}</strong><span>{x.kind==='post'?'帖子':'回复'} · {x.author.displayName||x.author.uid||'账户'}</span><button type="button" className="galaxy-secondary" onClick={()=>{setContent(x);setSelected('new');}}>选择内容</button>{x.author.accountId&&<button type="button" className="galaxy-secondary" onClick={()=>{setContent(x);setAccount([x.author.accountId!]);setSelected('new');}}>选择内容及作者</button>}</li>)}</ul>{directory.value.nextAfter&&<button type="button" className="galaxy-secondary" onClick={()=>setAfter(directory.value!.nextAfter!)}>更多内容</button>}</>}{content&&<p>已选择：{content.title||content.excerpt||'回复'}</p>}
- {account[0]&&<>{permissions.autonomyRead&&<AccountWeights key={account[0]} csrfToken={csrfToken} accountId={account[0]}/>}<button type="button" disabled={page.loading} onClick={()=>void page.read()}>刷新记录</button><ReadStatus loading={page.loading} error={page.error} retry={page.read}/><label htmlFor={fieldId+'-record'}>记录<select id={fieldId+'-record'} aria-label="记录" value={selected} onChange={e=>setSelected(e.target.value)}><option value="new">新建记录</option>{page.value?.items.map(x=><option key={x.id} value={x.id}>{({content:'内容认可',honor:'荣誉',activity:'活动结果'} as const)[x.kind]} · {x.reason}</option>)}</select></label>{page.value?.nextCursor&&<button type="button" className="galaxy-secondary" disabled={page.loading} onClick={page.more}>更多记录</button>}{(chosen||content)&&<RecognitionEditor permissions={permissions} definitions={definitions.value?.items??[]} accountId={account[0]} item={chosen} content={content} command={command} draft={drafts[draftKey]??initialDraft} onDraft={value=>setDrafts(old=>({...old,[draftKey]:value}))}/>}<CommandFeedback command={command}/></>}
+ {account[0]&&<><button type="button" disabled={page.loading} onClick={()=>void page.read()}>刷新记录</button><ReadStatus loading={page.loading} error={page.error} retry={page.read}/><label htmlFor={fieldId+'-record'}>记录<select id={fieldId+'-record'} aria-label="记录" value={selected} onChange={e=>setSelected(e.target.value)}><option value="new">新建记录</option>{page.value?.items.map(x=><option key={x.id} value={x.id}>{({content:'内容认可',honor:'荣誉',activity:'活动结果'} as const)[x.kind]} · {x.reason}</option>)}</select></label>{page.value?.nextCursor&&<button type="button" className="galaxy-secondary" disabled={page.loading} onClick={page.more}>更多记录</button>}{(chosen||content)&&<RecognitionEditor permissions={permissions} definitions={definitions.value?.items??[]} accountId={account[0]} item={chosen} content={content} command={command} draft={drafts[draftKey]??initialDraft} onDraft={value=>setDrafts(old=>({...old,[draftKey]:value}))}/>}<CommandFeedback command={command}/></>}
  </section>;
 }
 export function CommunityGrowth({csrfToken,operatorId,permissions}:{csrfToken:string;operatorId:string;permissions:GrowthPermissions}){
- const [tab,setTab]=useState(permissions.rulesRead?'rules':permissions.contentRead?'recognitions':'weights');
- return <Owner.Provider value={operatorId}><section className="galaxy-business-users"><header><h1>社区成长</h1></header><nav className="galaxy-operation-actions" aria-label="社区成长管理">{permissions.rulesRead&&<><button type="button" className="galaxy-secondary" aria-pressed={tab==='rules'} onClick={()=>setTab('rules')}>成长规则与等级</button><button type="button" className="galaxy-secondary" aria-pressed={tab==='definitions'} onClick={()=>setTab('definitions')}>荣誉定义</button></>}{permissions.contentRead&&<button type="button" className="galaxy-secondary" aria-pressed={tab==='recognitions'} onClick={()=>setTab('recognitions')}>认可与活动</button>}{permissions.autonomyRead&&<button type="button" className="galaxy-secondary" aria-pressed={tab==='weights'} onClick={()=>setTab('weights')}>账户权重</button>}</nav><div hidden={tab!=='weights'}>{permissions.autonomyRead&&<Weights csrfToken={csrfToken} permissions={permissions}/>}</div><div hidden={tab!=='rules'}>{permissions.rulesRead&&<Rules csrfToken={csrfToken} permissions={permissions}/>}</div><div hidden={tab!=='definitions'}>{permissions.rulesRead&&<Definitions csrfToken={csrfToken} permissions={permissions}/>}</div><div hidden={tab!=='recognitions'}>{permissions.contentRead&&<Recognitions csrfToken={csrfToken} permissions={permissions}/>}</div></section></Owner.Provider>;
+ const [tab,setTab]=useState(permissions.rulesRead?'rules':permissions.contentRead?'recognitions':'history');
+ return <Owner.Provider value={operatorId}><section className="galaxy-business-users">
+  <header><h1>社区成长</h1></header>
+  <nav className="galaxy-operation-actions" aria-label="社区成长管理">
+   {permissions.rulesRead&&<>
+    <button type="button" className="galaxy-secondary" aria-pressed={tab==='rules'} onClick={()=>setTab('rules')}>成长规则与等级</button>
+    <button type="button" className="galaxy-secondary" aria-pressed={tab==='definitions'} onClick={()=>setTab('definitions')}>荣誉定义</button>
+   </>}
+   {permissions.contentRead&&<>
+    <button type="button" className="galaxy-secondary" aria-pressed={tab==='recognitions'} onClick={()=>setTab('recognitions')}>认可与活动</button>
+    <button type="button" className="galaxy-secondary" aria-pressed={tab==='accounts'} onClick={()=>setTab('accounts')}>账户成长</button>
+   </>}
+   {permissions.autonomyRead&&<button type="button" className="galaxy-secondary" aria-pressed={tab==='history'} onClick={()=>setTab('history')}>历史评估</button>}
+  </nav>
+  {permissions.autonomyRead&&tab==='history'&&<AccountGrowth csrfToken={csrfToken} permissions={permissions} historical/>}
+  {permissions.contentRead&&tab==='accounts'&&<AccountGrowth csrfToken={csrfToken} permissions={permissions}/>}
+  <div hidden={tab!=='rules'}>{permissions.rulesRead&&<Rules csrfToken={csrfToken} permissions={permissions}/>}</div>
+  <div hidden={tab!=='definitions'}>{permissions.rulesRead&&<Definitions csrfToken={csrfToken} permissions={permissions}/>}</div>
+  <div hidden={tab!=='recognitions'}>{permissions.contentRead&&<Recognitions csrfToken={csrfToken} permissions={permissions}/>}</div>
+ </section></Owner.Provider>;
 }

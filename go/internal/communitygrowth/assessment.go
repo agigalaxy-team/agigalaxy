@@ -77,6 +77,14 @@ func (s *AssessmentService) SourceChangedWithin(ctx context.Context, tx pgx.Tx, 
 	if e := s.ensureAssessment(ctx, tx); e != nil {
 		return e
 	}
+	var purposes []string
+	if e := tx.QueryRow(ctx, `SELECT CASE WHEN retired_at IS NULL THEN purposes ELSE '{}'::text[] END
+		FROM community_assessment_config_v1 WHERE endpoint=$1`, s.Endpoint).Scan(&purposes); e != nil {
+		return e
+	}
+	if len(purposes) == 0 {
+		return nil
+	}
 	if _, e := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,734912767))`, jsonText([]string{s.Endpoint, source.AccountID, source.Kind, source.ID, source.RuleKey})); e != nil {
 		return e
 	}
@@ -90,10 +98,6 @@ func (s *AssessmentService) SourceChangedWithin(ctx context.Context, tx pgx.Tx, 
 		ON CONFLICT(endpoint,account_id,source_kind,source_id,rule_key) DO UPDATE SET revision=excluded.revision,domains=excluded.domains
 		WHERE community_assessment_source_revisions_v1.revision<excluded.revision`, s.Endpoint, source.AccountID, source.Kind, source.ID, source.RuleKey, source.Revision, domains)
 	if e != nil || tag.RowsAffected() == 0 {
-		return e
-	}
-	var purposes []string
-	if e = tx.QueryRow(ctx, `SELECT purposes FROM community_assessment_config_v1 WHERE endpoint=$1`, s.Endpoint).Scan(&purposes); e != nil {
 		return e
 	}
 	for _, domain := range assessmentDomains(append(domains, prior...)) {
@@ -140,4 +144,8 @@ func assessmentDecode(v any, target any) error {
 
 func assessmentNotConnected() error {
 	return fault.New("community_assessment_not_connected", 503)
+}
+
+func assessmentRetired() error {
+	return fault.New("community_assessment_retired", 409)
 }

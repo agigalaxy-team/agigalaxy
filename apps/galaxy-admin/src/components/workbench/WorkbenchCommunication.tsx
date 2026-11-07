@@ -69,6 +69,7 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const identityEnded=!!checkedSession&&(checkedSession.state==='signed-out'||checkedSession.operator.id!==operatorId);
   const verifiedSession=!signedOut&&checkedSession?.state==='signed-in'&&checkedSession.operator.id===operatorId?checkedSession:null;
   const permittedDomains=domains.map(item=>item.id as AgentOsDomain).filter(item=>agentOsCanUseDomain(verifiedSession,item)),canUseDomain=permittedDomains.includes(domain);
+  const openGovernance=search.get('workbench')==='governance',openedGovernance=useRef(false);
   const data=useWorkbenchConversationData(domain,canUseDomain&&(focused||logSource==='actions'),verifiedSession?.csrfToken??null);
   const conversation=data.context,currentConversation=canUseDomain?data.conversation:null;
   const actionCards=useMemo(()=>[...new Map(workbenchActionCards(!data.denied?[...data.cards.value?.domain===domain?data.cards.value.items:[],...data.pageCards]:[],domain).sort((a,b)=>a.checkedAt-b.checkedAt).map(card=>[card.cardId,card])).values()],[data.cards.value,data.pageCards,data.denied,domain]);
@@ -84,6 +85,15 @@ function WorkbenchCommunicationForOperator({connection,focused,onFocusChange,ope
   const replying=!!waitingReply||!!currentConversation?.runs.some(run=>['PENDING','RUNNING'].includes(run.status));
   useEffect(()=>{if(memory.current.focused){onFocusChange(true);requestAnimationFrame(()=>input.current?.scrollIntoView({block:'nearest'}));}},[onFocusChange]);
   useEffect(()=>{memory.current.focused=focused;},[focused]);
+  useEffect(()=>{
+    if(!openGovernance){openedGovernance.current=false;return;}
+    if(openedGovernance.current||taskId||!agentOsCanUseDomain(verifiedSession,'governance'))return;
+    openedGovernance.current=true;
+    domainRef.current='governance';
+    setDomain('governance');
+    onFocusChange(true);
+    requestAnimationFrame(()=>input.current?.scrollIntoView({block:'nearest'}));
+  },[openGovernance,taskId,verifiedSession,onFocusChange]);
   useEffect(()=>{
     if(!data.contextInvalidated&&!data.denied)return;
     setWaiting(previous=>{if(!previous[domain])return previous;const next={...previous};delete next[domain];memory.current.waiting=next;return next;});

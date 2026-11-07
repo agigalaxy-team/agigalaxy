@@ -28,7 +28,7 @@ func (w *AssessmentWorker) Step(ctx context.Context) (Object, error) {
 	var configVersion int64
 	var configuration Object
 	var purposes []string
-	e = tx.QueryRow(ctx, `SELECT enabled,version,purposes,jsonb_build_object('version',version,'instructions',instructions,'executorConfigId',executor_config_id)
+	e = tx.QueryRow(ctx, `SELECT enabled AND retired_at IS NULL,version,purposes,jsonb_build_object('version',version,'instructions',instructions,'executorConfigId',executor_config_id)
 		FROM community_assessment_config_v1 WHERE endpoint=$1`, s.Endpoint).Scan(&enabled, &configVersion, &purposes, &configuration)
 	if e != nil {
 		return nil, e

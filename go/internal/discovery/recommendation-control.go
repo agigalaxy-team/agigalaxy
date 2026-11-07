@@ -59,12 +59,12 @@ type RecommendationPlan struct {
 	PreviouslyExposed map[string]bool
 }
 type recommendationCandidate struct {
-	Document  *Document
-	Candidate Object
-	Mode      string
-	Themes    []string
-	Direction int
-	ResultIDs []string
+	Document        *Document
+	Candidate       Object
+	Mode            string
+	Themes          []string
+	Direction       int
+	CommunitySignal *CommunitySignal
 }
 
 func objects(value any) []Object {

@@ -6,79 +6,79 @@
       "code": "operations_autonomy_source_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 68
+      "line": 69
     },
     {
       "code": "operations_autonomy_source_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 80
+      "line": 81
     },
     {
       "code": "operations_autonomy_source_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 91
+      "line": 92
     },
     {
       "code": "business_admin_denied",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 95
+      "line": 96
     },
     {
       "code": "operations_autonomy_source_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 105
+      "line": 106
     },
     {
       "code": "operations_autonomy_source_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 122
+      "line": 123
     },
     {
       "code": "operations_autonomy_source_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 135
+      "line": 136
     },
     {
       "code": "operations_autonomy_source_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 139
+      "line": 140
     },
     {
       "code": "operations_autonomy_receipt_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 169
+      "line": 170
     },
     {
       "code": "operations_autonomy_receipt_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 199
+      "line": 200
     },
     {
       "code": "operations_agentos_conversation_not_ready",
       "status": 503,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 203
+      "line": 204
     },
     {
       "code": "operations_autonomy_operation_not_found",
       "status": 404,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 242
+      "line": 251
     },
     {
       "code": "operations_autonomy_operation_not_found",
       "status": 404,
       "source": "go/cmd/galaxy-api/agentos-actions.go",
-      "line": 248
+      "line": 257
     },
     {
       "code": "discovery_search_not_connected",
@@ -96,37 +96,37 @@
       "code": "operations_ai_work_unassigned",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 38
+      "line": 39
     },
     {
       "code": "operations_ai_work_unassigned",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 51
+      "line": 52
     },
     {
       "code": "operations_autonomy_workbench_scope_denied",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 68
+      "line": 70
     },
     {
       "code": "operations_autonomy_workbench_scope_denied",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 72
+      "line": 78
     },
     {
       "code": "operations_autonomy_workbench_scope_denied",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 77
+      "line": 83
     },
     {
       "code": "operations_ai_work_unassigned",
       "status": 403,
       "source": "go/cmd/galaxy-api/agentos-workbench.go",
-      "line": 97
+      "line": 103
     },
     {
       "code": "governance_configuration_invalid",
@@ -258,19 +258,19 @@
       "code": "listen_configuration_invalid",
       "status": 400,
       "source": "go/cmd/galaxy-api/main.go",
-      "line": 479
+      "line": 480
     },
     {
       "code": "listen_configuration_invalid",
       "status": 400,
       "source": "go/cmd/galaxy-api/main.go",
-      "line": 487
+      "line": 488
     },
     {
       "code": "listen_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-api/main.go",
-      "line": 491
+      "line": 492
     },
     {
       "code": "governance_configuration_invalid",
@@ -437,38 +437,56 @@
     {
       "code": "migration_action_required",
       "status": 400,
-      "source": "go/cmd/galaxy-migrate/main.go",
-      "line": 39
+      "source": "go/cmd/galaxy-migrate/community_growth.go",
+      "line": 15
     },
     {
       "code": "migration_configuration_invalid",
       "status": 400,
-      "source": "go/cmd/galaxy-migrate/main.go",
-      "line": 42
+      "source": "go/cmd/galaxy-migrate/community_growth.go",
+      "line": 19
     },
     {
       "code": "database_unavailable",
       "status": 503,
-      "source": "go/cmd/galaxy-migrate/main.go",
-      "line": 46
+      "source": "go/cmd/galaxy-migrate/community_growth.go",
+      "line": 23
     },
     {
       "code": "migration_action_required",
       "status": 400,
       "source": "go/cmd/galaxy-migrate/main.go",
-      "line": 86
+      "line": 42
     },
     {
       "code": "migration_configuration_invalid",
       "status": 400,
       "source": "go/cmd/galaxy-migrate/main.go",
-      "line": 96
+      "line": 45
     },
     {
       "code": "database_unavailable",
       "status": 503,
       "source": "go/cmd/galaxy-migrate/main.go",
-      "line": 100
+      "line": 49
+    },
+    {
+      "code": "migration_action_required",
+      "status": 400,
+      "source": "go/cmd/galaxy-migrate/main.go",
+      "line": 89
+    },
+    {
+      "code": "migration_configuration_invalid",
+      "status": 400,
+      "source": "go/cmd/galaxy-migrate/main.go",
+      "line": 99
+    },
+    {
+      "code": "database_unavailable",
+      "status": 503,
+      "source": "go/cmd/galaxy-migrate/main.go",
+      "line": 103
     },
     {
       "code": "non_root_runtime_required",
@@ -534,31 +552,31 @@
       "code": "native_arguments_invalid",
       "status": 400,
       "source": "go/cmd/galaxy/client.go",
-      "line": 135
+      "line": 139
     },
     {
       "code": "setup_host_required",
       "status": 400,
       "source": "go/cmd/galaxy/client.go",
-      "line": 165
+      "line": 175
     },
     {
       "code": "setup_configuration_conflict",
       "status": 400,
       "source": "go/cmd/galaxy/client.go",
-      "line": 225
+      "line": 235
     },
     {
       "code": "native_arguments_invalid",
       "status": 400,
       "source": "go/cmd/galaxy/client.go",
-      "line": 286
+      "line": 296
     },
     {
       "code": "native_release_pointer_unavailable",
       "status": 409,
       "source": "go/cmd/galaxy/client.go",
-      "line": 353
+      "line": 363
     },
     {
       "code": "native_arguments_invalid",
@@ -606,37 +624,43 @@
       "code": "native_arguments_invalid",
       "status": 400,
       "source": "go/cmd/galaxy/install.go",
-      "line": 134
+      "line": 135
     },
     {
       "code": "native_arguments_invalid",
       "status": 400,
       "source": "go/cmd/galaxy/install.go",
-      "line": 152
+      "line": 159
     },
     {
       "code": "native_arguments_invalid",
       "status": 400,
       "source": "go/cmd/galaxy/install.go",
-      "line": 157
+      "line": 164
     },
     {
       "code": "native_arguments_invalid",
       "status": 400,
       "source": "go/cmd/galaxy/install.go",
-      "line": 162
+      "line": 169
     },
     {
       "code": "setup_choice_required",
       "status": 400,
       "source": "go/cmd/galaxy/install.go",
-      "line": 179
+      "line": 186
     },
     {
       "code": "setup_host_invalid",
       "status": 400,
       "source": "go/cmd/galaxy/install.go",
-      "line": 183
+      "line": 190
+    },
+    {
+      "code": "upload_privacy_level_invalid",
+      "status": 400,
+      "source": "go/cmd/galaxy/install.go",
+      "line": 315
     },
     {
       "code": "native_arguments_invalid",
@@ -5448,7 +5472,7 @@
       "code": "community_growth_version_conflict",
       "status": 409,
       "source": "go/internal/communitygrowth/assessment-management.go",
-      "line": 151
+      "line": 155
     },
     {
       "code": "community_assessment_task_not_found",
@@ -5484,31 +5508,37 @@
       "code": "community_assessment_evidence_mismatch",
       "status": 409,
       "source": "go/internal/communitygrowth/assessment-results.go",
-      "line": 136
+      "line": 139
     },
     {
       "code": "community_assessment_source_changed",
       "status": 409,
       "source": "go/internal/communitygrowth/assessment-results.go",
-      "line": 153
+      "line": 156
     },
     {
       "code": "community_assessment_source_changed",
       "status": 409,
       "source": "go/internal/communitygrowth/assessment-results.go",
-      "line": 164
+      "line": 167
     },
     {
       "code": "community_assessment_versions_unavailable",
       "status": 503,
       "source": "go/internal/communitygrowth/assessment-results.go",
-      "line": 172
+      "line": 175
     },
     {
       "code": "community_assessment_not_connected",
       "status": 503,
       "source": "go/internal/communitygrowth/assessment.go",
-      "line": 142
+      "line": 146
+    },
+    {
+      "code": "community_assessment_retired",
+      "status": 409,
+      "source": "go/internal/communitygrowth/assessment.go",
+      "line": 150
     },
     {
       "code": "community_growth_source_unavailable",
@@ -5607,6 +5637,18 @@
       "line": 209
     },
     {
+      "code": "community_growth_ledger_reconciling",
+      "status": 409,
+      "source": "go/internal/communitygrowth/ledger.go",
+      "line": 96
+    },
+    {
+      "code": "community_growth_ledger_reconciling",
+      "status": 409,
+      "source": "go/internal/communitygrowth/ledger.go",
+      "line": 112
+    },
+    {
       "code": "community_growth_source_unavailable",
       "status": 503,
       "source": "go/internal/communitygrowth/legacy_honors.go",
@@ -5646,43 +5688,43 @@
       "code": "community_assessment_lifecycle_not_connected",
       "status": 503,
       "source": "go/internal/communitygrowth/lifecycle.go",
-      "line": 47
+      "line": 50
     },
     {
       "code": "community_assessment_not_connected",
       "status": 503,
       "source": "go/internal/communitygrowth/lifecycle.go",
-      "line": 82
+      "line": 85
     },
     {
       "code": "operations_authorization_unavailable",
       "status": 503,
       "source": "go/internal/communitygrowth/management.go",
-      "line": 136
+      "line": 154
     },
     {
       "code": "business_admin_denied",
       "status": 403,
       "source": "go/internal/communitygrowth/management.go",
-      "line": 139
+      "line": 157
     },
     {
       "code": "business_admin_denied",
       "status": 403,
       "source": "go/internal/communitygrowth/management.go",
-      "line": 146
+      "line": 164
     },
     {
       "code": "business_admin_denied",
       "status": 403,
       "source": "go/internal/communitygrowth/management.go",
-      "line": 190
+      "line": 203
     },
     {
       "code": "community_growth_operation_conflict",
       "status": 409,
       "source": "go/internal/communitygrowth/management.go",
-      "line": 203
+      "line": 231
     },
     {
       "code": "official_account_login_required",
@@ -5751,16 +5793,28 @@
       "line": 20
     },
     {
+      "code": "community_growth_rule_not_found",
+      "status": 404,
+      "source": "go/internal/communitygrowth/parameters.go",
+      "line": 28
+    },
+    {
+      "code": "business_admin_denied",
+      "status": 403,
+      "source": "go/internal/communitygrowth/parameters.go",
+      "line": 142
+    },
+    {
       "code": "community_growth_account_not_found",
       "status": 404,
       "source": "go/internal/communitygrowth/projection.go",
-      "line": 33
+      "line": 36
     },
     {
       "code": "community_growth_source_revision_conflict",
       "status": 409,
       "source": "go/internal/communitygrowth/projection.go",
-      "line": 64
+      "line": 79
     },
     {
       "code": "community_growth_profile_unavailable",
@@ -5790,7 +5844,7 @@
       "code": "community_growth_source_unavailable",
       "status": 503,
       "source": "go/internal/communitygrowth/ranking.go",
-      "line": 16
+      "line": 23
     },
     {
       "code": "community_growth_version_conflict",
@@ -5832,13 +5886,13 @@
       "code": "community_growth_version_conflict",
       "status": 409,
       "source": "go/internal/communitygrowth/rule_commands.go",
-      "line": 39
+      "line": 47
     },
     {
       "code": "community_growth_version_conflict",
       "status": 409,
       "source": "go/internal/communitygrowth/rule_commands.go",
-      "line": 84
+      "line": 92
     },
     {
       "code": "community_growth_invalid_request",
@@ -11070,103 +11124,103 @@
       "code": "local_initialization_input_invalid",
       "status": 400,
       "source": "go/internal/native/initialization.go",
-      "line": 66
+      "line": 83
     },
     {
       "code": "local_identity_subject_type_invalid",
       "status": 400,
       "source": "go/internal/native/initialization.go",
-      "line": 142
+      "line": 159
     },
     {
       "code": "local_initialization_path_planned",
       "status": 400,
       "source": "go/internal/native/initialization.go",
-      "line": 198
+      "line": 215
     },
     {
       "code": "local_initialization_choice_required",
       "status": 403,
       "source": "go/internal/native/initialization.go",
-      "line": 247
+      "line": 264
     },
     {
       "code": "local_initialization_requires_recovery",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 261
+      "line": 278
     },
     {
       "code": "local_identity_client_kind_mismatch",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 312
+      "line": 329
     },
     {
       "code": "local_initialization_incomplete",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 319
+      "line": 336
     },
     {
       "code": "local_initialization_incomplete",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 351
+      "line": 368
     },
     {
       "code": "local_identity_required",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 445
+      "line": 462
     },
     {
       "code": "local_initialization_journal_invalid",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 492
+      "line": 509
     },
     {
       "code": "local_initialization_journal_invalid",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 496
+      "line": 513
     },
     {
       "code": "local_initialization_journal_invalid",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 501
+      "line": 518
     },
     {
       "code": "local_initialization_journal_invalid",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 505
+      "line": 522
     },
     {
       "code": "local_initialization_journal_conflict",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 545
+      "line": 562
     },
     {
       "code": "local_initialization_file_conflict",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 574
+      "line": 591
     },
     {
       "code": "local_initialization_journal_invalid",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 605
+      "line": 622
     },
     {
       "code": "local_initialization_journal_invalid",
       "status": 409,
       "source": "go/internal/native/initialization.go",
-      "line": 613
+      "line": 630
     },
     {
       "code": "native_update_identity_missing",
@@ -11334,31 +11388,31 @@
       "code": "local_work_input_invalid",
       "status": 400,
       "source": "go/internal/native/mcp.go",
-      "line": 252
+      "line": 251
     },
     {
       "code": "local_work_input_invalid",
       "status": 400,
       "source": "go/internal/native/mcp.go",
-      "line": 270
+      "line": 269
     },
     {
       "code": "local_work_input_invalid",
       "status": 400,
       "source": "go/internal/native/mcp.go",
-      "line": 273
+      "line": 272
     },
     {
       "code": "local_identity_required",
       "status": 409,
       "source": "go/internal/native/mcp.go",
-      "line": 325
+      "line": 324
     },
     {
       "code": "local_identity_mismatch",
       "status": 409,
       "source": "go/internal/native/mcp.go",
-      "line": 328
+      "line": 327
     },
     {
       "code": "native_authorization_input_invalid",
@@ -11832,19 +11886,19 @@
       "code": "local_experience_unavailable",
       "status": 404,
       "source": "go/internal/native/work-experience.go",
-      "line": 274
+      "line": 307
     },
     {
       "code": "local_experience_unavailable",
       "status": 404,
       "source": "go/internal/native/work-experience.go",
-      "line": 281
+      "line": 314
     },
     {
       "code": "local_experience_unavailable",
       "status": 404,
       "source": "go/internal/native/work-experience.go",
-      "line": 288
+      "line": 321
     },
     {
       "code": "local_work_review_conflict",
@@ -12273,6 +12327,12 @@
       "line": 31
     },
     {
+      "code": "operations_permission_denied",
+      "status": 403,
+      "source": "go/internal/operationsautonomy/community-parameters.go",
+      "line": 87
+    },
+    {
       "code": "community_assessment_executor_unavailable",
       "status": 503,
       "source": "go/internal/operationsautonomy/community_assessment.go",
@@ -12288,7 +12348,7 @@
       "code": "operations_autonomy_pause_requested",
       "status": 409,
       "source": "go/internal/operationsautonomy/community_assessment.go",
-      "line": 181
+      "line": 186
     },
     {
       "code": "invalid_operations_autonomy_request",
@@ -12300,7 +12360,7 @@
       "code": "operations_autonomy_daily_time_required",
       "status": 400,
       "source": "go/internal/operationsautonomy/configuration.go",
-      "line": 110
+      "line": 115
     },
     {
       "code": "operations_autonomy_operation_not_found",
@@ -12492,19 +12552,19 @@
       "code": "operations_autonomy_task_not_found",
       "status": 404,
       "source": "go/internal/operationsautonomy/model.go",
-      "line": 170
+      "line": 173
     },
     {
       "code": "invalid_operations_autonomy_request",
       "status": 400,
       "source": "go/internal/operationsautonomy/model.go",
-      "line": 176
+      "line": 179
     },
     {
       "code": "operations_autonomy_config_not_found",
       "status": 404,
       "source": "go/internal/operationsautonomy/model.go",
-      "line": 183
+      "line": 186
     },
     {
       "code": "operations_autonomy_native_attempt_mismatch",
@@ -12690,25 +12750,31 @@
       "code": "operations_autonomy_tool_not_configured",
       "status": 503,
       "source": "go/internal/operationsautonomy/tool.go",
-      "line": 222
+      "line": 240
     },
     {
       "code": "operations_autonomy_tool_not_configured",
       "status": 503,
       "source": "go/internal/operationsautonomy/tool.go",
-      "line": 240
+      "line": 258
     },
     {
       "code": "operations_autonomy_scope_denied",
       "status": 403,
       "source": "go/internal/operationsautonomy/tool.go",
-      "line": 267
+      "line": 285
     },
     {
       "code": "operations_autonomy_scope_denied",
       "status": 403,
       "source": "go/internal/operationsautonomy/tool.go",
-      "line": 271
+      "line": 289
+    },
+    {
+      "code": "operations_autonomy_community_proposal_too_large",
+      "status": 400,
+      "source": "go/internal/operationsautonomy/tool.go",
+      "line": 414
     },
     {
       "code": "operations_autonomy_receipt_invalid",
@@ -14251,6 +14317,84 @@
       "status": 404,
       "source": "go/internal/subjectlifecycle/service.go",
       "line": 284
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 59
+    },
+    {
+      "code": "comment_account_service_unavailable",
+      "status": 503,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 62
+    },
+    {
+      "code": "access_denied",
+      "status": 401,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 65
+    },
+    {
+      "code": "official_account_unavailable",
+      "status": 503,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 72
+    },
+    {
+      "code": "unsupported_media_type",
+      "status": 415,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 75
+    },
+    {
+      "code": "request_too_large",
+      "status": 413,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 82
+    },
+    {
+      "code": "invalid_request",
+      "status": 400,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 90
+    },
+    {
+      "code": "invalid_request",
+      "status": 400,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 99
+    },
+    {
+      "code": "invalid_comment_receipt",
+      "status": 400,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 106
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 110
+    },
+    {
+      "code": "invalid_request",
+      "status": 400,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 118
+    },
+    {
+      "code": "invalid_comment_receipt",
+      "status": 400,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 125
+    },
+    {
+      "code": "not_found",
+      "status": 404,
+      "source": "go/internal/taskmaterials/comment_account_http.go",
+      "line": 129
     },
     {
       "code": "access_denied",

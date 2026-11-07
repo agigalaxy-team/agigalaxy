@@ -386,6 +386,32 @@ func cardPresentation(p Object) Object {
 		b.add("执行身份", "目标岗位使用自身现有角色和授权，不继承交办人的业务权限。")
 		return Object{"summary": title, "changes": b.changes, "details": b.details, "warnings": b.warnings, "reviewable": b.valid}
 	}
+	if kind == "community-parameter-adjustment" {
+		changes, _ := p["changes"].([]any)
+		for _, item := range changes {
+			change := object(item)
+			label, before, after := text(change, "label"), text(change, "before"), text(change, "after")
+			if label == "" || before == "" || after == "" {
+				b.warn("参数差异不完整。")
+				continue
+			}
+			b.changes = append(b.changes, Object{"label": label, "before": before, "after": after})
+		}
+		if len(b.changes) == 0 {
+			b.warn("参数差异不完整。")
+		}
+		basis, _ := p["basis"].([]any)
+		for _, item := range basis {
+			field := object(item)
+			b.add(text(field, "label"), text(field, "value"))
+		}
+		impacts, _ := p["impact"].([]any)
+		for _, item := range impacts {
+			value, _ := item.(string)
+			b.add("采用影响", value)
+		}
+		return Object{"summary": title, "changes": b.changes, "details": b.details, "warnings": b.warnings, "reviewable": b.valid}
+	}
 	// Chunks from preparation are reassembled only when every part is present in order.
 	impacts, ok := p["impact"].([]any)
 	if !ok && p["impact"] != nil {

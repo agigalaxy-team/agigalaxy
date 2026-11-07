@@ -31,7 +31,7 @@ func (s *Service) ConnectCommunityAssessments(assessment *communitygrowth.Assess
 		var enabled bool
 		e := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM community_assessment_tasks_v1 t
 			JOIN community_assessment_config_v1 c ON c.endpoint=t.endpoint
-			WHERE t.endpoint=$1 AND t.id=$2 AND t.native_task_id=t.id AND c.enabled
+			WHERE t.endpoint=$1 AND t.id=$2 AND t.native_task_id=t.id AND c.enabled AND c.retired_at IS NULL
 			AND t.account_id::text=$3 AND t.domain=$4 AND t.purpose=$5
 			AND t.input_revision=$6 AND t.config_version=$7
 			AND t.configuration->>'executorConfigId'=$8 AND c.executor_config_id::text=$8)`,
@@ -138,16 +138,21 @@ func (s *Service) ConnectCommunityAssessments(assessment *communitygrowth.Assess
 		return nil
 	}
 	s.CommunityAssessmentCompletionWithin = func(ctx context.Context, tx pgx.Tx, row Object) (Object, error) {
-		var current, saved bool
+		var current, saved, retired bool
 		var taskState string
 		e := tx.QueryRow(ctx, `SELECT t.state,
 			EXISTS(SELECT 1 FROM community_assessment_scopes_v1 x JOIN community_assessment_config_v1 c ON c.endpoint=x.endpoint
 			WHERE x.endpoint=t.endpoint AND x.account_id=t.account_id AND x.domain=t.domain AND x.purpose=t.purpose
 			AND x.input_revision=t.input_revision AND x.task_id=t.id AND c.enabled AND c.version=t.config_version),
-			EXISTS(SELECT 1 FROM community_assessment_results_v1 r WHERE r.endpoint=t.endpoint AND r.task_id=t.id AND r.status IN ('assessed','insufficient-material'))
-			FROM community_assessment_tasks_v1 t WHERE t.endpoint=$1 AND t.id=$2 AND t.native_task_id=$2`, s.Endpoint, row["id"]).Scan(&taskState, &current, &saved)
+			EXISTS(SELECT 1 FROM community_assessment_results_v1 r WHERE r.endpoint=t.endpoint AND r.task_id=t.id AND r.status IN ('assessed','insufficient-material')),
+			c.retired_at IS NOT NULL
+			FROM community_assessment_tasks_v1 t JOIN community_assessment_config_v1 c ON c.endpoint=t.endpoint
+			WHERE t.endpoint=$1 AND t.id=$2 AND t.native_task_id=$2`, s.Endpoint, row["id"]).Scan(&taskState, &current, &saved, &retired)
 		if e != nil {
 			return nil, e
+		}
+		if retired && !saved {
+			return Object{"businessState": "no-action", "eligibleToComplete": true, "disposition": "completed", "reasonCode": "community-assessment-retired", "nextAction": "旧评估已停止，结束本次计算"}, nil
 		}
 		if !current || taskState == "superseded" {
 			return Object{"businessState": "no-action", "eligibleToComplete": true, "disposition": "completed", "reasonCode": "community-assessment-source-changed", "nextAction": "本次输入已更换，结束原计算"}, nil

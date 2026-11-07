@@ -13,6 +13,7 @@ import (
 	"github.com/agigalaxy-team/agigalaxy/go/internal/accounts"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/community"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/databaseschema"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/discovery"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/postgres"
@@ -123,6 +124,24 @@ func TestCommunityGrowthRealWriteCancellationAndPublicQualification(t *testing.T
 	if got := get()["experience"]; got != int64(6) {
 		t.Fatalf("post and real received like: %v", got)
 	}
+	document, e := (&discovery.CommunitySource{Pool: pool, Endpoint: endpoint, Forum: forum}).Load(ctx, discovery.Reference{Kind: "post", ID: postID})
+	if e != nil || document == nil {
+		t.Fatalf("published recommendation source: %v %v", document, e)
+	}
+	score := func() (discovery.CommunitySignal, bool) {
+		t.Helper()
+		signals, err := growth.RankingSignalsWithRules(ctx, []discovery.CommunityCandidate{
+			{Key: document.ID, Kind: document.Kind, ID: document.SourceID, Version: document.Version},
+		}, discovery.DefaultCommunityScoringRules())
+		if err != nil {
+			t.Fatal(err)
+		}
+		signal, ok := signals[document.ID]
+		return signal, ok
+	}
+	if signal, ok := score(); !ok || signal.Recognition <= 0 {
+		t.Fatalf("real like was absent from the post score: %v", signal)
+	}
 	if deadline, valid := integer(get()["readExpiresAt"]); !valid || deadline != now.Add(time.Hour).Unix() {
 		t.Fatalf("known source deadline was lost: %v", get()["readExpiresAt"])
 	}
@@ -143,12 +162,18 @@ func TestCommunityGrowthRealWriteCancellationAndPublicQualification(t *testing.T
 	if got := get()["experience"]; got != int64(5) {
 		t.Fatalf("cancelled like still counted: %v", got)
 	}
+	if signal, ok := score(); !ok || signal.Recognition != 0 {
+		t.Fatalf("cancelled like still in the post score: %v", signal)
+	}
 	// A qualification change is effective even before background projection.
 	if _, e = owner.Exec(ctx, `UPDATE forum_permissions_v1 SET revoked_at=$2 WHERE object_id=$1`, post["versionId"], now); e != nil {
 		t.Fatal(e)
 	}
 	if got := get()["experience"]; got != int64(0) {
 		t.Fatalf("revoked content still counted: %v", got)
+	}
+	if _, ok := score(); ok {
+		t.Fatal("revoked content retained a recommendation signal")
 	}
 	if _, e = owner.Exec(ctx, `UPDATE official_account_profiles_v1 SET query_enabled=false WHERE account_id=$1`, ids[0]); e != nil {
 		t.Fatal(e)

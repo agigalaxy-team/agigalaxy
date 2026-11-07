@@ -56,6 +56,31 @@ func (t *ConversationTools) cardReadPermission(kind string) (string, error) {
 	}
 	return "", fail("operations_agentos_conversation_not_ready", 503)
 }
+func (t *ConversationTools) proposalReadPermission(proposal Object) (string, error) {
+	if text(proposal, "kind") == "community-parameter-adjustment" {
+		switch text(object(proposal["request"]), "area") {
+		case "growth":
+			return "rules.read", nil
+		case "content-score", "recommendation":
+			return "recommendations.read", nil
+		}
+		return "", fail("invalid_operations_agentos_request", 400)
+	}
+	return t.cardReadPermission(text(proposal, "kind"))
+}
+
+func communityParameterWritePermission(proposal Object) string {
+	if proposal["kind"] != "community-parameter-adjustment" {
+		return ""
+	}
+	switch text(object(proposal["request"]), "area") {
+	case "growth":
+		return "rules.write"
+	case "content-score", "recommendation":
+		return "recommendations.configure"
+	}
+	return ""
+}
 func (t *ConversationTools) recoverPrepared(ctx context.Context, a operationspermissions.Actor, proposal Object, operation string) (Object, error) {
 	if _, e := managementCardRead(text(proposal, "kind")); e == nil {
 		return t.Conversations.Permissions.RecoverManagementAction(ctx, a, proposal, operation)
@@ -83,7 +108,7 @@ func sameConversationJSON(a, b any) bool {
 
 func (t *ConversationTools) cardActorWithin(ctx context.Context, tx pgx.Tx, human operationspermissions.Actor, row *conversationCard) (operationspermissions.Actor, error) {
 	s := t.Conversations
-	permission, err := t.cardReadPermission(text(row.Proposal, "kind"))
+	permission, err := t.proposalReadPermission(row.Proposal)
 	if err != nil {
 		return operationspermissions.Actor{}, err
 	}

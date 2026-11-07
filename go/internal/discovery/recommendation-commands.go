@@ -37,16 +37,26 @@ func (s *Recommendations) command(ctx context.Context, actor Actor, kind string,
 		return nil, e
 	}
 	defer tx.Rollback(context.Background())
+	result, e := s.commandWithin(ctx, tx, actor, kind, input, change)
+	if e != nil {
+		return nil, e
+	}
+	return result, tx.Commit(ctx)
+}
+
+func (s *Recommendations) commandWithin(ctx context.Context, tx pgx.Tx, actor Actor, kind string, input Object, change func(pgx.Tx) (recommendationChange, error)) (Object, error) {
+	business := s.business()
 	fresh, e := business.require(ctx, tx, actor, "recommendations.configure")
 	if e != nil {
 		return nil, e
 	}
-	raw, e := identity.Canonical(Object{"kind": kind, "input": input})
+	hash, e := recommendationRequestHash(kind, input)
 	if e != nil {
 		return nil, e
 	}
-	digest := sha256.Sum256(raw)
-	hash := hex.EncodeToString(digest[:])
+	if kind == "community-signals" && (actor.AIProof != nil || s.Authority.Execution != nil && s.Authority.Execution.AcceptsExecution(fresh)) {
+		return nil, qualityFailure("operations_agentos_human_review_required", 403)
+	}
 	if s.Authority.Duty != nil && s.Authority.Duty.AcceptsDuty(fresh) {
 		if kind != "policy" {
 			return nil, qualityFailure("operations_agentos_human_review_required")
@@ -59,16 +69,9 @@ func (s *Recommendations) command(ctx context.Context, actor Actor, kind string,
 	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,734912429))", s.Endpoint); e != nil {
 		return nil, e
 	}
-	prior, e := rowObject(ctx, tx, "SELECT to_jsonb(e) FROM operations_recommendation_events_v1 e WHERE endpoint=$1 AND operation_id=$2", s.Endpoint, input["operationId"])
-	if e != nil {
-		return nil, e
-	}
-	if prior != nil {
-		if str(prior, "operator_id") != fresh.ID || str(prior, "request_hash") != hash {
-			return nil, qualityFailure("recommendation_operation_conflict")
-		}
-		result := merge(merge(Object{}, object(prior["result"])), Object{"replayed": true})
-		return result, tx.Commit(ctx)
+	prior, e := s.recommendationReceiptWithin(ctx, tx, fresh.ID, str(input, "operationId"), hash)
+	if e != nil || prior != nil {
+		return prior, e
 	}
 	changed, e := change(tx)
 	if e != nil {
@@ -84,7 +87,27 @@ func (s *Recommendations) command(ctx context.Context, actor Actor, kind string,
 	if e = business.recordFacts(ctx, tx, fresh, "recommendations.configure", str(input, "operationId"), Object{"kind": kind, "version": changed.Version}, Object{"version": changed.Version}); e != nil {
 		return nil, e
 	}
-	return result, tx.Commit(ctx)
+	return result, nil
+}
+
+func recommendationRequestHash(kind string, input Object) (string, error) {
+	raw, e := identity.Canonical(Object{"kind": kind, "input": input})
+	if e != nil {
+		return "", e
+	}
+	digest := sha256.Sum256(raw)
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func (s *Recommendations) recommendationReceiptWithin(ctx context.Context, tx pgx.Tx, operator, operation, hash string) (Object, error) {
+	prior, e := rowObject(ctx, tx, "SELECT to_jsonb(e) FROM operations_recommendation_events_v1 e WHERE endpoint=$1 AND operation_id=$2", s.Endpoint, operation)
+	if e != nil || prior == nil {
+		return nil, e
+	}
+	if str(prior, "operator_id") != operator || str(prior, "request_hash") != hash {
+		return nil, qualityFailure("recommendation_operation_conflict")
+	}
+	return merge(merge(Object{}, object(prior["result"])), Object{"replayed": true}), nil
 }
 func (s *Recommendations) SavePolicy(ctx context.Context, actor Actor, raw Object, expected *ThemeExpectation) (Object, error) {
 	input, e := parseRecommendationCommand("policy", raw)

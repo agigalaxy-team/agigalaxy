@@ -22,6 +22,9 @@ func (s *Service) RecoverPrepared(ctx context.Context, a Actor, proposal Object,
 	}
 	kind := str(x["kind"])
 	read, e := CardReadPermission(kind)
+	if kind == CommunityParameterAdjustment {
+		read, e = CommunityParameterReadAction(str(x["area"])), nil
+	}
 	if e != nil {
 		return nil, e
 	}
@@ -32,6 +35,9 @@ func (s *Service) RecoverPrepared(ctx context.Context, a Actor, proposal Object,
 	actor, e := s.human(ctx, a, str(proposal["domain"]), read, purpose, nil)
 	if e != nil {
 		return nil, e
+	}
+	if kind == CommunityParameterAdjustment {
+		return s.recoverMacro(ctx, actor, x, command, operationID)
 	}
 	var result Object
 	var finalCard Object

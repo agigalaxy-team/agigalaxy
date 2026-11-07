@@ -37,7 +37,23 @@ func (w *Worker) Step(ctx context.Context) (Object, error) {
 		return nil, invalid()
 	}
 	return postgres.InTx(ctx, s.Pool, func(tx pgx.Tx) (Object, error) {
-		_, e := tx.Exec(ctx, `INSERT INTO community_growth_reconcile_state_v1(endpoint,phase,cursor,updated_at) VALUES($1,'content','',$2) ON CONFLICT(endpoint) DO NOTHING`, s.Endpoint, s.now())
+		if e := s.lockLedger(ctx, tx); e != nil {
+			return nil, e
+		}
+		if e := s.ensureDefaults(ctx, tx); e != nil {
+			return nil, e
+		}
+		if e := s.prepareLedgerWithin(ctx, tx); e != nil {
+			return nil, e
+		}
+		pending, awarded, e := s.reconcilePendingAwardsWithin(ctx, tx, limit)
+		if e != nil {
+			return nil, e
+		}
+		if pending != 0 {
+			return Object{"phase": "awards", "scanned": awarded, "cycleComplete": false}, nil
+		}
+		_, e = tx.Exec(ctx, `INSERT INTO community_growth_reconcile_state_v1(endpoint,phase,cursor,updated_at) VALUES($1,'content','',$2) ON CONFLICT(endpoint) DO NOTHING`, s.Endpoint, s.now())
 		if e != nil {
 			return nil, e
 		}
@@ -47,7 +63,9 @@ func (w *Worker) Step(ctx context.Context) (Object, error) {
 		}
 		var kind, id, dirtyCursor string
 		var generation int64
-		e = tx.QueryRow(ctx, `SELECT kind,object_id::text,generation,cursor FROM community_growth_dirty_objects_v1 WHERE endpoint=$1 ORDER BY updated_at,kind,object_id LIMIT 1`, s.Endpoint).Scan(&kind, &id, &generation, &dirtyCursor)
+		e = tx.QueryRow(ctx, `SELECT kind,object_id::text,generation,cursor FROM community_growth_dirty_objects_v1
+			WHERE endpoint=$1 AND EXISTS(SELECT 1 FROM community_growth_ledger_state_v1 WHERE endpoint=$1 AND reconciled_at IS NOT NULL)
+			ORDER BY updated_at,kind,object_id LIMIT 1`, s.Endpoint).Scan(&kind, &id, &generation, &dirtyCursor)
 		if e == nil {
 			n, done, e := w.dirtyPage(ctx, tx, kind, id, dirtyCursor, generation, limit)
 			if e != nil {
@@ -127,6 +145,11 @@ func (w *Worker) Step(ctx context.Context) (Object, error) {
 		_, e = tx.Exec(ctx, `UPDATE community_growth_reconcile_state_v1 SET phase=$2,cursor=$3,updated_at=$4,completed_at=CASE WHEN $5 THEN $4 ELSE completed_at END WHERE endpoint=$1`, s.Endpoint, phase, next, s.now(), !more)
 		if e != nil {
 			return nil, e
+		}
+		if !more {
+			if _, e = tx.Exec(ctx, `UPDATE community_growth_ledger_state_v1 SET reconciled_at=$2 WHERE endpoint=$1 AND reconciled_at IS NULL`, s.Endpoint, s.now()); e != nil {
+				return nil, e
+			}
 		}
 		return Object{"phase": "reactions", "scanned": len(items), "cycleComplete": !more}, nil
 	})

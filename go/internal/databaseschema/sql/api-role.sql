@@ -422,6 +422,7 @@ GRANT SELECT,INSERT,UPDATE ON community_growth_sources_v1 TO galaxy_api;
 GRANT SELECT,INSERT,UPDATE ON community_growth_definitions_v1 TO galaxy_api;
 GRANT SELECT,INSERT,UPDATE ON community_growth_recognitions_v1 TO galaxy_api;
 GRANT SELECT,INSERT,UPDATE ON community_growth_reconcile_state_v1 TO galaxy_api;
+GRANT SELECT,INSERT(endpoint,prepared_at),UPDATE(reconciled_at) ON community_growth_ledger_state_v1 TO galaxy_api;
 GRANT SELECT,INSERT,UPDATE ON community_growth_dirty_objects_v1 TO galaxy_api;
 GRANT SELECT,INSERT,UPDATE ON community_assessment_config_v1 TO galaxy_api;
 GRANT SELECT,INSERT,UPDATE ON community_assessment_source_revisions_v1 TO galaxy_api;

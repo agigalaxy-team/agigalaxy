@@ -70,7 +70,8 @@ func TestCommunityCalculationUsesItsOwnActivation(t *testing.T) {
 		return nil, nil
 	}}
 	svc.ConnectCommunityAssessments(assessment)
-	if _, err := assessment.SaveConfiguration(ctx, f.Root, communitygrowth.Object{"kind": "assessment-config-save", "operationId": uuid.NewString(), "expectedVersion": 1, "enabled": true, "executorConfigId": executor, "purposes": []string{"contribution-impact"}, "instructions": "按已确认用途理解公开材料；不足以判断时保留未知。"}); err != nil {
+	configOperation := uuid.NewString()
+	if _, err := assessment.SaveConfiguration(ctx, f.Root, communitygrowth.Object{"kind": "assessment-config-save", "operationId": configOperation, "expectedVersion": 1, "enabled": true, "executorConfigId": executor, "purposes": []string{"contribution-impact"}, "instructions": "按已确认用途理解公开材料；不足以判断时保留未知。"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := owner.Exec(ctx, `INSERT INTO community_assessment_scopes_v1(endpoint,account_id,domain,purpose,next_attempt_at,updated_at) VALUES($1,$2,'technology','contribution-impact',$3,$3)`, f.Endpoint, account, f.Now()); err != nil {
@@ -94,11 +95,27 @@ func TestCommunityCalculationUsesItsOwnActivation(t *testing.T) {
 	if err = owner.QueryRow(ctx, `SELECT enabled,configuration->>'mode' FROM operations_autonomy_configs_v1 WHERE id=$1`, executor).Scan(&enabled, &mode); err != nil || enabled || mode != "code" {
 		t.Fatal("routine configuration changed", enabled, mode, err)
 	}
-	if _, err = owner.Exec(ctx, `UPDATE community_assessment_config_v1 SET enabled=false WHERE endpoint=$1`, f.Endpoint); err != nil {
+	if _, err = owner.Exec(ctx, `INSERT INTO community_growth_ledger_state_v1(endpoint,prepared_at,reconciled_at) VALUES($1,$2,$2)`, f.Endpoint, f.Now()); err != nil {
+		t.Fatal(err)
+	}
+	migration := &communitygrowth.Service{Pool: owner, Endpoint: f.Endpoint, Now: f.Now}
+	if _, err = migration.ActivateGrowthLedger(ctx); err != nil {
 		t.Fatal(err)
 	}
 	_, err = svc.Authorize(ctx, a.Object{"taskId": id, "operation": "run", "nativeAttemptId": native.row["native_attempt_id"]})
 	if err == nil || fault.Code(err) != "operations_autonomy_task_inactive" {
-		t.Fatalf("disabled calculation retained execution authority: %v", err)
+		t.Fatalf("retired calculation retained execution authority: %v", err)
+	}
+	queued, err = (&communitygrowth.AssessmentWorker{Service: assessment}).Step(ctx)
+	if err != nil || queued["state"] != "disabled" {
+		t.Fatalf("retired assessment worker still active: %v %v", queued, err)
+	}
+	var state string
+	if err = owner.QueryRow(ctx, `SELECT c.enabled,t.state FROM community_assessment_config_v1 c
+		JOIN community_assessment_tasks_v1 t ON t.endpoint=c.endpoint WHERE c.endpoint=$1 AND t.id=$2`, f.Endpoint, id).Scan(&enabled, &state); err != nil || !enabled || state != "running" {
+		t.Fatalf("retirement changed historical config or task: %v %v %v", enabled, state, err)
+	}
+	if receipt, err := assessment.ConfigurationReceipt(ctx, f.Root, configOperation); err != nil || receipt["state"] != "recorded" {
+		t.Fatalf("original configuration receipt missing: %v %v", receipt, err)
 	}
 }

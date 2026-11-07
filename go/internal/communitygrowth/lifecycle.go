@@ -21,6 +21,9 @@ func (s *Service) EraseSubjectSourcesWithTasksWithin(ctx context.Context, tx pgx
 	if subject == "" || s.Endpoint == "" {
 		return nil, invalid()
 	}
+	if e := s.lockLedger(ctx, tx); e != nil {
+		return nil, e
+	}
 	taskRows, e := tx.Query(ctx, `SELECT DISTINCT m.task_id::text FROM community_assessment_materials_v1 m
 	 JOIN community_assessment_tasks_v1 a ON a.endpoint=m.endpoint AND a.id=m.task_id
 	 WHERE m.endpoint=$1 AND ((m.snapshot->>'objectKind'='post' AND EXISTS(SELECT 1 FROM forum_posts_v1 p WHERE p.id::text=m.snapshot->>'objectId' AND (p.subject_id=$2 OR EXISTS(SELECT 1 FROM forum_versions_v1 v WHERE v.post_id=p.id AND v.subject_id=$2)))) OR (m.snapshot->>'objectKind'='reply' AND EXISTS(SELECT 1 FROM forum_replies_v1 r WHERE r.id::text=m.snapshot->>'objectId' AND r.subject_id=$2))) ORDER BY m.task_id::text`, s.Endpoint, subject)

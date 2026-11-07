@@ -116,7 +116,9 @@ function agentOsQueryAllowed(pathname,search){
   const params=new URLSearchParams(search);return search.length<=600&&[...params].every(([key,value])=>key==='before'&&params.getAll(key).length===1&&value.length>0&&value.length<=512&&/^[A-Za-z0-9_-]+$/.test(value));
  }
  if(new RegExp('^/v1/operations/agentos/'+agentOsConversationRoot+'/cards$','i').test(pathname)){
-  const params=new URLSearchParams(search);return search.length<=2500&&[...params].length<=50&&[...params].every(([key,value])=>key==='turnId'&&new RegExp('^'+uuid+'$','i').test(value));
+  const params=new URLSearchParams(search);
+  if(params.has('kind'))return pathname==='/v1/operations/agentos/conversations/governance/cards'&&[...params].length===1&&params.get('kind')==='community-parameter-adjustment';
+  return search.length<=2500&&[...params].length<=50&&[...params].every(([key,value])=>key==='turnId'&&new RegExp('^'+uuid+'$','i').test(value));
  }
  if(pathname!=='/v1/operations/agentos/runs')return !search;
  const params=new URLSearchParams(search);
@@ -254,7 +256,7 @@ export function operationsProxyPolicy({url,method,headers,publicOrigin}){
   const taskRead=new RegExp('^/v1/operations/(?:jobs(?:/(?:'+queues+')/'+uuid+')?|search/failures(?:/'+uuid+')?)$','i');
   const taskWrite=new RegExp('^/v1/operations/(?:jobs/(?:'+queues+')/'+uuid+'/(?:cancel|retry)|search/failures/'+uuid+'/retry)$','i');
   const read=method==='GET'&&(path==='/v1/operations/web-events'||(governanceOperationReadPath.test(path)||productChatOperationReadPath.test(path))||fileAccessReadPath.test(path)||fileCleanupReadPath.test(path)||strategiesReadPath.test(path)||ruleSettingsReadPath.test(path)||modelSettingsReadPath.test(path)||maintenanceReadPath.test(path)||searchQualityReadPath.test(path)||recommendationReadPath.test(path)||path===discoveryAnalyticsPath||agentOsReadPath.test(path)||messagingReadPath.test(path)||smtpReadPath.test(path)||permissionsReadPath.test(path)||path==='/v1/operations/session'||publicationPath.test(path)||userReadPath.test(path)||reportRead.test(path)||taskRead.test(path)||businessReads.some(pattern=>pattern.test(path)));
-  const growthWrite=method==='POST'&&/^\/v1\/operations\/community-growth\/(?:query|command|receipt|assessment-config|assessment-config-command|assessment-config-receipt|weights)$/.test(path)&&!requestUrl.search;
+  const growthWrite=method==='POST'&&/^\/v1\/operations\/community-growth\/(?:query|command|receipt|assessment-config|assessment-config-receipt|weights)$/.test(path)&&!requestUrl.search;
   const write=method==='POST'&&(growthWrite||fileAccessWritePath.test(path)||fileCleanupWritePath.test(path)||strategiesWritePath.test(path)||ruleSettingsWritePath.test(path)||modelSettingsWritePath.test(path)||maintenanceWritePath.test(path)||searchQualityWritePath.test(path)||recommendationWritePath.test(path)||agentOsWritePath.test(path)||messagingWritePath.test(path)||smtpWritePath.test(path)||permissionsWritePath.test(path)||path==='/v1/operations/logout'||path==='/v1/operations/content/publications'||reportWrite.test(path)||taskWrite.test(path)||businessWrites.some(pattern=>pattern.test(path))||new RegExp('^/v1/operations/users/'+uuid+'/(?:restriction(?:/release)?|type-change)$','i').test(path));
   const registeredRead=method==='GET'&&registeredUsersReadPath.test(path);
   const registeredWrite=method==='POST'&&registeredUsersWritePath.test(path);

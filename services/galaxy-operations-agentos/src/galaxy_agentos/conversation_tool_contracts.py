@@ -462,6 +462,19 @@ class RecommendationDirection(ClosedArguments):
     reason: SearchReason
 
 
+CommunityParameterArea = Literal["growth", "content-score", "recommendation"]
+CommunityParameterScope = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_-]*$")]
+
+
+class CommunityParameterAdjustment(ClosedArguments):
+    kind: Literal["community-parameter-adjustment"]
+    area: CommunityParameterArea
+    scope: CommunityParameterScope
+    expectedVersion: Annotated[int, Field(strict=True, ge=0, le=9007199254740991)]
+    parameters: Annotated[dict[str, Annotated[float, Field(strict=True, allow_inf_nan=False)]], Field(min_length=1, max_length=12)]
+    reason: SearchReason
+
+
 RuleKey = Literal["resource-budget", "community-quota", "forum-quota", "business-controls"]
 RuleReason = Annotated[str, Field(min_length=1, max_length=500)]
 
@@ -571,7 +584,7 @@ _BusinessOperation = Union[CleanupPlanCreate, CleanupPlanCancel, ContentTagCreat
     OrdinaryStrategyDraft, OrdinaryStrategyPublish, StrategyDraft, StrategyRehearsal, StrategyPublish,
     SearchDraftSave, SearchApply, SearchRestore, RulePublish, RuleRestore, RecommendationDirection, RecommendationPolicySave, RecommendationThemeUpdate]
 DutyPreparedOperation = Annotated[Union[_BusinessOperation, OrdinaryStrategyCreateDraft], Field(discriminator="kind")]
-PreparedOperation = Annotated[Union[_BusinessOperation, AiRoleCommand], Field(discriminator="kind")]
+PreparedOperation = Annotated[Union[_BusinessOperation, AiRoleCommand, CommunityParameterAdjustment], Field(discriminator="kind")]
 
 
 def _preparation_type(domain):

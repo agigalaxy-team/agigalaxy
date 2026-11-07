@@ -1,7 +1,7 @@
 {
   "version": 3,
   "status": "current-source-declarations",
-  "schema": 147,
+  "schema": 149,
   "migrationVersions": [
     1,
     2,
@@ -148,9 +148,11 @@
     144,
     145,
     146,
-    147
+    147,
+    148,
+    149
   ],
-  "table_count": 318,
+  "table_count": 319,
   "tables": [
     {
       "table": "access_credentials",
@@ -486,6 +488,11 @@
       "table": "community_growth_initialized_v1",
       "introducedByMigration": 147,
       "source": "go/internal/databaseschema/sql/147.sql"
+    },
+    {
+      "table": "community_growth_ledger_state_v1",
+      "introducedByMigration": 149,
+      "source": "go/internal/databaseschema/sql/149.sql"
     },
     {
       "table": "community_growth_levels_history_v1",
@@ -1907,7 +1914,9 @@
       144,
       145,
       146,
-      147
+      147,
+      148,
+      149
     ],
     "matchesCurrentMigrationHistory": true,
     "unclassifiedDeclaredTables": [],

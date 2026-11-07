@@ -97,7 +97,8 @@ func TestOriginalMaintenanceInventoryAndSignedApprovalPreparation(t *testing.T) 
 		t.Fatal(e)
 	}
 	if p.SubjectID == "" || p.Plan.Audit.Until != 2000000100 || p.PriorResult != nil || len(p.Inventory.References) != fixture.Original.Constraints || len(p.Inventory.Keys) != len(fixture.Original.Keys) {
-		t.Fatal("original maintenance preparation mismatch")
+		t.Fatalf("original maintenance preparation mismatch: foreign references %d (expected %d), keyed targets %d (expected %d)",
+			len(p.Inventory.References), fixture.Original.Constraints, len(p.Inventory.Keys), len(fixture.Original.Keys))
 	}
 	for table, keys := range fixture.Original.Keys {
 		actual := p.Inventory.Keys[table]

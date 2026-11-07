@@ -15,6 +15,7 @@ type preparation struct {
 	title             string
 	impact            []any
 	basis             []any
+	changes           []any
 	expires           int64
 }
 
@@ -60,6 +61,9 @@ func (s *Service) PrepareWithReference(ctx context.Context, a Actor, domain stri
 		return nil, fail("invalid_operations_agentos_request", 400)
 	}
 	read, e := CardReadPermission(kind)
+	if kind == CommunityParameterAdjustment {
+		read, e = CommunityParameterReadAction(str(x["area"])), nil
+	}
 	if e != nil {
 		return nil, e
 	}
@@ -73,6 +77,8 @@ func (s *Service) PrepareWithReference(ctx context.Context, a Actor, domain stri
 	}
 	p := preparation{impact: []any{}, basis: []any{}, expires: s.now() + 30}
 	switch kind {
+	case CommunityParameterAdjustment:
+		e = s.prepareMacro(ctx, actor, domain, x, &p)
 	case "file-cleanup-plan-create", "file-cleanup-plan-cancel":
 		e = s.prepareCleanupPlan(ctx, actor, x, &p)
 	case "content-tag-create", "content-tag-update":
@@ -117,6 +123,10 @@ func (s *Service) PrepareWithReference(ctx context.Context, a Actor, domain stri
 		return nil, fail("operations_source_unavailable", 409)
 	}
 	out := Object{"schemaVersion": 1, "kind": kind, "domain": domain, "request": x, "command": p.command, "target": p.target, "title": p.title, "impact": p.impact, "basis": p.basis, "requiredAction": permission, "checkedAt": s.now(), "readExpiresAt": p.expires, "decisionSource": "human-required"}
+	if kind == CommunityParameterAdjustment {
+		out["changes"] = p.changes
+		out["dismissalAllowed"] = true
+	}
 	if len(p.presentationNames) > 0 {
 		out["presentationNames"] = p.presentationNames
 	}

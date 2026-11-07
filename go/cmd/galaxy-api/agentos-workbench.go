@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos"
+	"github.com/agigalaxy-team/agigalaxy/go/internal/agentos/actions"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationsautonomy"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/operationspermissions"
@@ -64,11 +65,16 @@ func connectWorkbench(conversations *agentos.Conversations, autonomy *operations
 			}
 			return false
 		}
-		if !contains(task["actions"], proposal["requiredAction"]) {
-			return fault.New("operations_autonomy_workbench_scope_denied", 403)
-		}
 		scope, _ := task["resourceScope"].(map[string]any)
 		if scope["kind"] != "all" && scope["kind"] != "eligible" && scope["kind"] != "selected" {
+			return fault.New("operations_autonomy_workbench_scope_denied", 403)
+		}
+		// A governance analysis can propose a scoped parameter change. The
+		// original business owner still requires human approval before any write.
+		if proposal["kind"] == actions.CommunityParameterAdjustment && row.Domain == "governance" && scope["kind"] != "selected" {
+			return nil
+		}
+		if !contains(task["actions"], proposal["requiredAction"]) {
 			return fault.New("operations_autonomy_workbench_scope_denied", 403)
 		}
 		if scope["kind"] == "selected" {

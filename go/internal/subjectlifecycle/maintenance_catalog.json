@@ -291,6 +291,7 @@
     "forum_reaction_operations_v1",
     "discovery_feedback_state_v1",
     "community_growth_initialized_v1",
+    "community_growth_ledger_state_v1",
     "community_growth_rules_v1",
     "community_growth_rule_history_v1",
     "community_growth_levels_history_v1",
@@ -475,6 +476,8 @@
     144,
     145,
     146,
-    147
+    147,
+    148,
+    149
   ]
 }

@@ -16,6 +16,7 @@ _GROUPS = {
     "maintenance": ("文件与维护任务", (c.CleanupPlanCreate, c.CleanupPlanCancel, c.FileScanRetry, c.FileCleanupApprove, c.FileAccess, c.JobCancel, c.JobRetry)),
     "search": ("搜索", (c.SearchRetry, c.SearchDraftSave, c.SearchApply, c.SearchRestore)),
     "recommendations": ("推荐", (c.RecommendationDirection, c.RecommendationPolicySave, c.RecommendationThemeUpdate)),
+    "community_parameters": ("社区宏观调控", (c.CommunityParameterAdjustment,)),
     "strategy": ("策略与规则", (c.StrategyControl, c.StrategyContinue, c.OrdinaryStrategyDraft, c.OrdinaryStrategyPublish, c.StrategyDraft, c.StrategyRehearsal, c.StrategyPublish, c.RulePublish, c.RuleRestore)),
     "ai_management": ("AI专用角色", (c.AiRoleCommand,)),
 }
@@ -28,6 +29,7 @@ _GUIDANCE = {
     "maintenance": "File cleanup approval reviews an existing actual awaiting-approval plan. File access stops or restores access; it does not delete a file. Use actual targets and explicit deadlines.",
     "search": "Read the current complete settings and fixed constraints before a draft; explicitly select an existing draft before overwriting. A draft is not an applied configuration.",
     "recommendations": "Use actual theme identifiers and preserve unrelated settings. A saved direction does not imply ranking is active when the policy or theme is disabled.",
+    "community_parameters": "Read current community parameters before proposing changes. Use one growth rule or one global content-score or recommendation configuration per card. Propose changed numeric fields and a business reason. These are uniform rules; do not score individual accounts, posts or replies.",
     "strategy": "Use actual drafts, versions and original rehearsal evidence. Historical validity does not establish current publication eligibility.",
     "ai_management": "Read current_summary and read_ai_delegation for actual allowed targets and current role data. These actions cannot expand delegation or edit model settings.",
 }
@@ -40,6 +42,7 @@ _READ_GUIDANCE = {
     "maintenance": "maintenance/overview contains observed runtime and health facts. File cleanup views only read candidates and progress. runtime_event_rejected normalizes an event outside the allowed names and alone is not a security or proxy finding.",
     "search": "search/overview supports days 7/30/90 and defaults to 7. Search history returns version IDs; read the actual version for complete restore settings.",
     "recommendations": "recommendations/overview supports days 7/30/90 and defaults to 30. Its period is an event window; supply is current public stock, not new posts.",
+    "community_parameters": "Use read_community_parameters for the actual version and available aggregate evidence. Omit scope to list growth rule keys, then use one rule key or global for the other areas. The recommendations/overview query adds category and demand evidence when authorized.",
     "strategy": "strategy-version returns same-owner historical rehearsals with after/limit pagination. Historical validity does not establish current publication eligibility.",
     "ai_management": "system-settings is safe configuration and adoption metadata, not a service-health check; general is the current published website configuration, not an admin draft.",
     "analytics": "analytics uses relative days 1..90 (default 7), not calendar day/from/to. overview/business accept days; paths/retention accept scope=accounts and optional accountId, which requires that scope; account requires accountId. Returned period, basis and coverage can differ for fixed weekly, lifetime and current-stock metrics; null/unknown is not zero.",
@@ -62,11 +65,11 @@ def is_preparation_tool(name):
     return name == "request_task" or is_business_preparation_tool(name)
 
 
-def load_business_tools(run_context: RunContext, fc: FunctionCall, domains: list[Literal["content", "feedback_accounts", "messaging", "maintenance", "search", "recommendations", "strategy", "ai_management", "analytics"]]) -> str:
+def load_business_tools(run_context: RunContext, fc: FunctionCall, domains: list[Literal["content", "feedback_accounts", "messaging", "maintenance", "search", "recommendations", "community_parameters", "strategy", "ai_management", "analytics"]]) -> str:
     """Load preparation tool definitions for the named business domains for this run.
 
     Available domains: content, feedback_accounts, messaging, maintenance,
-    search, recommendations, strategy, ai_management, analytics. Loading definitions
+    search, recommendations, community_parameters, strategy, ai_management, analytics. Loading definitions
     does not authorize or execute an action; the business service checks it.
     """
     import json
@@ -94,7 +97,7 @@ def preparation_tools(gateway, *, domains=None):
         if domain not in _GROUPS:
             continue
         label, models = _GROUPS[domain]
-        operation_type = Annotated[Union[models], Field(discriminator="kind")]
+        operation_type = models[0] if len(models) == 1 else Annotated[Union[models], Field(discriminator="kind")]
         def call(run_context, fc, operation):
             return prepare(run_context, fc, operation)
         call.__name__ = "prepare_" + domain + "_operation"

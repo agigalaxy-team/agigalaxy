@@ -30,7 +30,7 @@ func (s *Service) recordTypedPreDispatchRejection(ctx context.Context, x Object,
 			return false, nil
 		}
 		outcome := Object{"preDispatch": Object{"phase": rejection.Phase(), "basis": "typed-pre-dispatch-rejection"}}
-		result, err := tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state='not-admitted',code=$5,read_outcome=$6,updated_at=$7 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3 AND operation_id=$4 AND tool='execute-operation' AND state IN ('started','unknown')`, s.Endpoint, x["taskId"], x["callId"], operationID, errorCode(rejection), jsonText(outcome), s.now())
+		result, err := tx.Exec(ctx, `UPDATE operations_autonomy_tool_calls_v1 SET state='not-admitted',code=$5,read_outcome=$6,updated_at=$7 WHERE endpoint=$1 AND task_id=$2 AND call_id=$3 AND operation_id=$4 AND tool=$8 AND tool IN ('execute-operation','prepare-community-parameters') AND state IN ('started','unknown')`, s.Endpoint, x["taskId"], x["callId"], operationID, errorCode(rejection), jsonText(outcome), s.now(), x["tool"])
 		return err == nil && result.RowsAffected() == 1, err
 	})
 }

@@ -97,7 +97,7 @@ func (s *Recommendations) WithAuthorize(authority *operationspermissions.Busines
 	if s == nil {
 		return nil
 	}
-	return &Recommendations{Pool: s.Pool, Endpoint: s.Endpoint, Authority: authority, Source: s.Source, OpenPanel: s.OpenPanel, Now: s.Now, preparedAuthorize: fresh}
+	return &Recommendations{CommunitySampleWithin: s.CommunitySampleWithin, Pool: s.Pool, Endpoint: s.Endpoint, Authority: authority, Source: s.Source, OpenPanel: s.OpenPanel, Now: s.Now, preparedAuthorize: fresh}
 }
 
 // CommandVersionWithin is an internal, non-mutating original-command check.

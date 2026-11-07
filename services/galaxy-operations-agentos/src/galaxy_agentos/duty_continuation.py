@@ -13,7 +13,7 @@ from agno.run.requirement import RunRequirement
 from .gateway import AuthorityDenied
 
 
-WRITE_TOOLS = frozenset({"execute_operation", "manage_ai_role", "manage_ai_prompt"})
+WRITE_TOOLS = frozenset({"execute_operation", "manage_ai_role", "manage_ai_prompt", "prepare_community_parameters"})
 DECISION_STATES = frozenset({"completed", "failed", "rejected", "cancelled", "no-action"})
 DECISION_BASES = frozenset({"manual-pause-read-again", "persisted-domain-operation-receipt", "original-operation-query",
     "persisted-ai-role-delegation-event", "persisted-human-decision"})

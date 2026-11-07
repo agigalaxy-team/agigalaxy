@@ -49,6 +49,9 @@ type Service struct {
 	CommunityAssessmentTool             func(context.Context, Actor, string, string, Object) (Object, error)
 	CommunityAssessmentAllowedWithin    func(context.Context, pgx.Tx, Object, Actor) error
 	CommunityAssessmentCompletionWithin func(context.Context, pgx.Tx, Object) (Object, error)
+	CommunityParameters                 func(context.Context, Actor, string, Object) (Object, error)
+	PrepareCommunityParameters          func(context.Context, Actor, string, string, Object) (Object, error)
+	ConfirmCommunityParametersWithin    func(context.Context, pgx.Tx, Actor, Object, string) (Object, error)
 	TaskOwners                          map[string]func(context.Context, pgx.Tx, Object) (bool, error)
 	Log                                 func(Object)
 	defaultsMu                          sync.RWMutex

@@ -1,3 +1,4 @@
+import {communityParameterErrors} from '../community-parameters';
 import {shanghaiMinute} from '../shanghai-time.mjs';
 import type {AutonomyAccount,AutonomyConfig,AutonomyDomain,AutonomyDutyDraft,AutonomyMode,AutonomySource,AutonomyTask} from "../../components/autonomy/autonomy-types";
 
@@ -34,7 +35,7 @@ export function autonomyConfigMerge(draft:AutonomyDutyDraft,current:AutonomyConf
  }
  return {configuration,conflicts,ready:conflicts.every(row=>!!choices[row.key])};
 }
-export const autonomyErrors:Record<string,string>={operations_autonomy_version_changed:'设置已有更新，你的修改已保留。',operations_autonomy_revision_changed:'设置已有更新，你的修改已保留。',operations_autonomy_not_ready:'所选岗位尚未就绪，请补齐列出的条件。',operations_autonomy_schedule_required:'请先为运维选择每日巡检时刻。',operations_autonomy_daily_time_required:'请先为运维选择每日巡检时刻。',operations_autonomy_task_changed:'任务已有变化，已读取当前状态。',operations_autonomy_task_control_denied:'当前任务不能执行这个操作。',operations_permission_denied:'当前权限不允许这项操作。',invalid_operations_autonomy_request:'请检查填写内容后再保存。'};
+export const autonomyErrors:Record<string,string>={...communityParameterErrors,operations_autonomy_version_changed:'设置已有更新，你的修改已保留。',operations_autonomy_revision_changed:'设置已有更新，你的修改已保留。',operations_autonomy_not_ready:'所选岗位尚未就绪，请补齐列出的条件。',operations_autonomy_schedule_required:'请先为运维选择每日巡检时刻。',operations_autonomy_daily_time_required:'请先为运维选择每日巡检时刻。',operations_autonomy_task_changed:'任务已有变化，已读取当前状态。',operations_autonomy_task_control_denied:'当前任务不能执行这个操作。',operations_permission_denied:'当前权限不允许这项操作。',invalid_operations_autonomy_request:'请检查填写内容后再保存。'};
 
 export function autonomyFailureLabel(task:Pick<AutonomyTask,'state'|'failure'>){
  if(task.state!=='failed')return null;

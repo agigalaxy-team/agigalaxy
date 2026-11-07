@@ -89,9 +89,9 @@ func (s *AssessmentService) SaveResult(ctx context.Context, taskID string, resul
 		}
 		// Configuration comes before scope in the lock order shared by config
 		// adoption and worker scheduling.
-		var enabled bool
+		var enabled, retired bool
 		var configVersion int64
-		if e = tx.QueryRow(ctx, `SELECT enabled,version FROM community_assessment_config_v1 WHERE endpoint=$1 FOR SHARE`, s.Endpoint).Scan(&enabled, &configVersion); e != nil {
+		if e = tx.QueryRow(ctx, `SELECT enabled,version,retired_at IS NOT NULL FROM community_assessment_config_v1 WHERE endpoint=$1 FOR SHARE`, s.Endpoint).Scan(&enabled, &configVersion, &retired); e != nil {
 			return nil, e
 		}
 		// The scope lock serializes source corrections against adoption without
@@ -117,6 +117,9 @@ func (s *AssessmentService) SaveResult(ctx context.Context, taskID string, resul
 				}
 			}
 			return Object{"state": taskState, "taskId": taskID, "replayed": true, "adopted": adopted}, nil
+		}
+		if retired {
+			return nil, assessmentRetired()
 		}
 		if revision != task.InputRevision || activeTask == nil || *activeTask != taskID || !enabled || configVersion != task.ConfigVersion {
 			_, e = tx.Exec(ctx, `UPDATE community_assessment_tasks_v1 SET state='superseded',result_hash=$3,updated_at=$4 WHERE endpoint=$1 AND id=$2`, s.Endpoint, taskID, hash, s.now())
@@ -200,7 +203,7 @@ func (s *AssessmentService) CurrentWeightWithin(ctx context.Context, tx pgx.Tx, 
 	var evidence []AssessmentEvidence
 	e := tx.QueryRow(ctx, `SELECT r.value,r.id::text,r.task_id::text,r.evidence FROM community_assessment_scopes_v1 x
 		JOIN community_assessment_results_v1 r ON r.endpoint=x.endpoint AND r.id=x.current_result_id
-		JOIN community_assessment_config_v1 c ON c.endpoint=x.endpoint AND c.enabled AND c.version=r.config_version
+		JOIN community_assessment_config_v1 c ON c.endpoint=x.endpoint AND c.enabled AND c.retired_at IS NULL AND c.version=r.config_version
 		WHERE x.endpoint=$1 AND x.account_id=$2 AND x.domain=$3 AND x.purpose=$4 AND x.purpose=ANY(c.purposes) AND r.adopted AND r.status='assessed'`, s.Endpoint, account, domain, purpose).Scan(&value, &version, &taskID, &evidence)
 	if noRows(e) {
 		return nil, "", nil

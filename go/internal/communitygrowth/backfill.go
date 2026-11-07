@@ -95,9 +95,14 @@ func (s *Service) ReconcilePublicSourceWithin(ctx context.Context, tx pgx.Tx, fo
 	if _, e := uuid.Parse(id); e != nil {
 		return false, invalid()
 	}
+	if e := s.lockLedger(ctx, tx); e != nil {
+		return false, e
+	}
 	var account *string
 	var at time.Time
-	q := `SELECT account_id::text,created_at FROM forum_posts_v1 WHERE id=$1 FOR SHARE`
+	q := `SELECT p.account_id::text,COALESCE(v.created_at,p.created_at)
+		FROM forum_posts_v1 p LEFT JOIN forum_versions_v1 v ON v.id=p.current_version_id
+		WHERE p.id=$1 FOR SHARE OF p`
 	if kind == "reply" {
 		q = `SELECT account_id::text,created_at FROM forum_replies_v1 WHERE id=$1 FOR SHARE`
 	}
@@ -178,7 +183,8 @@ func (s *Service) ReconcilePublicSourceWithin(ctx context.Context, tx pgx.Tx, fo
 	x := Source{Kind: kind, ID: id, RuleKey: kind, AccountID: *account, Domains: domains, Title: title, ObjectKind: kind, ObjectID: id, Active: true, Revision: 1, OccurredAt: at}
 	if existing != nil {
 		x.Revision = existing.Revision
-		if existing.Active != x.Active || existing.Title != x.Title || existing.ObjectKind != x.ObjectKind || existing.ObjectID != x.ObjectID || jsonText(existing.Domains) != jsonText(x.Domains) || !existing.OccurredAt.Equal(x.OccurredAt) {
+		x.OccurredAt = existing.OccurredAt
+		if existing.Active != x.Active || existing.Title != x.Title || existing.ObjectKind != x.ObjectKind || existing.ObjectID != x.ObjectID || jsonText(existing.Domains) != jsonText(x.Domains) {
 			x.Revision++
 		}
 	}

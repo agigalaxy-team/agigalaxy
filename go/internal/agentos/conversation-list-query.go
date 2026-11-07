@@ -56,3 +56,15 @@ func (s *Conversations) ReadCardsForTurns(ctx context.Context, a operationspermi
 	at := s.now().Unix()
 	return Object{"domain": domain, "items": items, "checkedAt": at}, nil
 }
+
+func (s *Conversations) ReadCommunityParameterCards(ctx context.Context, a operationspermissions.Actor) (Object, error) {
+	const domain = "governance"
+	if s.Tools == nil {
+		return nil, fail("operations_agentos_conversation_not_ready", 503)
+	}
+	items, err := s.Tools.readCardBatchFiltered(ctx, a, domain, "community-parameter-adjustment")
+	if err != nil {
+		return nil, err
+	}
+	return Object{"domain": domain, "items": items, "checkedAt": s.now().Unix()}, nil
+}

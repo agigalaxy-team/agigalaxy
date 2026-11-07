@@ -32,6 +32,9 @@ func (s *Service) reconcileReceivedReactionWithin(ctx context.Context, tx pgx.Tx
 		return invalid()
 	}
 	sourceID := ReactionSourceID(kind, id, actor)
+	if e := s.lockLedger(ctx, tx); e != nil {
+		return e
+	}
 	if _, e := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,734912770))`, s.Endpoint+":"+sourceID); e != nil {
 		return e
 	}
@@ -115,7 +118,8 @@ func (s *Service) reconcileReceivedReactionWithin(ctx context.Context, tx pgx.Tx
 	x := Source{Kind: "like", ID: sourceID, RuleKey: "like_received", AccountID: author, Domains: domains, Title: title, ObjectKind: kind, ObjectID: id, Active: true, Revision: 1, OccurredAt: at}
 	if current != nil {
 		x.Revision = current.Revision
-		if current.Active && current.OccurredAt.Equal(at) && current.Title == title && current.ObjectKind == kind && current.ObjectID == id && jsonText(current.Domains) == jsonText(domains) {
+		x.OccurredAt = current.OccurredAt
+		if current.Active && current.Title == title && current.ObjectKind == kind && current.ObjectID == id && jsonText(current.Domains) == jsonText(domains) {
 			return nil
 		}
 		x.Revision++
@@ -129,6 +133,9 @@ func (s *Service) MarkContentChangedWithin(ctx context.Context, tx pgx.Tx, kind,
 	}
 	if _, e := uuid.Parse(id); e != nil {
 		return invalid()
+	}
+	if e := s.lockLedger(ctx, tx); e != nil {
+		return e
 	}
 	_, e := tx.Exec(ctx, `INSERT INTO community_growth_dirty_objects_v1(endpoint,kind,object_id,generation,cursor,updated_at) VALUES($1,$2,$3,1,'',$4) ON CONFLICT(endpoint,kind,object_id) DO UPDATE SET generation=community_growth_dirty_objects_v1.generation+1,cursor='',updated_at=excluded.updated_at`, s.Endpoint, kind, id, s.now())
 	return e

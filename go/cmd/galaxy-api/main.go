@@ -611,10 +611,12 @@ func serve(ctx context.Context, runtimeLog *runtimelog.Logger) (result error) {
 	eventAuthority.Public.Consumers.Growth = communityGrowth.PublicEventRead
 	eventAuthority.Public.Consumers.PublicFollows = communityGrowth.PublicEventRead
 	autonomy.ConnectCommunityAssessments(communityAssessment)
+	connectCommunityParameterActions(agentConversations, autonomy, businessActions, communityGrowth)
 	executionDiscovery = discoveryRuntime
 	accountAnalytics.Runtime = discoveryRuntime
 	if discoveryRuntime != nil {
-		discoveryRuntime.Recommendations.CommunitySignals = communityGrowth.RankingSignals
+		discoveryRuntime.Recommendations.CommunitySignals = communityGrowth.RankingSignalsWithRules
+		discoveryRuntime.Recommendations.CommunitySampleWithin = communityGrowth.CommunityContentSampleWithin
 		queries.Analytics, queries.Recommendations, queries.Search = discoveryRuntime, discoveryRuntime.Recommendations, discoveryRuntime.SearchQuality
 		businessActions.SearchQuality, businessActions.Recommendations = discoveryRuntime.SearchQuality, discoveryRuntime.Recommendations
 	}

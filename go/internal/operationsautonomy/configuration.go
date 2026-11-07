@@ -65,7 +65,7 @@ func parseConfiguration(input Object) (Object, error) {
 		plan = Object{}
 		x["plan"] = plan
 	}
-	if !closed(plan, nil, []string{"strategyIds", "grantIds", "actions", "resourceIds", "eventTypes", "inspectionProfile"}) {
+	if !closed(plan, nil, []string{"strategyIds", "grantIds", "actions", "resourceIds", "eventTypes", "inspectionProfile", "communityParameterProposals"}) {
 		return nil, invalid()
 	}
 	for k, max := range map[string]int{"strategyIds": 50, "grantIds": 50, "actions": 200, "resourceIds": 100, "eventTypes": 50} {
@@ -98,6 +98,11 @@ func parseConfiguration(input Object) (Object, error) {
 			if len(list(plan[key])) != 0 {
 				return nil, invalid()
 			}
+		}
+	}
+	if enabled, present := plan["communityParameterProposals"]; present {
+		if enabled != true || !has([]string{"ai", "ai-human"}, str(x["mode"])) || len(list(plan["resourceIds"])) != 0 || plan["inspectionProfile"] != nil {
+			return nil, invalid()
 		}
 	}
 	return x, nil
@@ -202,6 +207,10 @@ func (s *Service) readinessWithin(ctx context.Context, tx pgx.Tx, row, runtime O
 	}
 	cfg := obj(row["configuration"])
 	plan, schedule := obj(cfg["plan"]), obj(cfg["schedule"])
+	if plan["communityParameterProposals"] == true && role != nil &&
+		!has(role.Permissions, "rules.read") && !has(role.Permissions, "recommendations.read") {
+		add("community-parameter-read-denied", "治理岗位尚未获得社区规则或推荐读取权限")
+	}
 	ordinary := []string{}
 	for _, code := range texts(plan["actions"]) {
 		d := operationsai.Definition(code)

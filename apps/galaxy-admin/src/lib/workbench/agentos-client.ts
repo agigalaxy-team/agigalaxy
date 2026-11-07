@@ -1,4 +1,5 @@
 import type {AiManagementCapabilities} from './ai-management-capabilities';
+import {communityParameterErrors} from '../community-parameters';
 
 export type AgentOsDomain='overview'|'governance'|'messaging'|'discovery'|'maintenance';
 export type AgentOsStatus={state:'connected'|'not-configured'|'unavailable';modelState:'configured'|'not-configured'|'unknown';framework:'agno';version:string;checkedAt:number;readExpiresAt:number};
@@ -22,6 +23,7 @@ export function agentOsCanUseDomain(session:AgentOsSession|null|undefined,domain
  return permissions?.includes('workbench.read')===true&&operationsAiUseAllowed(permissions,domain);
 }
 export const agentOsErrors:Record<string,string>={
+ ...communityParameterErrors,
  operations_ai_prompt_version_changed:'岗位工作要求已有更新，请按当前版本重新准备。',operations_ai_prompt_no_change:'岗位工作要求与当前内容相同，无需保存。',operations_ai_delegation_version_changed:'总控管理范围已有更新，请按当前范围重新准备。',operations_ai_delegation_denied:'当前未获准执行这项总控管理动作。',operations_ai_delegation_target_denied:'这个岗位当前不在获准管理范围内。',operations_agentos_prompt_review_unavailable:'岗位工作要求的完整变更暂时无法取得，尚未执行。',
  operations_agentos_ai_use_denied:'无权使用此 AI',
  operations_agentos_not_configured:'服务未配置',operations_agentos_model_not_configured:'未配置模型',operations_agentos_conversation_not_ready:'连接失败',

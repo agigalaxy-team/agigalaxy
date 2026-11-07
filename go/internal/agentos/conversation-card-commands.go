@@ -41,6 +41,14 @@ func (t *ConversationTools) Confirm(ctx context.Context, human operationspermiss
 		if text(row.Proposal, "kind") == "task-dispatch" {
 			return s.Permissions.TaskOwnerWithin(ctx, tx, fresh, domain)
 		}
+		if permission := communityParameterWritePermission(row.Proposal); permission != "" {
+			if s.Permissions.Authority == nil {
+				return operationspermissions.Actor{}, fail("operations_authorization_unavailable", 503)
+			}
+			if _, e := s.Permissions.Authority.RequireWithin(ctx, tx, fresh, permission); e != nil {
+				return operationspermissions.Actor{}, e
+			}
+		}
 		return s.Permissions.HumanAIWithin(ctx, tx, fresh, domain, "prepare", text(row.Proposal, "requiredAction"))
 	})
 	if err != nil {
