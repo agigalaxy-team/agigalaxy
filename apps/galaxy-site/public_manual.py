@@ -1,6 +1,6 @@
 """Publish the repository manual and the common Native Skill on stable site URLs."""
 from html import escape
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
@@ -20,7 +20,7 @@ CHAPTERS = (
 PUBLIC_ASSETS = (*[path.lstrip("/") for path in CONTRACT["staticImages"]], "docs/public/examples/capsule-v2.json")
 
 
-def publish_manual(site):
+def publish_manual(site, released_skill=None):
     pages = {
         "/docs/public/" + source: MANUAL_ROOT + ("" if source == "README.md" else source.removesuffix(".md").lower() + "/")
         for source in CHAPTERS
@@ -45,9 +45,44 @@ def publish_manual(site):
 
     site["write"]("agent.md", (REPO / "docs/public/ai-reading.md").read_text(encoding="utf-8"))
     site["write"]("downloads/galaxy-update.mjs", (REPO / "scripts/galaxy-update-legacy.mjs").read_text(encoding="utf-8"))
+    publish_skill(Path(site["OUT"]).resolve(), released_skill)
+    return pages.values()
+
+
+def publish_skill(output, released_skill):
+    skill_parent = output / "skills"
+    public_skill = skill_parent / "galaxy"
+    if (skill_parent.is_symlink() or public_skill.is_symlink()
+            or not public_skill.resolve().is_relative_to(output)
+            or public_skill.resolve() != public_skill):
+        raise ValueError("Generated Skill directory must stay inside the output directory")
+    if public_skill.exists():
+        if not public_skill.is_dir():
+            raise ValueError("Generated Skill target must be a directory")
+        shutil.rmtree(public_skill)
+    archive_path = skill_parent / "galaxy.zip"
+    if archive_path.is_symlink():
+        raise ValueError("Generated Skill archive must not be a symbolic link")
+    archive_path.parent.mkdir(parents=True, exist_ok=True)
+    if released_skill is not None:
+        # The installer compares Skill files byte-for-byte with its packaged
+        # tree. Use the verified release ZIP even when checkout line endings differ.
+        with ZipFile(released_skill) as archive:
+            names = archive.namelist()
+            if "galaxy/SKILL.md" not in names or len(names) != len(set(names)):
+                raise ValueError("Invalid released Skill archive")
+            for name in names:
+                path = PurePosixPath(name)
+                if (not name.startswith("galaxy/") or name.endswith("/") or "\\" in name
+                        or path.as_posix() != name or ".." in path.parts):
+                    raise ValueError("Invalid released Skill path")
+                target = skill_parent.joinpath(*path.parts)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(archive.read(name))
+        shutil.copyfile(released_skill, archive_path)
+        return
+
     skill = REPO / "integrations/native-v2/skills/galaxy"
-    # Publish the same complete Skill tree as the client package, including
-    # nested reference resources. Never follow a source symlink.
     if skill.is_symlink():
         raise ValueError("Skill source must not be a symbolic link")
     paths = []
@@ -65,21 +100,6 @@ def publish_manual(site):
             raise ValueError("Skill assets must be regular files or directories")
     if skill / "SKILL.md" not in paths:
         raise FileNotFoundError(skill / "SKILL.md")
-    output = Path(site["OUT"]).resolve()
-    skill_parent = output / "skills"
-    public_skill = skill_parent / "galaxy"
-    if (skill_parent.is_symlink() or public_skill.is_symlink()
-            or not public_skill.resolve().is_relative_to(output)
-            or public_skill.resolve() != public_skill):
-        raise ValueError("Generated Skill directory must stay inside the output directory")
-    if public_skill.exists():
-        if not public_skill.is_dir():
-            raise ValueError("Generated Skill target must be a directory")
-        shutil.rmtree(public_skill)
-    archive_path = skill_parent / "galaxy.zip"
-    if archive_path.is_symlink():
-        raise ValueError("Generated Skill archive must not be a symbolic link")
-    archive_path.parent.mkdir(parents=True, exist_ok=True)
     with ZipFile(archive_path, "w") as archive:
         for path in paths:
             relative = "galaxy/" + path.relative_to(skill).as_posix()
@@ -88,4 +108,3 @@ def publish_manual(site):
             content = path.read_bytes()
             target.write_bytes(content)
             archive.writestr(ZipInfo(relative), content, compress_type=ZIP_DEFLATED)
-    return pages.values()

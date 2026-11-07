@@ -220,7 +220,9 @@ def main():
     copy_external_images(output)
     site = {'page': chrome.page, 'write': chrome.write, 'OUT': output, 'PREVIEW': preview, 'RUNTIME_DATA': True}
     guide_pages = render_versioned_guides(site, metadata)
-    manual_pages = publish_manual(site)
+    released_skill = metadata['currentNativeClient']['assetBase'].lstrip('/') + 'galaxy-skill.zip'
+    skill_archive = output / released_skill if released_skill in catalog['files'] else None
+    manual_pages = publish_manual(site, skill_archive if skill_archive and skill_archive.is_file() else None)
     render_product_pages({**site, 'GUIDE_PAGES': guide_pages})
     chrome.write('assets/public-pages/index.json', json.dumps({'version': 1, 'routes': chrome.PUBLIC_PAGES}, indent=2) + '\n')
     pages = ['/', '/how-it-works/', '/start/', '/downloads/', '/downloads/verification/', '/network/', '/open-source/', '/docs/', '/privacy/', '/status/']
