@@ -87,7 +87,7 @@ func initializeBareWithin(dir, subject, kind string) (map[string]any, error) {
 		if selectedSubject == "" {
 			selectedSubject = "person"
 		}
-		record, e := initializationNew(selectedSubject)
+		record, e := initializationNew(selectedSubject, nil)
 		if e != nil {
 			return nil, e
 		}

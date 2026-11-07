@@ -119,6 +119,7 @@ func hostConfigurationsCommand(ctx context.Context, args []string) error {
 // Setup checks the installation before applying the explicitly requested setup.
 func setupCommand(ctx context.Context, args []string) error {
 	input := native.NativeInstallationInput{SubjectType: "person"}
+	var uploadPrivacy *native.UploadPrivacySelection
 	for i := 0; i < len(args); i++ {
 		argument := args[i]
 		if argument == "--local-only" {
@@ -148,6 +149,12 @@ func setupCommand(ctx context.Context, args []string) error {
 				input.OpenCodePath = value
 			case "--opencode-config-dir":
 				input.OpenCodeConfigDirectory = value
+			case "--upload-privacy":
+				var err error
+				uploadPrivacy, err = installationUploadPrivacy(value)
+				if err != nil {
+					return err
+				}
 			default:
 				return fault.New("native_arguments_invalid", 400)
 			}
@@ -275,7 +282,7 @@ func setupCommand(ctx context.Context, args []string) error {
 			return err
 		}
 	}
-	managedInput := native.ManagedNativeInstallationInput{Host: input.Host, Home: home, Environment: environment, PackageDirectory: input.PackageDirectory, InstallRoot: input.Destination, DataDirectory: input.DataDirectory, ConfigPath: configurationPath, LocalOnly: input.LocalOnly, SubjectType: input.SubjectType, NodeExecutable: node, HostExecutable: input.OpenCodePath}
+	managedInput := native.ManagedNativeInstallationInput{Host: input.Host, Home: home, Environment: environment, PackageDirectory: input.PackageDirectory, InstallRoot: input.Destination, DataDirectory: input.DataDirectory, ConfigPath: configurationPath, LocalOnly: input.LocalOnly, SubjectType: input.SubjectType, UploadPrivacy: uploadPrivacy, NodeExecutable: node, HostExecutable: input.OpenCodePath}
 	if pending {
 		// Preserve an existing host's configured connection. For a new host,
 		// install its local tools and keep the selected website in the record.
@@ -301,4 +308,15 @@ func setupCommand(ctx context.Context, args []string) error {
 		value["pendingWebsite"] = website
 	}
 	return completeManagedInstallation(ctx, value, applyError, !input.LocalOnly && !pending, configurationPath)
+}
+
+func installationUploadPrivacy(level string) (*native.UploadPrivacySelection, error) {
+	if level == "" {
+		return nil, fault.New("upload_privacy_level_invalid", 400)
+	}
+	selection := native.UploadPrivacySelection{Level: level}
+	if _, err := native.SelectUploadPrivacy(native.NormalizeUploadPrivacy(nil), selection, ""); err != nil {
+		return nil, err
+	}
+	return &selection, nil
 }

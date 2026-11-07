@@ -13,25 +13,26 @@ import (
 // ManagedNativeInstallationInput is shared by interactive and noninteractive
 // entry points. Host must be the one explicitly selected current user host.
 type ManagedNativeInstallationInput struct {
-	Host             string            `json:"host"`
-	OpenCodeLayout   string            `json:"openCodeLayout,omitempty"`
-	OpenCodeVersion  string            `json:"openCodeVersion,omitempty"`
-	UserMCPPath      string            `json:"userMcpPath,omitempty"`
-	UserSkillPath    string            `json:"userSkillPath,omitempty"`
-	UserMCPFormat    string            `json:"userMcpFormat,omitempty"`
-	Home             string            `json:"home"`
-	Environment      map[string]string `json:"-"`
-	PackageDirectory string            `json:"packageDirectory"`
-	InstallRoot      string            `json:"installRoot"`
-	DataDirectory    string            `json:"dataDirectory"`
-	ConfigPath       string            `json:"configPath,omitempty"`
-	Endpoint         string            `json:"endpoint,omitempty"`
-	LocalOnly        bool              `json:"localOnly"`
-	PendingWebsite   string            `json:"pendingWebsite,omitempty"`
-	SubjectType      string            `json:"subjectType"`
-	NodeExecutable   string            `json:"nodeExecutable,omitempty"`
-	HostExecutable   string            `json:"hostExecutable,omitempty"`
-	KeepIdentity     bool              `json:"-"`
+	Host             string                  `json:"host"`
+	OpenCodeLayout   string                  `json:"openCodeLayout,omitempty"`
+	OpenCodeVersion  string                  `json:"openCodeVersion,omitempty"`
+	UserMCPPath      string                  `json:"userMcpPath,omitempty"`
+	UserSkillPath    string                  `json:"userSkillPath,omitempty"`
+	UserMCPFormat    string                  `json:"userMcpFormat,omitempty"`
+	Home             string                  `json:"home"`
+	Environment      map[string]string       `json:"-"`
+	PackageDirectory string                  `json:"packageDirectory"`
+	InstallRoot      string                  `json:"installRoot"`
+	DataDirectory    string                  `json:"dataDirectory"`
+	ConfigPath       string                  `json:"configPath,omitempty"`
+	Endpoint         string                  `json:"endpoint,omitempty"`
+	LocalOnly        bool                    `json:"localOnly"`
+	PendingWebsite   string                  `json:"pendingWebsite,omitempty"`
+	SubjectType      string                  `json:"subjectType"`
+	UploadPrivacy    *UploadPrivacySelection `json:"-"`
+	NodeExecutable   string                  `json:"nodeExecutable,omitempty"`
+	HostExecutable   string                  `json:"hostExecutable,omitempty"`
+	KeepIdentity     bool                    `json:"-"`
 }
 type ManagedNativeInstallationPlan struct {
 	Action               string `json:"action"`

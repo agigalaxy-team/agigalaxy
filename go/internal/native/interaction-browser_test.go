@@ -238,7 +238,7 @@ func TestInteractionBrowserCancellationExpiryAndScopeCannotApprove(t *testing.T)
 	}
 	fresh := interactionChoice(t, browser, input, run)
 	freshRaw := text(fresh["url"])
-	other, e := initializationNew("organization")
+	other, e := initializationNew("organization", nil)
 	if e != nil {
 		t.Fatal(e)
 	}

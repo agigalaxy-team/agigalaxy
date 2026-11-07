@@ -123,6 +123,10 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	flags.BoolVar(&input.LocalOnly, "local-only", false, "")
 	organization := flags.Bool("organization", false, "")
 	dryRun := flags.Bool("dry-run", false, "")
+	var uploadPrivacy string
+	if action == "install" {
+		flags.StringVar(&uploadPrivacy, "upload-privacy", "", "")
+	}
 	var ifNeeded bool
 	if action == "repair" {
 		flags.BoolVar(&ifNeeded, "if-needed", false, "")
@@ -137,6 +141,12 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	supplied := make(map[string]bool)
 	flags.Visit(func(value *flag.Flag) { supplied[value.Name] = true })
 	var err error
+	if supplied["upload-privacy"] {
+		input.UploadPrivacy, err = installationUploadPrivacy(uploadPrivacy)
+		if err != nil {
+			return err
+		}
+	}
 	if input.Home == "" {
 		input.Home, err = os.UserHomeDir()
 		if err != nil {

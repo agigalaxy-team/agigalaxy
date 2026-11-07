@@ -227,7 +227,7 @@ func hostDirectoryCheck(path string) error {
 	return e
 }
 
-func installationPrepareLocal(ctx context.Context, store *Store, subject string, scope *ChoiceScope) (map[string]any, error) {
+func installationPrepareLocal(ctx context.Context, store *Store, subject string, privacy *UploadPrivacySelection, scope *ChoiceScope) (map[string]any, error) {
 	var existing map[string]any
 	e := store.With(ctx, false, func(dir string) error {
 		if e := store.verifyChoiceWithin(dir, scope); e != nil {
@@ -257,7 +257,7 @@ func installationPrepareLocal(ctx context.Context, store *Store, subject string,
 	if existing != nil {
 		return existing, nil
 	}
-	result, e := store.Initialize(ctx, InitializationInput{InitializationPath: "personal-galaxy", SubjectType: subject}, true, scope)
+	result, e := store.Initialize(ctx, InitializationInput{InitializationPath: "personal-galaxy", SubjectType: subject, UploadPrivacy: privacy}, true, scope)
 	if e != nil {
 		return nil, e
 	}

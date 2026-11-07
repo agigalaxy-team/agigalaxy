@@ -56,7 +56,7 @@ func readNativeContractFixture(t *testing.T, name string) map[string]any {
 // No private key is stored in the fixture; initializationNew generates it for this test process.
 func legacyInitializationFixture(t *testing.T) (initializationRecord, []byte) {
 	t.Helper()
-	record, err := initializationNew("person")
+	record, err := initializationNew("person", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestInitializationConfirmedLocalIdentityKeysAndModulesAreJSReadable(t *test
 }
 func TestInitializationJournalIsCompatibleWithOriginalRecoveryAndRefusesConflicts(t *testing.T) {
 	dir := t.TempDir()
-	record, e := initializationNew("person")
+	record, e := initializationNew("person", nil)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -307,7 +307,7 @@ func TestInitializationPreservesSelectedOtherIdentityAndOnlyStoresItsModules(t *
 	}
 	localBefore, _ := os.ReadFile(filepath.Join(dir, "galaxy-id.json"))
 	stateBefore, _ := os.ReadFile(filepath.Join(dir, "galaxy-local-state.json"))
-	other, e := initializationNew("person")
+	other, e := initializationNew("person", nil)
 	if e != nil {
 		t.Fatal(e)
 	}

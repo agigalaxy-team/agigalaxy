@@ -28,7 +28,7 @@ func managedPrepareIdentity(ctx context.Context, input ManagedNativeInstallation
 		return nil, err
 	}
 	if input.Host == "opencode" {
-		return installationPrepareLocal(ctx, store, input.SubjectType, &scope)
+		return installationPrepareLocal(ctx, store, input.SubjectType, input.UploadPrivacy, &scope)
 	}
 	owner := ""
 	err = store.With(ctx, false, func(dir string) error {
@@ -45,7 +45,7 @@ func managedPrepareIdentity(ctx context.Context, input ManagedNativeInstallation
 	if owner != "" {
 		return map[string]any{"created": false, "existingIdentityPreserved": true}, nil
 	}
-	created, err := store.Initialize(ctx, InitializationInput{InitializationPath: "personal-galaxy", SubjectType: input.SubjectType}, true, &scope)
+	created, err := store.Initialize(ctx, InitializationInput{InitializationPath: "personal-galaxy", SubjectType: input.SubjectType, UploadPrivacy: input.UploadPrivacy}, true, &scope)
 	if err != nil {
 		return nil, err
 	}

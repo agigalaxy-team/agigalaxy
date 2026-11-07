@@ -336,7 +336,7 @@ func (s *Store) Initialize(ctx context.Context, input InitializationInput, confi
 					return fault.New("local_initialization_incomplete", 409)
 				}
 			}
-			record, e := initializationNew(input.SubjectType)
+			record, e := initializationNew(input.SubjectType, input.UploadPrivacy)
 			if e != nil {
 				return e
 			}
@@ -642,7 +642,7 @@ func initializationBase32(value *big.Int, length int) string {
 	}
 	return string(out)
 }
-func initializationNew(subject string) (initializationRecord, error) {
+func initializationNew(subject string, privacy *UploadPrivacySelection) (initializationRecord, error) {
 	if subject == "" {
 		subject = "person"
 	}
@@ -679,6 +679,13 @@ func initializationNew(subject string) (initializationRecord, error) {
 	}
 	local := map[string]any{"version": 2, "id": id, "genesisProof": map[string]any{"version": 1, "publicKeyPem": pub, "nonce": base64.RawURLEncoding.EncodeToString(nonce)}, "idFormat": "guid-32-v1", "birthOrigin": "local", "birthOriginCode": "0", "subjectType": subject, "clientKind": "normal", "publicKeyFingerprint": strings.Join(parts, ":"), "keyAlgorithm": "Ed25519", "createdAt": at, "localOnly": true, "transport": "none", "note": "This Galaxy ID was created locally. It has not been registered, verified, or uploaded."}
 	state := initializationState()
+	if privacy != nil {
+		settings, err := SelectUploadPrivacy(NormalizeUploadPrivacy(nil), *privacy, at)
+		if err != nil {
+			return initializationRecord{}, err
+		}
+		state["uploadPrivacy"] = settings
+	}
 	initializationAudit(state, "galaxy_id.initialized", id, at, map[string]any{"localOnly": true})
 	ib, e := protocol.Encode(local)
 	if e != nil {
