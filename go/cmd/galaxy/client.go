@@ -322,6 +322,9 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	if *dryRun {
 		return printValue(plan)
 	}
+	if action == "install" {
+		setupHeading(os.Stdout, "正在接入")
+	}
 	result, applyError := native.ApplyManagedNativeInstallation(ctx, plan)
 	return completeManagedInstallation(ctx, result, applyError, action == "install" && !input.LocalOnly, input.ConfigPath)
 }
@@ -388,6 +391,9 @@ func completeManagedInstallation(ctx context.Context, result map[string]any, app
 		}
 	}
 	if result != nil {
+		if outputAction == "setup" || outputAction == "install" {
+			setupHeading(os.Stdout, "安装回执")
+		}
 		if humanOutput && applyError != nil {
 			if result["releaseInstalled"] == true && result["hostConfigured"] == true && result["serviceConnection"] == "pending" {
 				fmt.Fprintln(os.Stdout, "银河已安装，暂未连接服务。")

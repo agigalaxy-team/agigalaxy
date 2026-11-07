@@ -175,10 +175,12 @@ func setupCommand(ctx context.Context, args []string) error {
 			input.Host = detected[0]
 		}
 	}
-	if input.Host == "" {
+	needsHostChoice := input.Host == ""
+	if needsHostChoice {
 		hosts := native.HostConfigurationOptions()
+		setupHeading(os.Stderr, "首次接入")
 		for index, host := range hosts {
-			fmt.Fprintf(os.Stderr, "%d. %s\n", index+1, host["label"])
+			setupHostOption(index+1, host["label"])
 		}
 		fmt.Fprint(os.Stderr, "请选择宿主编号：")
 		line, err := reader.ReadString('\n')
@@ -301,6 +303,9 @@ func setupCommand(ctx context.Context, args []string) error {
 		return err
 	}
 
+	if !needsHostChoice {
+		setupHeading(os.Stdout, "正在接入")
+	}
 	value, applyError := native.ApplyManagedNativeInstallation(ctx, managed)
 	if pending && value != nil && value["releaseInstalled"] == true && value["hostConfigured"] == true {
 		value["installed"] = true
