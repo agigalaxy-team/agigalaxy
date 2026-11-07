@@ -17,11 +17,3 @@
 | Disclosure and consent controls | Stores previews, bounded Consent Grants, revocations, and Local Proof Drafts. | Transfer data, independently verify work, or create Evidence. |
 | Galaxy MCP workspace | Exposes enabled local actions to the AI host over stdio. | Run a public network service. |
 | AI-guided setup | Guides module choice and confirmation. | Override user confirmation. |
-
-## Planned, not selectable
-
-- OpenClaw adapter
-- GitHub / CI verification adapter
-- Remote sync
-
-These names are roadmap markers. They are not enabled, configured, or implied by installing the pack.

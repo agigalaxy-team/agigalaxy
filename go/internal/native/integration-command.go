@@ -83,9 +83,9 @@ func (s *Store) IntegrationCommand(ctx context.Context, input CommandInput) (any
 			if snapshot["identity"] != nil {
 				message = "A local Galaxy ID already exists. Integration modules are not initialized; this read creates no identity, connection or upload."
 			}
-			return map[string]any{"command": name, "state": "not-initialized", "route": route, "title": title, "message": message, "initializationPaths": paths, "nextTools": []string{"galaxy_command", "galaxy_integration_preview_initialization"}, "localOnly": true}, nil
+			return map[string]any{"command": name, "state": "not-initialized", "route": route, "title": title, "message": message, "initializationPaths": availableInitializationEntries(paths), "nextTools": []string{"galaxy_command", "galaxy_integration_preview_initialization"}, "localOnly": true}, nil
 		}
-		out := map[string]any{"command": name, "state": "needs-initialization", "route": "galaxy-initialization", "title": "Set up Galaxy once", "message": "Galaxy has not been initialized on this device. Choose an initialization path, preview its local effects, then confirm once.", "initializationPaths": paths, "nextTools": []string{"galaxy_integration_preview_initialization", "galaxy_integration_initialize"}, "localOnly": true}
+		out := map[string]any{"command": name, "state": "needs-initialization", "route": "galaxy-initialization", "title": "Set up Galaxy once", "message": "Galaxy has not been initialized on this device. Choose an initialization path, preview its local effects, then confirm once.", "initializationPaths": availableInitializationEntries(paths), "nextTools": []string{"galaxy_integration_preview_initialization", "galaxy_integration_initialize"}, "localOnly": true}
 		for k, v := range CommandInitialization(input) {
 			out[k] = integrationReferences(v)
 		}

@@ -13,7 +13,7 @@
 | `/Galaxy privacy` | `privacy` | Enter consent and disclosure controls when enabled; otherwise offer a configuration preview. |
 | `/Galaxy language` | `language` | Reopen the bilingual display-language choice. It changes only the current host interaction. |
 | `/Galaxy website` or `/Galaxy 官网` | `website` → `galaxy_open_official_website` | On explicit request only, open the configured official HTTPS site in the Windows default browser. If no URL is configured, report that fact; never substitute a local preview or guessed domain. |
-| `/Galaxy worker` | `worker` | Explain the Worker path. In Founding Beta it is planned, not runnable. |
-| `/Galaxy hub` | `hub` | Explain the Hub path. In Founding Beta it is planned, not runnable. |
+| `/Galaxy worker` | `worker` | Open the separate local Worker identity setup. |
+| `/Galaxy hub` | `hub` | Show the current local tool response for Hub access. |
 
 Host adapters must not store their own authoritative Galaxy state, bypass MCP confirmation, invent a Worker/Hub runtime, or treat a slash-command invocation as Evidence. The Galaxy Core state and its audit events remain authoritative.

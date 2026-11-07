@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Galaxy Integration Pack",
     "shortDescription": "Set up a Personal Galaxy once, then open Galaxy services with AI guidance.",
-    "longDescription": "A local-first Galaxy integration bundle. It routes /Galaxy to first-run setup only when needed, or to normal local services after setup. It presents Personal Galaxy, Galaxy Worker, and Galaxy Hub as distinct initialization paths while keeping future runtimes clearly unavailable.",
+    "longDescription": "Use local Galaxy identity, work records, privacy settings, and case tools from Codex.",
     "developerName": "Galaxy Founding Beta",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],

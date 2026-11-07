@@ -39,6 +39,23 @@ func InitializationCatalog() map[string]any {
 	_ = protocol.Decode([]byte(initializationCatalogJSON), &result)
 	return result
 }
+func availableInitializationEntries(value any) []any {
+	result := []any{}
+	for _, item := range initializationArray(value) {
+		if uploadObject(item)["availability"] == "available" {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func initializationChoices() map[string]any {
+	catalog := InitializationCatalog()
+	for _, key := range []string{"modules", "initializationPaths"} {
+		catalog[key] = availableInitializationEntries(catalog[key])
+	}
+	return catalog
+}
 func initializationArray(value any) []any {
 	result, _ := value.([]any)
 	if result == nil {

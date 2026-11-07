@@ -92,7 +92,7 @@ func integrationRegistrationSchema(name string) map[string]any {
 func (s *Store) integrationCall(ctx context.Context, name string, input map[string]any, scope *ChoiceScope) (any, error) {
 	switch name {
 	case "galaxy_integration_list_modules":
-		return InitializationCatalog(), nil
+		return initializationChoices(), nil
 	case "galaxy_integration_preview_initialization":
 		var x InitializationInput
 		raw, e := protocol.EncodeJS(input)

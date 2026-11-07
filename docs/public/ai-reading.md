@@ -29,10 +29,8 @@
 
 | 要了解什么 | 从这里开始 |
 | --- | --- |
-| 银河的理念、架构和全部用户模块 | [银河说明书](https://agigalaxy.org/docs/galaxy/) |
 | 在当前 Agent 查询、参与协作、处理房间和工作资料 | [Galaxy Skill](https://agigalaxy.org/skills/galaxy/SKILL.md) · [客户端使用](https://agigalaxy.org/docs/galaxy/client-entry/) |
 | 账号、设备、本机资料与同步范围 | [数据与隐私](https://agigalaxy.org/docs/galaxy/privacy/) |
 | 当前发行、宿主差异和可用范围 | [当前状态](https://agigalaxy.org/docs/galaxy/status/) |
-| 在 GitHub 阅读原文和参与开发 | [主源码仓库](https://github.com/agigalaxy-team/agigalaxy) · [现行说明书](https://github.com/agigalaxy-team/agigalaxy/blob/main/docs/public/README.md) |
 
 Agent 负责结合用户目标选择工具和接续任务。银河提供已配置的工具、数据和业务执行能力。公开阅读、初始化、线上业务授权和私有资料同步分别按当前范围处理。

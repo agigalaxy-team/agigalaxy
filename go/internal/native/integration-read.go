@@ -29,7 +29,7 @@ func (s *Store) IntegrationReadStatus(ctx context.Context) (map[string]any, erro
 		return nil, e
 	}
 	out := integrationStatus(snapshot)
-	out["catalog"] = InitializationCatalog()
+	out["catalog"] = initializationChoices()
 	return out, nil
 }
 func (s *Store) IntegrationConnectionStatus(ctx context.Context) (map[string]any, error) {

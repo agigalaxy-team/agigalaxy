@@ -79,7 +79,7 @@ func CommandInitialization(input CommandInput) map[string]any {
 func integrationStatus(snapshot map[string]any) map[string]any {
 	state := uploadObject(snapshot["state"])
 	integration := uploadObject(state["integration"])
-	return map[string]any{"dataDir": snapshot["dataDir"], "initialized": integration != nil, "recoveryRequired": snapshot["recoveryRequired"] == true, "galaxyId": snapshot["identity"], "integration": state["integration"], "uploadPrivacy": NormalizeUploadPrivacy(state["uploadPrivacy"]), "catalog": InitializationCatalog()["modules"], "recordCounts": map[string]any{"cases": len(uploadRows(state["cases"])), "disclosurePlans": len(uploadRows(state["disclosurePlans"])), "consentGrants": len(uploadRows(state["consentGrants"])), "localProofDrafts": len(uploadRows(state["localProofDrafts"])), "auditEvents": len(uploadRows(state["auditEvents"]))}, "localOnly": true}
+	return map[string]any{"dataDir": snapshot["dataDir"], "initialized": integration != nil, "recoveryRequired": snapshot["recoveryRequired"] == true, "galaxyId": snapshot["identity"], "integration": state["integration"], "uploadPrivacy": NormalizeUploadPrivacy(state["uploadPrivacy"]), "catalog": initializationChoices()["modules"], "recordCounts": map[string]any{"cases": len(uploadRows(state["cases"])), "disclosurePlans": len(uploadRows(state["disclosurePlans"])), "consentGrants": len(uploadRows(state["consentGrants"])), "localProofDrafts": len(uploadRows(state["localProofDrafts"])), "auditEvents": len(uploadRows(state["auditEvents"]))}, "localOnly": true}
 }
 func (s *Store) IntegrationStatus(ctx context.Context) (any, error) {
 	snapshot, e := s.LocalSnapshot(ctx)
@@ -199,9 +199,9 @@ func (r *Runtime) commandSurface(ctx context.Context, name string, input Command
 			if local != nil {
 				message = "A local Galaxy ID already exists. Integration modules are not initialized; this read creates no identity, connection or upload."
 			}
-			return map[string]any{"command": name, "state": "not-initialized", "route": route, "title": title, "message": message, "initializationPaths": paths, "nextTools": []string{"galaxy_command", "galaxy_native_initialize_preview"}, "localOnly": true}, nil
+			return map[string]any{"command": name, "state": "not-initialized", "route": route, "title": title, "message": message, "initializationPaths": availableInitializationEntries(paths), "nextTools": []string{"galaxy_command", "galaxy_native_initialize_preview"}, "localOnly": true}, nil
 		}
-		value := map[string]any{"command": name, "state": "needs-initialization", "route": "galaxy-initialization", "title": "Set up Galaxy once", "message": "Galaxy has not been initialized on this device. Choose an initialization path, preview its local effects, then confirm once.", "initializationPaths": paths, "nextTools": []string{"galaxy_native_initialize_preview", "galaxy_native_initialize"}, "localOnly": true}
+		value := map[string]any{"command": name, "state": "needs-initialization", "route": "galaxy-initialization", "title": "Set up Galaxy once", "message": "Galaxy has not been initialized on this device. Choose an initialization path, preview its local effects, then confirm once.", "initializationPaths": availableInitializationEntries(paths), "nextTools": []string{"galaxy_native_initialize_preview", "galaxy_native_initialize"}, "localOnly": true}
 		if local != nil {
 			value["message"] = "A local Galaxy ID already exists. Review and confirm the local module configuration without creating another ID."
 		}
