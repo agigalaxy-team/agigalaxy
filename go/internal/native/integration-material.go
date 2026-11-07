@@ -50,7 +50,7 @@ func integrationPrivacyMaterialWithin(dir string) (uploadPrivacyMaterial, string
 }
 
 func integrationPrivacyView(owner string, settings UploadPrivacySettings) map[string]any {
-	return map[string]any{"galaxyId": nullableText(owner), "settings": settings, "levels": uploadPrivacyLevelsWithDefault(), "allowedDataTypes": AllowedUploadDataTypes(settings), "uploadStarted": false, "changesOnlineVisibility": false, "localOnly": true}
+	return map[string]any{"galaxyId": nullableText(owner), "settings": settings, "levels": UploadPrivacyLevels(), "allowedDataTypes": AllowedUploadDataTypes(settings), "uploadStarted": false, "changesOnlineVisibility": false, "localOnly": true}
 }
 
 func (s *Store) integrationPrivacyGet(ctx context.Context) (map[string]any, error) {

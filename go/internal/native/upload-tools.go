@@ -63,7 +63,7 @@ func registerUploadTools(server *mcp.Server, rt *toolRuntime, runtime *Runtime) 
 	level := map[string]any{"type": "string", "enum": []string{"local-only", "history-overview", "work-content", "conversation-archive"}}
 	boolean := map[string]any{"type": "boolean"}
 	ids := func(item any) any { return map[string]any{"type": "array", "maxItems": 500, "items": item} }
-	register("galaxy_local_upload_privacy_get", "Read the saved four-level upload selection. Level 2 is the initial default; full conversations stay excluded unless explicitly enabled for selected archive session IDs.", "local_upload_privacy_input_invalid", empty, false, false, func(ctx context.Context, _ map[string]any, _ *ChoiceScope) (any, error) {
+	register("galaxy_local_upload_privacy_get", "Read the saved four-level upload selection. The initial setting keeps work data on this device. Full conversations require a separate selection.", "local_upload_privacy_input_invalid", empty, false, false, func(ctx context.Context, _ map[string]any, _ *ChoiceScope) (any, error) {
 		return runtime.GetUploadPrivacy(ctx)
 	})
 	register("galaxy_local_upload_privacy_set", "Choose local upload data types. This starts no upload, changes no online public-query setting, and does not limit your own host model or local history reads.", "local_upload_privacy_input_invalid", objectSchema(map[string]any{"galaxyId": stringSchema(), "level": level, "includeFullConversations": boolean, "sessionIds": ids(stringSchema())}, "level"), true, true, func(ctx context.Context, input map[string]any, scope *ChoiceScope) (any, error) {

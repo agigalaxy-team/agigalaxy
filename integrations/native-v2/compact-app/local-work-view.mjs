@@ -161,6 +161,10 @@ export function mountLocalWorkPanel(root,{call,continueLocalWork,supportsHandoff
     accountRefreshers.set('settings',next=>{const before=target.value;refillAccounts(target,next);if(!before&&!originalValue.targetAccountId&&originalValue.conversationMode==='cloud'&&target.value)originalValue={...originalValue,targetAccountId:target.value};changed();});
     form.addEventListener('submit',event=>{event.preventDefault();if(pendingWrite)return;const value=values();if(sameLocalSelection(value,originalValue))return;activeAction='galaxy_local_panel_settings_save';if(value.conversationMode!=='off'&&!value.sessions.length){report('请选择会话。');return;}draft={name:activeAction,args:{...value,choiceId:crypto.randomUUID()}};void request(draft.name,draft.args);});body.append(form);
     if(!current.workSync)return;
+    if(privacy.level==='local-only'){
+      body.append(el('h2','履历保存到账户'),muted('当前只存本机。'));
+      return;
+    }
     const choice=current.workSync.choice,workForm=el('form'),future=check('自动保存今后新开始的工作',choice.includeFutureWork),workTarget=accountSelect(choice.targetAccountId??archiveChoice?.targetAccountId,accounts);workForm.dataset.form='work';workForm.append(el('h2','履历保存到账户'),future.label,workTarget);accountHelp(workTarget);
     const chosen=[];
     for(const item of current.work.items){const row=check(workTitle(item)+' · '+date(item.updatedAt),choice.workIds.includes(item.workId)),source={...row,id:item.workId,extras:[]};chosen.push(source);if(current.workSync.sources?.some(entry=>entry.workId===item.workId&&entry.blocked)){const restore=check('重新保存这段工作的云副本');restore.input.dataset.restore=item.workId;source.extras.push(restore.label);}}

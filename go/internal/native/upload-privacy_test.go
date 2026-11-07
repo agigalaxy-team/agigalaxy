@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 )
 
 func TestUploadPrivacyAndProjectionMatchOriginalJavaScript(t *testing.T) {
@@ -156,6 +158,13 @@ func TestUploadPrivacyReviewedPersistenceKeepsLocalAndAdoptedOwnersSeparate(t *t
 	if e != nil {
 		t.Fatal(e)
 	}
+	// A previously saved level 2 remains effective for an adopted identity.
+	if e = writeJSON(filepath.Join(store.Directory, "galaxy-upload-privacy.json"), map[string]any{
+		"version":    1,
+		"identities": map[string]any{adopted.Owner: NormalizeUploadPrivacy(map[string]any{"level": "history-overview"})},
+	}); e != nil {
+		t.Fatal(e)
+	}
 	if _, e = rt.SetUploadPrivacyReviewed(ctx, UploadPrivacySelection{Level: "local-only"}, &adopted); e != nil {
 		t.Fatal(e)
 	}
@@ -170,5 +179,46 @@ func TestUploadPrivacyReviewedPersistenceKeepsLocalAndAdoptedOwnersSeparate(t *t
 	compareOriginal(adopted.Owner, view)
 	if _, e = rt.SetUploadPrivacyReviewed(ctx, UploadPrivacySelection{Level: "conversation-archive"}, &scope); e == nil {
 		t.Fatal("stale owner choice overwrote adopted preference")
+	}
+}
+
+func TestUploadPrivacyDispatchFollowsSavedScope(t *testing.T) {
+	ctx := context.Background()
+	store := materialStore(t)
+	runtime := commandRuntime(t, store)
+	selection, err := runtime.connection.selection(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lease := connectionLease{selection: selection}
+	path := filepath.Join(store.Directory, "galaxy-local-state.json")
+	cases := []struct {
+		name, level, kind, session string
+		includeFull, allowed       bool
+	}{
+		{name: "unset blocks metadata", kind: "history-metadata"},
+		{name: "level 2 allows metadata", level: "history-overview", kind: "history-metadata", allowed: true},
+		{name: "level 2 blocks summaries", level: "history-overview", kind: "work-summary"},
+		{name: "level 3 allows summaries", level: "work-content", kind: "work-summary", allowed: true},
+		{name: "level 3 blocks full sessions", level: "work-content", kind: "full-conversation", session: "chosen"},
+		{name: "level 4 alone blocks full sessions", level: "conversation-archive", kind: "full-conversation", session: "chosen"},
+		{name: "level 4 allows selected session", level: "conversation-archive", kind: "full-conversation", session: "chosen", includeFull: true, allowed: true},
+		{name: "level 4 blocks other sessions", level: "conversation-archive", kind: "full-conversation", session: "other", includeFull: true},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			state := map[string]any{}
+			if test.level != "" {
+				state["uploadPrivacy"] = map[string]any{"level": test.level, "includeFullConversations": test.includeFull, "sessionIds": []string{"chosen"}}
+			}
+			if err := writeJSON(path, state); err != nil {
+				t.Fatal(err)
+			}
+			options := ConnectionLocalUpload{DataTypes: []string{test.kind}, SessionID: test.session}
+			err := runtime.connection.checkUpload(ctx, "/v2/example", map[string]any{}, "POST", lease, options)
+			if test.allowed && err != nil || !test.allowed && fault.Code(err) != "local_upload_type_not_allowed" {
+				t.Fatalf("upload allowed = %t, got %v", test.allowed, err)
+			}
+		})
 	}
 }

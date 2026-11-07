@@ -446,8 +446,8 @@ export function createGalaxyAdapter(
           };
           showSelect({
             title: chinese
-              ? '开始使用银河\n普通工作会自动记录到本机，供本人回看与自己的 AI 整理；保留事实、来源和有限片段，默认不另存全部会话。\n上传预设“履历概况”，接入在线服务前不关联、不上传。沿用已有身份；新身份默认为个人，类型创建后不可更改。'
-              : 'Start using Galaxy\nOrdinary work is recorded on this device for your review and AI summaries. Facts, sources and bounded excerpts are retained; full conversations are not copied by default.\nUpload is preset to history overview, with no connection or upload before choosing a service. Existing identity is reused; new identities are personal by default and their type is permanent.',
+              ? '开始使用银河\n普通工作会自动记录到本机，供本人回看与自己的 AI 整理；保留事实、来源和有限片段，默认不另存全部会话。\n工作资料默认只存本机。沿用已有身份；新身份默认为个人，类型创建后不可更改。'
+              : 'Start using Galaxy\nOrdinary work is recorded on this device for your review and AI summaries. Facts, sources and bounded excerpts are retained; full conversations are not copied by default.\nWork data stays on this device by default. Existing identity is reused; new identities are personal by default and their type is permanent.',
             options: [
               {
                 number: '1',

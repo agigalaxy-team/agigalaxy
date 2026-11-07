@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -96,9 +95,7 @@ func (c *Connection) checkUpload(ctx context.Context, path string, input any, me
 			return connectionFailure("local_upload_payload_invalid")
 		}
 	}
-	level := "history-overview"
-	includeFull := false
-	sessions := []string{}
+	var settings UploadPrivacySettings
 	e = c.store.With(ctx, false, func(dir string) error {
 		selected, e := c.selectionWithin(dir)
 		if e != nil {
@@ -111,70 +108,20 @@ func (c *Connection) checkUpload(ctx context.Context, path string, input any, me
 		if selected.Active != nil {
 			owner = selected.Active.SubjectID
 		}
-		var local map[string]any
-		if e = readFallback(dir, "galaxy-id.json", "node.json", &local); e != nil {
-			return e
-		}
-		if owner == "" {
-			owner = text(local["id"])
-		}
-		var state map[string]any
-		if e = readFallback(dir, "galaxy-local-state.json", "local-state.json", &state); e != nil {
-			return e
-		}
-		var separate map[string]any
-		ok, e := readJSON(filepath.Join(dir, "galaxy-upload-privacy.json"), &separate)
+		material, e := uploadPrivacyWithin(dir, owner)
 		if e != nil {
 			return e
 		}
-		if ok {
-			if integer(separate["version"]) != 1 {
-				return connectionFailure("local_upload_privacy_file_invalid")
-			}
-			if _, ok := separate["identities"].(map[string]any); !ok {
-				return connectionFailure("local_upload_privacy_file_invalid")
-			}
-		}
-		settings, _ := state["uploadPrivacy"].(map[string]any)
-		if owner != "" && owner != text(local["id"]) {
-			identities, _ := separate["identities"].(map[string]any)
-			settings, _ = identities[owner].(map[string]any)
-			if settings == nil {
-				byID, _ := state["uploadPrivacyByIdentity"].(map[string]any)
-				settings, _ = byID[owner].(map[string]any)
-			}
-		}
-		configured := text(settings["level"])
-		if isOne(configured, "local-only", "history-overview", "work-content", "conversation-archive") {
-			level = configured
-		}
-		if level == "conversation-archive" && settings["includeFullConversations"] == true {
-			if values, ok := connectionStrings(settings["sessionIds"]); ok {
-				for _, v := range values {
-					v = strings.TrimSpace(v)
-					if v != "" && protocol.TextLength(v) <= 512 && !connectionIncludes(sessions, v) && len(sessions) < 500 {
-						sessions = append(sessions, v)
-					}
-				}
-				includeFull = len(sessions) > 0
-			}
-		}
+		settings = material.settings
 		return nil
 	})
 	if e != nil {
 		return e
 	}
+	allowed := AllowedUploadDataTypes(settings)
 	allows := func(kind, session string) bool {
-		if kind == "full-conversation" {
-			return includeFull && connectionIncludes(sessions, session)
-		}
-		if level == "local-only" {
-			return false
-		}
-		if kind == "history-metadata" || kind == "environment-versions" {
-			return true
-		}
-		return (level == "work-content" || level == "conversation-archive") && isOne(kind, "work-summary", "work-content", "work-artifact")
+		return connectionIncludes(allowed, kind) &&
+			(kind != "full-conversation" || connectionIncludes(settings.SessionIDs, session))
 	}
 	required := append([]string{}, options.DataTypes...)
 	if path == "/v2/context/grants" {

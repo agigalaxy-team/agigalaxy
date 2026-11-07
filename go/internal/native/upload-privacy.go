@@ -38,8 +38,10 @@ func uploadObject(value any) map[string]any {
 	object, _ := connectionObject(raw)
 	return object
 }
+const defaultUploadPrivacyLevel = "local-only"
+
 func NormalizeUploadPrivacy(value any) UploadPrivacySettings {
-	out := UploadPrivacySettings{Version: 1, Level: "history-overview", SessionIDs: []string{}}
+	out := UploadPrivacySettings{Version: 1, Level: defaultUploadPrivacyLevel, SessionIDs: []string{}}
 	object := uploadObject(value)
 	level := text(object["level"])
 	if !isOne(level, "local-only", "history-overview", "work-content", "conversation-archive") {

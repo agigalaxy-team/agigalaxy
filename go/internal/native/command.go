@@ -161,7 +161,7 @@ func (r *Runtime) commandSurface(ctx context.Context, name string, input Command
 		if e != nil {
 			return nil, e
 		}
-		privacy := map[string]any{"galaxyId": nullableText(owner), "initialized": owner != "", "recoveryRequired": false, "settings": settings, "levels": uploadPrivacyLevelsWithDefault(), "allowedDataTypes": AllowedUploadDataTypes(settings), "uploadStarted": false, "changesOnlineVisibility": false, "localOnly": true}
+		privacy := map[string]any{"galaxyId": nullableText(owner), "initialized": owner != "", "recoveryRequired": false, "settings": settings, "levels": UploadPrivacyLevels(), "allowedDataTypes": AllowedUploadDataTypes(settings), "uploadStarted": false, "changesOnlineVisibility": false, "localOnly": true}
 		return map[string]any{"command": name, "route": "galaxy-privacy-controls", "state": "ready", "privacy": privacy, "nextTools": []string{"galaxy_local_upload_privacy_set", "galaxy_local_archive_settings", "galaxy_local_archive_list"}, "localOnly": true}, nil
 	}
 	local := uploadObject(snapshot["identity"])
