@@ -70,6 +70,8 @@ func nativeResultLines(data any, isError bool) []string {
 		object, _ := data.(map[string]any)
 		message := "这次操作遇到问题，原因尚不明确。"
 		switch object["error"] {
+		case helpQueryInvalid:
+			message = `查找帮助只需提供问题关键词，例如 {"query":"问题关键词"}。按来源查询时请使用工具说明中的请求格式。`
 		case "native_remote_input_invalid", "native_choice_input_invalid", "local_work_input_invalid":
 			message = "这次操作所需的内容不完整或不符合要求。"
 		case "local_identity_required":
@@ -92,6 +94,28 @@ func nativeResultLines(data any, isError bool) []string {
 	}
 	lines := []string{}
 	if object, ok := data.(map[string]any); ok {
+		if object["queryDoesNotPublish"] == true {
+			for _, value := range uploadRows(object["results"]) {
+				row := uploadObject(value)
+				label := "资料"
+				switch row["kind"] {
+				case "search-v2":
+					label = "相关资料"
+				case "participants-v2", "participant-v2":
+					label = "相关参与者"
+				}
+				switch row["state"] {
+				case "empty":
+					lines = append(lines, label+"：本次没有找到匹配结果。")
+				case "failed":
+					lines = append(lines, label+"：暂未查到结果，请稍后再试。")
+				case "ready":
+					items := uploadRows(uploadObject(row["data"])["items"])
+					lines = append(lines, fmt.Sprintf("%s：找到 %d 项。", label, len(items)))
+					lines = append(lines, nativeAuthoredLines(items)...)
+				}
+			}
+		}
 		if object["initialized"] == true {
 			service := uploadObject(object["serviceAccess"])
 			switch service["state"] {

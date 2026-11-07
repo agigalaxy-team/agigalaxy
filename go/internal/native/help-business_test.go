@@ -116,3 +116,24 @@ func TestHelpQueryBranchDefaultsPreserveOriginalRequestKinds(t *testing.T) {
 		t.Fatal("retaining a query snapshot introduced fields from another source", session)
 	}
 }
+
+func TestHelpQueryKeywordsAndReadableResults(t *testing.T) {
+	input, err := helpInput("galaxy_help_query", map[string]any{"query": "  DNS  "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := trustArray(input["requests"])
+	if len(requests) != 2 || psObject(requests[0])["kind"] != "search-v2" || psObject(requests[1])["kind"] != "participants-v2" || psObject(psObject(requests[1])["input"])["query"] != "DNS" {
+		t.Fatalf("wrong help sources: %v", input)
+	}
+	if _, err = helpInput("galaxy_help_query", map[string]any{"query": "  "}); err == nil || err.Error() != helpQueryInvalid {
+		t.Fatalf("missing actionable query error: %v", err)
+	}
+	result := map[string]any{"queryDoesNotPublish": true, "results": []any{
+		map[string]any{"kind": "search-v2", "state": "empty"},
+		map[string]any{"kind": "participants-v2", "state": "failed"},
+	}}
+	if visible := strings.Join(nativeResultLines(result, false), "\n"); !strings.Contains(visible, "没有找到匹配") || !strings.Contains(visible, "暂未查到") {
+		t.Fatalf("query states hidden from text-only hosts: %q", visible)
+	}
+}

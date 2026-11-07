@@ -2,10 +2,15 @@ package native
 
 import (
 	"context"
-	"github.com/agigalaxy-team/agigalaxy/go/internal/jstext"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"sort"
+	"strings"
+
+	"github.com/agigalaxy-team/agigalaxy/go/internal/jstext"
+	"github.com/google/uuid"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+const helpQueryInvalid = "help_query_input_invalid"
 
 func helpTrim(v any) any {
 	switch s := v.(type) {
@@ -28,6 +33,19 @@ func helpInput(name string, input any) (map[string]any, error) {
 	if name == "galaxy_help_start" {
 		values["localTaskRef"] = helpTrim(values["localTaskRef"])
 	}
+	if name == "galaxy_help_query" {
+		if raw, present := values["query"]; present {
+			query := strings.TrimSpace(text(raw))
+			if _, batched := values["requests"]; batched || query == "" || len(jstext.From(query)) > 200 {
+				return nil, helpError(helpQueryInvalid)
+			}
+			delete(values, "query")
+			values["requests"] = []any{
+				map[string]any{"requestId": uuid.NewString(), "kind": "search-v2", "input": map[string]any{"type": "capsule", "query": map[string]any{"query": query, "limit": 5}}},
+				map[string]any{"requestId": uuid.NewString(), "kind": "participants-v2", "input": map[string]any{"query": query, "limit": 5}},
+			}
+		}
+	}
 	if name == "galaxy_help_compose" {
 		for _, v := range trustArray(values["offers"]) {
 			o := psObject(v)
@@ -49,6 +67,9 @@ func helpInput(name string, input any) (map[string]any, error) {
 	schema := psObject(contract["schema"])
 	helpDefaults(schema, values)
 	if remoteChatValidate(schema, values) != nil {
+		if name == "galaxy_help_query" {
+			return nil, helpError(helpQueryInvalid)
+		}
 		return nil, remoteFactsInvalid()
 	}
 	key, field := "", ""
@@ -274,7 +295,17 @@ func registerNativeHelpTools(server *mcp.Server, tools *toolRuntime, runtime *Ru
 	sort.Strings(names)
 	for _, name := range names {
 		contract := psObject(contracts[name])
-		addNativeTool(server, &mcp.Tool{Name: name, InputSchema: contract["schema"], Description: text(contract["description"]), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: contract["readOnlyHint"] == true, DestructiveHint: func() *bool { b := contract["destructiveHint"] == true; return &b }(), OpenWorldHint: func() *bool { b := contract["openWorldHint"] == true; return &b }()}}, "help_operation_failed", func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		schema := psObject(contract["schema"])
+		description := text(contract["description"])
+		invalidCode := "help_operation_failed"
+		if name == "galaxy_help_query" {
+			psObject(schema["properties"])["query"] = map[string]any{"type": "string", "minLength": 1, "maxLength": 200, "description": "Keywords describing the current blocker. Finds published methods and relevant participants."}
+			delete(schema, "required")
+			schema["oneOf"] = []any{map[string]any{"required": []string{"query"}}, map[string]any{"required": []string{"requests"}}}
+			description = `Find published methods and relevant participants for blocked work. Pass {"query":"problem keywords"} for a read-only lookup. Use requests for specific sources; no help session is required.`
+			invalidCode = helpQueryInvalid
+		}
+		addNativeTool(server, &mcp.Tool{Name: name, InputSchema: schema, Description: description, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: contract["readOnlyHint"] == true, DestructiveHint: func() *bool { b := contract["destructiveHint"] == true; return &b }(), OpenWorldHint: func() *bool { b := contract["openWorldHint"] == true; return &b }()}}, invalidCode, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			decoded, e := jstext.DecodeJSON(req.Params.Arguments)
 			if e != nil {
 				return helpToolError(e)

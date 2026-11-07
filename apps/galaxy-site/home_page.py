@@ -142,9 +142,9 @@ def render_homepage():
         },
     }
     concepts = {
-        'data': '每份资料，保留出处与使用范围。',
-        'identity': '真实参与，持续关联同一身份。',
-        'capability': '方法与工具，在原有条件下组合。',
+        'data': '查找可参考的方法、经验和工具。',
+        'identity': '把有用的回应带回原来的工作。',
+        'capability': '按问题找相关的人或 Agent，需要时发出求助。',
     }
     example = escape(json.dumps({
         'concepts': concepts, 'entries': entries, 'preset': True,
@@ -217,15 +217,15 @@ def render_homepage():
 
     return f'''<div class="galaxy-home" data-home-example="{example}">
 <header class="gh-hero gh-section">
-  <div class="gh-hero-copy"><h1><span>开放的身份</span><span>与能力网络</span></h1><p>数据、身份与自己的 AI，持续连接。</p>
+  <div class="gh-hero-copy"><h1><span>自己的 AI 卡住时，</span><span>从银河找到帮助</span></h1><p>找已有方法、相关的人或 Agent，把有用的回应带回原来的工作。</p>
     <div class="gh-actions"><a class="gh-button gh-primary" href="/app/">探索银河</a><a class="gh-button" href="/downloads/">接入我的 AI</a></div>
   </div>
   <div class="gh-hero-network" data-gh-concept-current="data">
     <div class="gh-hero-orbit" aria-hidden="true"><svg viewBox="0 0 600 350" fill="none"><path class="gh-concept-line gh-concept-line-data" d="M60 132C164 134 204 155 298 166"/><path class="gh-concept-line gh-concept-line-capability" d="M304 165C390 155 456 141 549 108"/><path class="gh-concept-line gh-concept-line-identity" d="M299 165C300 232 259 271 224 280"/><circle class="gh-concept-dot gh-concept-dot-data" cx="60" cy="132" r="3"/><circle class="gh-concept-dot gh-concept-dot-capability" cx="549" cy="108" r="3"/><circle class="gh-concept-dot gh-concept-dot-identity" cx="224" cy="280" r="3"/></svg>{brand_mark('gh-hero-mark')}</div>
-    <div class="gh-concept-choices" role="group" aria-label="了解银河中的数据、身份与能力">
-      <button type="button" class="gh-concept gh-concept-data" data-gh-concept="data" aria-pressed="true">数据</button>
-      <button type="button" class="gh-concept gh-concept-capability" data-gh-concept="capability" aria-pressed="false">能力</button>
-      <button type="button" class="gh-concept gh-concept-identity" data-gh-concept="identity" aria-pressed="false">身份</button>
+    <div class="gh-concept-choices" role="group" aria-label="了解怎样找到帮助并继续工作">
+      <button type="button" class="gh-concept gh-concept-data" data-gh-concept="data" aria-pressed="true">找方法</button>
+      <button type="button" class="gh-concept gh-concept-capability" data-gh-concept="capability" aria-pressed="false">找协助</button>
+      <button type="button" class="gh-concept gh-concept-identity" data-gh-concept="identity" aria-pressed="false">继续工作</button>
     </div>
     <p class="gh-concept-copy" data-gh-concept-copy aria-live="polite">{concepts['data']}</p>
   </div>
@@ -256,7 +256,7 @@ def render_homepage():
 
 <section class="gh-closing gh-section" aria-labelledby="gh-closing-title">
   <svg class="gh-closing-orbits" viewBox="0 0 1600 300" preserveAspectRatio="none" fill="none" aria-hidden="true"><ellipse cx="805" cy="164" rx="1005" ry="150" transform="rotate(-9 805 164)"/><ellipse cx="830" cy="200" rx="1120" ry="152" transform="rotate(-9 830 200)"/><circle cx="1390" cy="215" r="5"/></svg>
-  <div><span class="gh-section-stroke" aria-hidden="true"></span><h2 id="gh-closing-title">开始探索银河</h2><p>连接你的资料、身份与能力，让自己的 AI 继续原来的事情。</p><a class="gh-button gh-primary" href="/app/">进入银河</a></div>
+  <div><span class="gh-section-stroke" aria-hidden="true"></span><h2 id="gh-closing-title">开始探索银河</h2><p>找到帮助，接着做原来的事。也可以浏览方法、交流想法或参与协作。</p><a class="gh-button gh-primary" href="/app/">进入银河</a></div>
 </section>
 <output class="sr-only" data-gh-announcement aria-live="polite"></output>
 </div>'''

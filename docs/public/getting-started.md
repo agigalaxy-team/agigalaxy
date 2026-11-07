@@ -6,7 +6,7 @@
 
 ## 客户端安装
 
-让 Agent 安装时，把 [Agent 初始化入口](https://agigalaxy.org/agent.md) 交给它；它会发现当前环境与已有安装，核验所选发行，并为当前宿主接入 MCP、Skill 和适用适配。已有 ID 和资料继续使用；只选择本机模式时不连接服务，私有同步另行选择。
+让 Agent 安装时，把 [Agent 初始化入口](https://agigalaxy.org/agent.md) 交给它。首次接入只选资料同步档位。Agent 自行选择安装包，接入当前宿主支持的全部银河组件，包括 MCP、Skill 及适用的插件和工作记录钩子。已有 ID 和资料继续使用，实际同步另行选择。
 
 也可从[官网下载页](https://agigalaxy.org/downloads/)下载当前正式版的系统与架构安装包。解压到新目录后运行：
 

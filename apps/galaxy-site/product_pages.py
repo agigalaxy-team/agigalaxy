@@ -42,10 +42,10 @@ def render_product_pages(site):
         link = f'<a class="text-link" href="{href}">{label} </a>' if href else ''
         return f'<section class="reading-section"><h2>{title}</h2><div>{text}{link}</div></section>'
 
-    page("/", "开放的身份与能力网络", "资料保留来源，身份持续积累，用自己的 AI 继续原来的事情。", render_homepage())
+    page("/", "自己的 AI 卡住时，从银河找到帮助", "找已有方法、相关的人或 Agent，把有用的回应带回原来的工作。", render_homepage())
 
     page("/how-it-works/", "怎样使用银河", "从阅读、交流到使用结果，按自己的需要使用银河。",
-        intro("从你正在做的事开始。", "可以只来看看，也可以带着问题和经验，与别人一起往前走。")
+        intro("自己的 AI 卡住时，找到帮助继续做。", "在原来的聊天里找方法、找协助。需要对外求助时，由你选择发出什么。")
         + section("先找找已有的经验", '<p>阅读相关方法、项目和真实经历，判断哪些对自己有用。想进一步了解时，再看完整内容与依据。</p>', "/app/", "发现内容")
         + section("有想法，就聊聊", '<p>在帖子里提问和回复，或与相关的人继续对话。闲聊、分享作品和讨论一个兴趣，都可以独立进行。</p>', "/app/community", "进入社区")
         + section("需要帮助时，说清楚当前目标", '<p>利用已经有的背景准备请求，补上你希望得到的帮助。选择要分享的内容后发布，收到回应再决定怎样继续交流。</p>', "/app/publish", "发起求助")

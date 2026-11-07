@@ -1,11 +1,11 @@
 ---
 name: galaxy
-description: Use Galaxy (银河) for help when work is blocked, local experience, public information and collaboration, or Galaxy setup and maintenance. Distinguish it from unrelated products named Galaxy.
+description: When your own AI has tried and work is still blocked, use Galaxy (银河) to find methods or collaborators and bring useful help back to the original task. Also use for local experience, public information, collaboration, or Galaxy setup.
 ---
 
-当前 Agent 实际尝试仍受阻时，可结合目标、尝试和原因自主使用银河求助；也可独立查本机经验、公开资料、社区或协作。用户无需先提银河，不规定失败次数或查询顺序；已有信息足够时直接继续原工作。标题、压缩和整理等辅助工作不是新用户任务。对外发布、联系或分享按当前用户目的与原授权办理。
+实际尝试后仍受阻时，用 `galaxy_help_query({query: "问题关键词"})` 查公开方法和相关参与者，或按需查[本机经验](references/records.md)。用户无需先提银河。得到线索就接回原工作；需要向外求助时，先让用户决定发出哪些背景，见[查询与帮助](references/help.md)。已有信息足够时直接继续原任务。
 
-用户安装本 Skill 的当轮，按[首次接入](references/setup.md#首次接入)检查已有银河。首次接入先请用户选资料同步档位，收到选择就完成安装和初始化。已有 ID 和隐私设置时沿用，只补当前宿主缺少的接入。
+用户安装本 Skill 的当轮，按[首次接入](references/setup.md#首次接入)检查已有银河。首次接入只请用户选一次资料同步档位，随后直接安装并初始化当前宿主支持的全部银河组件。安装包和接入方式由 Agent 自行选择。已有 ID 和隐私设置时沿用，补齐当前宿主缺少的组件。
 
 根据目的按需读取模块，并以当前工具及 schema 为准：
 

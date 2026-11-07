@@ -91,7 +91,7 @@ class HomepageTests(unittest.TestCase):
         parsed = HomepageParser(html)
         links = {attrs['href'] for tag, attrs in parsed.elements if tag == 'a'}
         self.assertTrue({'/app/', '/downloads/'} <= links)
-        for title in ('开放的身份与能力网络', '星河研究', '出处始终清楚',
+        for title in ('自己的 AI 卡住时，从银河找到帮助', '星河研究', '出处始终清楚',
                       '同一身份，积累继续发挥作用', '从你熟悉的地方接入', '开始探索银河'):
             self.assertIn(title, ''.join(parsed.text))
         self.assertIn('资料、身份与回答均为预设内容', html)
