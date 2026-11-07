@@ -249,6 +249,9 @@ func nativeGoUploadFixtureWithPool(t *testing.T, pool *pgxpool.Pool, peer bool) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err = rt.SetUploadPrivacyReviewed(ctx, UploadPrivacySelection{Level: "history-overview"}, &scope); err != nil {
+		t.Fatal(err)
+	}
 	note, err := store.RecordWorkNote(ctx, WorkNoteInput{GalaxyID: scope.Owner, Host: "opencode", SessionID: "opaque-session", Text: "Synthetic isolated work statement"})
 	if err != nil {
 		t.Fatal(err)
