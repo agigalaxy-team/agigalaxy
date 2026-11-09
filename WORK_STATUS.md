@@ -8,7 +8,7 @@
 
 ## 银河首次接入与受阻求助
 
-[Native 0.1.23](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.23) 已发布，官网 0.1.136 默认提供。Agent 入口及 Skill 收为首次接入、受阻查找、按需功能索引三条路径，移除配色及排版指令。首次同步编号直接传给安装器，回执只报告安装和接入状态。Windows 隔离实装确认编号正确传递且补装沿用。官网独立无头实测新版下载、安装说明、Agent 入口和 Skill。211 复查已无银河 MCP、Skill、本机身份或测试目录，可重新体验。尚未用 211 的 Gemini 做同题对照。
+[Native 0.1.24](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.24) 已发布，官网 0.1.137 默认提供。首次接入先等用户明确选择，第一档仅推荐。安装回执直接显示组件、银河服务和 MCP。211 独立 DSH Web 用 Gemini 3.5 Flash Lite 离线首次接入，验证等待、按选择安装和三行回执，重载后实际调用 MCP；测试资料和进程已清理。官网独立无头确认下载、安装说明和 Skill，GitHub CI 通过。
 
 首次接入只选资料同步档位，默认第 1 档。Agent 自行选择安装包并接入当前宿主支持的全部银河组件；已有接入补齐缺项，保留 ID 和已存档位。第 4 档的具体归档范围另选。安装回执只显示实际可用状态。
 
