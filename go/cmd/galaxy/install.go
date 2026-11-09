@@ -360,30 +360,6 @@ func setupCommand(ctx context.Context, args []string) error {
 	return completeManagedInstallation(ctx, value, applyError, !input.LocalOnly && !pending, configurationPath, formatReceipt)
 }
 
-func printSetupReceipt(result map[string]any) error {
-	components := "暂无已确认组件"
-	if result["hostConfigured"] == true {
-		components = "银河客户端、Skill"
-		if result["observationPluginConfigured"] == true {
-			components += "、宿主工作记录插件"
-		}
-	} else if result["releaseInstalled"] == true {
-		components = "银河客户端"
-	}
-	service := "未连接"
-	if result["serviceConnection"] == "ready" {
-		service = "已连接"
-	} else if result["serviceConnection"] == "pending" {
-		service = "尚未确认"
-	}
-	mcp := "尚未配置"
-	if result["hostConfigured"] == true {
-		mcp = "已配置，待验证"
-	}
-	_, err := fmt.Fprintf(os.Stdout, "已安装：%s\n银河服务：%s\nMCP：%s\n", components, service, mcp)
-	return err
-}
-
 func installationPrivacyOption(option, value string) (*native.UploadPrivacySelection, error) {
 	if option == "--sync-tier" {
 		tier, err := strconv.Atoi(value)

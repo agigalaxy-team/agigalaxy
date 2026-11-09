@@ -13,6 +13,8 @@ const isOfficialOrigin = endpoint => {
 const isOfficial = status => isOfficialOrigin(status.endpoint) || status.access?.kind === 'official-account' || !!status.officialAccount;
 const accessReady = status => status.access?.kind === 'service' ? status.access.state === 'ready' : status.connected === true;
 const accountReady = status => status.accountAccess?.state === 'ready' || status.officialAccount?.state === 'linked';
+const accountUnlinked = status => status.officialAccount?.state === 'unlinked' ||
+  !status.officialAccount && status.accountAccess?.state === 'account-required';
 
 export function createPurposeIdentity(session) {
   function identity(onReady = null, back = session.onBack) {
@@ -51,7 +53,7 @@ export function createPurposeIdentity(session) {
               ? [[session.label('连接当前身份', 'Connect this identity'),
                   () => identityChoice('galaxy_native_connect', {}, () => identity(onReady, back), ['awaiting-account', 'processing'].includes(status.connectionOperation?.state))]]
               : []),
-            ...(ready && isOfficial(status) && !accountReady(status)
+            ...(ready && isOfficial(status) && accountUnlinked(status)
               ? [[session.label('关联官网账户（按需）', 'Link website account (optional)'),
                   () => identityChoice('galaxy_native_account_connect', {}, () => identity(null, back), ['awaiting-account', 'processing'].includes(status.connectionOperation?.state))]]
               : []),

@@ -6,7 +6,14 @@ labels.proposal='协助说明';
 labels.reportedOutcome='结果判断';labels.outcome='结果判断';
 export function nativeConnectionMessage(status,language='zh-CN'){
  const zh=language!=='en-US',label=(cn,en)=>zh?cn:en;
- if(status.connected)return label('当前设备已连接银河，可以继续当前工作。','This device is connected to Galaxy. Continue the current work.');
+ if(status.connected){
+  const service=label('银河服务：已连接','Galaxy service: Connected');
+  if(!status.officialAccount&&!status.accountAccess)return service;
+  const account=status.officialAccount?.state??({ready:'linked','account-required':'unlinked'}[status.accountAccess?.state]);
+  return [service,account==='linked'?label('在线账户：已关联','Website account: Linked'):
+    account==='unlinked'?label('在线账户：尚未关联，可继续浏览公开内容','Website account: Not linked. Public content is available.'):
+      label('在线账户：暂时查不到关联状态','Website account: Link status unavailable')].join('\n');
+ }
  if(status.connectionError==='current_device_control_required')return label('当前设备的连接权限已变化。请在仍获准的设备上接续身份；原工作和本机资料保留。','This device no longer has the required connection permission. Continue the identity from an authorized device; original work and local material are retained.');
  if(status.connectionError)return label('暂时无法恢复已选服务的连接。原身份、使用范围和工作保留，可以重试当前连接。','The selected service connection cannot be restored right now. Your identity, selected scope and work are retained; retry this connection.');
  return status.identity?label('这台设备已有稳定身份。按当前工作需要连接服务即可继续。','This device has a stable identity. Connect to the service when the current work needs it.'):

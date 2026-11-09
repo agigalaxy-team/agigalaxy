@@ -10,6 +10,6 @@
 
 `galaxy_native_connect` 沿用当前本机 ID 完成所选服务的技术连接及必要设备登记，不要求官网账户。初始化 ID 后自动连接；用户明确选择仅本机模式时保留该选择。以 `access.kind: service` 和 `access.state: ready` 判断技术连接，`disconnected` 表示未连接。
 
-只有当前操作实际需要官网账户时，提醒用户注册或登录并关联，然后使用 `galaxy_native_account_connect` 沿原 ID 办理；本人按工具返回页面确认账户与 ID。以 `accountAccess.kind: official-account`、`accountAccess.state` 和 `officialAccount` 判断账户状态：`ready`、`account-required`、`unknown` 分别处理；技术连接成功不证明账户已关联，未知不宣称成功。旧核心缺工具时按[接入与维护](setup.md)处理并保留原资料。未打开浏览器不等于用户拒绝。
+当前操作需要官网账户时，说明原因。首次接入确认未关联时，可在回执里顺带说明关联有什么用。用户要关联时使用 `galaxy_native_account_connect` 沿原 ID 办理，由本人在工具返回的页面确认账户与 ID。以 `accountAccess.kind: official-account`、`accountAccess.state` 和 `officialAccount` 区分已关联、未关联与查不到。旧核心缺工具时按[接入与维护](setup.md)处理并保留原资料。
 
 单独管理已有账户关联、Personal MCP OAuth 或网页设备接续时，按需读[账户、OAuth 与网页设备管理](identity-management.md)；网页链接和原聊天返回见[网页与聊天接续](continuation.md)。

@@ -52,3 +52,16 @@ test('linked account is not offered for linking again', async () => {
   await new Promise(setImmediate);
   assert.ok(!options.some(item=>item[0]==='关联官网账户（按需）'));
 });
+
+test('an unavailable account lookup is shown without prompting a new link', async () => {
+  const status={identity:'existing-identity',endpoint:'https://official.agigalaxy.org',connected:true,
+    access:{kind:'service',state:'ready'},officialAccount:{state:'unavailable'}};
+  let options, details;
+  const session={nativeTools:{},language:'zh-CN',onBack(){},label(cn){return cn;},native:async()=>status,
+    run:async(read,done)=>done(await read()),menu(title,items){options=items;},message(title,body){details=body;}};
+  createPurposeIdentity(session).identity();
+  await new Promise(setImmediate);
+  assert.ok(!options.some(item=>item[0]==='关联官网账户（按需）'));
+  options.find(item=>item[0]==='当前身份与服务')[1]();
+  assert.match(String(details),/银河服务：已连接[\s\S]*在线账户：暂时查不到关联状态/);
+});

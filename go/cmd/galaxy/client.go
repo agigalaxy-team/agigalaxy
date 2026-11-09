@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/native"
@@ -331,7 +332,11 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 		return printValue(plan)
 	}
 	result, applyError := native.ApplyManagedNativeInstallation(ctx, plan)
-	return completeManagedInstallation(ctx, result, applyError, action == "install" && !input.LocalOnly, input.ConfigPath, nil)
+	var formatReceipt func(map[string]any) error
+	if action == "install" && humanOutput {
+		formatReceipt = printSetupReceipt
+	}
+	return completeManagedInstallation(ctx, result, applyError, action == "install" && !input.LocalOnly, input.ConfigPath, formatReceipt)
 }
 
 // The caller holds the update lock through installation and selection.
@@ -383,11 +388,18 @@ func completeManagedInstallation(ctx context.Context, result map[string]any, app
 		result["serviceConnection"] = "pending"
 		_, err := nativebridge.EnsureLocked(ctx, nativebridge.Options{ExplicitStart: true})
 		if err == nil {
+			profile := nativebridge.Profile{ConfigurationPath: configPath}
 			var connection any
-			connection, err = nativebridge.ConnectService(ctx, nativebridge.Profile{ConfigurationPath: configPath})
+			connection, err = nativebridge.ConnectService(ctx, profile)
 			if err == nil {
 				result["serviceConnection"] = "ready"
 				result["connection"] = connection
+				check, cancel := context.WithTimeout(ctx, 3*time.Second)
+				status, _ := nativebridge.Command(check, profile, native.CommandInput{Command: "connect"})
+				cancel()
+				if account := setupOfficialAccountState(connection, status); account != "" {
+					result["officialAccount"] = map[string]any{"state": account}
+				}
 			}
 		}
 		if err != nil {
