@@ -72,3 +72,18 @@ func TestInstallationPrivacyOptionUsesUserTier(t *testing.T) {
 		t.Fatalf("existing named selection: %v, %v", selected, err)
 	}
 }
+
+func TestSetupRequiresFirstSyncChoiceBeforeWriting(t *testing.T) {
+	root := t.TempDir()
+	data := filepath.Join(root, "new-identity")
+	install := filepath.Join(root, "install")
+	err := run(context.Background(), []string{"setup", "--local-only", "--host", "cursor", "--data-dir", data, "--destination", install, "--json"})
+	if fault.Code(err) != "setup_sync_choice_required" {
+		t.Fatalf("got %v, want an explicit sync choice", err)
+	}
+	for _, path := range []string{data, install} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("setup created %s or could not check it: %v", path, err)
+		}
+	}
+}

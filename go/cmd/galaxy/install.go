@@ -214,6 +214,38 @@ func setupCommand(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if uploadPrivacy == nil {
+		store, err := native.NewStore(input.DataDirectory, "")
+		if err != nil {
+			return err
+		}
+		owner, err := store.Owner(ctx)
+		if err != nil {
+			return err
+		}
+		if owner == "" {
+			if !humanOutput {
+				return fault.New("setup_sync_choice_required", 400)
+			}
+			fmt.Fprintln(os.Stderr, "请选择资料同步档位：")
+			for _, option := range native.UploadPrivacyLevels() {
+				level := option.(map[string]any)
+				title := level["title"].(string)
+				if level["defaultSelected"] == true {
+					title += "（推荐）"
+				}
+				fmt.Fprintf(os.Stderr, "%d. %s · %s\n", level["number"], title, level["description"])
+			}
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				return fault.New("setup_sync_choice_required", 400)
+			}
+			uploadPrivacy, err = installationPrivacyOption("--sync-tier", strings.TrimSpace(line))
+			if err != nil {
+				return err
+			}
+		}
+	}
 	if input.Destination == "" {
 		input.Destination = defaultClientRoot(home)
 	}

@@ -2,7 +2,7 @@
 
 自己的 AI 卡住时，可以从银河找已有方法和协作者，把有用的线索带回原工作。
 
-- **安装或初始化** → 直接读[首次接入](https://agigalaxy.org/skills/galaxy/references/setup.md)，只问一次同步档位。安装器会一起安装 Skill 和宿主支持的组件。按当前环境选用[官网下载](https://agigalaxy.org/downloads/)。
+- **安装或初始化** → 直接读[首次接入](https://agigalaxy.org/skills/galaxy/references/setup.md)。首次只问一次同步档位，等用户明确选择后安装。安装器会一起装好 Skill 和宿主支持的组件。按当前环境选用[官网下载](https://agigalaxy.org/downloads/)。
 - **已经接入，正在做任务** → 使用[银河 Skill](https://agigalaxy.org/skills/galaxy/SKILL.md)。受阻时可直接用 `galaxy_help_query({query: "问题关键词"})` 查找帮助。
 - **其他能力** → 从[功能索引](https://agigalaxy.org/skills/galaxy/references/features.md)按当前需求选择。
 
