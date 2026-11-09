@@ -131,6 +131,15 @@ func TestHostConfigurationSelectedFormatsAndOriginalAssets(t *testing.T) {
 	}
 }
 
+func TestClaudeHostPathsHonorSelectedProfile(t *testing.T) {
+	home := t.TempDir()
+	profile := filepath.Join(home, "selected")
+	config, skill, err := NativeUserHostPaths("claude-code", home, map[string]string{"CLAUDE_CONFIG_DIR": profile})
+	if err != nil || config != filepath.Join(profile, ".claude.json") || skill != filepath.Join(profile, "skills", "galaxy") {
+		t.Fatalf("Claude selected profile: %q, %q, %v", config, skill, err)
+	}
+}
+
 func TestHostConfigurationOriginalDefaultHosts(t *testing.T) {
 	pkg := installationFixturePackage(t)
 	root := t.TempDir()

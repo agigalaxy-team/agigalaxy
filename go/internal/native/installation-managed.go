@@ -408,7 +408,7 @@ func ApplyManagedNativeInstallation(ctx context.Context, plan *ManagedNativeInst
 		if input.Host == "codex" {
 			next.HookPath = filepath.Join(filepath.Dir(plan.ConfigPath), "hooks.json")
 		} else {
-			next.HookPath = filepath.Join(input.Home, ".claude", "settings.json")
+			next.HookPath = filepath.Join(filepath.Dir(filepath.Dir(plan.SkillPath)), "settings.json")
 		}
 		next.NodeExecutable = input.NodeExecutable
 		next.HostExecutable = input.HostExecutable

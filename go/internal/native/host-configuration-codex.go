@@ -27,6 +27,12 @@ func NativeUserHostPaths(host, home string, environment map[string]string) (conf
 		configPath, err = OpenCodeConfigurationDirectory(environment, home)
 		return configPath, "", err
 	case "claude-code":
+		if dir := environment["CLAUDE_CONFIG_DIR"]; dir != "" {
+			if !filepath.IsAbs(dir) {
+				return "", "", hostConfigurationFailure("setup_path_invalid")
+			}
+			return filepath.Join(dir, ".claude.json"), filepath.Join(dir, "skills", "galaxy"), nil
+		}
 		return filepath.Join(home, ".claude.json"), filepath.Join(home, ".claude", "skills", "galaxy"), nil
 	case "github-copilot":
 		profile := environment["GALAXY_VSCODE_PROFILE_DIR"]
