@@ -143,7 +143,9 @@ func main() {
 			}
 			os.Exit(75)
 		}
-		if humanOutput {
+		if fault.Code(e) == "setup_write_permission_required" {
+			fmt.Fprintln(os.Stderr, "setup_write_permission_required：安装需要写入本机用户目录和当前宿主配置。请用宿主的单次命令授权重试同一条安装命令。")
+		} else if humanOutput {
 			fmt.Fprintln(os.Stderr, "银河未能完成操作，请让当前 Agent 协助处理。")
 		} else {
 			slog.Error("galaxy command failed", "code", fault.Code(e))

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/native"
@@ -117,7 +119,10 @@ func hostConfigurationsCommand(ctx context.Context, args []string) error {
 }
 
 // Setup checks the installation before applying the explicitly requested setup.
-func setupCommand(ctx context.Context, args []string) error {
+func setupCommand(ctx context.Context, args []string) (resultErr error) {
+	defer func() {
+		resultErr = setupWriteError(resultErr)
+	}()
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
 		_, err := fmt.Fprintln(os.Stdout, "galaxy setup <官网地址> --host <宿主> --sync-tier <1–4> [--json]\n离线安装：galaxy setup --local-only --host <宿主> [--sync-tier <1–4>]")
 		return err
@@ -358,6 +363,13 @@ func setupCommand(ctx context.Context, args []string) error {
 		formatReceipt = printSetupReceipt
 	}
 	return completeManagedInstallation(ctx, value, applyError, !input.LocalOnly && !pending, configurationPath, formatReceipt)
+}
+
+func setupWriteError(err error) error {
+	if errors.Is(err, os.ErrPermission) || errors.Is(err, syscall.EROFS) {
+		return fault.New("setup_write_permission_required", 403)
+	}
+	return err
 }
 
 func installationPrivacyOption(option, value string) (*native.UploadPrivacySelection, error) {

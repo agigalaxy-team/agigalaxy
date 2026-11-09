@@ -6,11 +6,25 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"testing"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
 	"github.com/agigalaxy-team/agigalaxy/go/internal/native"
 )
+
+func TestSetupWritePermissionHasActionableFault(t *testing.T) {
+	for _, cause := range []error{os.ErrPermission, syscall.EROFS} {
+		err := &os.PathError{Op: "mkdir", Path: "test", Err: cause}
+		if got := fault.Code(setupWriteError(err)); got != "setup_write_permission_required" {
+			t.Errorf("write restriction was reported as %s", got)
+		}
+	}
+	original := fault.New("setup_host_invalid", 400)
+	if setupWriteError(original) != original {
+		t.Fatal("unrelated fault changed")
+	}
+}
 
 func TestLocalCLIReadThenExplicitInitPreservesOriginalIdentity(t *testing.T) {
 	directory := filepath.Join(t.TempDir(), "local")

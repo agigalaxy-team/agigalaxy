@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 
 import chrome
-from product_pages import render_product_pages
+from product_pages import native_install_packages, render_product_pages
 from guide_pages import render_versioned_guides
 from public_manual import publish_manual
 
@@ -206,6 +206,8 @@ def main():
     chrome.OUT = output
     chrome.PREVIEW = preview
     chrome.PUBLIC_PAGES.clear()
+    current_native = metadata['currentNativeClient']
+    current_native['packages'] = native_install_packages(current_native)
     chrome.write('release.json', json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')
     assets = ('site.css', 'cms-content.css', 'interaction-copy.mjs', 'home-experience.css')
     for name in assets:

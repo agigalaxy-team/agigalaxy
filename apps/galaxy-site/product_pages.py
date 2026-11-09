@@ -11,6 +11,19 @@ from cms_slots import content_slot
 from release_status import release_status_body
 
 REPOSITORY = 'https://github.com/agigalaxy-team/agigalaxy'
+PLATFORMS = (('windows', 'Windows'), ('linux', 'Linux'), ('darwin', 'macOS'))
+ARCHITECTURES = (('amd64', 'x64'), ('arm64', 'ARM64'))
+
+
+def native_install_packages(current):
+    version, base = current['version'], current['assetBase']
+    return {
+        f'{system}-{arch}': {
+            'archive': f'{base}galaxy-native-go-{version}-{system}-{arch}.tgz',
+            'executable': 'galaxy.exe' if system == 'windows' else 'galaxy',
+        }
+        for system, _ in PLATFORMS for arch, _ in ARCHITECTURES
+    }
 
 
 def icon(name):
@@ -89,14 +102,13 @@ def render_product_pages(site):
         + '<div id="leave">' + section("导出与删除", '<p>已同步工作在账户中管理。选定归档的完整会话保持私有，可以阅读、导出、删除或设置自动清理。</p><nav class="reading-resources" aria-label="本人资料管理"><a href="/app/account?section=settings&view=work">已同步工作</a><a href="/app/account?section=settings&view=archives">私有会话</a></nav>') + '</div>'
         + section("本地身份与设备资料", '<p>需要导出本地 ID 对应的服务资料、管理设备或申请删除时，在当前设备连接本地银河后办理。退出在线账户或解除关联不会删除本地身份和履历。</p>', "/app/settings/privacy", "身份资料与设备设置"))
 
-    platforms = (('windows', 'Windows'), ('linux', 'Linux'), ('darwin', 'macOS'))
-    architectures = (('amd64', 'x64'), ('arm64', 'ARM64'))
+    native_packages = native_install_packages(current)
     platform_links = ''.join(
         f'<div><dt>{label}</dt><dd>' + ' · '.join(
-            f'<a href="{asset_base}galaxy-native-go-{version}-{os}-{arch}.tgz" aria-label="下载 {label} {name}">{name}</a>'
-            for arch, name in architectures
+            f'<a href="{escape(native_packages[f"{os}-{arch}"]["archive"], quote=True)}" aria-label="下载 {label} {name}">{name}</a>'
+            for arch, name in ARCHITECTURES
         ) + '</dd></div>'
-        for os, label in platforms
+        for os, label in PLATFORMS
     )
     page("/downloads/", "客户端下载", "下载银河 Go 客户端，接入常用的 AI 工具。",
         intro("客户端下载", "把银河接入常用的 AI 工具。")
