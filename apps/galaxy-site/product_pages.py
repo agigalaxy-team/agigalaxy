@@ -139,14 +139,14 @@ def render_product_pages(site):
         f'<div><dt>{label} {name}</dt><dd>'
         f'<a href="{asset_base}galaxy-native-go-{version}-{os}-{arch}.tgz.jws">签名</a> · '
         f'<a href="{asset_base}galaxy-native-go-{version}-{os}-{arch}.tgz.report.json">核验报告</a></dd></div>'
-        for os, label in platforms for arch, name in architectures
+        for os, label in PLATFORMS for arch, name in ARCHITECTURES
     )
     npm_links = ''.join(
         f'<div><dt>{label}</dt><dd>' + ' · '.join(
             f'<a href="{asset_base}galaxy-native-{os}-{arch}-{version}.tgz">{name}</a>'
-            for arch, name in architectures
+            for arch, name in ARCHITECTURES
         ) + '</dd></div>'
-        for os, label in platforms
+        for os, label in PLATFORMS
     )
     page("/downloads/verification/", "下载核验与历史版本", "核对当前发行的校验清单，查阅历史安装资料。",
         intro("下载核验与历史版本", "查阅当前发行的校验文件和旧版本。")

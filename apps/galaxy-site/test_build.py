@@ -178,8 +178,11 @@ class PublicNavigationTests(unittest.TestCase):
                 self.assertEqual(skill, (output/'skills/galaxy/SKILL.md').read_bytes())
                 self.assertIn(b'references/setup.md',skill)
                 setup=archive.read('galaxy/references/setup.md')
-                self.assertIn(b'https://agigalaxy.org/downloads/',setup)
-                self.assertIn(b'https://agigalaxy.org/docs/galaxy/getting-started/',setup)
+                self.assertIn(b'(setup-install.md)',setup)
+                install=archive.read('galaxy/references/setup-install.md')
+                self.assertIn(b'https://agigalaxy.org/release.json',install)
+                self.assertIn(b'./galaxy setup',install)
+                self.assertIn(b'https://agigalaxy.org/downloads/verification/',install)
                 source=REPO/'integrations/native-v2/skills/galaxy'
                 expected={file.relative_to(source).as_posix():file.read_bytes() for file in source.rglob('*') if file.is_file()}
                 self.assertEqual(set(archive.namelist()), {'galaxy/'+name for name in expected})
