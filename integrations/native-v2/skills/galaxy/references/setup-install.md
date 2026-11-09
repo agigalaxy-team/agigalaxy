@@ -14,6 +14,4 @@ galaxy setup https://agigalaxy.org --host <当前宿主> --sync-tier N
 galaxy setup --local-only --host <当前宿主> --sync-tier N
 ```
 
-**回执。** 直接转述安装器的三行结果，不加前言、选择记录或下一步。若当前宿主已有 `galaxy_native_status`，调用成功后把第三行改为「MCP：可用」。工具尚未加载时照抄「已配置，待验证」。本机进程启动与否不能替代回执里的银河服务连接结果。
-
-[其他安装和维护操作](https://agigalaxy.org/docs/galaxy/getting-started/)。
+**安装完成就回复。** 原样复制安装器输出的三行，结束这一轮。不追加状态检查，不改写「MCP：已配置，待验证」。用户之后询问 MCP 状态时，才从当前宿主调用银河 MCP；终端命令的结果不能说明宿主已经加载它。
