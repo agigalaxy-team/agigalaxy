@@ -8,6 +8,8 @@
 
 ## 银河首次接入与受阻求助
 
+[Native 0.1.26](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.26) 已发布，官网 0.1.139 默认提供。官网发行清单直接列出各平台安装包和包内可执行文件，Skill 首次安装使用包根目录。211 独立 DSH 和 Gemini 实测普通工作区权限下离线安装成功，用户资料和宿主配置使用可写的测试范围。官网无头确认下载、校验值、发行清单和 Skill。组件 CI 42579149998、Runner 42579150101 均通过。
+
 [Native 0.1.25](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.25) 已发布，官网 0.1.138 默认提供。回执分开显示组件、本机身份、银河服务、在线账户和 MCP，首次仍等待用户明确选择。OpenCode 面板区分账户状态，Claude Code 遵循选定配置目录。Codex CLI、Claude Code CLI、OpenCode CLI 和 DSH Web 已在隔离环境接通检查；Cursor、两种 Copilot 入口和 Hermes 已检查安装与回执，桌面宿主及正式在线账户未逐一实测。官网独立无头验证下载、安装说明和 Skill；组件 CI 42573866899、Runner 42573866929 均通过。
 
 [Native 0.1.22](https://github.com/agigalaxy-team/agigalaxy/releases/tag/native-v0.1.22) 已正式发布，官网 0.1.135 默认提供。首页、Agent 入口和 Skill 统一以「自己的 AI 受阻时找到帮助，把有用的回应带回原工作」为首层说明。MCP 求助查询直接接受关键词，文字结果区分有候选、无匹配和查询失败。源码 `b953145e` 与目录 `f25d4414` 的 CI 通过。官网独立无头实测 Windows x64 下载及校验、安装说明、首页和固定 Skill 包；公开 Agent 入口返回新版内容。
