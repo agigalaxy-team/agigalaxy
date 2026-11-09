@@ -164,8 +164,8 @@ func usage() {
   galaxy service-config prepare --website <HTTPS origin> --endpoint <HTTPS origin> --data-dir <absolute path> --output <new absolute file> [--root-pins-file <absolute JSON> --trust-directory <absolute path>] [--network-type official|hub]
   galaxy host-configs <absolute config> <new output directory> [--package-dir <release>] [--hosts <comma-separated ids>]
   galaxy host-configs <new output directory> --local-only [--data-dir <path>] [--hosts <comma-separated ids>]
-  galaxy setup <website URL> [--host <host id>] [--data-dir <path>] [--organization] [--upload-privacy <level>]
-  galaxy setup --local-only [--host <host id>] [--data-dir <path>] [--organization] [--upload-privacy <level>]
+  galaxy setup <website URL> [--host <host id>] [--data-dir <path>] [--organization] [--sync-tier <1-4>]
+  galaxy setup --local-only [--host <host id>] [--data-dir <path>] [--organization] [--sync-tier <1-4>]
   galaxy service start|status|stop|restart|run    Shared local runtime; no login autostart
   galaxy install|update|repair [--host <id>] [--package-dir <release>] [--install-root <path>] [--data-dir <path>] [--config <file>|--local-only] [--dry-run]
   galaxy update checks the official release when --package-dir is omitted. Use --restart-legacy after closing old host connections if handover is unsupported.

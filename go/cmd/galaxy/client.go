@@ -123,9 +123,10 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	flags.BoolVar(&input.LocalOnly, "local-only", false, "")
 	organization := flags.Bool("organization", false, "")
 	dryRun := flags.Bool("dry-run", false, "")
-	var uploadPrivacy string
+	var uploadPrivacy, syncTier string
 	if action == "install" {
 		flags.StringVar(&uploadPrivacy, "upload-privacy", "", "")
+		flags.StringVar(&syncTier, "sync-tier", "", "")
 	}
 	var ifNeeded bool
 	if action == "repair" {
@@ -141,8 +142,15 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	supplied := make(map[string]bool)
 	flags.Visit(func(value *flag.Flag) { supplied[value.Name] = true })
 	var err error
-	if supplied["upload-privacy"] {
-		input.UploadPrivacy, err = installationUploadPrivacy(uploadPrivacy)
+	if supplied["upload-privacy"] && supplied["sync-tier"] {
+		return fault.New("upload_privacy_level_invalid", 400)
+	}
+	if supplied["upload-privacy"] || supplied["sync-tier"] {
+		option, value := "--upload-privacy", uploadPrivacy
+		if supplied["sync-tier"] {
+			option, value = "--sync-tier", syncTier
+		}
+		input.UploadPrivacy, err = installationPrivacyOption(option, value)
 		if err != nil {
 			return err
 		}
@@ -322,9 +330,6 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 	if *dryRun {
 		return printValue(plan)
 	}
-	if action == "install" {
-		setupHeading(os.Stdout, "正在接入")
-	}
 	result, applyError := native.ApplyManagedNativeInstallation(ctx, plan)
 	return completeManagedInstallation(ctx, result, applyError, action == "install" && !input.LocalOnly, input.ConfigPath)
 }
@@ -391,9 +396,6 @@ func completeManagedInstallation(ctx context.Context, result map[string]any, app
 		}
 	}
 	if result != nil {
-		if outputAction == "setup" || outputAction == "install" {
-			setupHeading(os.Stdout, "安装回执")
-		}
 		if humanOutput && applyError != nil {
 			if result["releaseInstalled"] == true && result["hostConfigured"] == true && result["serviceConnection"] == "pending" {
 				fmt.Fprintln(os.Stdout, "银河已安装，暂未连接服务。")

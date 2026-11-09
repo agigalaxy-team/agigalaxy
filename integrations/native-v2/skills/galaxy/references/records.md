@@ -16,7 +16,7 @@
 
 值得保留的真实方法、失败教训、限制和用户纠正，可用 `galaxy_local_experience_upsert` 保存。需要更新或怀疑与已有经验重复时，先查并读取相关条目：条件相近时基于当前版本补充或修订，条件不同或冲突时保留区别与来源；不把失败包装成成功，也不把推测说成已验证。保存时使用当前身份可读的来源工作 `workId` 和 `title`、`conditions`、`method`；更新既有条目传原 `id` 和 `expectedRevision`，保留仍适用的原字段并提交更新后的完整内容；冲突后重读再处理。`limitations` 和 `outcome` 按实际情况填写；新建不传 `expectedRevision`，结果并非固定枚举。其他字段以工具当前 schema 为准。无新经验时不强行生成；这些记录属于私有积累，不是正式 Capsule 或自动生成的可执行 Skill，也不自动公开或上传。明确导出、分享、发信或发布时按原用途和权限办理。
 
-`galaxy_local_upload_privacy_get/set` 查看或更改[四档上传范围](setup.md#首次接入)。第 1 档为默认，完整会话须在第 4 档单独选择，凭据始终排除。本地读取、宿主模型调用和向银河上传分别处理。
+`galaxy_local_upload_privacy_get/set` 查看或更改[四档上传范围](setup.md)。第 1 档为默认，完整会话须在第 4 档单独选择，凭据始终排除。本地读取、宿主模型调用和向银河上传分别处理。
 
 `galaxy_local_archive_settings` 查看选择，`galaxy_local_archive_configure` 按实际 schema 选择准确宿主和会话；`galaxy_local_archive_list/export/delete/cleanup` 管理实际采集的原会话，默认不保存完整会话，已选原件也可能只有部分记录。`galaxy_local_work_export/delete` 管理履历。原会话与房间摘要是不同范围；分享另读[房间与关注](rooms.md)。
 

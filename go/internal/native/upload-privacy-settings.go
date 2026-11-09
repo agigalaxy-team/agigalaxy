@@ -20,6 +20,17 @@ func UploadPrivacyLevels() []any {
 	}
 	return levels
 }
+
+func UploadPrivacyLevelForTier(tier int) string {
+	for _, value := range UploadPrivacyLevels() {
+		level := value.(map[string]any)
+		if level["number"] == tier {
+			return level["id"].(string)
+		}
+	}
+	return ""
+}
+
 func (r *Runtime) GetUploadPrivacy(ctx context.Context) (any, error) {
 	settings, owner, e := r.ReadUploadPrivacy(ctx, nil)
 	if e != nil {

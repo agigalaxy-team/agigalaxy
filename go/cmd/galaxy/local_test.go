@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/agigalaxy-team/agigalaxy/go/internal/fault"
@@ -50,5 +51,24 @@ func TestLocalCLIReadThenExplicitInitPreservesOriginalIdentity(t *testing.T) {
 	}
 	if fault.Code(run(ctx, []string{"status", "--data-dir", directory, "--config", "unused"})) != "native_arguments_invalid" {
 		t.Fatal("unrelated arguments were accepted")
+	}
+}
+
+func TestInstallationPrivacyOptionUsesUserTier(t *testing.T) {
+	levels := []string{"local-only", "history-overview", "work-content", "conversation-archive"}
+	for index, level := range levels {
+		selected, err := installationPrivacyOption("--sync-tier", strconv.Itoa(index+1))
+		if err != nil || selected.Level != level {
+			t.Fatalf("tier %d: got %v, %v, want %s", index+1, selected, err, level)
+		}
+	}
+	for _, value := range []string{"", "0", "5", "local-only"} {
+		if _, err := installationPrivacyOption("--sync-tier", value); err == nil {
+			t.Errorf("accepted invalid tier %q", value)
+		}
+	}
+	selected, err := installationPrivacyOption("--upload-privacy", "conversation-archive")
+	if err != nil || selected.Level != "conversation-archive" {
+		t.Fatalf("existing named selection: %v, %v", selected, err)
 	}
 }

@@ -118,6 +118,10 @@ func hostConfigurationsCommand(ctx context.Context, args []string) error {
 
 // Setup checks the installation before applying the explicitly requested setup.
 func setupCommand(ctx context.Context, args []string) error {
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+		_, err := fmt.Fprintln(os.Stdout, "galaxy setup <官网地址> --host <宿主> --sync-tier <1–4> [--json]\n离线安装：galaxy setup --local-only --host <宿主> [--sync-tier <1–4>]")
+		return err
+	}
 	input := native.NativeInstallationInput{SubjectType: "person"}
 	var uploadPrivacy *native.UploadPrivacySelection
 	for i := 0; i < len(args); i++ {
@@ -149,9 +153,12 @@ func setupCommand(ctx context.Context, args []string) error {
 				input.OpenCodePath = value
 			case "--opencode-config-dir":
 				input.OpenCodeConfigDirectory = value
-			case "--upload-privacy":
+			case "--upload-privacy", "--sync-tier":
+				if uploadPrivacy != nil {
+					return fault.New("upload_privacy_level_invalid", 400)
+				}
 				var err error
-				uploadPrivacy, err = installationUploadPrivacy(value)
+				uploadPrivacy, err = installationPrivacyOption(argument, value)
 				if err != nil {
 					return err
 				}
@@ -178,9 +185,9 @@ func setupCommand(ctx context.Context, args []string) error {
 	needsHostChoice := input.Host == ""
 	if needsHostChoice {
 		hosts := native.HostConfigurationOptions()
-		setupHeading(os.Stderr, "首次接入")
+		fmt.Fprintln(os.Stderr, "银河 / AGI GALAXY · 首次接入")
 		for index, host := range hosts {
-			setupHostOption(index+1, host["label"])
+			fmt.Fprintf(os.Stderr, "%d. %s\n", index+1, host["label"])
 		}
 		fmt.Fprint(os.Stderr, "请选择宿主编号：")
 		line, err := reader.ReadString('\n')
@@ -303,9 +310,6 @@ func setupCommand(ctx context.Context, args []string) error {
 		return err
 	}
 
-	if !needsHostChoice {
-		setupHeading(os.Stdout, "正在接入")
-	}
 	value, applyError := native.ApplyManagedNativeInstallation(ctx, managed)
 	if pending && value != nil && value["releaseInstalled"] == true && value["hostConfigured"] == true {
 		value["installed"] = true
@@ -313,6 +317,17 @@ func setupCommand(ctx context.Context, args []string) error {
 		value["pendingWebsite"] = website
 	}
 	return completeManagedInstallation(ctx, value, applyError, !input.LocalOnly && !pending, configurationPath)
+}
+
+func installationPrivacyOption(option, value string) (*native.UploadPrivacySelection, error) {
+	if option == "--sync-tier" {
+		tier, err := strconv.Atoi(value)
+		if err != nil {
+			return nil, fault.New("upload_privacy_level_invalid", 400)
+		}
+		value = native.UploadPrivacyLevelForTier(tier)
+	}
+	return installationUploadPrivacy(value)
 }
 
 func installationUploadPrivacy(level string) (*native.UploadPrivacySelection, error) {
