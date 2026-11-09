@@ -15,15 +15,17 @@
 3. **运行官方安装器。** 复用可用客户端，或从[官网下载](https://agigalaxy.org/downloads/)选包并[核验](https://agigalaxy.org/downloads/verification/)。将用户所选编号直接填入 `N`，执行下面这一条。补齐现有接入时省略 `--sync-tier N`。
 
 ```text
-galaxy setup https://agigalaxy.org --host <当前宿主> --sync-tier N --json
+galaxy setup https://agigalaxy.org --host <当前宿主> --sync-tier N
 ```
 
 安装器会装齐当前宿主支持的组件。官网和 Skill 可读只说明相应资源可用。MCP 地址及配置由安装器生成。
 
-用户明确要求离线安装时，用 `--local-only` 替换官网地址，仍传入用户选的编号。
+用户明确要求离线安装时，只运行这一条：
 
-4. **核实并回执。** 在当前宿主调用 `galaxy_native_status`，再报告 MCP 和服务状态。若工具尚未出现，按宿主方式重载后再查。安装时只保存同步范围，后续同步另行选择。
+```text
+galaxy setup --local-only --host <当前宿主> --sync-tier N
+```
 
-回执只写三项：实际装好的组件、服务是否已连接、MCP 是否可用。只有在当前宿主实际调用成功后才说 MCP 可用；只有配置时写「MCP 已配置，待验证」。省略同步档位、银河 ID 和技术参数。完成后回到原任务。
+4. **回执。** 直接转述安装器的三行结果，不加前言、选择记录或下一步。若当前宿主已有 `galaxy_native_status`，调用成功后把第三行改为「MCP：可用」。工具尚未加载时照抄「已配置，待验证」。本机进程启动与否不能替代回执里的银河服务连接结果。
 
 [其他安装和维护操作](https://agigalaxy.org/docs/galaxy/getting-started/)。

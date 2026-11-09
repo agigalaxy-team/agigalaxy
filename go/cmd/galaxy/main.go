@@ -41,6 +41,9 @@ func run(ctx context.Context, args []string) error {
 			for _, arg := range args {
 				if arg == "--json" {
 					humanOutput = false
+					if outputAction == "setup" {
+						filtered = append(filtered, arg)
+					}
 				} else {
 					if arg == "--dry-run" {
 						outputDryRun = true

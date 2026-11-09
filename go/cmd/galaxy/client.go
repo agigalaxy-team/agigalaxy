@@ -331,11 +331,11 @@ func managedClientCommand(ctx context.Context, action string, args []string) err
 		return printValue(plan)
 	}
 	result, applyError := native.ApplyManagedNativeInstallation(ctx, plan)
-	return completeManagedInstallation(ctx, result, applyError, action == "install" && !input.LocalOnly, input.ConfigPath)
+	return completeManagedInstallation(ctx, result, applyError, action == "install" && !input.LocalOnly, input.ConfigPath, nil)
 }
 
 // The caller holds the update lock through installation and selection.
-func completeManagedInstallation(ctx context.Context, result map[string]any, applyError error, connect bool, configPath string) error {
+func completeManagedInstallation(ctx context.Context, result map[string]any, applyError error, connect bool, configPath string, formatReceipt func(map[string]any) error) error {
 	if applyError == nil && result != nil {
 		if release, ok := result["release"].(*native.NativeRelease); ok && result["hostConfigured"] == true {
 			desired, changed, err := nativebridge.SelectDesiredRelease(release.Executable, false)
@@ -396,7 +396,11 @@ func completeManagedInstallation(ctx context.Context, result map[string]any, app
 		}
 	}
 	if result != nil {
-		if humanOutput && applyError != nil {
+		if formatReceipt != nil {
+			if err := formatReceipt(result); err != nil {
+				return err
+			}
+		} else if humanOutput && applyError != nil {
 			if result["releaseInstalled"] == true && result["hostConfigured"] == true && result["serviceConnection"] == "pending" {
 				fmt.Fprintln(os.Stdout, "银河已安装，暂未连接服务。")
 			} else if result["releaseInstalled"] == true && result["hostConfigured"] == true && result["serviceAdoption"] == "pending" {
